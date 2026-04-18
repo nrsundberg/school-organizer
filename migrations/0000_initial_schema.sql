@@ -1,0 +1,77 @@
+-- better-auth tables
+CREATE TABLE IF NOT EXISTS "User" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "email" TEXT NOT NULL UNIQUE,
+  "emailVerified" INTEGER NOT NULL DEFAULT 0,
+  "name" TEXT NOT NULL DEFAULT '',
+  "image" TEXT,
+  "role" TEXT NOT NULL DEFAULT 'VIEWER',
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS "Session" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "token" TEXT NOT NULL UNIQUE,
+  "expiresAt" DATETIME NOT NULL,
+  "ipAddress" TEXT,
+  "userAgent" TEXT,
+  "userId" TEXT NOT NULL,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "Account" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "accountId" TEXT NOT NULL,
+  "providerId" TEXT NOT NULL,
+  "userId" TEXT NOT NULL,
+  "accessToken" TEXT,
+  "refreshToken" TEXT,
+  "idToken" TEXT,
+  "accessTokenExpiresAt" DATETIME,
+  "refreshTokenExpiresAt" DATETIME,
+  "scope" TEXT,
+  "password" TEXT,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS "Verification" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "identifier" TEXT NOT NULL,
+  "value" TEXT NOT NULL,
+  "expiresAt" DATETIME NOT NULL,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- App domain tables
+CREATE TABLE IF NOT EXISTS "Teacher" (
+  "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  "homeRoom" TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS "Student" (
+  "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  "firstName" TEXT NOT NULL,
+  "lastName" TEXT NOT NULL,
+  "spaceNumber" INTEGER,
+  "homeRoom" TEXT,
+  FOREIGN KEY ("spaceNumber") REFERENCES "Space"("spaceNumber") ON DELETE SET NULL,
+  FOREIGN KEY ("homeRoom") REFERENCES "Teacher"("homeRoom") ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS "Student_spaceNumber_idx" ON "Student"("spaceNumber");
+CREATE INDEX IF NOT EXISTS "Student_homeRoom_idx" ON "Student"("homeRoom");
+
+CREATE TABLE IF NOT EXISTS "Space" (
+  "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  "spaceNumber" INTEGER NOT NULL UNIQUE,
+  "status" TEXT NOT NULL DEFAULT 'EMPTY',
+  "timestamp" TEXT
+);
+
+CREATE INDEX IF NOT EXISTS "Space_spaceNumber_idx" ON "Space"("spaceNumber");

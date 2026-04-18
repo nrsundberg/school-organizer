@@ -1,0 +1,9 @@
+/app/db
+/.idea
+/node_modules
+/.react-router
+.env
+.dev.vars
+/build
+/prisma/migrations/*/migration.sql
+.wrangler/

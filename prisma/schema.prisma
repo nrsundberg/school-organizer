@@ -1,0 +1,257 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/db/generated"
+  runtime  = "cloudflare"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// better-auth tables
+model User {
+  id                         String    @id @default(cuid())
+  email                      String    @unique
+  emailVerified              Boolean   @default(false)
+  name                       String    @default("")
+  image                      String?
+  role                       String    @default("VIEWER")
+  mustChangePassword         Boolean   @default(false)
+  banned                     Boolean   @default(false)
+  banReason                  String?
+  banExpires                 Int?
+  /// "board" | "controller" (keypad); null defaults to board
+  controllerViewPreference   String?
+  orgId                      String?
+  org                        Org?      @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  sessions                   Session[]
+  accounts                   Account[]
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+
+  @@index([orgId])
+}
+
+model Org {
+  id                     String                   @id @default(cuid())
+  name                   String
+  slug                   String                   @unique
+  customDomain           String?                  @unique
+  brandColor             String?
+  brandAccentColor       String?
+  logoUrl                String?
+  logoObjectKey          String?
+  status                 OrgStatus                @default(ACTIVE)
+  stripeCustomerId       String?                  @unique
+  stripeSubscriptionId   String?                  @unique
+  billingPlan            BillingPlan              @default(FREE)
+  subscriptionStatus     StripeSubscriptionStatus?
+  users                  User[]
+  appSettings            AppSettings[]
+  viewerAccessAttempts   ViewerAccessAttempt[]
+  viewerAccessSessions   ViewerAccessSession[]
+  viewerMagicLinks       ViewerMagicLink[]
+  teachers               Teacher[]
+  students               Student[]
+  spaces                 Space[]
+  callEvents             CallEvent[]
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+}
+
+model StripeWebhookEvent {
+  id            String   @id @default(cuid())
+  stripeEventId String   @unique
+  type          String
+  createdAt     DateTime @default(now())
+}
+
+/// Singleton row: use id "default"
+model AppSettings {
+  id                     String  @id
+  orgId                  String  @default("org_tome")
+  org                    Org     @relation(fields: [orgId], references: [id])
+  viewerDrawingEnabled   Boolean @default(false)
+  viewerPinHash          String?
+
+  @@index([orgId])
+}
+
+model ViewerAccessAttempt {
+  clientKey           String   @id
+  orgId               String   @default("org_tome")
+  org                 Org      @relation(fields: [orgId], references: [id])
+  ipHint              String?
+  failedCount         Int      @default(0)
+  stage               Int      @default(0)
+  lockedUntil         DateTime?
+  requiresAdminReset  Boolean  @default(false)
+  lastFailedAt        DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([orgId])
+}
+
+model ViewerAccessSession {
+  id           String   @id @default(cuid())
+  orgId        String   @default("org_tome")
+  org          Org      @relation(fields: [orgId], references: [id])
+  tokenHash    String   @unique
+  source       String
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([orgId])
+}
+
+model ViewerMagicLink {
+  id               String   @id @default(cuid())
+  orgId            String   @default("org_tome")
+  org              Org      @relation(fields: [orgId], references: [id])
+  tokenHash        String   @unique
+  expiresAt        DateTime
+  usedAt           DateTime?
+  revokedAt        DateTime?
+  createdByUserId  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([orgId])
+}
+
+model Session {
+  id             String   @id @default(cuid())
+  token          String   @unique
+  expiresAt      DateTime
+  ipAddress      String?
+  userAgent      String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonatedBy String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// App domain models
+model Teacher {
+  id       Int       @id @default(autoincrement())
+  orgId    String    @default("org_tome")
+  org      Org       @relation(fields: [orgId], references: [id])
+  homeRoom String    @unique
+  students Student[]
+
+  @@index([orgId])
+  @@index([orgId, homeRoom])
+}
+
+model Student {
+  id          Int      @id @default(autoincrement())
+  orgId       String   @default("org_tome")
+  org         Org      @relation(fields: [orgId], references: [id])
+  firstName   String
+  lastName    String
+  space       Space?   @relation(fields: [spaceNumber], references: [spaceNumber])
+  spaceNumber Int?
+  teacher     Teacher? @relation(fields: [homeRoom], references: [homeRoom])
+  homeRoom    String?
+  callEvents  CallEvent[]
+
+  @@index([orgId])
+  @@index([spaceNumber])
+  @@index([homeRoom])
+  @@index([orgId, spaceNumber])
+  @@index([orgId, homeRoom])
+}
+
+model Space {
+  id          Int       @id @default(autoincrement())
+  orgId       String    @default("org_tome")
+  org         Org       @relation(fields: [orgId], references: [id])
+  spaceNumber Int       @unique
+  students    Student[]
+  status      Status    @default(EMPTY)
+  timestamp   String?
+  callEvents  CallEvent[]
+
+  @@index([orgId])
+  @@index([spaceNumber])
+  @@index([orgId, spaceNumber])
+}
+
+model CallEvent {
+  id               Int      @id @default(autoincrement())
+  orgId            String   @default("org_tome")
+  org              Org      @relation(fields: [orgId], references: [id])
+  space            Space    @relation(fields: [spaceNumber], references: [spaceNumber])
+  spaceNumber      Int
+  student          Student? @relation(fields: [studentId], references: [id])
+  studentId        Int?
+  studentName      String
+  homeRoomSnapshot String?
+  createdAt        DateTime @default(now())
+
+  @@index([orgId])
+  @@index([createdAt])
+  @@index([spaceNumber])
+  @@index([studentId])
+  @@index([orgId, createdAt])
+  @@index([orgId, spaceNumber])
+  @@index([orgId, studentId])
+}
+
+enum Status {
+  ACTIVE
+  EMPTY
+}
+
+enum BillingPlan {
+  FREE
+  STARTER
+}
+
+enum OrgStatus {
+  ACTIVE
+  TRIALING
+  PAST_DUE
+  INCOMPLETE
+  CANCELED
+}
+
+enum StripeSubscriptionStatus {
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+}

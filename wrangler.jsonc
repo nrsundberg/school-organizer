@@ -1,0 +1,35 @@
+{
+  "name": "school-organizer",
+  "compatibility_date": "2026-03-30",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./workers/app.ts",
+  "assets": {
+    "directory": "./build/client"
+  },
+  "vars": {
+    "SENTRY_DSN": "",
+    "ENVIRONMENT": "production"
+  },
+  "d1_databases": [
+    {
+      "binding": "D1_DATABASE",
+      "database_name": "school-organizer",
+      "database_id": "399295fb-9f0d-42a9-a271-8619366caa1d",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "BINGO_BOARD",
+        "class_name": "BingoBoardDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["BingoBoardDO"]
+    }
+  ],
+}
