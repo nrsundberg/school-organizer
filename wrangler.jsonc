@@ -8,7 +8,16 @@
   },
   "vars": {
     "SENTRY_DSN": "",
-    "ENVIRONMENT": "production"
+    "ENVIRONMENT": "production",
+    // Set to your apex (e.g. schoolorganizer.com) so apex/www serve the marketing homepage, not a tenant board.
+    // Leave empty only for local; in Cloudflare Dashboard → Workers → your worker → Settings → Variables, set PUBLIC_ROOT_DOMAIN for production.
+    "PUBLIC_ROOT_DOMAIN": "",
+    // Dev defaults plus production Workers URL so the marketing homepage loads (not tenant bingo board).
+    "MARKETING_HOSTS": "localhost,127.0.0.1,school-organizer.sundbergne.workers.dev",
+    "PLATFORM_ADMIN_EMAILS": ""
+  },
+  "triggers": {
+    "crons": ["0 10 * * *"]
   },
   "d1_databases": [
     {

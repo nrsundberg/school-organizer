@@ -5,10 +5,9 @@
   "scripts": {
     "build": "prisma generate && react-router build",
     "dev": "react-router dev",
+    "dev:worker": "npm run build && wrangler dev",
     "deploy": "npm run build && wrangler deploy",
-    "deploy:dev": "npm run build && wrangler deploy --env dev",
-    "d1:migrate": "wrangler d1 migrations apply --remote tome-bingo",
-    "d1:migrate:dev": "wrangler d1 migrations apply tome-bingo-dev --env dev",
+    "d1:migrate": "wrangler d1 migrations apply --remote school-organizer",
     "d1:create-migration": "wrangler d1 migrations create",
     "backfill:org-id": "npx tsx scripts/backfill-org-id.ts",
     "typecheck": "react-router typegen && tsc",

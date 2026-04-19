@@ -1,11 +1,18 @@
+import { MarketingLanding } from "~/components/marketing/MarketingLanding";
 import { Page } from "~/components/Page";
-import { useFetcher, useSearchParams } from "react-router";
+import { useFetcher, useSearchParams, redirect } from "react-router";
 import { type Space, Status } from "~/db/browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { Send } from "lucide-react";
 import type { Route } from "./+types/_index";
-import { getTenantPrisma, getOptionalUserFromContext } from "~/domain/utils/global-context.server";
+import { isMarketingHost } from "~/domain/utils/host.server";
+import {
+  getTenantPrisma,
+  getOptionalOrgFromContext,
+  getOptionalUserFromContext,
+} from "~/domain/utils/global-context.server";
+import { DEFAULT_SITE_NAME } from "~/lib/site";
 import {
   Button,
   Separator,
@@ -17,14 +24,30 @@ import { useBingoWebSocket } from "~/hooks/useBingoWebSocket";
 import MobileCallerView from "~/components/MobileCallerView";
 import confetti from "canvas-confetti";
 
-export const meta: Route.MetaFunction = () => {
+export const meta: Route.MetaFunction = ({ data }) => {
+  if (!data || data.mode === "marketing") {
+    return [
+      { title: `${DEFAULT_SITE_NAME} — Car line made clear` },
+      { name: "description", content: "Live car line board, viewer access, and school admin tools." },
+    ];
+  }
   return [
-    { title: "Tome Car Bingo" },
-    { name: "description", content: "Tome School car line!" }
+    { title: `${data.orgName} — Car line` },
+    { name: "description", content: `${data.orgName} car line board.` },
   ];
 };
 
 export async function loader({ request, context }: Route.LoaderArgs) {
+  if (isMarketingHost(request, context)) {
+    return { mode: "marketing" as const };
+  }
+
+  const org = getOptionalOrgFromContext(context);
+  if (!org) {
+    const u = new URL(request.url);
+    throw redirect(`/login?next=${encodeURIComponent(`${u.pathname}${u.search}`)}`);
+  }
+
   const prisma = getTenantPrisma(context);
   const user = getOptionalUserFromContext(context);
   const filterRooms = new URL(request.url).searchParams.get("room");
@@ -50,6 +73,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const viewerDrawingEnabled = appSettings?.viewerDrawingEnabled ?? false;
 
   return {
+    mode: "tenant" as const,
+    orgName: org.name,
     permitted,
     role,
     user: !!user,
@@ -63,6 +88,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 export default function Index({ loaderData }: Route.ComponentProps) {
+  if (loaderData.mode === "marketing") {
+    return <MarketingLanding />;
+  }
+
+  return <TenantCarLineHome loaderData={loaderData} />;
+}
+
+function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.ComponentProps["loaderData"], { mode: "marketing" }> }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     homeRooms,

@@ -8,7 +8,7 @@ import { useState, type FormEvent } from "react";
 
 export function meta() {
   return [
-    { title: "Signup - Tome Car Bingo" },
+    { title: "Signup — School Organizer" },
     { name: "description", content: "Create your organization and account" },
   ];
 }

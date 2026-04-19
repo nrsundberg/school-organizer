@@ -1,5 +1,7 @@
 import { createRequestHandler, RouterContextProvider } from "react-router";
-import { withSentry } from "@sentry/cloudflare";
+import { getCurrentScope, withSentry } from "@sentry/cloudflare";
+import { runTrialMaintenance } from "../app/domain/billing/trial-maintenance.server";
+import { isMarketingHost } from "../app/domain/utils/host.server";
 export { BingoBoardDO } from "./bingo-board";
 
 // @ts-expect-error - build output has no type declarations
@@ -36,11 +38,31 @@ export default withSentry(
       const context = new RouterContextProvider();
       (context as any).cloudflare = { env, ctx };
 
+      try {
+        const scope = getCurrentScope();
+        scope.setTag("http.host", url.host);
+        scope.setTag("app.surface", isMarketingHost(request, context) ? "marketing" : "tenant");
+      } catch {
+        // optional Sentry scope
+      }
+
       const serverMode =
         (env as any).ENVIRONMENT === "development"
           ? "development"
           : "production";
       return createRequestHandler(buildImport, serverMode)(request, context);
+    },
+
+    async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+      Object.assign(process.env, env);
+      const context = new RouterContextProvider();
+      (context as any).cloudflare = { env, ctx };
+      try {
+        await runTrialMaintenance(context);
+      } catch (e) {
+        console.error("trial maintenance failed", e);
+        throw e;
+      }
     },
   } satisfies ExportedHandler<Env>,
 );

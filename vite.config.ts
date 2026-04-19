@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import path from "node:path";
-import type { Plugin } from "vite";
 import { reactRouter } from "@react-router/dev/vite";
+import type { Plugin } from "vite";
 import { sentryReactRouter } from "@sentry/react-router";
 import { defineConfig, loadEnv } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
@@ -9,16 +9,15 @@ import devtoolsJson from "vite-plugin-devtools-json";
 import tailwindcss from "@tailwindcss/vite";
 import babel from "vite-plugin-babel";
 
-// Prisma 7 generates ?module WASM imports (Cloudflare Workers syntax).
-// Vite can't parse them — mark them external so wrangler handles them instead.
+// Prisma 7 uses `*.wasm?module` imports (Workers). Rollup cannot parse WASM; externalize so the
+// path resolves at deploy time. Path is relative to build/server/index.js (same idea as church-finder-inagg).
 const cloudflareWasmModule: Plugin = {
   name: "cloudflare-wasm-module",
   enforce: "pre",
   resolveId(id) {
     if (id.includes(".wasm") && id.endsWith("?module")) {
-      // Return a path relative to build/server/ so wrangler can resolve it
       return {
-        id: "../../app/db/internal/query_compiler_fast_bg.wasm?module",
+        id: "../../app/db/generated/internal/query_compiler_fast_bg.wasm?module",
         external: true,
       };
     }

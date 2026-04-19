@@ -8,8 +8,8 @@ import { signIn, authClient } from "~/lib/auth-client";
 
 export function meta() {
   return [
-    { title: "Set Password - Tome Car Bingo" },
-    { name: "description", content: "Set your password for Tome School car line" },
+    { title: "Set password — School Organizer" },
+    { name: "description", content: "Set your password for your school car line" },
   ];
 }
 
@@ -79,7 +79,7 @@ export default function SetPassword() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#212525]">
-      <p className="text-2xl font-bold text-white mb-1">Tome School</p>
+      <p className="text-2xl font-bold text-white mb-1">School Organizer</p>
       <p className="text-lg font-semibold text-white mb-2">Car Line Bingo</p>
       <p className="text-sm text-gray-400 mb-6">Set your new password</p>
 

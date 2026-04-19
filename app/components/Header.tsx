@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import logo from "/favicon.ico?url";
+import { DEFAULT_SITE_NAME } from "~/lib/site";
 
 type HeaderBranding = {
   orgName?: string;
@@ -14,7 +15,7 @@ export default function ({
   user: boolean;
   branding?: HeaderBranding;
 }) {
-  const orgName = branding?.orgName ?? "Tome School";
+  const orgName = branding?.orgName ?? DEFAULT_SITE_NAME;
   const headerColor = branding?.primaryColor ?? "#60A5FA";
   const logoSrc = branding?.logoUrl ?? logo;
 

@@ -2,6 +2,7 @@ import type { BillingPlan } from "~/db";
 import { getPrisma } from "~/db.server";
 import { requireStripeConfig } from "~/domain/billing/stripe.server";
 import { mapStripeSubscriptionStatusToOrgStatus } from "~/domain/billing/org-status";
+import { addDaysUtc } from "~/domain/billing/trial.server";
 
 function toSubscriptionStatus(
   value: string | null | undefined,
@@ -69,12 +70,16 @@ export async function ensureOrgForUser(params: {
 
   const slug = await uniqueOrgSlug(context, requestedSlug);
 
+  const trialStartedAt = new Date();
   const org = await db.org.create({
     data: {
       name: orgName.trim(),
       slug,
       billingPlan: plan,
-      status: "ACTIVE",
+      status: plan === "FREE" ? "TRIALING" : "INCOMPLETE",
+      trialStartedAt,
+      trialQualifyingPickupDays: 0,
+      trialEndsAt: addDaysUtc(trialStartedAt, 30),
     },
   });
 
@@ -112,7 +117,7 @@ export async function ensureOrgForUser(params: {
         subscriptionStatus: toSubscriptionStatus(subscriptionStatus),
         status: subscriptionStatus
           ? mapStripeSubscriptionStatusToOrgStatus(subscriptionStatus)
-          : "ACTIVE",
+          : "INCOMPLETE",
       },
     }),
   ]);

@@ -26,7 +26,7 @@ export function ErrorBoundary() {
         <div className="h-10 w-full bg-blue-300 flex items-center justify-center flex-shrink-0 relative">
           <a href="/" className="text-black font-bold inline-flex items-center">
             <img src={logo} alt="school logo" height={40} width={40} />
-            Tome School - Car Line Bingo
+            School Organizer — Car line
           </a>
           <a
             href="/login"

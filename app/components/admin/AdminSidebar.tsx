@@ -1,10 +1,11 @@
-import { LayoutDashboard, Users, GraduationCap, Palette } from "lucide-react";
+import { LayoutDashboard, Users, GraduationCap, Palette, ClipboardList } from "lucide-react";
 import { NavLink } from "react-router";
 
 const navItems = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/children", label: "Children & Classes", icon: GraduationCap },
+  { to: "/admin/fire-drill", label: "Fire drill", icon: ClipboardList },
   { to: "/admin/branding", label: "Branding", icon: Palette },
 ];
 

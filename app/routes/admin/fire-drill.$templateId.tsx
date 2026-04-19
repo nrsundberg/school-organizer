@@ -1,0 +1,396 @@
+import { Link, useFetcher } from "react-router";
+import { Button } from "@heroui/react";
+import { ArrowDown, ArrowLeft, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import type { Route } from "./+types/fire-drill.$templateId";
+import { protectToAdminAndGetPermissions } from "~/sessions.server";
+import { getTenantPrisma } from "~/domain/utils/global-context.server";
+import type { Prisma } from "~/db";
+import { type ColumnDef, type TemplateDefinition, parseTemplateDefinition } from "~/domain/fire-drill/types";
+import { dataWithError, dataWithSuccess } from "remix-toast";
+
+export const meta: Route.MetaFunction = ({ data }) => [
+  { title: data?.template ? `Edit – ${data.template.name}` : "Edit checklist" },
+];
+
+export async function loader({ context, params }: Route.LoaderArgs) {
+  await protectToAdminAndGetPermissions(context);
+  const prisma = getTenantPrisma(context);
+  const id = params.templateId;
+  if (!id) {
+    throw new Response("Not found", { status: 404 });
+  }
+  const template = await prisma.fireDrillTemplate.findFirst({
+    where: { id },
+    select: { id: true, name: true, definition: true, updatedAt: true },
+  });
+  if (!template) {
+    throw new Response("Not found", { status: 404 });
+  }
+  return { template };
+}
+
+export async function action({ request, context, params }: Route.ActionArgs) {
+  await protectToAdminAndGetPermissions(context);
+  const prisma = getTenantPrisma(context);
+  const id = params.templateId;
+  if (!id) {
+    return dataWithError(null, "Missing template.");
+  }
+  const formData = await request.formData();
+  const intent = String(formData.get("intent") ?? "");
+
+  if (intent === "rename") {
+    const name = String(formData.get("name") ?? "").trim();
+    if (!name) {
+      return dataWithError(null, "Name is required.");
+    }
+    await prisma.fireDrillTemplate.update({
+      where: { id },
+      data: { name },
+    });
+    return dataWithSuccess(null, "Name saved.");
+  }
+
+  if (intent === "saveDefinition") {
+    const raw = String(formData.get("definition") ?? "");
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return dataWithError(null, "Invalid JSON.");
+    }
+    const definition = parseTemplateDefinition(parsed as Prisma.JsonValue);
+    if (definition.columns.filter((c) => c.kind === "toggle").length === 0) {
+      return dataWithError(null, "Add at least one toggle column (e.g. Check).");
+    }
+    await prisma.fireDrillTemplate.update({
+      where: { id },
+      data: { definition: definition as object },
+    });
+    return dataWithSuccess(null, "Layout saved.");
+  }
+
+  return dataWithError(null, "Unknown action.");
+}
+
+function newId(): string {
+  return crypto.randomUUID();
+}
+
+function cloneDefinition(def: TemplateDefinition): TemplateDefinition {
+  return {
+    columns: def.columns.map((c) => ({ ...c })),
+    rows: def.rows.map((r) => ({ id: r.id, cells: { ...r.cells } })),
+  };
+}
+
+export default function FireDrillTemplateEdit({ loaderData }: Route.ComponentProps) {
+  const { template } = loaderData;
+  const [definition, setDefinition] = useState<TemplateDefinition>(() =>
+    cloneDefinition(parseTemplateDefinition(template.definition)),
+  );
+  const fetcher = useFetcher();
+
+  useEffect(() => {
+    setDefinition(cloneDefinition(parseTemplateDefinition(template.definition)));
+  }, [template.id, template.updatedAt, template.definition]);
+
+  const updateColumn = useCallback((index: number, patch: Partial<ColumnDef>) => {
+    setDefinition((d) => {
+      const next = cloneDefinition(d);
+      const prev = next.columns[index];
+      if (!prev) return d;
+      const merged = { ...prev, ...patch };
+      next.columns[index] = merged;
+      if (patch.kind && patch.kind !== prev.kind) {
+        if (patch.kind === "toggle") {
+          for (const row of next.rows) {
+            delete row.cells[merged.id];
+          }
+        } else {
+          for (const row of next.rows) {
+            row.cells[merged.id] = row.cells[merged.id] ?? "";
+          }
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  const removeColumn = useCallback((index: number) => {
+    setDefinition((d) => {
+      const next = cloneDefinition(d);
+      const [removed] = next.columns.splice(index, 1);
+      if (!removed) return d;
+      for (const row of next.rows) {
+        delete row.cells[removed.id];
+      }
+      return next;
+    });
+  }, []);
+
+  const moveColumn = useCallback((index: number, dir: -1 | 1) => {
+    setDefinition((d) => {
+      const j = index + dir;
+      if (j < 0 || j >= d.columns.length) return d;
+      const next = cloneDefinition(d);
+      const tmp = next.columns[index];
+      next.columns[index] = next.columns[j]!;
+      next.columns[j] = tmp!;
+      return next;
+    });
+  }, []);
+
+  const addColumn = useCallback((kind: ColumnDef["kind"]) => {
+    setDefinition((d) => {
+      const next = cloneDefinition(d);
+      const id = newId();
+      const label = kind === "toggle" ? "Check" : "Column";
+      next.columns.push({ id, label, kind });
+      if (kind === "text") {
+        for (const row of next.rows) {
+          row.cells[id] = "";
+        }
+      }
+      return next;
+    });
+  }, []);
+
+  const addRow = useCallback(() => {
+    setDefinition((d) => {
+      const next = cloneDefinition(d);
+      const id = newId();
+      const cells: Record<string, string> = {};
+      for (const c of next.columns) {
+        if (c.kind === "text") {
+          cells[c.id] = "";
+        }
+      }
+      next.rows.push({ id, cells });
+      return next;
+    });
+  }, []);
+
+  const updateRowCell = useCallback((rowIndex: number, colId: string, value: string) => {
+    setDefinition((d) => {
+      const next = cloneDefinition(d);
+      const row = next.rows[rowIndex];
+      if (!row) return d;
+      row.cells[colId] = value;
+      return next;
+    });
+  }, []);
+
+  const removeRow = useCallback((index: number) => {
+    setDefinition((d) => {
+      const next = cloneDefinition(d);
+      next.rows.splice(index, 1);
+      return next;
+    });
+  }, []);
+
+  const moveRow = useCallback((index: number, dir: -1 | 1) => {
+    setDefinition((d) => {
+      const j = index + dir;
+      if (j < 0 || j >= d.rows.length) return d;
+      const next = cloneDefinition(d);
+      const tmp = next.rows[index];
+      next.rows[index] = next.rows[j]!;
+      next.rows[j] = tmp!;
+      return next;
+    });
+  }, []);
+
+  const saveDefinition = () => {
+    const fd = new FormData();
+    fd.set("intent", "saveDefinition");
+    fd.set("definition", JSON.stringify(definition));
+    fetcher.submit(fd, { method: "post" });
+  };
+
+  return (
+    <div className="flex flex-col gap-6 p-6 max-w-[min(100%,56rem)]">
+      <div className="flex flex-wrap items-center gap-3">
+        <Link
+          to="/admin/fire-drill"
+          className="inline-flex items-center gap-1 text-sm text-white/50 hover:text-white transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          All checklists
+        </Link>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-4 justify-between">
+        <fetcher.Form method="post" className="flex flex-wrap items-end gap-3 flex-1 min-w-[240px]">
+          <input type="hidden" name="intent" value="rename" />
+          <label className="text-sm text-white/60 flex flex-col gap-1 flex-1 max-w-md">
+            Template name
+            <input
+              name="name"
+              key={template.updatedAt.toISOString()}
+              type="text"
+              defaultValue={template.name}
+              className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white"
+            />
+          </label>
+          <Button type="submit" variant="secondary" size="sm">
+            Save name
+          </Button>
+        </fetcher.Form>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="secondary" size="sm" onPress={() => addColumn("text")}>
+            <Plus className="w-4 h-4 mr-1 inline" />
+            Text column
+          </Button>
+          <Button type="button" variant="secondary" size="sm" onPress={() => addColumn("toggle")}>
+            <Plus className="w-4 h-4 mr-1 inline" />
+            Toggle column
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onPress={saveDefinition}
+            isPending={fetcher.state !== "idle"}
+          >
+            Save layout
+          </Button>
+        </div>
+      </div>
+
+      <p className="text-xs text-white/40">
+        Toggle columns show a check on the run screen. Text columns store labels (grade, teacher name, etc.).
+      </p>
+
+      <div className="overflow-x-auto rounded-xl border border-white/10">
+        <table className="w-full text-sm min-w-[640px]">
+          <thead>
+            <tr className="border-b border-white/10 bg-white/5">
+              <th className="px-2 py-2 text-left text-white/50 font-medium w-10">#</th>
+              {definition.columns.map((col, ci) => (
+                <th key={col.id} className="px-2 py-2 text-left align-bottom">
+                  <div className="flex flex-col gap-2 min-w-[120px]">
+                    <input
+                      value={col.label}
+                      onChange={(e) => updateColumn(ci, { label: e.target.value })}
+                      className="rounded border border-white/20 bg-white/5 px-2 py-1 text-white text-xs font-semibold"
+                      aria-label={`Column ${ci + 1} label`}
+                    />
+                    <select
+                      value={col.kind}
+                      onChange={(e) =>
+                        updateColumn(ci, { kind: e.target.value === "toggle" ? "toggle" : "text" })
+                      }
+                      className="rounded border border-white/20 bg-[#1a1f1f] px-2 py-1 text-white text-xs"
+                    >
+                      <option value="text">Text</option>
+                      <option value="toggle">Toggle</option>
+                    </select>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        className="p-1 rounded border border-white/10 text-white/60 hover:bg-white/10"
+                        onClick={() => moveColumn(ci, -1)}
+                        aria-label="Move column left"
+                      >
+                        <ArrowUp className="w-3 h-3 -rotate-90" />
+                      </button>
+                      <button
+                        type="button"
+                        className="p-1 rounded border border-white/10 text-white/60 hover:bg-white/10"
+                        onClick={() => moveColumn(ci, 1)}
+                        aria-label="Move column right"
+                      >
+                        <ArrowDown className="w-3 h-3 -rotate-90" />
+                      </button>
+                      <button
+                        type="button"
+                        className="p-1 rounded border border-rose-500/30 text-rose-300 hover:bg-rose-500/10 ml-auto"
+                        onClick={() => removeColumn(ci)}
+                        aria-label="Remove column"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </th>
+              ))}
+              <th className="px-2 py-2 w-24" />
+            </tr>
+          </thead>
+          <tbody>
+            {definition.rows.map((row, ri) => (
+              <tr key={row.id} className="border-b border-white/5 hover:bg-white/[0.02]">
+                <td className="px-2 py-2 text-white/40 text-xs align-middle">{ri + 1}</td>
+                {definition.columns.map((col) => (
+                  <td key={col.id} className="px-2 py-2 align-middle">
+                    {col.kind === "text" ? (
+                      <input
+                        value={row.cells[col.id] ?? ""}
+                        onChange={(e) => updateRowCell(ri, col.id, e.target.value)}
+                        className="w-full min-w-[6rem] rounded border border-white/15 bg-white/5 px-2 py-1.5 text-white"
+                      />
+                    ) : (
+                      <span className="text-white/30 text-xs">check on run</span>
+                    )}
+                  </td>
+                ))}
+                <td className="px-2 py-2 align-middle">
+                  <div className="flex gap-1 justify-end">
+                    <button
+                      type="button"
+                      className="p-1 rounded border border-white/10 text-white/60 hover:bg-white/10"
+                      onClick={() => moveRow(ri, -1)}
+                      aria-label="Move row up"
+                    >
+                      <ArrowUp className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      className="p-1 rounded border border-white/10 text-white/60 hover:bg-white/10"
+                      onClick={() => moveRow(ri, 1)}
+                      aria-label="Move row down"
+                    >
+                      <ArrowDown className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      className="p-1 rounded border border-rose-500/30 text-rose-300 hover:bg-rose-500/10"
+                      onClick={() => removeRow(ri)}
+                      aria-label="Remove row"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Button type="button" variant="secondary" onPress={addRow}>
+        <Plus className="w-4 h-4 mr-1 inline" />
+        Add row
+      </Button>
+
+      <div className="flex flex-wrap gap-3">
+        <Link
+          to={`/admin/fire-drill/${template.id}/run`}
+          className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+        >
+          Open run screen
+        </Link>
+        <Link
+          to={`/admin/print/fire-drill/${template.id}`}
+          className="inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-white hover:bg-white/10 transition-colors"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Print preview
+        </Link>
+      </div>
+    </div>
+  );
+}

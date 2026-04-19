@@ -14,12 +14,16 @@ export default [
     route("users", "routes/admin/users.tsx"),
     route("children", "routes/admin/children.tsx"),
     route("branding", "routes/admin/branding.tsx"),
+    route("fire-drill", "routes/admin/fire-drill.tsx"),
+    route("fire-drill/:templateId/run", "routes/admin/fire-drill.$templateId.run.tsx"),
+    route("fire-drill/:templateId", "routes/admin/fire-drill.$templateId.tsx"),
   ]),
 
   // Print routes — standalone (no admin chrome) so browser Cmd+P output is clean
   route("admin/print/board", "routes/admin/print.board.tsx"),
   route("admin/print/master", "routes/admin/print.master.tsx"),
   route("admin/print/homeroom/:teacherId", "routes/admin/print.homeroom.$teacherId.tsx"),
+  route("admin/print/fire-drill/:templateId", "routes/admin/print.fire-drill.$templateId.tsx"),
 
   ...prefix("create", [
     route("homeroom", "routes/create/create.homeroom.tsx"),
@@ -49,6 +53,11 @@ export default [
   route("login", "routes/auth/login.tsx"),
   route("viewer-access", "routes/viewer-access.tsx"),
   route("signup", "routes/auth/signup.tsx"),
+  route("pricing", "routes/pricing.tsx"),
+  route("faqs", "routes/faqs.tsx"),
+
+  route("platform", "routes/platform/layout.tsx", [index("routes/platform/index.tsx")]),
+
   route("billing-required", "routes/billing-required.tsx"),
   route("logout", "routes/auth/logout.ts"),
   route("set-password", "routes/set-password.tsx")

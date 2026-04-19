@@ -5,7 +5,7 @@
  *   npx tsx scripts/seed.ts
  *
  * For D1 (production), run the SQL printed at the end with:
- *   wrangler d1 execute tome-bingo --command "<SQL>"
+ *   wrangler d1 execute school-organizer --command "<SQL>"
  */
 import { createClient } from "@libsql/client";
 
@@ -105,6 +105,44 @@ async function seed() {
 
   console.log(`\n  Temporary password: ${tempPassword}`);
   console.log(`  → They will be prompted to set a new password on first login.\n`);
+
+  const demoDefinition = JSON.stringify({
+    columns: [
+      { id: "fdcol-grade", label: "Grade", kind: "text" },
+      { id: "fdcol-teacher", label: "Teacher", kind: "text" },
+      { id: "fdcol-check", label: "Check", kind: "toggle" },
+    ],
+    rows: [
+      { id: "fdrow-1", cells: { "fdcol-grade": "K", "fdcol-teacher": "Example" } },
+      { id: "fdrow-2", cells: { "fdcol-grade": "Specials", "fdcol-teacher": "" } },
+      { id: "fdrow-3", cells: { "fdcol-grade": "Office", "fdcol-teacher": "" } },
+    ],
+  });
+
+  try {
+    const orgRow = await db.execute({
+      sql: `SELECT "orgId" FROM "User" WHERE email = ?`,
+      args: [email],
+    });
+    const orgId = orgRow.rows[0]?.orgId as string | undefined;
+    if (orgId) {
+      const exists = await db.execute({
+        sql: `SELECT id FROM "FireDrillTemplate" WHERE "orgId" = ? AND name = ?`,
+        args: [orgId, "Fire drill"],
+      });
+      if (exists.rows.length === 0) {
+        const templateId = generateId();
+        await db.execute({
+          sql: `INSERT INTO "FireDrillTemplate" (id, "orgId", name, definition, "createdAt", "updatedAt")
+                VALUES (?, ?, ?, ?, ?, ?)`,
+          args: [templateId, orgId, "Fire drill", demoDefinition, now, now],
+        });
+        console.log(`✓ Seeded demo "Fire drill" checklist template for org ${orgId}`);
+      }
+    }
+  } catch (e) {
+    console.warn("Skipping fire drill template seed (run migrations if the table is missing):", e);
+  }
 
   db.close();
 }

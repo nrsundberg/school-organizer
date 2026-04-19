@@ -46,6 +46,12 @@ model Org {
   stripeSubscriptionId   String?                  @unique
   billingPlan            BillingPlan              @default(FREE)
   subscriptionStatus     StripeSubscriptionStatus?
+  /// When the org began the product trial (signup). Used with qualifying pickup days.
+  trialStartedAt         DateTime?
+  /// Count of calendar days (UTC) with more than 10 distinct students called — qualifying “pickup” days.
+  trialQualifyingPickupDays Int                   @default(0)
+  /// Effective trial end: max(calendar 30d from start, completion of 25th qualifying day). Updated by cron.
+  trialEndsAt              DateTime?
   users                  User[]
   appSettings            AppSettings[]
   viewerAccessAttempts   ViewerAccessAttempt[]
@@ -55,8 +61,38 @@ model Org {
   students               Student[]
   spaces                 Space[]
   callEvents             CallEvent[]
+  fireDrillTemplates     FireDrillTemplate[]
+  fireDrillRuns          FireDrillRun[]
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
+}
+
+/// Org-configurable checklist template (e.g. fire drill, lockdown).
+model FireDrillTemplate {
+  id          String          @id @default(cuid())
+  orgId       String
+  org         Org             @relation(fields: [orgId], references: [id])
+  name        String
+  definition  Json
+  runs        FireDrillRun[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([orgId])
+}
+
+/// Latest run state for a template (toggles, notes, action items).
+model FireDrillRun {
+  id         String            @id @default(cuid())
+  orgId      String
+  org        Org               @relation(fields: [orgId], references: [id])
+  templateId String            @unique
+  template   FireDrillTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  state      Json
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([orgId])
 }
 
 model StripeWebhookEvent {

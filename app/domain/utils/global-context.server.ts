@@ -5,6 +5,7 @@ import { getPrisma } from "~/db.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { hasValidViewerAccess } from "~/domain/auth/viewer-access.server";
 import { isOrgStatusAllowedForApp } from "~/domain/billing/org-status";
+import { isMarketingHost, resolveTenantSlugFromHost } from "~/domain/utils/host.server";
 
 export const userContext = createContext<User | null>(null);
 export const orgContext = createContext<Org | null>(null);
@@ -38,17 +39,29 @@ export const getTenantPrisma = (context: any) => {
   return getPrisma(context, org.id);
 };
 
-async function resolveOrgByHost(db: ReturnType<typeof getPrisma>, request: Request): Promise<Org | null> {
+async function resolveOrgByHost(
+  db: ReturnType<typeof getPrisma>,
+  request: Request,
+  context: any,
+): Promise<Org | null> {
   const host = new URL(request.url).host.toLowerCase().split(":")[0];
-  const subdomain = host.split(".")[0] ?? null;
-  return db.org.findFirst({
-    where: {
-      OR: [
-        { customDomain: host },
-        ...(subdomain ? [{ slug: subdomain }] : []),
-      ],
-    },
-  });
+
+  const byCustom = await db.org.findFirst({ where: { customDomain: host } });
+  if (byCustom) return byCustom;
+
+  if (isMarketingHost(request, context)) {
+    return null;
+  }
+
+  const slug = resolveTenantSlugFromHost(request, context);
+  if (slug) {
+    const bySlug = await db.org.findUnique({ where: { slug } });
+    if (bySlug) return bySlug;
+  }
+
+  const defaultOrg = await db.org.findUnique({ where: { slug: "default" } });
+  if (defaultOrg) return defaultOrg;
+  return db.org.findFirst({ orderBy: { createdAt: "asc" } });
 }
 
 export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
@@ -60,7 +73,7 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   let org: Org | null = null;
 
   try {
-    org = await resolveOrgByHost(db, request);
+    org = await resolveOrgByHost(db, request, context);
   } catch {
     // Host-to-org resolution is best-effort during rollout.
   }
@@ -84,31 +97,68 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   }
 
   context.set(userContext, user);
-  if (!org && user?.orgId) {
+
+  const onMarketingHost = isMarketingHost(request, context);
+  if (!onMarketingHost && !org && user?.orgId) {
     org = await db.org.findUnique({ where: { id: user.orgId } });
+  }
+  if (onMarketingHost) {
+    org = null;
   }
   context.set(orgContext, org);
 
   const url = new URL(request.url);
-  const isSetPassword = url.pathname === "/set-password";
-  const isApi = url.pathname.startsWith("/api/");
-  const isLogout = url.pathname === "/logout";
-  const isLogin = url.pathname === "/login";
-  const isViewerAccess = url.pathname === "/viewer-access";
-  const isBillingRequired = url.pathname === "/billing-required";
-  const isOnboardingApi = url.pathname === "/api/onboarding";
-  const isStripeWebhook = url.pathname === "/api/webhooks/stripe";
-  const isAuthApi = url.pathname.startsWith("/api/auth/");
-  const isStatic = url.pathname.startsWith("/assets/") || url.pathname.startsWith("/build/") || url.pathname === "/favicon.ico";
+  const pathname = url.pathname;
+  const isSetPassword = pathname === "/set-password";
+  const isApi = pathname.startsWith("/api/");
+  const isLogout = pathname === "/logout";
+  const isLogin = pathname === "/login";
+  const isViewerAccess = pathname === "/viewer-access";
+  const isBillingRequired = pathname === "/billing-required";
+  const isOnboardingApi = pathname === "/api/onboarding";
+  const isStripeWebhook = pathname === "/api/webhooks/stripe";
+  const isAuthApi = pathname.startsWith("/api/auth/");
+  const isStatic =
+    pathname.startsWith("/assets/") ||
+    pathname.startsWith("/build/") ||
+    pathname === "/favicon.ico";
+  const isCheckEmailApi = pathname === "/api/check-email";
+  const isBrandingLogoApi = pathname.startsWith("/api/branding/logo/");
+  const isPlatform = pathname.startsWith("/platform");
+
+  const publicMarketingPath =
+    pathname === "/pricing" ||
+    pathname === "/faqs" ||
+    pathname === "/signup" ||
+    pathname.startsWith("/api/onboarding") ||
+    (pathname === "/" && onMarketingHost);
 
   if (user?.mustChangePassword && !isSetPassword && !isApi && !isLogout) {
     throw redirect("/set-password");
   }
 
-  if (!user && !isLogin && !isLogout && !isViewerAccess && !isAuthApi && !isStatic) {
+  const anonSkipsViewer =
+    isLogin ||
+    isLogout ||
+    isViewerAccess ||
+    isAuthApi ||
+    isStatic ||
+    isCheckEmailApi ||
+    isBrandingLogoApi ||
+    publicMarketingPath;
+
+  if (!user && !anonSkipsViewer) {
+    if (isPlatform) {
+      const nextPath = `${pathname}${url.search}`;
+      throw redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+    }
+    if (!org) {
+      const nextPath = `${pathname}${url.search}`;
+      throw redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+    }
     const hasAccess = await hasValidViewerAccess({ request, context });
     if (!hasAccess) {
-      const nextPath = `${url.pathname}${url.search}`;
+      const nextPath = `${pathname}${url.search}`;
       throw redirect(`/viewer-access?next=${encodeURIComponent(nextPath)}`);
     }
   }

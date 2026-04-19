@@ -8,8 +8,8 @@ import { Page } from "~/components/Page";
 
 export function meta() {
   return [
-    { title: "Login - Tome Car Bingo" },
-    { name: "description", content: "Sign in to Tome School car line" }
+    { title: "Login — School Organizer" },
+    { name: "description", content: "Sign in to your school car line board" },
   ];
 }
 
@@ -77,7 +77,7 @@ export default function Login() {
   return (
     <Page user={false}>
       <div className="h-[calc(100vh-40px)] flex flex-col items-center justify-center bg-[#212525]">
-        <p className="text-2xl font-bold text-white mb-1">Tome School</p>
+        <p className="text-2xl font-bold text-white mb-1">School Organizer</p>
         <p className="text-lg font-semibold text-white mb-6">Car Line Bingo</p>
 
         {step === "email" ? (

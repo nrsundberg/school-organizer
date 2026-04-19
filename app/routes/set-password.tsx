@@ -7,7 +7,7 @@ import type { Route } from "./+types/set-password";
 import { useState } from "react";
 
 export function meta() {
-  return [{ title: "Set Password - Tome Car Bingo" }];
+  return [{ title: "Set password — School Organizer" }];
 }
 
 export async function loader({ context }: Route.LoaderArgs) {
@@ -60,7 +60,7 @@ export default function SetPassword({ loaderData, actionData }: Route.ComponentP
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#212525]">
-      <p className="text-2xl font-bold text-white mb-1">Tome School</p>
+      <p className="text-2xl font-bold text-white mb-1">School Organizer</p>
       <p className="text-lg font-semibold text-white mb-2">Welcome!</p>
       <p className="text-sm text-white/60 mb-6">Please set a password to continue.</p>
 

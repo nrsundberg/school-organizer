@@ -2,6 +2,8 @@
 
 Use these tracks to run implementation in parallel with minimal overlap.
 
+**Current architecture (implemented):** marketing hosts (`PUBLIC_ROOT_DOMAIN` apex + `www`, plus `MARKETING_HOSTS`) serve landing/pricing/FAQs/signup without a tenant org. Tenant subdomains `{slug}.PUBLIC_ROOT_DOMAIN` resolve `Org.slug`. Middleware allowlists public marketing paths and sends anonymous users on tenant hosts to viewer PIN flow. `/platform` is gated by `PLATFORM_ADMIN` role or `PLATFORM_ADMIN_EMAILS`. Trial fields on `Org` plus nightly cron (`workers/app.ts` `scheduled`) refresh qualifying pickup days and end trials.
+
 ## Track A: Tenant schema and migrations
 - Add `Org` model and `orgId` fields/indexes on tenant-scoped tables.
 - Create migration and data backfill strategy.

@@ -7,10 +7,13 @@ import {
   getViewerLockState,
   verifyViewerPinAndIssueSession,
 } from "~/domain/auth/viewer-access.server";
-import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
+import {
+  getOptionalOrgFromContext,
+  getOptionalUserFromContext,
+} from "~/domain/utils/global-context.server";
 
 export function meta() {
-  return [{ title: "Viewer Access - Tome Car Bingo" }];
+  return [{ title: "Viewer access — School Organizer" }];
 }
 
 function safeRedirect(next: string | null): string {
@@ -21,6 +24,9 @@ function safeRedirect(next: string | null): string {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
+  const org = getOptionalOrgFromContext(context);
+  if (!org) throw redirect("/");
+
   const user = getOptionalUserFromContext(context);
   if (user) throw redirect("/");
   const url = new URL(request.url);
@@ -40,6 +46,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
+  const org = getOptionalOrgFromContext(context);
+  if (!org) throw redirect("/");
+
   const formData = await request.formData();
   const pin = String(formData.get("pin") ?? "").trim();
   const next = safeRedirect(String(formData.get("next") ?? "/"));

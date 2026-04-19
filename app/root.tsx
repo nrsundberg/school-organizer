@@ -20,19 +20,34 @@ import {
   userContext,
   getOptionalOrgFromContext,
 } from "~/domain/utils/global-context.server";
+import { isMarketingHost } from "~/domain/utils/host.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { ImpersonationBanner } from "~/components/ImpersonationBanner";
 import logo from "/favicon.ico?url";
 import { getBrandingFromOrg } from "~/domain/org/branding.server";
+import { DEFAULT_SITE_NAME } from "~/lib/site";
 
 export const middleware: MiddlewareFunction<Response>[] = [
   globalStorageMiddleware
 ];
 
-export const meta: Route.MetaFunction = () => {
+export const meta: Route.MetaFunction = ({ data }) => {
+  if (!data) {
+    return [
+      { title: DEFAULT_SITE_NAME },
+      { name: "description", content: "Live car line board, viewer access, and school admin tools." },
+    ];
+  }
+  if (data.marketing) {
+    return [
+      { title: `${DEFAULT_SITE_NAME} — Car line made clear` },
+      { name: "description", content: "Live car line board, viewer access, and school admin tools." },
+    ];
+  }
+  const name = data.branding?.orgName ?? DEFAULT_SITE_NAME;
   return [
-    { title: "Tome Car Bingo" },
-    { name: "description", content: "Tome School car line!" }
+    { title: `${name} — Car line` },
+    { name: "description", content: `${name} car line board.` },
   ];
 };
 
@@ -44,6 +59,7 @@ export const links: Route.LinksFunction = () => [
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = context.get(userContext) ?? null;
   const org = getOptionalOrgFromContext(context);
+  const marketing = isMarketingHost(request, context);
   const { toast, headers } = await getToast(request);
 
   let impersonatedBy: string | null = null;
@@ -57,7 +73,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }
   }
 
-  return data({ toast, user, impersonatedBy, branding: getBrandingFromOrg(org) }, { headers });
+  return data(
+    { toast, user, impersonatedBy, branding: getBrandingFromOrg(org), marketing },
+    { headers },
+  );
 }
 
 export function ErrorBoundary() {
@@ -90,7 +109,7 @@ export function ErrorBoundary() {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Error — Tome Car Bingo</title>
+        <title>Error — School Organizer</title>
         <Meta />
         <Links />
       </head>
@@ -98,7 +117,7 @@ export function ErrorBoundary() {
         <div className="h-10 w-full bg-blue-300 flex items-center justify-center flex-shrink-0 relative">
           <a href="/" className="text-black font-bold inline-flex items-center">
             <img src={logo} alt="school logo" height={40} width={40} />
-            Tome School - Car Line Bingo
+            School Organizer — Car line
           </a>
           <a
             href="/login"

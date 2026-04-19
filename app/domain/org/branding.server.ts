@@ -1,5 +1,6 @@
 import type { Org } from "~/db";
 import { getPrisma } from "~/db.server";
+import { DEFAULT_SITE_NAME } from "~/lib/site";
 
 export const DEFAULT_BRAND_PRIMARY = "#60A5FA";
 export const DEFAULT_BRAND_ACCENT = "#E9D500";
@@ -58,7 +59,7 @@ export function getBrandingFromOrg(org: Org | null): OrgBranding {
 
   return {
     orgId: org?.id ?? null,
-    orgName: org?.name ?? "School",
+    orgName: org?.name ?? DEFAULT_SITE_NAME,
     orgSlug: org?.slug ?? null,
     primaryColor,
     accentColor,
