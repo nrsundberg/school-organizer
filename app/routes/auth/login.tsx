@@ -1,6 +1,7 @@
 import { Button, Input } from "@heroui/react";
 import { Link, redirect } from "react-router";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
+import { isPlatformAdmin } from "~/domain/utils/host.server";
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
 import type { Route } from "./+types/login";
 import { useState } from "react";
@@ -14,12 +15,27 @@ export function meta() {
   ];
 }
 
+function safeInternalNextPath(next: string | null): string | null {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return null;
+  return next;
+}
+
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = getOptionalUserFromContext(context);
   if (!user) return null;
   if (!user.orgId) throw redirect("/signup?step=2");
-  const url = await getTenantBoardUrlForRequest(request, context);
-  if (url) throw redirect(url);
+
+  const next = safeInternalNextPath(new URL(request.url).searchParams.get("next"));
+  if (next) {
+    throw redirect(next);
+  }
+
+  if (isPlatformAdmin(user, context)) {
+    throw redirect("/platform");
+  }
+
+  const boardUrl = await getTenantBoardUrlForRequest(request, context);
+  if (boardUrl) throw redirect(boardUrl);
   throw redirect("/");
 }
 
