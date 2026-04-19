@@ -17,6 +17,14 @@ declare global {
     MARKETING_HOSTS: string;
     /** Comma-separated emails that may access /platform when role is not PLATFORM_ADMIN */
     PLATFORM_ADMIN_EMAILS: string;
+    /** Stripe recurring price for Car Line plan (optional if using legacy STRIPE_STARTER_PRICE_ID for dev). */
+    STRIPE_CAR_LINE_PRICE_ID?: string;
+    /** Stripe recurring price for Campus plan. */
+    STRIPE_CAMPUS_PRICE_ID?: string;
+    /** @deprecated Use STRIPE_CAR_LINE_PRICE_ID + STRIPE_CAMPUS_PRICE_ID; dev fallback for both. */
+    STRIPE_STARTER_PRICE_ID?: string;
+    STRIPE_SECRET_KEY?: string;
+    STRIPE_WEBHOOK_SECRET?: string;
   }
 }
 

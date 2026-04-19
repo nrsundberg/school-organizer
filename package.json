@@ -11,7 +11,7 @@
     "d1:create-migration": "wrangler d1 migrations create",
     "backfill:org-id": "npx tsx scripts/backfill-org-id.ts",
     "typecheck": "react-router typegen && tsc",
-    "test": "tsx --test app/domain/billing/*.test.ts"
+    "test": "tsx --test app/domain/billing/*.test.ts app/domain/utils/*.test.ts app/lib/*.test.ts"
   },
   "dependencies": {
     "@heroui/react": "^3.0.1",

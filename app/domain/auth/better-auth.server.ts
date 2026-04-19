@@ -50,6 +50,37 @@ export async function verifyPassword(hash: string, password: string): Promise<bo
   return diff === 0;
 }
 
+function normalizeRootDomain(env: Record<string, string | undefined>): string {
+  return (env.PUBLIC_ROOT_DOMAIN ?? "").trim().toLowerCase();
+}
+
+/** Apex marketing + tenant subdomains share session cookies; localhost-style roots skip this. */
+function shouldShareAuthCookiesAcrossSubdomains(
+  root: string,
+  isProduction: boolean,
+): boolean {
+  if (!isProduction || !root) return false;
+  if (root === "localhost" || root.endsWith(".localhost")) return false;
+  if (root.includes("127.0.0.1")) return false;
+  if (root.endsWith(".local")) return false;
+  return true;
+}
+
+/** Set-Cookie `Domain` for shared apex + tenant cookies, or null for host-only. */
+export function sharedSessionCookieDomain(context: any): string | null {
+  const env = context?.cloudflare?.env ?? process.env;
+  const isProduction = env.ENVIRONMENT !== "development";
+  const root = normalizeRootDomain(env as Record<string, string | undefined>);
+  return shouldShareAuthCookiesAcrossSubdomains(root, isProduction) ? root : null;
+}
+
+function marketingHostsFromEnv(env: Record<string, string | undefined>): string[] {
+  return (env.MARKETING_HOSTS ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 // Cache at module level — reused across requests within the same CF Worker isolate.
 // Keyed by env object reference so local dev (process.env) and prod (CF env) stay separate.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -65,15 +96,44 @@ export function getAuth(context: any) {
 
   const db = getPrisma(context);
   const isProduction = env.ENVIRONMENT !== "development";
+  const envRecord = env as Record<string, string | undefined>;
+  const publicRoot = normalizeRootDomain(envRecord);
+  const shareSubdomainCookies = shouldShareAuthCookiesAcrossSubdomains(publicRoot, isProduction);
 
   const secret = (env as any).BETTER_AUTH_SECRET ?? process.env.BETTER_AUTH_SECRET;
+
+  const marketingHosts = marketingHostsFromEnv(envRecord);
+  const baseURLConfig =
+    shareSubdomainCookies && publicRoot
+      ? {
+          baseURL: {
+            allowedHosts: [publicRoot, `www.${publicRoot}`, `*.${publicRoot}`, ...marketingHosts],
+            protocol: "https" as const,
+            fallback: `https://${publicRoot}`,
+          },
+          trustedOrigins: [
+            `https://${publicRoot}`,
+            `https://www.${publicRoot}`,
+            `https://*.${publicRoot}`,
+          ],
+        }
+      : {};
 
   const auth = betterAuth({
     basePath: "/api/auth",
     secret,
+    ...baseURLConfig,
     advanced: {
       cookiePrefix: "tome",
       useSecureCookies: isProduction,
+      ...(shareSubdomainCookies && publicRoot
+        ? {
+            crossSubDomainCookies: {
+              enabled: true,
+              domain: publicRoot,
+            },
+          }
+        : {}),
       ...(context as any)?.cloudflare?.ctx
         ? {
             backgroundTasks: {
@@ -125,9 +185,10 @@ export function getAuth(context: any) {
     },
     plugins: [
       admin({
-        adminRoles: ["ADMIN"],
+        adminRoles: ["ADMIN", "PLATFORM_ADMIN"],
         roles: {
           ADMIN: adminAc,
+          PLATFORM_ADMIN: adminAc,
         },
       }),
     ],

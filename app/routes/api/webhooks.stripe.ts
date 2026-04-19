@@ -2,6 +2,7 @@ import { data } from "react-router";
 import type { Route } from "./+types/webhooks.stripe";
 import { getPrisma } from "~/db.server";
 import { getStripeConfig, requireStripeConfig } from "~/domain/billing/stripe.server";
+import type { OrgStatus } from "~/db";
 import { mapStripeSubscriptionStatusToOrgStatus } from "~/domain/billing/org-status";
 import type Stripe from "stripe";
 
@@ -28,6 +29,17 @@ function toSubscriptionStatus(
   }
 }
 
+function billingPlanFromStripePrice(
+  context: any,
+  priceId: string | undefined,
+): "FREE" | "CAR_LINE" | "CAMPUS" {
+  const cfg = getStripeConfig(context);
+  if (!cfg || !priceId) return "CAMPUS";
+  if (priceId === cfg.carLinePriceId) return "CAR_LINE";
+  if (priceId === cfg.campusPriceId) return "CAMPUS";
+  return "CAMPUS";
+}
+
 async function applySubscriptionToOrg(
   context: any,
   subscription: Stripe.Subscription,
@@ -44,13 +56,38 @@ async function applySubscriptionToOrg(
 
   if (!org) return;
 
+  const priceId = subscription.items.data[0]?.price?.id;
+  const hasItems = subscription.items.data.length > 0;
+  const billingPlan = !hasItems
+    ? "FREE"
+    : billingPlanFromStripePrice(context, priceId);
+
+  const subStatus = subscription.status;
+  const subscriptionStatus = toSubscriptionStatus(subStatus);
+  const mappedOrgStatus = mapStripeSubscriptionStatusToOrgStatus(subStatus);
+
+  let pastDueSinceAt: Date | null;
+  let status: OrgStatus;
+
+  if (subStatus === "past_due") {
+    pastDueSinceAt = org.pastDueSinceAt ?? new Date();
+    status = org.status === "SUSPENDED" ? "SUSPENDED" : mappedOrgStatus;
+  } else if (subStatus === "active" || subStatus === "trialing") {
+    pastDueSinceAt = null;
+    status = mappedOrgStatus;
+  } else {
+    pastDueSinceAt = null;
+    status = mappedOrgStatus;
+  }
+
   await db.org.update({
     where: { id: org.id },
     data: {
       stripeSubscriptionId: subscription.id,
-      subscriptionStatus: toSubscriptionStatus(subscription.status),
-      status: mapStripeSubscriptionStatusToOrgStatus(subscription.status),
-      billingPlan: subscription.items.data.length > 0 ? "STARTER" : "FREE",
+      subscriptionStatus,
+      status,
+      billingPlan,
+      pastDueSinceAt,
     },
   });
 }

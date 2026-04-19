@@ -4,7 +4,16 @@ import { useState } from "react";
 import { SchoolIcon, UserIcon, XIcon } from "lucide-react";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import type { Route } from "./+types/create.homeroom";
-import { getTenantPrisma } from "~/domain/utils/global-context.server";
+import {
+  getOrgFromContext,
+  getTenantPrisma,
+} from "~/domain/utils/global-context.server";
+import {
+  assertUsageAllowsIncrement,
+  countOrgUsage,
+  PlanLimitError,
+  syncUsageGracePeriod,
+} from "~/domain/billing/plan-usage.server";
 import { Page } from "~/components/Page";
 import { redirectWithSuccess } from "remix-toast";
 
@@ -29,6 +38,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 export async function action({ request, context }: Route.ActionArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
+  const org = getOrgFromContext(context);
   const formData = await request.formData();
 
   const homeRoom = formData.get("homeRoom") as string;
@@ -46,6 +56,13 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (existingTeacher) {
       return { error: `Homeroom "${homeRoom}" already exists` };
     }
+
+    const counts = await countOrgUsage(prisma, org.id);
+    assertUsageAllowsIncrement(org, counts, {
+      students: 0,
+      families: 0,
+      classrooms: 1,
+    });
 
     const teacher = await prisma.teacher.create({
       data: { homeRoom: homeRoom.trim() }
@@ -71,9 +88,18 @@ export async function action({ request, context }: Route.ActionArgs) {
         ? `Homeroom "${homeRoom}" created with ${studentCount} student${studentCount !== 1 ? "s" : ""}`
         : `Homeroom "${homeRoom}" created successfully`;
 
+    const freshOrg = await prisma.org.findUnique({ where: { id: org.id } });
+    if (freshOrg) {
+      const nextCounts = await countOrgUsage(prisma, org.id);
+      await syncUsageGracePeriod(prisma, freshOrg, nextCounts);
+    }
+
     return redirectWithSuccess("/admin", { message });
   } catch (error) {
     console.error("Error creating homeroom:", error);
+    if (error instanceof PlanLimitError) {
+      return { error: error.message };
+    }
     return {
       error: error instanceof Error ? error.message : "Failed to create homeroom"
     };

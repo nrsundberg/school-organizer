@@ -1,5 +1,6 @@
 import { Button, Input } from "@heroui/react";
-import { redirect, useSearchParams } from "react-router";
+import { Link, redirect, useSearchParams } from "react-router";
+import { MarketingNav } from "~/components/marketing/MarketingNav";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
 // @ts-expect-error - route types not yet generated
 import type { Route } from "./+types/set-password";
@@ -78,47 +79,65 @@ export default function SetPassword() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#212525]">
-      <p className="text-2xl font-bold text-white mb-1">School Organizer</p>
-      <p className="text-lg font-semibold text-white mb-2">Car Line Bingo</p>
-      <p className="text-sm text-gray-400 mb-6">Set your new password</p>
+    <div className="min-h-screen bg-[#0f1414] text-white">
+      <MarketingNav />
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3 w-full max-w-sm px-4">
-        <label className="text-sm text-gray-400">Temporary password</label>
-        <Input
-          type="password"
-          placeholder="Enter your temporary password"
-          required
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
-          autoComplete="current-password"
-          autoFocus
-        />
-        <label className="text-sm text-gray-400">New password</label>
-        <Input
-          type="password"
-          placeholder="At least 8 characters"
-          required
-          value={newPassword}
-          onChange={(e) => setNewPassword(e.target.value)}
-          autoComplete="new-password"
-        />
-        <label className="text-sm text-gray-400">Confirm new password</label>
-        <Input
-          type="password"
-          placeholder="Re-enter your new password"
-          required
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          autoComplete="new-password"
-        />
-        {error && (
-          <p className="text-red-400 text-sm text-center">{error}</p>
-        )}
-        <Button type="submit" isPending={loading} variant="primary">
-          Set Password
-        </Button>
-      </form>
+      <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-lg flex-col justify-center px-4 py-10">
+        <div className="rounded-2xl border border-white/10 bg-[#151a1a] p-6 shadow-xl">
+          <h1 className="text-2xl font-bold">Set your password</h1>
+          <p className="mt-2 text-sm text-white/65">
+            Replace your temporary password with a new one you&apos;ll remember.
+          </p>
+
+          <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-3">
+            <label className="text-sm text-white/80">Temporary password</label>
+            <Input
+              type="password"
+              placeholder="Enter your temporary password"
+              required
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              autoComplete="current-password"
+              autoFocus
+            />
+            <label className="text-sm text-white/80">New password</label>
+            <Input
+              type="password"
+              placeholder="At least 8 characters"
+              required
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              autoComplete="new-password"
+            />
+            <label className="text-sm text-white/80">Confirm new password</label>
+            <Input
+              type="password"
+              placeholder="Re-enter your new password"
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
+            />
+            {error && (
+              <p className="text-center text-sm text-red-400">{error}</p>
+            )}
+            <Button
+              type="submit"
+              isPending={loading}
+              variant="primary"
+              className="mt-1 bg-[#E9D500] font-semibold text-[#193B4B]"
+            >
+              Set password
+            </Button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-white/55">
+            <Link to="/login" className="font-medium text-[#E9D500] hover:underline">
+              Back to log in
+            </Link>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

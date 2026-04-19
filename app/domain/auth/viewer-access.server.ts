@@ -1,4 +1,8 @@
-import { hashPassword, verifyPassword } from "~/domain/auth/better-auth.server";
+import {
+  hashPassword,
+  sharedSessionCookieDomain,
+  verifyPassword,
+} from "~/domain/auth/better-auth.server";
 import { getTenantPrisma } from "~/domain/utils/global-context.server";
 
 const VIEWER_FID_COOKIE = "tome_viewer_fid";
@@ -40,7 +44,9 @@ async function sha256Hex(value: string): Promise<string> {
 function cookieAttr(context: any) {
   const env = context?.cloudflare?.env ?? process.env;
   const isProd = env.ENVIRONMENT !== "development";
-  return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${VIEWER_SESSION_DAYS * ONE_DAY_MS / 1000}${isProd ? "; Secure" : ""}`;
+  const domain = sharedSessionCookieDomain(context);
+  const domainPart = domain ? `; Domain=${domain}` : "";
+  return `Path=/; HttpOnly; SameSite=Lax; Max-Age=${VIEWER_SESSION_DAYS * ONE_DAY_MS / 1000}${isProd ? "; Secure" : ""}${domainPart}`;
 }
 
 function ipFromRequest(request: Request): string {
@@ -265,5 +271,7 @@ export async function consumeViewerMagicLink(ctx: Ctx, rawToken: string): Promis
 export function clearViewerSessionCookie(context: any): string {
   const env = context?.cloudflare?.env ?? process.env;
   const isProd = env.ENVIRONMENT !== "development";
-  return `${VIEWER_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${isProd ? "; Secure" : ""}`;
+  const domain = sharedSessionCookieDomain(context);
+  const domainPart = domain ? `; Domain=${domain}` : "";
+  return `${VIEWER_SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${isProd ? "; Secure" : ""}${domainPart}`;
 }

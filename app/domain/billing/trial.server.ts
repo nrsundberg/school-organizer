@@ -1,12 +1,12 @@
 import type { Org } from "~/db";
 import type { PrismaClient } from "~/db/generated/client";
+import {
+  TRIAL_CALENDAR_DAYS,
+  TRIAL_MIN_STUDENTS_PER_QUALIFYING_DAY,
+  TRIAL_QUALIFYING_DAYS,
+} from "~/lib/trial-rules";
 
-/** Calendar window from trial start (UTC date arithmetic). */
-export const TRIAL_CALENDAR_DAYS = 30;
-/** Qualifying “pickup” days required for the trial milestone. */
-export const TRIAL_QUALIFYING_DAYS = 25;
-/** A qualifying day has more than this many distinct students with call events. */
-export const TRIAL_MIN_STUDENTS_PER_QUALIFYING_DAY = 10;
+export { TRIAL_CALENDAR_DAYS, TRIAL_MIN_STUDENTS_PER_QUALIFYING_DAY, TRIAL_QUALIFYING_DAYS };
 
 export function addDaysUtc(start: Date, days: number): Date {
   const d = new Date(start.getTime());

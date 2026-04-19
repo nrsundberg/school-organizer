@@ -1,15 +1,47 @@
 import { useState } from "react";
-import { isRouteErrorResponse, Outlet, useRouteError, useRouteLoaderData } from "react-router";
+import {
+  isRouteErrorResponse,
+  Outlet,
+  useLoaderData,
+  useRouteError,
+  useRouteLoaderData,
+} from "react-router";
 import { Menu, X, ShieldAlert, LogIn } from "lucide-react";
 import type { Route } from "./+types/layout";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
+import { buildUsageSnapshot, countOrgUsage } from "~/domain/billing/plan-usage.server";
+import { addDaysUtc } from "~/domain/billing/trial.server";
+import {
+  getOrgFromContext,
+  getTenantPrisma,
+} from "~/domain/utils/global-context.server";
 import AdminSidebar from "~/components/admin/AdminSidebar";
+import { AdminUsageBanner } from "~/components/admin/AdminUsageBanner";
+import { PastDuePaymentBanner } from "~/components/admin/PastDuePaymentBanner";
 import Header from "~/components/Header";
 import logo from "/favicon.ico?url";
 
 export async function loader({ context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
-  return {};
+  const org = getOrgFromContext(context);
+  const prisma = getTenantPrisma(context);
+  const counts = await countOrgUsage(prisma, org.id);
+  const usage = buildUsageSnapshot(org, counts, new Date());
+
+  const now = new Date();
+  let pastDuePaymentBanner: { suspendOnIso: string } | null = null;
+  if (
+    org.pastDueSinceAt &&
+    org.subscriptionStatus === "PAST_DUE" &&
+    org.status !== "SUSPENDED" &&
+    now < addDaysUtc(org.pastDueSinceAt, 7)
+  ) {
+    pastDuePaymentBanner = {
+      suspendOnIso: addDaysUtc(org.pastDueSinceAt, 14).toISOString(),
+    };
+  }
+
+  return { usage, pastDuePaymentBanner };
 }
 
 export function ErrorBoundary() {
@@ -78,6 +110,7 @@ export function ErrorBoundary() {
 
 export default function AdminLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { usage, pastDuePaymentBanner } = useLoaderData<typeof loader>();
   const rootData = useRouteLoaderData("root") as
     | { branding?: { orgName?: string; primaryColor?: string; logoUrl?: string | null } }
     | undefined;
@@ -85,6 +118,10 @@ export default function AdminLayout() {
   return (
     <div className="flex flex-col min-h-screen bg-[#212525] text-white">
       <Header user={true} branding={rootData?.branding} />
+      {pastDuePaymentBanner && (
+        <PastDuePaymentBanner suspendOnIso={pastDuePaymentBanner.suspendOnIso} />
+      )}
+      {usage.limits && <AdminUsageBanner usage={usage} />}
       <div className="flex flex-1">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-56 min-h-screen bg-[#1a1f1f] border-r border-white/10 flex-shrink-0">

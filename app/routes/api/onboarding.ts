@@ -2,14 +2,31 @@ import { data } from "react-router";
 import type { Route } from "./+types/onboarding";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { ensureOrgForUser, slugifyOrgName } from "~/domain/billing/onboarding.server";
+import { isMarketingHost } from "~/domain/utils/host.server";
 import type { BillingPlan } from "~/db";
 
 function asPlan(value: string | null): BillingPlan {
-  if (value === "STARTER") return "STARTER";
-  return "FREE";
+  switch (value) {
+    case "CAR_LINE":
+      return "CAR_LINE";
+    case "CAMPUS":
+    case "STARTER":
+      return "CAMPUS";
+    case "ENTERPRISE":
+      return "ENTERPRISE";
+    default:
+      return "FREE";
+  }
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
+  if (!isMarketingHost(request, context)) {
+    return data(
+      { error: "Organization setup is only available on the main site." },
+      { status: 403 },
+    );
+  }
+
   const auth = getAuth(context);
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session?.user?.id || !session.user.email) {

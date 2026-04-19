@@ -5,7 +5,13 @@ import { getPrisma } from "~/db.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { hasValidViewerAccess } from "~/domain/auth/viewer-access.server";
 import { isOrgStatusAllowedForApp } from "~/domain/billing/org-status";
-import { isMarketingHost, resolveTenantSlugFromHost } from "~/domain/utils/host.server";
+import { tenantBoardUrlFromRequest } from "~/lib/org-slug";
+import {
+  isMarketingHost,
+  isPlatformAdmin,
+  marketingOriginFromRequest,
+  resolveTenantSlugFromHost,
+} from "~/domain/utils/host.server";
 
 export const userContext = createContext<User | null>(null);
 export const orgContext = createContext<Org | null>(null);
@@ -123,18 +129,42 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
     pathname.startsWith("/build/") ||
     pathname === "/favicon.ico";
   const isCheckEmailApi = pathname === "/api/check-email";
+  const isCheckOrgSlugApi = pathname === "/api/check-org-slug";
   const isBrandingLogoApi = pathname.startsWith("/api/branding/logo/");
   const isPlatform = pathname.startsWith("/platform");
 
   const publicMarketingPath =
     pathname === "/pricing" ||
     pathname === "/faqs" ||
-    pathname === "/signup" ||
-    pathname.startsWith("/api/onboarding") ||
+    (pathname === "/signup" && onMarketingHost) ||
+    (pathname.startsWith("/api/onboarding") && onMarketingHost) ||
     (pathname === "/" && onMarketingHost);
 
   if (user?.mustChangePassword && !isSetPassword && !isApi && !isLogout) {
     throw redirect("/set-password");
+  }
+
+  const skipTenantOrgBinding = isStatic || isAuthApi || isStripeWebhook;
+  if (
+    !onMarketingHost &&
+    user &&
+    org &&
+    !skipTenantOrgBinding &&
+    !isPlatformAdmin(user, context)
+  ) {
+    const sameOrg = !!user.orgId && user.orgId === org.id;
+    if (!sameOrg) {
+      if (user.orgId) {
+        const userOrgRow = await db.org.findUnique({
+          where: { id: user.orgId },
+          select: { slug: true },
+        });
+        if (userOrgRow?.slug) {
+          throw redirect(tenantBoardUrlFromRequest(request, userOrgRow.slug));
+        }
+      }
+      throw redirect(`${marketingOriginFromRequest(request, context)}/signup`);
+    }
   }
 
   const anonSkipsViewer =
@@ -144,6 +174,7 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
     isAuthApi ||
     isStatic ||
     isCheckEmailApi ||
+    isCheckOrgSlugApi ||
     isBrandingLogoApi ||
     publicMarketingPath;
 

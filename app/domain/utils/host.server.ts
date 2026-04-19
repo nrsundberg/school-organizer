@@ -10,6 +10,34 @@ export function getPublicEnv(context: any): Record<string, string | undefined> {
   >;
 }
 
+/** Same policy as `isPlatformAdmin` in platform-admin.server (kept here for host/middleware helpers). */
+export function isPlatformAdmin(
+  user: { email: string; role: string } | null,
+  context: any,
+): boolean {
+  if (!user) return false;
+  if (user.role === "PLATFORM_ADMIN") return true;
+  const env = getPublicEnv(context);
+  const allow = (env.PLATFORM_ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return allow.includes(user.email.toLowerCase());
+}
+
+/**
+ * Origin for the marketing site (apex of PUBLIC_ROOT_DOMAIN), preserving scheme and port from the request.
+ * Used to redirect users away from tenant hosts when they must use marketing-only flows.
+ */
+export function marketingOriginFromRequest(request: Request, context: any): string {
+  const env = getPublicEnv(context);
+  const root = (env.PUBLIC_ROOT_DOMAIN ?? "").trim().toLowerCase();
+  const u = new URL(request.url);
+  const host = root || "localhost";
+  const port = u.port;
+  return port ? `${u.protocol}//${host}:${port}` : `${u.protocol}//${host}`;
+}
+
 function normalizeHost(request: Request): string {
   return new URL(request.url).host.toLowerCase().split(":")[0];
 }

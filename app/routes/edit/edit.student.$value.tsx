@@ -3,7 +3,8 @@ import { useFetcher } from "react-router";
 import { useState } from "react";
 import { SaveIcon, Trash2Icon } from "lucide-react";
 import type { Route } from "./+types/edit.student.$value";
-import { getTenantPrisma } from "~/domain/utils/global-context.server";
+import { countOrgUsage, syncUsageGracePeriod } from "~/domain/billing/plan-usage.server";
+import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 import { Page } from "~/components/Page";
 import { redirectWithInfo, redirectWithSuccess } from "remix-toast";
 
@@ -26,6 +27,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 
 export async function action({ request, context }: Route.ActionArgs) {
   const prisma = getTenantPrisma(context);
+  const org = getOrgFromContext(context);
   const formData = await request.formData();
   const action = formData.get("action") as string;
   const id = formData.get("id") as string;
@@ -37,6 +39,11 @@ export async function action({ request, context }: Route.ActionArgs) {
   try {
     if (action === "delete") {
       await prisma.student.delete({ where: { id: parseInt(id) } });
+      const freshOrg = await prisma.org.findUnique({ where: { id: org.id } });
+      if (freshOrg) {
+        const nextCounts = await countOrgUsage(prisma, org.id);
+        await syncUsageGracePeriod(prisma, freshOrg, nextCounts);
+      }
       return redirectWithInfo("/admin", "Student deleted successfully");
     }
 

@@ -12,6 +12,7 @@ test("allows active-like org statuses", () => {
 });
 
 test("blocks non-active org statuses", () => {
+  assert.equal(isOrgStatusAllowedForApp("SUSPENDED"), false);
   assert.equal(isOrgStatusAllowedForApp("INCOMPLETE"), false);
   assert.equal(isOrgStatusAllowedForApp("CANCELED"), false);
 });

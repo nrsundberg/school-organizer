@@ -2,3 +2,5 @@
 # .dev.vars is used by wrangler for local secrets (gitignored)
 BETTER_AUTH_SECRET=generate-a-random-secret-here
 SENTRY_AUTH_TOKEN=your-sentry-auth-token
+# Optional: use while running `wrangler dev` if you need tenant hosts like slug.localhost (overrides PUBLIC_ROOT_DOMAIN from wrangler.jsonc).
+# PUBLIC_ROOT_DOMAIN=

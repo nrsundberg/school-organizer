@@ -3,6 +3,9 @@ import { getPrisma } from "~/db.server";
 import { requireStripeConfig } from "~/domain/billing/stripe.server";
 import { mapStripeSubscriptionStatusToOrgStatus } from "~/domain/billing/org-status";
 import { addDaysUtc } from "~/domain/billing/trial.server";
+import { slugifyOrgName } from "~/lib/org-slug";
+
+export { slugifyOrgName };
 
 function toSubscriptionStatus(
   value: string | null | undefined,
@@ -27,29 +30,6 @@ function toSubscriptionStatus(
   }
 }
 
-export function slugifyOrgName(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 50);
-}
-
-export async function uniqueOrgSlug(
-  context: any,
-  requestedSlug: string,
-): Promise<string> {
-  const db = getPrisma(context);
-  const base = requestedSlug || "org";
-  for (let i = 0; i < 20; i++) {
-    const candidate = i === 0 ? base : `${base}-${i + 1}`;
-    const existing = await db.org.findUnique({ where: { slug: candidate } });
-    if (!existing) return candidate;
-  }
-  throw new Error("Unable to generate unique org slug.");
-}
-
 export async function ensureOrgForUser(params: {
   context: any;
   userId: string;
@@ -68,7 +48,15 @@ export async function ensureOrgForUser(params: {
     return { orgId: existingUser.orgId, plan };
   }
 
-  const slug = await uniqueOrgSlug(context, requestedSlug);
+  const slug = slugifyOrgName(requestedSlug);
+  if (!slug) {
+    throw new Error("A valid organization slug is required.");
+  }
+
+  const taken = await db.org.findUnique({ where: { slug } });
+  if (taken) {
+    throw new Error("That slug is already taken. Choose another or verify availability again.");
+  }
 
   const trialStartedAt = new Date();
   const org = await db.org.create({
@@ -87,8 +75,10 @@ export async function ensureOrgForUser(params: {
   let stripeSubscriptionId: string | undefined;
   let subscriptionStatus: string | undefined;
 
-  if (plan !== "FREE") {
+  if (plan !== "FREE" && plan !== "ENTERPRISE") {
     const stripe = requireStripeConfig(context);
+    const priceId =
+      plan === "CAR_LINE" ? stripe.carLinePriceId : stripe.campusPriceId;
     const customer = await stripe.client.customers.create({
       email,
       name: org.name,
@@ -96,8 +86,8 @@ export async function ensureOrgForUser(params: {
     });
     const subscription = await stripe.client.subscriptions.create({
       customer: customer.id,
-      items: [{ price: stripe.starterPriceId }],
-      metadata: { orgId: org.id },
+      items: [{ price: priceId }],
+      metadata: { orgId: org.id, billingPlan: plan },
     });
     stripeCustomerId = customer.id;
     stripeSubscriptionId = subscription.id;

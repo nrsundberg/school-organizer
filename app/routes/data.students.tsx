@@ -2,8 +2,17 @@ import { z } from "zod";
 import invariant from "tiny-invariant";
 import { convertToDataType, headerBody } from "~/csvParser/utils";
 import type { Route } from "./+types/data.students";
-import { getTenantPrisma } from "~/domain/utils/global-context.server";
-import { dataWithSuccess } from "remix-toast";
+import {
+  getOrgFromContext,
+  getTenantPrisma,
+} from "~/domain/utils/global-context.server";
+import {
+  assertUsageAllowsIncrement,
+  countOrgUsage,
+  PlanLimitError,
+  syncUsageGracePeriod,
+} from "~/domain/billing/plan-usage.server";
+import { dataWithError, dataWithSuccess } from "remix-toast";
 
 const schema = z.object({
   "Last Name": z.string().min(1),
@@ -14,6 +23,7 @@ const schema = z.object({
 
 export async function action({ request, context }: Route.ActionArgs) {
   const prisma = getTenantPrisma(context);
+  const org = getOrgFromContext(context);
 
   // Use native Web API for multipart form data (works on Cloudflare Workers)
   const formData = await request.formData();
@@ -24,6 +34,31 @@ export async function action({ request, context }: Route.ActionArgs) {
   const allCsvData = convertToDataType<typeof schema>(h.header, h.body);
 
   const homeRooms = new Set(h.body.map((it) => it[3]));
+  let newClassrooms = 0;
+  for (const room of homeRooms) {
+    const exists = await prisma.teacher.findFirst({
+      where: { homeRoom: room }
+    });
+    if (!exists) {
+      newClassrooms += 1;
+    }
+  }
+
+  const rowCount = allCsvData.length;
+  const counts = await countOrgUsage(prisma, org.id);
+  try {
+    assertUsageAllowsIncrement(org, counts, {
+      students: rowCount,
+      families: rowCount,
+      classrooms: newClassrooms,
+    });
+  } catch (e) {
+    if (e instanceof PlanLimitError) {
+      return dataWithError({ result: "blocked" }, e.message);
+    }
+    throw e;
+  }
+
   for (const room of homeRooms) {
     const exists = await prisma.teacher.findFirst({
       where: { homeRoom: room }
@@ -45,6 +80,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     await prisma.student.createMany({
       data: rows.slice(i, i + CHUNK_SIZE),
     });
+  }
+
+  const freshOrg = await prisma.org.findUnique({ where: { id: org.id } });
+  if (freshOrg) {
+    const nextCounts = await countOrgUsage(prisma, org.id);
+    await syncUsageGracePeriod(prisma, freshOrg, nextCounts);
   }
 
   return dataWithSuccess(

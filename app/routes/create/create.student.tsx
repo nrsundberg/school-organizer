@@ -3,7 +3,17 @@ import { useFetcher } from "react-router";
 import { useState } from "react";
 import { ArrowLeftIcon, UserPlusIcon } from "lucide-react";
 import type { Route } from "./+types/create.student";
-import { getTenantPrisma } from "~/domain/utils/global-context.server";
+import {
+  getOrgFromContext,
+  getTenantPrisma,
+} from "~/domain/utils/global-context.server";
+import {
+  assertUsageAllowsIncrement,
+  countOrgUsage,
+  familiesDeltaForNewStudent,
+  PlanLimitError,
+  syncUsageGracePeriod,
+} from "~/domain/billing/plan-usage.server";
 import { Page } from "~/components/Page";
 import { redirectWithSuccess } from "remix-toast";
 
@@ -22,6 +32,7 @@ export async function loader({ context }: Route.LoaderArgs) {
 
 export async function action({ request, context }: Route.ActionArgs) {
   const prisma = getTenantPrisma(context);
+  const org = getOrgFromContext(context);
   const formData = await request.formData();
 
   const spaceNum = formData.get("spaceNum") as string;
@@ -55,20 +66,39 @@ export async function action({ request, context }: Route.ActionArgs) {
       }
     }
 
+    const householdId = null;
+    const counts = await countOrgUsage(prisma, org.id);
+    const famDelta = await familiesDeltaForNewStudent(prisma, org.id, householdId);
+    assertUsageAllowsIncrement(org, counts, {
+      students: 1,
+      families: famDelta,
+      classrooms: 0,
+    });
+
     const student = await prisma.student.create({
       data: {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         spaceNumber,
-        homeRoom: trimmedHomeRoom || null
+        homeRoom: trimmedHomeRoom || null,
+        householdId,
       }
     });
+
+    const freshOrg = await prisma.org.findUnique({ where: { id: org.id } });
+    if (freshOrg) {
+      const nextCounts = await countOrgUsage(prisma, org.id);
+      await syncUsageGracePeriod(prisma, freshOrg, nextCounts);
+    }
 
     return redirectWithSuccess("/admin", {
       message: `Student ${student.firstName} ${student.lastName} created successfully`
     });
   } catch (error) {
     console.error("Error creating student:", error);
+    if (error instanceof PlanLimitError) {
+      return { error: error.message };
+    }
     return {
       error: error instanceof Error ? error.message : "Failed to create student"
     };

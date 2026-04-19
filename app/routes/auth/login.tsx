@@ -1,10 +1,11 @@
 import { Button, Input } from "@heroui/react";
-import { redirect } from "react-router";
+import { Link, redirect } from "react-router";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
+import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
 import type { Route } from "./+types/login";
 import { useState } from "react";
 import { signIn } from "~/lib/auth-client";
-import { Page } from "~/components/Page";
+import { MarketingNav } from "~/components/marketing/MarketingNav";
 
 export function meta() {
   return [
@@ -13,10 +14,13 @@ export function meta() {
   ];
 }
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const user = getOptionalUserFromContext(context);
-  if (user) throw redirect("/");
-  return null;
+  if (!user) return null;
+  if (!user.orgId) throw redirect("/signup?step=2");
+  const url = await getTenantBoardUrlForRequest(request, context);
+  if (url) throw redirect(url);
+  throw redirect("/");
 }
 
 type Step = "email" | "password";
@@ -66,7 +70,7 @@ export default function Login() {
         setError("Invalid password.");
         setLoading(false);
       } else {
-        window.location.href = "/";
+        window.location.reload();
       }
     } catch {
       setError("Something went wrong. Please try again.");
@@ -75,67 +79,96 @@ export default function Login() {
   };
 
   return (
-    <Page user={false}>
-      <div className="h-[calc(100vh-40px)] flex flex-col items-center justify-center bg-[#212525]">
-        <p className="text-2xl font-bold text-white mb-1">School Organizer</p>
-        <p className="text-lg font-semibold text-white mb-6">Car Line Bingo</p>
+    <div className="min-h-screen bg-[#0f1414] text-white">
+      <MarketingNav />
 
-        {step === "email" ? (
-          <form
-            onSubmit={handleEmailNext}
-            className="flex flex-col gap-3 w-full max-w-sm px-4"
-          >
-            <label htmlFor={"email"}>Email Address</label>
-            <Input
-              type="email"
-              placeholder="you@example.com"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-            />
-            {error && (
-              <p className="text-red-400 text-sm text-center">{error}</p>
-            )}
-            <Button type="submit" isPending={loading} variant="primary">
-              Next
-            </Button>
-          </form>
-        ) : (
-          <form
-            onSubmit={handleLogin}
-            className="flex flex-col gap-3 w-full max-w-sm px-4"
-          >
-            <p className="text-white text-sm text-center">{email}</p>
-            <label className="text-sm text-gray-400">Password</label>
-            <Input
-              type="password"
-              placeholder="Enter your password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="current-password"
-            />
-            {error && (
-              <p className="text-red-400 text-sm text-center">{error}</p>
-            )}
-            <Button type="submit" isPending={loading} variant="primary">
-              Sign In
-            </Button>
-            <button
-              type="button"
-              onClick={() => {
-                setStep("email");
-                setError(null);
-                setPassword("");
-              }}
-              className="text-sm text-gray-400 hover:text-white text-center"
+      <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-lg flex-col justify-center px-4 py-10">
+        <div className="rounded-2xl border border-white/10 bg-[#151a1a] p-6 shadow-xl">
+          <h1 className="text-2xl font-bold">Log in</h1>
+          <p className="mt-2 text-sm text-white/65">
+            Sign in to manage your school&apos;s car line board.
+          </p>
+
+          {step === "email" ? (
+            <form
+              onSubmit={handleEmailNext}
+              className="mt-6 flex w-full flex-col gap-3"
             >
-              Use a different email
-            </button>
-          </form>
-        )}
+              <label className="text-sm text-white/80" htmlFor="email">
+                Email
+              </label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@school.edu"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
+              {error && (
+                <p className="text-center text-sm text-red-400">{error}</p>
+              )}
+              <Button
+                type="submit"
+                isPending={loading}
+                variant="primary"
+                className="mt-1 bg-[#E9D500] font-semibold text-[#193B4B]"
+              >
+                Next
+              </Button>
+            </form>
+          ) : (
+            <form
+              onSubmit={handleLogin}
+              className="mt-6 flex w-full flex-col gap-3"
+            >
+              <p className="text-center text-sm text-white/80">{email}</p>
+              <label className="text-sm text-white/80" htmlFor="password">
+                Password
+              </label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+              {error && (
+                <p className="text-center text-sm text-red-400">{error}</p>
+              )}
+              <Button
+                type="submit"
+                isPending={loading}
+                variant="primary"
+                className="mt-1 bg-[#E9D500] font-semibold text-[#193B4B]"
+              >
+                Sign in
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStep("email");
+                  setError(null);
+                  setPassword("");
+                }}
+                className="text-center text-sm text-white/50 transition hover:text-white"
+              >
+                Use a different email
+              </button>
+            </form>
+          )}
+
+          <p className="mt-6 text-center text-sm text-white/55">
+            Need an account?{" "}
+            <Link to="/signup" className="font-medium text-[#E9D500] hover:underline">
+              Sign up
+            </Link>
+          </p>
+        </div>
       </div>
-    </Page>
+    </div>
   );
 }

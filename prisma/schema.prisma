@@ -52,6 +52,14 @@ model Org {
   trialQualifyingPickupDays Int                   @default(0)
   /// Effective trial end: max(calendar 30d from start, completion of 25th qualifying day). Updated by cron.
   trialEndsAt              DateTime?
+  /// First time any usage metric exceeded 100% of plan cap; 30-day grace to reach 110% or upgrade.
+  usageGraceStartedAt      DateTime?
+  /// Set when the Stripe subscription first becomes past_due; cleared when payment succeeds or sub ends past_due.
+  pastDueSinceAt           DateTime?
+  /// Platform ops notes (e.g. manual comp reasons).
+  billingNote              String?
+  /// When set, billing enforcement may treat the org as comped until this instant (UTC).
+  compedUntil              DateTime?
   users                  User[]
   appSettings            AppSettings[]
   viewerAccessAttempts   ViewerAccessAttempt[]
@@ -215,6 +223,8 @@ model Student {
   org         Org      @relation(fields: [orgId], references: [id])
   firstName   String
   lastName    String
+  /// Siblings share one household; each distinct household (or unassigned student) counts toward family cap.
+  householdId String?
   space       Space?   @relation(fields: [spaceNumber], references: [spaceNumber])
   spaceNumber Int?
   teacher     Teacher? @relation(fields: [homeRoom], references: [homeRoom])
@@ -222,6 +232,7 @@ model Student {
   callEvents  CallEvent[]
 
   @@index([orgId])
+  @@index([householdId])
   @@index([spaceNumber])
   @@index([homeRoom])
   @@index([orgId, spaceNumber])
@@ -271,13 +282,21 @@ enum Status {
 
 enum BillingPlan {
   FREE
+  /// @deprecated Use CAMPUS — migrated in DB; kept for compatibility with old clients.
   STARTER
+  /// Base paid: car line + subdomain (see plan-limits).
+  CAR_LINE
+  /// Full campus tier (families/students/classrooms caps in plan-limits).
+  CAMPUS
+  ENTERPRISE
 }
 
 enum OrgStatus {
   ACTIVE
   TRIALING
   PAST_DUE
+  /// Non-payment: set by cron after 14-day grace while subscription remains past_due.
+  SUSPENDED
   INCOMPLETE
   CANCELED
 }

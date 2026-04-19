@@ -46,6 +46,7 @@ export default [
   // Auth routes
   route("api/auth/*", "routes/api/auth.ts"),
   route("api/check-email", "routes/api/check-email.ts"),
+  route("api/check-org-slug", "routes/api/check-org-slug.ts"),
   route("api/branding/logo/:slug", "routes/api/branding.logo.$slug.ts"),
   route("api/user-prefs", "routes/api/user-prefs.tsx"),
   route("api/onboarding", "routes/api/onboarding.ts"),
@@ -56,7 +57,13 @@ export default [
   route("pricing", "routes/pricing.tsx"),
   route("faqs", "routes/faqs.tsx"),
 
-  route("platform", "routes/platform/layout.tsx", [index("routes/platform/index.tsx")]),
+  route("platform", "routes/platform/layout.tsx", [
+    index("routes/platform/index.tsx"),
+    route("orgs/:orgId", "routes/platform/orgs.$orgId.tsx"),
+    route("signups", "routes/platform/signups.tsx"),
+    route("sessions", "routes/platform/sessions.tsx"),
+    route("webhooks", "routes/platform/webhooks.tsx"),
+  ]),
 
   route("billing-required", "routes/billing-required.tsx"),
   route("logout", "routes/auth/logout.ts"),

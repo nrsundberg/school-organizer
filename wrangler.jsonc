@@ -6,15 +6,21 @@
   "assets": {
     "directory": "./build/client"
   },
+  // Apex + www use Custom Domains; tenant subdomains use a zone route (wildcard not supported on custom_domain in wrangler).
+  // In the pickuproster.com zone, add a proxied DNS record for *.pickuproster.com (or each slug); otherwise {slug}.pickuproster.com will not resolve.
+  "routes": [
+    { "pattern": "pickuproster.com", "custom_domain": true },
+    { "pattern": "www.pickuproster.com", "custom_domain": true },
+    { "pattern": "*.pickuproster.com/*", "zone_name": "pickuproster.com" }
+  ],
   "vars": {
     "SENTRY_DSN": "",
     "ENVIRONMENT": "production",
-    // Set to your apex (e.g. schoolorganizer.com) so apex/www serve the marketing homepage, not a tenant board.
-    // Leave empty only for local; in Cloudflare Dashboard → Workers → your worker → Settings → Variables, set PUBLIC_ROOT_DOMAIN for production.
-    "PUBLIC_ROOT_DOMAIN": "",
-    // Dev defaults plus production Workers URL so the marketing homepage loads (not tenant bingo board).
+    // Apex and www serve marketing; {slug}.pickuproster.com are tenant boards (see MARKETING_HOSTS for local preview).
+    "PUBLIC_ROOT_DOMAIN": "pickuproster.com",
+    // Local dev plus default *.workers.dev URL so preview deploys show marketing on the worker hostname (not a tenant board).
     "MARKETING_HOSTS": "localhost,127.0.0.1,school-organizer.sundbergne.workers.dev",
-    "PLATFORM_ADMIN_EMAILS": ""
+    "PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com"
   },
   "triggers": {
     "crons": ["0 10 * * *"]

@@ -1,5 +1,6 @@
 import { createRequestHandler, RouterContextProvider } from "react-router";
 import { getCurrentScope, withSentry } from "@sentry/cloudflare";
+import { runPastDueSuspension } from "../app/domain/billing/past-due-suspension.server";
 import { runTrialMaintenance } from "../app/domain/billing/trial-maintenance.server";
 import { isMarketingHost } from "../app/domain/utils/host.server";
 export { BingoBoardDO } from "./bingo-board";
@@ -59,8 +60,9 @@ export default withSentry(
       (context as any).cloudflare = { env, ctx };
       try {
         await runTrialMaintenance(context);
+        await runPastDueSuspension(context);
       } catch (e) {
-        console.error("trial maintenance failed", e);
+        console.error("scheduled billing maintenance failed", e);
         throw e;
       }
     },
