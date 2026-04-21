@@ -1,5 +1,5 @@
 /**
- * Marketing vs tenant host detection using PUBLIC_ROOT_DOMAIN (e.g. schoolorganizer.com).
+ * Marketing vs tenant host detection using PUBLIC_ROOT_DOMAIN (e.g. pickuproster.com).
  * Apex and www → marketing. {slug}.root → tenant slug. MARKETING_HOSTS adds dev hosts (localhost).
  */
 
@@ -60,7 +60,7 @@ export function isMarketingHost(request: Request, context: any): boolean {
 }
 
 /**
- * Slug for tenant subdomain: tome.schoolorganizer.com → "tome".
+ * Slug for tenant subdomain: tome.pickuproster.com → "tome".
  * Returns null for apex, www, or non-matching hosts.
  */
 export function tenantSlugFromHost(request: Request, context: any): string | null {

@@ -48,8 +48,8 @@ test("suggestOrgSlugsFromName omits one-letter initials", () => {
 });
 
 test("schoolBoardHostname", () => {
-  assert.equal(schoolBoardHostname("schoolorganizer.com", "acme"), "acme.schoolorganizer.com");
-  assert.equal(schoolBoardHostname("www.schoolorganizer.com", "acme"), "acme.schoolorganizer.com");
+  assert.equal(schoolBoardHostname("pickuproster.com", "acme"), "acme.pickuproster.com");
+  assert.equal(schoolBoardHostname("www.pickuproster.com", "acme"), "acme.pickuproster.com");
   assert.equal(schoolBoardHostname("localhost", "tome"), "tome.localhost");
 });
 
@@ -63,8 +63,8 @@ test("tenantBoardUrlFromRequest preserves port on localhost", () => {
 
 test("tenantBoardUrlFromRequest apex marketing host", () => {
   const url = tenantBoardUrlFromRequest(
-    new Request("https://schoolorganizer.com/signup"),
+    new Request("https://pickuproster.com/signup"),
     "maple",
   );
-  assert.equal(url, "https://maple.schoolorganizer.com/");
+  assert.equal(url, "https://maple.pickuproster.com/");
 });

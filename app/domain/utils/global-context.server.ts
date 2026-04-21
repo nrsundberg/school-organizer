@@ -119,6 +119,8 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   const isApi = pathname.startsWith("/api/");
   const isLogout = pathname === "/logout";
   const isLogin = pathname === "/login";
+  const isForgotPassword = pathname === "/forgot-password";
+  const isResetPassword = pathname === "/reset-password";
   const isViewerAccess = pathname === "/viewer-access";
   const isBillingRequired = pathname === "/billing-required";
   const isOnboardingApi = pathname === "/api/onboarding";
@@ -170,6 +172,8 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   const anonSkipsViewer =
     isLogin ||
     isLogout ||
+    isForgotPassword ||
+    isResetPassword ||
     isViewerAccess ||
     isAuthApi ||
     isStatic ||
@@ -197,7 +201,7 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   if (
     user &&
     org &&
-    !isOrgStatusAllowedForApp(org.status) &&
+    !isOrgStatusAllowedForApp(org.status, { isComped: !!(org as any).isComped }) &&
     !isBillingRequired &&
     !isOnboardingApi &&
     !isStripeWebhook &&

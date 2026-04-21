@@ -1,7 +1,16 @@
-import type { EntryContext } from "react-router";
+import type { EntryContext, HandleErrorFunction } from "react-router";
 import { ServerRouter } from "react-router";
 import { renderToReadableStream } from "react-dom/server";
 import { isbot } from "isbot";
+import { captureException } from "~/lib/sentry.server";
+
+export const handleError: HandleErrorFunction = (error, { request }) => {
+  // Don't report aborted requests (e.g. user navigated away mid-stream)
+  if (!request.signal.aborted) {
+    captureException(error);
+    console.error(error);
+  }
+};
 
 const ABORT_DELAY = 5_000;
 

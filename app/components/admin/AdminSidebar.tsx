@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, GraduationCap, Palette, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Users, GraduationCap, Palette, ClipboardList, CreditCard } from "lucide-react";
 import { NavLink } from "react-router";
 
 const navItems = [
@@ -7,6 +7,7 @@ const navItems = [
   { to: "/admin/children", label: "Children & Classes", icon: GraduationCap },
   { to: "/admin/fire-drill", label: "Fire drill", icon: ClipboardList },
   { to: "/admin/branding", label: "Branding", icon: Palette },
+  { to: "/admin/billing", label: "Billing", icon: CreditCard },
 ];
 
 export default function AdminSidebar({ onLinkClick }: { onLinkClick?: () => void }) {

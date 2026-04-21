@@ -1,6 +1,6 @@
-# School organizer
+# Pickup Roster
 
-Multi-tenant school operations app: homerooms, car line / bingo board, viewer access, and billing (Stripe). Built with **React Router 7**, deployed to **Cloudflare Workers** with **D1** (SQLite) and **Prisma 7**.
+Pickup Roster is a multi-tenant school operations app: homerooms, car line / bingo board, viewer access, and billing (Stripe). Built with **React Router 7**, deployed to **Cloudflare Workers** with **D1** (SQLite) and **Prisma 7**.
 
 ## Requirements
 
@@ -41,7 +41,7 @@ Tenant isolation is enforced with a Prisma client extension (`orgId` on all scho
 
 Configure these Worker vars (see [`wrangler.jsonc`](wrangler.jsonc) and [`env.d.ts`](env.d.ts)):
 
-- **`PUBLIC_ROOT_DOMAIN`** — e.g. `schoolorganizer.com`. The apex host and `www` serve the marketing pages (`/`, `/pricing`, `/faqs`, `/signup`). Tenant hosts are `{orgSlug}.PUBLIC_ROOT_DOMAIN`, resolved to `Org.slug`.
+- **`PUBLIC_ROOT_DOMAIN`** — e.g. `pickuproster.com`. The apex host and `www` serve the marketing pages (`/`, `/pricing`, `/faqs`, `/signup`). Tenant hosts are `{orgSlug}.PUBLIC_ROOT_DOMAIN`, resolved to `Org.slug`.
 - **`MARKETING_HOSTS`** — comma-separated hosts that always behave as marketing (default includes `localhost` and `127.0.0.1` for local dev).
 - **`PLATFORM_ADMIN_EMAILS`** — comma-separated emails that may access `/platform` (internal org list) in addition to users with role `PLATFORM_ADMIN`.
 
@@ -79,6 +79,19 @@ In non-interactive environments (CI, some sandboxes), set `CLOUDFLARE_API_TOKEN`
 - Set production secrets in the Cloudflare dashboard (Workers → your worker → Settings → Variables) or via `wrangler secret put`, e.g. `BETTER_AUTH_SECRET`.
 - Configure any R2 buckets or custom domains referenced in `wrangler.jsonc` / `env.d.ts`.
 
+### Stripe
+
+See [docs/stripe-products.md](docs/stripe-products.md) for product/price setup. Then set the required secrets:
+
+```sh
+npx wrangler secret put STRIPE_SECRET_KEY
+npx wrangler secret put STRIPE_WEBHOOK_SECRET
+npx wrangler secret put STRIPE_CAR_LINE_PRICE_ID
+npx wrangler secret put STRIPE_CAMPUS_PRICE_ID
+```
+
+Point your Stripe webhook endpoint at `https://pickuproster.com/api/webhooks/stripe` and subscribe to at least `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `checkout.session.completed`, `invoice.payment_succeeded`, and `invoice.payment_failed`.
+
 ## Scripts
 
 | Script | Purpose |
@@ -89,6 +102,22 @@ In non-interactive environments (CI, some sandboxes), set `CLOUDFLARE_API_TOKEN`
 | `npm run deploy` | Build + deploy to Cloudflare |
 | `npm run d1:migrate` | Apply D1 migrations to remote DB |
 | `npm run test` | Domain tests |
+
+## Running E2E tests
+
+Install the Chromium browser binary once:
+
+```sh
+npx playwright install chromium
+```
+
+Then run the full suite against a local wrangler dev server:
+
+```sh
+npm run test:e2e
+```
+
+The dev server (`npx wrangler dev --log-level=warn`) is started automatically by Playwright before the tests run. Use `npm run test:e2e:ui` for the interactive Playwright UI mode.
 
 ## Docs
 

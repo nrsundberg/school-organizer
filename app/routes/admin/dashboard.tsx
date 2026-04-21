@@ -1,8 +1,9 @@
-import { Form, useFetcher } from "react-router";
+import { Form, Link, useFetcher } from "react-router";
 import { Button } from "@heroui/react";
 import { Status } from "~/db/browser";
 import { protectToAdminAndGetPermissions, requireRole } from "~/sessions.server";
-import { getTenantPrisma } from "~/domain/utils/global-context.server";
+import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
+import { buildUsageSnapshot, countOrgUsage, type UsageSnapshot } from "~/domain/billing/plan-usage.server";
 import { useState } from "react";
 import { MinimalCsvFileChooser } from "~/components/FileChooser";
 import type { Route } from "./+types/dashboard";
@@ -13,14 +14,17 @@ export const meta: Route.MetaFunction = () => [{ title: "Admin Dashboard" }];
 
 export async function loader({ context }: Route.LoaderArgs) {
   const me = await protectToAdminAndGetPermissions(context);
+  const org = getOrgFromContext(context);
   const prisma = getTenantPrisma(context);
-  const [studentCount, spaceCount, appSettings, maxSpace, teachers] = await Promise.all([
+  const [studentCount, spaceCount, appSettings, maxSpace, teachers, counts] = await Promise.all([
     prisma.student.count(),
     prisma.space.count(),
     prisma.appSettings.findUnique({ where: { id: "default" } }),
     prisma.space.aggregate({ _max: { spaceNumber: true } }),
     prisma.teacher.findMany({ orderBy: { homeRoom: "asc" } }),
+    countOrgUsage(prisma, org.id),
   ]);
+  const usage = buildUsageSnapshot(org, counts, new Date());
   return {
     studentCount,
     spaceCount,
@@ -28,6 +32,8 @@ export async function loader({ context }: Route.LoaderArgs) {
     isAdmin: me.role === "ADMIN",
     maxSpaceNumber: maxSpace._max.spaceNumber ?? 0,
     teachers,
+    usage,
+    billingPlan: org.billingPlan,
   };
 }
 
@@ -127,6 +133,84 @@ export async function action({ request, context }: Route.ActionArgs) {
   return dataWithError(null, "Unknown action");
 }
 
+function usageBarColor(ratio: number): string {
+  if (ratio >= 1) return "bg-red-500/70";
+  if (ratio >= 0.8) return "bg-amber-400/70";
+  return "bg-white/10";
+}
+
+function PlanUsagePanel({
+  usage,
+  billingPlan,
+}: {
+  usage: UsageSnapshot;
+  billingPlan: string;
+}) {
+  const isAtOrNearLimit =
+    usage.worstLevel === "over_cap" ||
+    usage.worstLevel === "grace" ||
+    usage.worstLevel === "grace_expired";
+
+  const dims: { key: "students" | "families" | "classrooms"; label: string }[] = [
+    { key: "students", label: "Students" },
+    { key: "families", label: "Families" },
+    { key: "classrooms", label: "Classrooms" },
+  ];
+
+  return (
+    <section className="rounded-xl bg-white/5 border border-white/10 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-white font-semibold text-base">Plan usage</h2>
+          <p className="text-white/50 text-xs mt-0.5">
+            Plan: <span className="text-white">{billingPlan}</span>
+            {" · "}
+            <Link to="/admin/billing" className="text-blue-400 hover:underline">
+              Manage billing
+            </Link>
+          </p>
+        </div>
+        {isAtOrNearLimit && (
+          <p className="text-sm text-amber-300 text-right max-w-xs">
+            You&apos;re at or near your plan limit.{" "}
+            <Link to="/admin/billing" className="underline hover:text-amber-200">
+              View billing
+            </Link>
+          </p>
+        )}
+      </div>
+      {usage.limits ? (
+        <div className="flex flex-col gap-4">
+          {dims.map(({ key, label }) => {
+            const count = usage.counts[key];
+            const cap = usage.limits![key];
+            const ratio = cap > 0 ? count / cap : 0;
+            const pct = Math.min(100, Math.round(ratio * 100));
+            return (
+              <div key={key}>
+                <div className="flex items-center justify-between text-xs text-white/60 mb-1">
+                  <span>{label}</span>
+                  <span>
+                    {count} / {cap}
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-white/5 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${usageBarColor(ratio)}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-white/50 text-sm">Enterprise plan — no usage limits apply.</p>
+      )}
+    </section>
+  );
+}
+
 export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
   const {
     studentCount,
@@ -135,6 +219,8 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
     isAdmin,
     maxSpaceNumber,
     teachers,
+    usage,
+    billingPlan,
   } = loaderData;
   const fetcher = useFetcher();
   const deleteFetcher = useFetcher({ key: "deleteStudents" });
@@ -160,6 +246,9 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
           <p className="text-3xl font-bold text-white">{spaceCount}</p>
         </div>
       </div>
+
+      {/* Plan usage */}
+      <PlanUsagePanel usage={usage} billingPlan={billingPlan} />
 
       {/* Grid Controls */}
       <section>

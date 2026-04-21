@@ -1,13 +1,13 @@
 # Stripe products to create
 
-Create these in the [Stripe Dashboard](https://dashboard.stripe.com/) (Products → Add product). Use **recurring monthly** prices unless you sell annual separately later.
+Create these in the [Stripe Dashboard](https://dashboard.stripe.com/) (Products → Add product). Each plan has a **monthly** price; annual prices are optional but recommended.
 
 ## Products and prices
 
 | Product name   | Billing | Purpose | Maps to `billingPlan` in app |
 |----------------|---------|---------|------------------------------|
-| **Car Line**   | Monthly | Base paid tier — car line + subdomain, lower enrollment caps | `CAR_LINE` |
-| **Campus**     | Monthly | Full campus tier — higher caps (e.g. 300 families / 900 students) | `CAMPUS` |
+| **Car Line**   | Monthly + Annual | Base paid tier — car line + subdomain, lower enrollment caps | `CAR_LINE` |
+| **Campus**     | Monthly + Annual | Full campus tier — higher caps (e.g. 300 families / 900 students) | `CAMPUS` |
 | **Free trial** | —       | No Stripe product required | `FREE` (trial orgs) |
 
 **Enterprise** (`ENTERPRISE`) is not sold via self-serve checkout in this app; use **Invoice + manual subscription** or a custom Price in Stripe if needed.
@@ -20,10 +20,12 @@ After creating prices, copy each Price ID (`price_...`) into your environment:
 |----------|-------------|
 | `STRIPE_SECRET_KEY` | Secret API key |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret for `https://your-domain/api/webhooks/stripe` |
-| `STRIPE_CAR_LINE_PRICE_ID` | Recurring price for **Car Line** |
-| `STRIPE_CAMPUS_PRICE_ID` | Recurring price for **Campus** |
+| `STRIPE_CAR_LINE_PRICE_ID` | Recurring **monthly** price for **Car Line** |
+| `STRIPE_CAR_LINE_ANNUAL_PRICE_ID` | Recurring **annual** price for **Car Line** (optional) |
+| `STRIPE_CAMPUS_PRICE_ID` | Recurring **monthly** price for **Campus** |
+| `STRIPE_CAMPUS_ANNUAL_PRICE_ID` | Recurring **annual** price for **Campus** (optional) |
 
-**Local / dev:** you may set only `STRIPE_STARTER_PRICE_ID` — the app falls back to it for **both** Car Line and Campus price IDs so a single test price works.
+**Local / dev:** you may set only `STRIPE_STARTER_PRICE_ID` — the app falls back to it for **both** Car Line and Campus monthly price IDs so a single test price works. Annual prices have no fallback; leave the annual env vars empty and the `/pricing` page will hide the annual toggle.
 
 ## Webhook
 
@@ -33,7 +35,7 @@ Subscribe to at least:
 - `customer.subscription.updated`
 - `customer.subscription.deleted`
 
-The handler maps the subscription’s **first line item’s price** to `CAR_LINE` or `CAMPUS` by comparing `price.id` to your env vars.
+The handler maps the subscription’s **first line item’s price** to `CAR_LINE` or `CAMPUS` by comparing `price.id` to your env vars (both monthly and annual price IDs resolve to the same plan).
 
 ## SMS / email add-ons (future)
 

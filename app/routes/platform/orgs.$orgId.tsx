@@ -1,12 +1,13 @@
-import { useState } from "react";
-import { Link } from "react-router";
+import { data, Form, Link } from "react-router";
 import { getPrisma } from "~/db.server";
 import type { Route } from "./+types/orgs.$orgId";
 import { requirePlatformAdmin } from "~/domain/auth/platform-admin.server";
+import { getAuth } from "~/domain/auth/better-auth.server";
 import { buildUsageSnapshot, countOrgUsage } from "~/domain/billing/plan-usage.server";
+import { setOrgComp, clearOrgComp, recordOrgAudit } from "~/domain/billing/comp.server";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
 import { getPublicEnv } from "~/domain/utils/host.server";
-import { authClient } from "~/lib/auth-client";
+import { tenantBoardUrlFromRequest } from "~/lib/org-slug";
 import type { UsageSnapshot } from "~/lib/plan-usage-types";
 
 export const meta: Route.MetaFunction = ({ data }) => [
@@ -27,6 +28,40 @@ export async function loader({ context, params }: Route.LoaderArgs) {
     throw new Response("Not found", { status: 404 });
   }
 
+  // Load last 20 audit log entries (OrgAuditLog is a new model; use (db as any) until prisma generate runs)
+  // TODO: remove `as any` after running `PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 npx prisma generate`
+  let auditLogs: Array<{
+    id: string;
+    action: string;
+    actorUserId: string | null;
+    payload: unknown;
+    createdAt: Date | string;
+    actorEmail?: string | null;
+  }> = [];
+  try {
+    const rawLogs = await (db as any).orgAuditLog.findMany({
+      where: { orgId: org.id },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+    // Enrich with actor email
+    const actorIds = [...new Set(rawLogs.map((l: any) => l.actorUserId).filter(Boolean))] as string[];
+    let actorMap: Record<string, string> = {};
+    if (actorIds.length > 0) {
+      const actors = await db.user.findMany({
+        where: { id: { in: actorIds } },
+        select: { id: true, email: true },
+      });
+      actorMap = Object.fromEntries(actors.map((a) => [a.id, a.email]));
+    }
+    auditLogs = rawLogs.map((l: any) => ({
+      ...l,
+      actorEmail: l.actorUserId ? (actorMap[l.actorUserId] ?? null) : null,
+    }));
+  } catch {
+    // OrgAuditLog table may not exist yet in this environment — safe to ignore
+  }
+
   const [counts, users] = await Promise.all([
     countOrgUsage(db, org.id),
     db.user.findMany({
@@ -43,15 +78,207 @@ export async function loader({ context, params }: Route.LoaderArgs) {
     org,
     usageSnapshot,
     users,
+    auditLogs,
     tenantHomeUrl,
     publicRootDomain: root,
     currentUserId: me?.id ?? null,
   };
 }
 
+export async function action({ request, context, params }: Route.ActionArgs) {
+  await requirePlatformAdmin(context);
+  const me = getOptionalUserFromContext(context);
+  const db = getPrisma(context);
+  const formData = await request.formData();
+  const intent = String(formData.get("intent") ?? "");
+  const orgId = params.orgId;
+
+  // Verify org exists
+  const org = await db.org.findUnique({ where: { id: orgId } });
+  if (!org) throw new Response("Not found", { status: 404 });
+
+  switch (intent) {
+    case "set-comp": {
+      const compedUntilRaw = String(formData.get("compedUntil") ?? "").trim();
+      const billingNote = String(formData.get("billingNote") ?? "").trim() || null;
+      if (!compedUntilRaw) {
+        return data({ ok: false, error: "compedUntil is required" }, { status: 400 });
+      }
+      const compedUntil = new Date(compedUntilRaw);
+      if (isNaN(compedUntil.getTime())) {
+        return data({ ok: false, error: "Invalid date" }, { status: 400 });
+      }
+      await setOrgComp({
+        context,
+        orgId,
+        compedUntil,
+        billingNote,
+        actorUserId: me?.id ?? null,
+      });
+      return data({ ok: true });
+    }
+
+    case "clear-comp": {
+      await clearOrgComp({ context, orgId, actorUserId: me?.id ?? null });
+      return data({ ok: true });
+    }
+
+    case "manual-plan": {
+      const billingPlanRaw = String(formData.get("billingPlan") ?? "");
+      const validPlans = [
+        "FREE",
+        "CAR_LINE",
+        "CAMPUS",
+        "DISTRICT",
+        "ENTERPRISE",
+      ] as const;
+      type ValidPlan = (typeof validPlans)[number];
+      if (!validPlans.includes(billingPlanRaw as ValidPlan)) {
+        return data({ ok: false, error: "Invalid plan" }, { status: 400 });
+      }
+      const billingPlan = billingPlanRaw as ValidPlan;
+      const fromPlan = org.billingPlan;
+      await db.org.update({
+        where: { id: orgId },
+        data: { billingPlan },
+      });
+      await recordOrgAudit({
+        context,
+        orgId,
+        actorUserId: me?.id ?? null,
+        action: "plan.manual_change",
+        payload: { from: fromPlan, to: billingPlan },
+      });
+      return data({ ok: true });
+    }
+
+    case "extend-trial": {
+      const daysRaw = Number(formData.get("days") ?? "0");
+      const days = Math.floor(daysRaw);
+      if (!Number.isFinite(days) || days <= 0 || days > 365) {
+        return data(
+          { ok: false, error: "Enter a positive number of days (≤ 365)." },
+          { status: 400 },
+        );
+      }
+      const base = org.trialEndsAt ? new Date(org.trialEndsAt) : new Date();
+      const newEnd = new Date(base.getTime() + days * 86_400_000);
+      const patch: Record<string, unknown> = { trialEndsAt: newEnd };
+      // If the org was already suspended after trial end, put it back into
+      // TRIALING so the extension actually restores access.
+      if (org.status === "SUSPENDED" || org.status === "INCOMPLETE") {
+        patch.status = "TRIALING";
+      }
+      await db.org.update({ where: { id: orgId }, data: patch });
+      await recordOrgAudit({
+        context,
+        orgId,
+        actorUserId: me?.id ?? null,
+        action: "trial.extend",
+        payload: {
+          days,
+          from: org.trialEndsAt?.toISOString() ?? null,
+          to: newEnd.toISOString(),
+          statusRestored: patch.status === "TRIALING",
+        },
+      });
+      return data({ ok: true });
+    }
+
+    case "toggle-comped": {
+      // Flip the persistent `isComped` flag. If turning on, also flip status
+      // to ACTIVE so the org has full access immediately. If turning off and
+      // the trial has expired, drop them back into SUSPENDED.
+      const currentIsComped = !!(org as any).isComped;
+      const nextIsComped = !currentIsComped;
+      const patch: Record<string, unknown> = { isComped: nextIsComped };
+      if (nextIsComped) {
+        patch.status = "ACTIVE";
+      } else {
+        const trialExpired =
+          org.trialEndsAt && new Date(org.trialEndsAt).getTime() <= Date.now();
+        if (trialExpired && org.status !== "ACTIVE") {
+          patch.status = "SUSPENDED";
+        }
+      }
+      await db.org.update({ where: { id: orgId }, data: patch });
+      await recordOrgAudit({
+        context,
+        orgId,
+        actorUserId: me?.id ?? null,
+        action: nextIsComped ? "comp.toggle_on" : "comp.toggle_off",
+        payload: { statusAfter: patch.status ?? org.status },
+      });
+      return data({ ok: true });
+    }
+
+    case "impersonate": {
+      const userId = String(formData.get("userId") ?? "").trim();
+      if (!userId) {
+        return data({ ok: false, error: "userId required" }, { status: 400 });
+      }
+
+      // Use better-auth server-side impersonation API.
+      // auth.api.impersonateUser with asResponse: true returns a full Response
+      // with Set-Cookie headers we can forward.
+      const auth = getAuth(context);
+      const env = getPublicEnv(context);
+      const root = (env.PUBLIC_ROOT_DOMAIN ?? "").trim();
+      const tenantHomeUrl = root ? `https://${org.slug}.${root}/` : `https://${org.slug}.localhost/`;
+
+      let impersonateResponse: Response;
+      try {
+        impersonateResponse = await auth.api.impersonateUser({
+          body: { userId },
+          headers: request.headers,
+          asResponse: true,
+        }) as Response;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Impersonation failed";
+        return data({ ok: false, error: msg }, { status: 400 });
+      }
+
+      // Write audit log
+      try {
+        await recordOrgAudit({
+          context,
+          orgId,
+          actorUserId: me?.id ?? null,
+          action: "impersonate.start",
+          payload: { targetUserId: userId },
+        });
+      } catch {
+        // Audit failure should not block impersonation
+      }
+
+      // Forward the Set-Cookie headers from the auth response, then redirect
+      const setCookieHeader = impersonateResponse.headers.get("set-cookie");
+      const headers = new Headers();
+      if (setCookieHeader) {
+        headers.set("set-cookie", setCookieHeader);
+      }
+      headers.set("location", tenantHomeUrl);
+      return new Response(null, { status: 302, headers });
+    }
+
+    default:
+      return data({ ok: false, error: "Unknown intent" }, { status: 400 });
+  }
+}
+
 function formatDt(d: Date | string) {
   const x = typeof d === "string" ? new Date(d) : d;
   return x.toISOString().replace("T", " ").slice(0, 19) + "Z";
+}
+
+/** Convert a Date to a value suitable for datetime-local inputs (local time, no seconds). */
+function toLocalDatetime(d: Date | string | null | undefined): string {
+  if (!d) return "";
+  const x = typeof d === "string" ? new Date(d) : d;
+  if (isNaN(x.getTime())) return "";
+  // datetime-local format: YYYY-MM-DDTHH:MM
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}T${pad(x.getHours())}:${pad(x.getMinutes())}`;
 }
 
 function UsageBlock({ snapshot }: { snapshot: UsageSnapshot }) {
@@ -90,40 +317,8 @@ function UsageBlock({ snapshot }: { snapshot: UsageSnapshot }) {
   );
 }
 
-function ImpersonateButton({
-  userId,
-  currentUserId,
-  tenantHomeUrl,
-}: {
-  userId: string;
-  currentUserId: string | null;
-  tenantHomeUrl: string;
-}) {
-  const [loading, setLoading] = useState(false);
-  if (!currentUserId || userId === currentUserId) return null;
-
-  return (
-    <button
-      type="button"
-      disabled={loading}
-      onClick={async () => {
-        setLoading(true);
-        const { error } = await authClient.admin.impersonateUser({ userId });
-        if (error) {
-          setLoading(false);
-          return;
-        }
-        window.location.href = tenantHomeUrl;
-      }}
-      className="rounded-md border border-[#E9D500]/40 bg-[#E9D500]/10 px-2 py-1 text-xs font-medium text-[#E9D500] hover:bg-[#E9D500]/20 disabled:opacity-50"
-    >
-      {loading ? "…" : "Impersonate"}
-    </button>
-  );
-}
-
 export default function PlatformOrgDetail({ loaderData }: Route.ComponentProps) {
-  const { org, usageSnapshot, users, tenantHomeUrl, publicRootDomain, currentUserId } = loaderData;
+  const { org, usageSnapshot, users, auditLogs, tenantHomeUrl, publicRootDomain, currentUserId } = loaderData;
   const stripeCustomerUrl = org.stripeCustomerId
     ? `https://dashboard.stripe.com/customers/${org.stripeCustomerId}`
     : null;
@@ -192,6 +387,12 @@ export default function PlatformOrgDetail({ loaderData }: Route.ComponentProps) 
               <dd>{org.pastDueSinceAt ? formatDt(org.pastDueSinceAt) : "—"}</dd>
             </div>
             <div>
+              <dt className="text-white/50">Hard comp</dt>
+              <dd className={(org as any).isComped ? "text-emerald-400" : "text-white/70"}>
+                {(org as any).isComped ? "On (billing bypassed)" : "Off"}
+              </dd>
+            </div>
+            <div>
               <dt className="text-white/50">Comped until</dt>
               <dd>{org.compedUntil ? formatDt(org.compedUntil) : "—"}</dd>
             </div>
@@ -224,6 +425,148 @@ export default function PlatformOrgDetail({ loaderData }: Route.ComponentProps) 
         </div>
       </div>
 
+      {/* Comp panel */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#E9D500]">Comp</h2>
+          <Form method="post" className="space-y-3">
+            <input type="hidden" name="intent" value="set-comp" />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-white/50" htmlFor="compedUntil">Comped until (local time)</label>
+              <input
+                id="compedUntil"
+                type="datetime-local"
+                name="compedUntil"
+                defaultValue={toLocalDatetime(org.compedUntil)}
+                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white w-full"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-white/50" htmlFor="billingNote">Billing note</label>
+              <textarea
+                id="billingNote"
+                name="billingNote"
+                defaultValue={org.billingNote ?? ""}
+                rows={3}
+                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white w-full resize-none"
+                placeholder="Optional internal note"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                className="rounded-lg bg-[#E9D500] px-3 py-1.5 text-xs font-semibold text-[#193B4B] hover:bg-[#f5e047]"
+              >
+                Save comp
+              </button>
+            </div>
+          </Form>
+          {org.compedUntil && (
+            <Form method="post" className="mt-3">
+              <input type="hidden" name="intent" value="clear-comp" />
+              <button
+                type="submit"
+                className="rounded-lg border border-red-500/30 px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-500/10"
+              >
+                Clear comp
+              </button>
+            </Form>
+          )}
+        </div>
+
+        {/* Manual plan override panel */}
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#E9D500]">Manual plan override</h2>
+          <Form method="post" className="flex flex-col gap-3">
+            <input type="hidden" name="intent" value="manual-plan" />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-white/50" htmlFor="billingPlan">Billing plan</label>
+              <select
+                id="billingPlan"
+                name="billingPlan"
+                defaultValue={org.billingPlan ?? "FREE"}
+                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white w-full"
+              >
+                <option value="FREE">FREE</option>
+                <option value="CAR_LINE">CAR_LINE</option>
+                <option value="CAMPUS">CAMPUS</option>
+                <option value="DISTRICT">DISTRICT</option>
+                <option value="ENTERPRISE">ENTERPRISE</option>
+              </select>
+            </div>
+            <button
+              type="submit"
+              className="self-start rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20"
+            >
+              Set plan
+            </button>
+          </Form>
+        </div>
+      </div>
+
+      {/* Extend trial + Toggle comped */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#E9D500]">
+            Extend trial
+          </h2>
+          <Form method="post" className="flex flex-col gap-3">
+            <input type="hidden" name="intent" value="extend-trial" />
+            <label htmlFor="days" className="text-xs text-white/50">Extend by (days)</label>
+            <input
+              id="days"
+              name="days"
+              type="number"
+              min={1}
+              max={365}
+              defaultValue={14}
+              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white w-full"
+            />
+            <button
+              type="submit"
+              className="self-start rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20"
+            >
+              Extend
+            </button>
+            <p className="text-xs text-white/40">
+              If the org is currently SUSPENDED or INCOMPLETE after trial end,
+              this also flips status back to TRIALING.
+            </p>
+          </Form>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#E9D500]">
+            Hard comp (bypass billing)
+          </h2>
+          <p className="text-sm text-white/70">
+            This org is currently{" "}
+            <strong className={(org as any).isComped ? "text-emerald-400" : "text-white"}>
+              {(org as any).isComped ? "COMPED" : "not comped"}
+            </strong>
+            .
+          </p>
+          <Form method="post" className="mt-3">
+            <input type="hidden" name="intent" value="toggle-comped" />
+            <button
+              type="submit"
+              className={
+                (org as any).isComped
+                  ? "rounded-lg border border-red-500/30 px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-500/10"
+                  : "rounded-lg bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/30"
+              }
+            >
+              {(org as any).isComped ? "Turn comp OFF" : "Turn comp ON"}
+            </button>
+          </Form>
+          <p className="mt-3 text-xs text-white/40">
+            Comped orgs skip the &quot;Billing Action Required&quot; gate
+            regardless of subscription / trial status. Turning comp off when
+            the trial has expired drops them back to SUSPENDED.
+          </p>
+        </div>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#E9D500]">Trial</h2>
@@ -245,6 +588,7 @@ export default function PlatformOrgDetail({ loaderData }: Route.ComponentProps) 
         <UsageBlock snapshot={usageSnapshot} />
       </div>
 
+      {/* Users table with impersonation via route action */}
       <div>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#E9D500]">Users</h2>
         <div className="overflow-x-auto rounded-xl border border-white/10">
@@ -266,17 +610,63 @@ export default function PlatformOrgDetail({ loaderData }: Route.ComponentProps) 
                   <td className="px-3 py-2">{u.role}</td>
                   <td className="px-3 py-2 text-white/70">{formatDt(u.createdAt)}</td>
                   <td className="px-3 py-2 text-right">
-                    <ImpersonateButton
-                      userId={u.id}
-                      currentUserId={currentUserId}
-                      tenantHomeUrl={tenantHomeUrl}
-                    />
+                    {currentUserId && u.id !== currentUserId ? (
+                      <Form method="post">
+                        <input type="hidden" name="intent" value="impersonate" />
+                        <input type="hidden" name="userId" value={u.id} />
+                        <button
+                          type="submit"
+                          className="rounded-md border border-[#E9D500]/40 bg-[#E9D500]/10 px-2 py-1 text-xs font-medium text-[#E9D500] hover:bg-[#E9D500]/20"
+                        >
+                          Impersonate
+                        </button>
+                      </Form>
+                    ) : null}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Audit log panel */}
+      <div>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#E9D500]">
+          Recent audit log
+        </h2>
+        {auditLogs.length === 0 ? (
+          <p className="text-sm text-white/40">No audit entries yet.</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-white/10">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead className="bg-white/5 text-white/80">
+                <tr>
+                  <th className="px-3 py-2 font-semibold">Timestamp</th>
+                  <th className="px-3 py-2 font-semibold">Actor</th>
+                  <th className="px-3 py-2 font-semibold">Action</th>
+                  <th className="px-3 py-2 font-semibold">Payload</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditLogs.map((log) => (
+                  <tr key={log.id} className="border-t border-white/10">
+                    <td className="px-3 py-2 text-xs text-white/60 whitespace-nowrap">
+                      {formatDt(log.createdAt)}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-white/70">
+                      {log.actorEmail ?? log.actorUserId ?? "system"}
+                    </td>
+                    <td className="px-3 py-2 font-mono text-xs">{log.action}</td>
+                    <td className="px-3 py-2 font-mono text-[10px] text-white/50 max-w-xs truncate">
+                      {log.payload ? JSON.stringify(log.payload) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

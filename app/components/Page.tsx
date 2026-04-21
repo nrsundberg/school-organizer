@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { useRouteLoaderData } from "react-router";
 
 function MainPage({ children }: { children: ReactNode }) {
-  return <div className="h-lvh"> {children}</div>;
+  return <div className="min-h-lvh"> {children}</div>;
 }
 
 export function Page({

@@ -1,9 +1,32 @@
 import type { Org } from "~/db";
 import { getPrisma } from "~/db.server";
 import { DEFAULT_SITE_NAME } from "~/lib/site";
+import {
+  DEFAULT_BRAND_ACCENT,
+  DEFAULT_BRAND_PRIMARY,
+  DEFAULT_LOGO_URL,
+  DEFAULT_PRIMARY_COLOR,
+  DEFAULT_SECONDARY_COLOR,
+  HEX_COLOR_RE,
+  isValidHexColor,
+  normalizeHexColor,
+} from "./branding-constants";
 
-export const DEFAULT_BRAND_PRIMARY = "#60A5FA";
-export const DEFAULT_BRAND_ACCENT = "#E9D500";
+// Re-export client-safe constants and helpers so existing server-side imports
+// keep working. Anything referenced from non-loader/action route exports
+// (links, meta, ErrorBoundary, default component) should import from
+// `./branding-constants` directly instead.
+export {
+  DEFAULT_BRAND_ACCENT,
+  DEFAULT_BRAND_PRIMARY,
+  DEFAULT_LOGO_URL,
+  DEFAULT_PRIMARY_COLOR,
+  DEFAULT_SECONDARY_COLOR,
+  HEX_COLOR_RE,
+  isValidHexColor,
+  normalizeHexColor,
+};
+
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 const ALLOWED_LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
@@ -14,13 +37,14 @@ export type OrgBranding = {
   primaryColor: string;
   accentColor: string;
   logoUrl: string | null;
+  /** Tenant palette override for --color-primary (null = no override). */
+  primaryColorOverride: string | null;
+  /** Tenant palette override for --color-secondary (null = no override). */
+  secondaryColorOverride: string | null;
 };
 
-function normalizeColor(input: string | null | undefined): string | null {
-  if (!input) return null;
-  const value = input.trim();
-  return /^#[0-9a-fA-F]{6}$/.test(value) ? value.toUpperCase() : null;
-}
+// Preserve prior internal name used by getBrandingFromOrg.
+const normalizeColor = normalizeHexColor;
 
 function hostToSlug(host: string): string | null {
   const bareHost = host.split(":")[0].toLowerCase();
@@ -57,13 +81,23 @@ export function getBrandingFromOrg(org: Org | null): OrgBranding {
   const primaryColor = normalizeColor(org?.brandColor) ?? DEFAULT_BRAND_PRIMARY;
   const accentColor = normalizeColor(org?.brandAccentColor) ?? DEFAULT_BRAND_ACCENT;
 
+  // Prisma generate doesn't run in the sandbox, so the generated Org model
+  // doesn't know about the new primaryColor / secondaryColor columns yet.
+  // Cast once here; once `prisma generate` runs in CI the cast is a no-op.
+  const orgLoose = org as (Org & {
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+  }) | null;
+
   return {
     orgId: org?.id ?? null,
     orgName: org?.name ?? DEFAULT_SITE_NAME,
     orgSlug: org?.slug ?? null,
     primaryColor,
     accentColor,
-    logoUrl: org?.logoObjectKey && org.slug ? `/api/branding/logo/${org.slug}` : org?.logoUrl ?? null,
+    logoUrl: org?.logoObjectKey && org.slug ? `/api/branding/logo/${org.slug}` : org?.logoUrl ?? DEFAULT_LOGO_URL,
+    primaryColorOverride: normalizeColor(orgLoose?.primaryColor ?? null),
+    secondaryColorOverride: normalizeColor(orgLoose?.secondaryColor ?? null),
   };
 }
 

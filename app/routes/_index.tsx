@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import { Send } from "lucide-react";
 import type { Route } from "./+types/_index";
 import { isMarketingHost } from "~/domain/utils/host.server";
+import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
 import {
   getTenantPrisma,
   getOptionalOrgFromContext,
@@ -39,6 +40,15 @@ export const meta: Route.MetaFunction = ({ data }) => {
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   if (isMarketingHost(request, context)) {
+    // If a logged-in user with an org visits the marketing home, send them
+    // straight to their tenant board. Edge cases (no org) fall through to
+    // the marketing page. Only triggered on "/" — other marketing pages
+    // (/pricing, /faqs) render normally so users can still browse.
+    const user = getOptionalUserFromContext(context);
+    if (user?.orgId) {
+      const url = await getTenantBoardUrlForRequest(request, context);
+      if (url) throw redirect(url);
+    }
     return { mode: "marketing" as const };
   }
 
@@ -256,8 +266,14 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
 
   const homeroomFilterControl = (
     <div className="text-left">
-      <p className="mb-1 text-sm text-gray-400">Filter Homeroom</p>
+      <label
+        htmlFor="homepage-homeroom"
+        className="mb-1 block text-sm text-gray-300"
+      >
+        Filter Homeroom
+      </label>
       <input
+        id="homepage-homeroom"
         value={homeroomFilter}
         list="homepage-homeroom-options"
         onChange={(e) => {
@@ -266,7 +282,7 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
           updateRoomFilter(value);
         }}
         placeholder="Homeroom..."
-        className="w-full rounded-lg border border-gray-500 bg-gray-900 px-3 py-2 text-gray-100 [color-scheme:dark] focus:border-primary focus:outline-none"
+        className="w-full rounded-lg border border-gray-500 bg-gray-900 px-3 py-2 text-gray-100 [color-scheme:dark] focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D500]"
       />
       <datalist id="homepage-homeroom-options">
         {homeRooms.map((room) => (
@@ -582,21 +598,34 @@ function ParkingTile({
     fetcher.submit({ space: spaceNumber }, { method: "post", action: `empty/${spaceNumber}` });
   };
 
-  const commonClasses = `border border-black flex items-center justify-center drop-shadow-sm select-none ${compact ? "min-h-[24px] text-[10px] px-0 leading-none" : "min-h-[30px] text-sm px-0.5 leading-none"}`;
+  // Non-compact tiles get a larger touch target on small screens (WCAG 2.5.5 — 44x44).
+  // Compact view is for the controller board, which is densely packed for quick scan.
+  const commonClasses = `w-full border border-black flex items-center justify-center drop-shadow-sm select-none ${compact ? "min-h-[24px] text-[10px] px-0 leading-none" : "min-h-[44px] md:min-h-[30px] text-sm px-0.5 leading-none"}`;
 
   return permitted ? (
     status === Status.EMPTY ? (
-      <div data-space={spaceNumber} className={`${color} ${commonClasses}`} onClick={() => updateToActive(spaceNumber)}>
+      <button
+        type="button"
+        data-space={spaceNumber}
+        aria-label={`Space ${spaceNumber} — empty. Activate to mark active.`}
+        className={`${color} ${commonClasses} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D500] focus-visible:z-10`}
+        onClick={() => updateToActive(spaceNumber)}
+      >
         {spaceNumber}
-      </div>
+      </button>
     ) : (
       status === Status.ACTIVE && (
         <Popover>
           <PopoverTrigger>
-            <div data-space={spaceNumber} className={`${color} ${commonClasses}`}>
-              <Send />
+            <button
+              type="button"
+              data-space={spaceNumber}
+              aria-label={`Space ${spaceNumber} — active. Open actions.`}
+              className={`${color} ${commonClasses} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D500] focus-visible:z-10`}
+            >
+              <Send aria-hidden="true" />
               {spaceNumber}
-            </div>
+            </button>
           </PopoverTrigger>
           <PopoverContent>
             <div className="px-1 py-2">
@@ -613,10 +642,11 @@ function ParkingTile({
     <button
       type="button"
       data-space={spaceNumber}
-      className={`${color} ${commonClasses} w-full ${onDrawingSpace ? "cursor-crosshair opacity-95" : ""}`}
+      aria-label={`Space ${spaceNumber} — ${status === Status.ACTIVE ? "active" : "empty"}`}
+      className={`${color} ${commonClasses} w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D500] focus-visible:z-10 ${onDrawingSpace ? "cursor-crosshair opacity-95" : ""}`}
       onClick={() => onDrawingSpace?.(spaceNumber)}
     >
-      {status === Status.ACTIVE && <Send />}
+      {status === Status.ACTIVE && <Send aria-hidden="true" />}
       {spaceNumber}
     </button>
   );

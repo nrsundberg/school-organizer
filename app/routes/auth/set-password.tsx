@@ -9,7 +9,7 @@ import { signIn, authClient } from "~/lib/auth-client";
 
 export function meta() {
   return [
-    { title: "Set password — School Organizer" },
+    { title: "Set password — Pickup Roster" },
     { name: "description", content: "Set your password for your school car line" },
   ];
 }

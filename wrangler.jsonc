@@ -1,50 +1,125 @@
 {
-  "name": "school-organizer",
-  "compatibility_date": "2026-03-30",
-  "compatibility_flags": ["nodejs_compat"],
-  "main": "./workers/app.ts",
-  "assets": {
-    "directory": "./build/client"
-  },
-  // Apex + www use Custom Domains; tenant subdomains use a zone route (wildcard not supported on custom_domain in wrangler).
-  // In the pickuproster.com zone, add a proxied DNS record for *.pickuproster.com (or each slug); otherwise {slug}.pickuproster.com will not resolve.
-  "routes": [
-    { "pattern": "pickuproster.com", "custom_domain": true },
-    { "pattern": "www.pickuproster.com", "custom_domain": true },
-    { "pattern": "*.pickuproster.com/*", "zone_name": "pickuproster.com" }
-  ],
-  "vars": {
-    "SENTRY_DSN": "",
-    "ENVIRONMENT": "production",
-    // Apex and www serve marketing; {slug}.pickuproster.com are tenant boards (see MARKETING_HOSTS for local preview).
-    "PUBLIC_ROOT_DOMAIN": "pickuproster.com",
-    // Local dev plus default *.workers.dev URL so preview deploys show marketing on the worker hostname (not a tenant board).
-    "MARKETING_HOSTS": "localhost,127.0.0.1,school-organizer.sundbergne.workers.dev",
-    "PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com"
-  },
-  "triggers": {
-    "crons": ["0 10 * * *"]
-  },
-  "d1_databases": [
-    {
-      "binding": "D1_DATABASE",
-      "database_name": "school-organizer",
-      "database_id": "399295fb-9f0d-42a9-a271-8619366caa1d",
-      "migrations_dir": "migrations"
-    }
-  ],
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "BINGO_BOARD",
-        "class_name": "BingoBoardDO"
-      }
-    ]
-  },
-  "migrations": [
-    {
-      "tag": "v1",
-      "new_sqlite_classes": ["BingoBoardDO"]
-    }
-  ],
+	"name": "school-organizer",
+	"compatibility_date": "2026-03-30",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"main": "./workers/app.ts",
+	"assets": {
+		"directory": "./build/client"
+	},
+	// Apex + www use Custom Domains; tenant subdomains use a zone route (wildcard not supported on custom_domain in wrangler).
+	// In the pickuproster.com zone, add a proxied DNS record for *.pickuproster.com (or each slug); otherwise {slug}.pickuproster.com will not resolve.
+	"routes": [
+		{
+			"pattern": "pickuproster.com",
+			"custom_domain": true
+		},
+		{
+			"pattern": "www.pickuproster.com",
+			"custom_domain": true
+		},
+		{
+			"pattern": "*.pickuproster.com/*",
+			"zone_name": "pickuproster.com"
+		}
+	],
+	"vars": {
+		"SENTRY_DSN": "",
+		"ENVIRONMENT": "production",
+		// Apex and www serve marketing; {slug}.pickuproster.com are tenant boards (see MARKETING_HOSTS for local preview).
+		"PUBLIC_ROOT_DOMAIN": "pickuproster.com",
+		// Local dev plus default *.workers.dev URL so preview deploys show marketing on the worker hostname (not a tenant board).
+		"MARKETING_HOSTS": "localhost,127.0.0.1,school-organizer.sundbergne.workers.dev",
+		"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
+		"SUPPORT_EMAIL": "support@pickuproster.com",
+		// Public Stripe status feed. Swap to a test double by setting this var locally or in a preview env.
+		"STRIPE_STATUS_URL": "https://www.stripe-status.com/api/v2/status.json"
+	},
+	// Crons:
+	//  - `0 10 * * *`  — daily billing / trial maintenance (runBilling scheduler)
+	//  - `*/2 * * * *` — status-page probes (runStatusProbes, see workers/app.ts)
+	// Branching happens on controller.cron in workers/app.ts.
+	"triggers": {
+		"crons": [
+			"0 10 * * *",
+			"*/2 * * * *"
+		]
+	},
+	"d1_databases": [
+		{
+			"binding": "D1_DATABASE",
+			"database_name": "school-organizer",
+			"database_id": "399295fb-9f0d-42a9-a271-8619366caa1d",
+			"migrations_dir": "migrations"
+		}
+	],
+	// R2 bucket for per-org branding assets (logos). Referenced as env.ORG_BRANDING_BUCKET
+	// by app/routes/admin/branding.tsx and app/routes/api/branding.logo.$slug.ts.
+	// The bucket must already exist in Cloudflare — run:
+	// `wrangler r2 bucket create pickup-roster-org-branding`
+	"r2_buckets": [
+		{
+			"binding": "ORG_BRANDING_BUCKET",
+			"bucket_name": "pickup-roster-org-branding",
+			"preview_bucket_name": "pickup-roster-org-branding"
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "BINGO_BOARD",
+				"class_name": "BingoBoardDO"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": [
+				"BingoBoardDO"
+			]
+		}
+	],
+	"ratelimits": [
+		{
+			// Auth rate limit: guards /login and /signup actions
+			"name": "RL_AUTH",
+			"namespace_id": "1001",
+			"simple": {
+				"limit": 10,
+				"period": 60
+			}
+		},
+		{
+			// Billing rate limit: guards /api/billing/checkout and /api/billing/portal
+			"name": "RL_BILLING",
+			"namespace_id": "1002",
+			"simple": {
+				"limit": 20,
+				"period": 60
+			}
+		}
+	],
+	// Outbound email queue. Producers enqueue EmailMessage payloads from request
+	// handlers / the cron; the consumer is this same Worker (see `queue` export
+	// in workers/app.ts) and hands off to Resend. The queue itself must exist in
+	// Cloudflare — run: `wrangler queues create pickup-roster-email`
+	"queues": {
+		"producers": [
+			{
+				"binding": "EMAIL_QUEUE",
+				"queue": "pickup-roster-email"
+			}
+		],
+		"consumers": [
+			{
+				"queue": "pickup-roster-email",
+				"max_batch_size": 10,
+				"max_batch_timeout": 5,
+				"max_retries": 3,
+				"dead_letter_queue": "pickup-roster-email-dlq"
+			}
+		]
+	}
 }

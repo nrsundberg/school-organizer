@@ -1,0 +1,62 @@
+name: E2E
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+
+      - run: PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1 npx prisma generate
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright system deps (cached)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: Write .dev.vars for wrangler dev
+        run: |
+          BETTER_AUTH_SECRET=$(openssl rand -hex 32)
+          cat > .dev.vars <<EOF
+          BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+          STRIPE_SECRET_KEY=sk_test_stub
+          STRIPE_WEBHOOK_SECRET=whsec_stub
+          STRIPE_CAR_LINE_PRICE_ID=price_stub_carline_monthly
+          STRIPE_CAMPUS_PRICE_ID=price_stub_campus_monthly
+          EOF
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

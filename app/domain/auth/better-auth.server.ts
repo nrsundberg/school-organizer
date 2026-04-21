@@ -181,6 +181,10 @@ export function getAuth(context: any) {
           type: "string",
           required: false,
         },
+        phone: {
+          type: "string",
+          required: false,
+        },
       },
     },
     plugins: [

@@ -4,7 +4,7 @@ import { MarketingNav } from "~/components/marketing/MarketingNav";
 
 export function meta() {
   return [
-    { title: "FAQs — School Organizer" },
+    { title: "FAQs — Pickup Roster" },
     { name: "description", content: "Common questions about car line boards, trials, and security." },
   ];
 }
@@ -16,7 +16,7 @@ export async function loader() {
 const FAQS = [
   {
     q: "Where does my school live?",
-    a: "Each organization gets its own subdomain like yourslug.yourdomain.com. The main domain shows this marketing site; the board never mixes tenants.",
+    a: "Each organization gets its own subdomain like yourslug.pickuproster.com. The main domain shows this marketing site; the board never mixes tenants. On Campus and District plans you can instead use a custom domain or a subdomain on your school's own domain (for example, pickup.yourschool.edu).",
   },
   {
     q: "How does the trial work?",
@@ -28,7 +28,7 @@ const FAQS = [
   },
   {
     q: "Can we use our own domain?",
-    a: "Custom domains are supported on the Org record for production setups. Point DNS to the same Worker as your other hosts.",
+    a: "Yes — custom domains (or a subdomain on your school's own domain) are available on Campus and District plans. Point DNS to the same Worker as your other hosts. Car Line uses a yourslug.pickuproster.com subdomain.",
   },
 ];
 

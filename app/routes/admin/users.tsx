@@ -12,7 +12,7 @@ import { dataWithError, dataWithSuccess, dataWithWarning } from "remix-toast";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import { createViewerMagicLink, resetViewerLock, revokeAllViewerSessions, setViewerPin } from "~/domain/auth/viewer-access.server";
-import { getTenantPrisma } from "~/domain/utils/global-context.server";
+import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 
 export const meta: Route.MetaFunction = () => [{ title: "Admin – Users" }];
 
@@ -59,10 +59,16 @@ const createMagicLinkSchema = zfd.formData({
   daysValid: zfd.numeric(z.number().int().min(1).max(30)),
 });
 
+const setPasswordResetEnabledSchema = zfd.formData({
+  action: zfd.text(),
+  enabled: zfd.checkbox().optional(),
+});
+
 export async function loader({ context }: Route.LoaderArgs) {
   const me = await protectToAdminAndGetPermissions(context);
   const prisma = getPrisma(context);
   const tenantPrisma = getTenantPrisma(context);
+  const org = getOrgFromContext(context);
   const [users, locks] = await Promise.all([
     prisma.user.findMany({ orderBy: { name: "asc" } }),
     tenantPrisma.viewerAccessAttempt.findMany({
@@ -75,7 +81,16 @@ export async function loader({ context }: Route.LoaderArgs) {
       orderBy: [{ requiresAdminReset: "desc" }, { updatedAt: "desc" }],
     }),
   ]);
-  return { users, locks, currentUserId: me.id };
+  // `passwordResetEnabled` is missing from the generated Prisma type until
+  // `prisma generate` re-runs. Cast at the boundary rather than weakening
+  // the rest of the loader. Default to true if the column is null/missing.
+  const orgAny = org as any;
+  return {
+    users,
+    locks,
+    currentUserId: me.id,
+    passwordResetEnabled: orgAny.passwordResetEnabled !== false,
+  };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -157,6 +172,27 @@ export async function action({ request, context }: Route.ActionArgs) {
     return dataWithSuccess(
       { magicLink: link },
       `Magic link created. Valid for ${daysValid} day(s).`,
+    );
+  }
+
+  if (action === "setPasswordResetEnabled") {
+    if (me.role !== "ADMIN") {
+      return dataWithError(null, "Only admins can change this setting.");
+    }
+    const parsed = setPasswordResetEnabledSchema.parse(formData);
+    const enabled = parsed.enabled === true;
+    const org = getOrgFromContext(context);
+    // Cast the update input: the generated Prisma type doesn't know about
+    // `passwordResetEnabled` yet (see comment in loader).
+    await (prisma.org as any).update({
+      where: { id: org.id },
+      data: { passwordResetEnabled: enabled },
+    });
+    return dataWithSuccess(
+      null,
+      enabled
+        ? "Password reset is now enabled for your org."
+        : "Password reset is now disabled. Users must sign in via SSO once configured.",
     );
   }
 
@@ -265,7 +301,7 @@ function ImpersonateButton({ user, currentUserId }: { user: { id: string; name: 
 }
 
 export default function AdminUsers({ loaderData }: Route.ComponentProps) {
-  const { users, locks, currentUserId } = loaderData;
+  const { users, locks, currentUserId, passwordResetEnabled } = loaderData;
   const userFetcher = useFetcher();
   const [newUserName, setNewUserName] = useState("");
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -280,6 +316,34 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
   return (
     <div className="flex flex-col gap-8 p-6">
       <h1 className="text-2xl font-bold text-white">Users</h1>
+
+      <section className="rounded-xl border border-white/10 p-4 bg-white/[0.02]">
+        <h2 className="text-white font-semibold text-base mb-3">Password reset</h2>
+        <userFetcher.Form method="post" className="flex flex-col gap-2">
+          <input type="hidden" name="action" value="setPasswordResetEnabled" />
+          {/*
+            Uncontrolled checkbox: submitting the form immediately toggles
+            the value. When unchecked, the form posts no `enabled` field,
+            which `zfd.checkbox()` reads as false.
+          */}
+          <label className="inline-flex items-center gap-2 text-sm text-white/85">
+            <input
+              type="checkbox"
+              name="enabled"
+              value="on"
+              defaultChecked={passwordResetEnabled}
+              onChange={(e) => e.currentTarget.form?.requestSubmit()}
+            />
+            Allow users to reset their password via email.
+          </label>
+          {!passwordResetEnabled && (
+            <p className="text-xs text-white/55">
+              Users will need to sign in via your SSO provider when that&apos;s
+              configured.
+            </p>
+          )}
+        </userFetcher.Form>
+      </section>
 
       <section className="rounded-xl border border-white/10 p-4 bg-white/[0.02]">
         <h2 className="text-white font-semibold text-base mb-3">Viewer Privacy Access</h2>

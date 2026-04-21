@@ -6,7 +6,20 @@ const ALLOWED_APP_STATUSES: ReadonlySet<OrgStatus> = new Set([
   "PAST_DUE",
 ]);
 
-export function isOrgStatusAllowedForApp(status: OrgStatus): boolean {
+/**
+ * Whether an org should be allowed to access the in-app experience based on
+ * its billing status.
+ *
+ * Comped orgs (`isComped = true`) bypass status checks entirely — staff can
+ * flip a comp on/off from the platform admin panel. This is distinct from
+ * `compedUntil`, which is a time-bounded comp window used by the existing
+ * comp.server logic.
+ */
+export function isOrgStatusAllowedForApp(
+  status: OrgStatus,
+  options?: { isComped?: boolean },
+): boolean {
+  if (options?.isComped) return true;
   return ALLOWED_APP_STATUSES.has(status);
 }
 
@@ -30,4 +43,3 @@ export function mapStripeSubscriptionStatusToOrgStatus(
       return "INCOMPLETE";
   }
 }
-

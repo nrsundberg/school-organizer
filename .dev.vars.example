@@ -4,3 +4,20 @@ BETTER_AUTH_SECRET=generate-a-random-secret-here
 SENTRY_AUTH_TOKEN=your-sentry-auth-token
 # Optional: use while running `wrangler dev` if you need tenant hosts like slug.localhost (overrides PUBLIC_ROOT_DOMAIN from wrangler.jsonc).
 # PUBLIC_ROOT_DOMAIN=
+
+# Optional override; defaults to support@pickuproster.com
+# SUPPORT_EMAIL=support@pickuproster.com
+
+# Stripe — see docs/stripe-products.md
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_CAR_LINE_PRICE_ID=
+STRIPE_CAMPUS_PRICE_ID=
+# Optional annual prices — if set, the /pricing page will show a monthly/annual toggle.
+STRIPE_CAR_LINE_ANNUAL_PRICE_ID=
+STRIPE_CAMPUS_ANNUAL_PRICE_ID=
+# Dev-only fallback; one price used for both Car Line and Campus when the specific ones are empty.
+# STRIPE_STARTER_PRICE_ID=
+
+# Sentry
+SENTRY_DSN=

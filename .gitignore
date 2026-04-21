@@ -7,3 +7,10 @@
 /build
 /prisma/migrations/*/migration.sql
 .wrangler/
+.remember/
+
+# Playwright
+playwright-report/
+test-results/
+/blob-report/
+/playwright/.cache/

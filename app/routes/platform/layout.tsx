@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router";
 import type { Route } from "./+types/layout";
 import { requirePlatformAdmin } from "~/domain/auth/platform-admin.server";
+import { DEFAULT_SITE_NAME } from "~/lib/site";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -18,7 +19,7 @@ export default function PlatformLayout() {
     <div className="min-h-screen bg-[#0f1414] text-white">
       <header className="border-b border-white/10 px-4 py-3">
         <p className="text-sm font-semibold uppercase tracking-wide text-[#E9D500]">Platform</p>
-        <h1 className="text-xl font-bold">School Organizer — internal</h1>
+        <h1 className="text-xl font-bold">{`${DEFAULT_SITE_NAME} — internal`}</h1>
         <nav className="mt-4 flex flex-wrap gap-1 border-t border-white/10 pt-3">
           <NavLink to="/platform" end className={navLinkClass}>
             Orgs
@@ -31,6 +32,9 @@ export default function PlatformLayout() {
           </NavLink>
           <NavLink to="/platform/webhooks" className={navLinkClass}>
             Webhooks
+          </NavLink>
+          <NavLink to="/platform/audit" className={navLinkClass}>
+            Audit
           </NavLink>
         </nav>
       </header>

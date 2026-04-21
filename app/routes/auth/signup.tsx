@@ -1,9 +1,14 @@
 import { Button, Input } from "@heroui/react";
-import { redirect, useRouteLoaderData, useSearchParams } from "react-router";
+import { data, Form, redirect, useActionData, useRouteLoaderData, useSearchParams } from "react-router";
+import { z } from "zod";
+import { zfd } from "zod-form-data";
 import type { Route } from "./+types/signup";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
 import { isMarketingHost, marketingOriginFromRequest } from "~/domain/utils/host.server";
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
+import { getAuth } from "~/domain/auth/better-auth.server";
+import { ensureOrgForUser } from "~/domain/billing/onboarding.server";
+import { getPrisma } from "~/db.server";
 import { signUp } from "~/lib/auth-client";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { MarketingNav } from "~/components/marketing/MarketingNav";
@@ -13,13 +18,37 @@ import {
   suggestOrgSlugsFromName,
   tenantBoardUrlFromRequest,
 } from "~/lib/org-slug";
-import { TRIAL_CALENDAR_DAYS, TRIAL_QUALIFYING_DAYS } from "~/lib/trial-rules";
+import {
+  checkRateLimit,
+  clientIpFromRequest,
+  getRateLimiter,
+} from "~/domain/utils/rate-limit.server";
 
 export function meta() {
   return [
-    { title: "Signup — School Organizer" },
+    { title: "Signup — Pickup Roster" },
     { name: "description", content: "Create your organization and account" },
   ];
+}
+
+/** Public plans accepted as `?plan=` query params on the signup route. */
+const PUBLIC_PLAN_SLUGS = ["car-line", "campus", "district"] as const;
+type PublicPlanSlug = (typeof PUBLIC_PLAN_SLUGS)[number];
+
+function normalizePublicPlan(raw: string | null): PublicPlanSlug | null {
+  if (!raw) return null;
+  const v = raw.trim().toLowerCase();
+  if (v === "car-line" || v === "car_line" || v === "carline") return "car-line";
+  if (v === "campus") return "campus";
+  if (v === "district") return "district";
+  return null;
+}
+
+/** Map a public plan slug to its BillingPlan enum value. */
+function billingPlanForSlug(slug: PublicPlanSlug): "CAR_LINE" | "CAMPUS" | "DISTRICT" {
+  if (slug === "district") return "DISTRICT";
+  if (slug === "campus") return "CAMPUS";
+  return "CAR_LINE";
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -32,16 +61,120 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     if (url) throw redirect(url);
     throw redirect("/");
   }
-  return null;
+  // Require a plan selection. If absent/invalid, bounce to pricing so the user
+  // picks a tier — there is no public free tier.
+  const planParam = new URL(request.url).searchParams.get("plan");
+  const plan = normalizePublicPlan(planParam);
+  if (!plan) {
+    throw redirect("/pricing");
+  }
+  return { plan };
 }
 
-type Plan = "FREE" | "CAR_LINE" | "CAMPUS";
+const VALID_PLANS = ["CAR_LINE", "CAMPUS", "DISTRICT"] as const;
+type Plan = (typeof VALID_PLANS)[number];
+
+/**
+ * Normalize a phone number to digits only, preserving a leading `+` if present.
+ * Example: "+1 (555) 123-4567" -> "+15551234567"; "(555) 123-4567" -> "5551234567".
+ */
+export function normalizePhone(input: string): string {
+  const trimmed = input.trim();
+  const hasPlus = trimmed.startsWith("+");
+  const digits = trimmed.replace(/\D+/g, "");
+  return hasPlus ? `+${digits}` : digits;
+}
+
+function countDigits(input: string): number {
+  return (input.match(/\d/g) ?? []).length;
+}
+
+const step1Schema = z.object({
+  name: z.string().min(1, "Please enter your name."),
+  email: z.string().email(),
+  phone: z
+    .string()
+    .refine((v) => countDigits(v) >= 10, "Phone number must be at least 10 digits."),
+  password: z.string().min(8, "Password must be at least 8 characters."),
+});
+
+const step3Schema = zfd.formData({
+  orgName: zfd.text(z.string().min(2)),
+  slug: zfd.text(z.string().min(1)),
+  plan: zfd.text(z.enum(VALID_PLANS)),
+});
+
+export async function action({ request, context }: Route.ActionArgs) {
+  if (!isMarketingHost(request, context)) {
+    throw redirect(`${marketingOriginFromRequest(request, context)}/`);
+  }
+
+  // 0. Rate limit by IP
+  const clientIp = clientIpFromRequest(request);
+  const rlResult = await checkRateLimit({
+    limiter: getRateLimiter(context, "RL_AUTH"),
+    key: "auth:" + clientIp,
+  });
+  if (!rlResult.ok) {
+    return data(
+      { error: "Too many attempts. Please try again in a minute.", field: undefined },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
+
+  // 1. Require authed user
+  const auth = getAuth(context);
+  const session = await auth.api.getSession({ headers: request.headers });
+  if (!session?.user?.id) {
+    return data({ error: "Your session expired. Please refresh and sign in again.", field: undefined }, { status: 401 });
+  }
+  const userId = session.user.id;
+  const email = session.user.email;
+
+  // 2. Parse FormData
+  const formData = await request.formData();
+  const parsed = step3Schema.safeParse(formData);
+  if (!parsed.success) {
+    const firstError = parsed.error.issues[0];
+    return data(
+      { error: firstError?.message ?? "Invalid form data.", field: firstError?.path[0]?.toString() },
+      { status: 400 },
+    );
+  }
+  const { orgName, slug, plan } = parsed.data;
+
+  // 3. Call ensureOrgForUser. Every new org starts as TRIALING with a 30-day
+  //    trial window regardless of tier — we do NOT collect a card at signup.
+  let orgId: string;
+  try {
+    const result = await ensureOrgForUser({
+      context,
+      userId,
+      orgName,
+      requestedSlug: slug,
+      plan,
+      email,
+    });
+    orgId = result.orgId;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unable to create organization.";
+    const isSlugError = msg.toLowerCase().includes("slug");
+    return data({ error: msg, field: isSlugError ? "slug" : undefined }, { status: 400 });
+  }
+
+  // 4. Redirect to the tenant board. The user is in-trial; Stripe customer /
+  //    checkout flows are deferred until they convert from the billing page.
+  const db = getPrisma(context);
+  const org = await db.org.findUnique({ where: { id: orgId }, select: { slug: true } });
+  const boardUrl = org?.slug ? tenantBoardUrlFromRequest(request, org.slug) : "/";
+  throw redirect(boardUrl);
+}
 
 type RootLoader = {
   user?: { id: string; orgId: string | null } | null;
 };
 
-export default function Signup() {
+export default function Signup({ loaderData }: Route.ComponentProps) {
   const rootData = useRouteLoaderData("root") as RootLoader | undefined;
   const authedUser = rootData?.user ?? null;
   const isAuthed = !!authedUser;
@@ -51,17 +184,28 @@ export default function Signup() {
   const stepParam = Number(searchParams.get("step")) || 1;
   const step = Math.min(3, Math.max(1, stepParam));
 
+  // The plan is locked in by the ?plan= query param (the signup loader
+  // redirects to /pricing if it's missing). We map the public slug to the
+  // BillingPlan enum value the server action expects.
+  const selectedPlanSlug = loaderData.plan;
+  const initialPlan: Plan = billingPlanForSlug(selectedPlanSlug);
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [orgName, setOrgName] = useState("");
   const [slug, setSlug] = useState("");
   const [slugVerifiedFor, setSlugVerifiedFor] = useState<string | null>(null);
-  const [plan, setPlan] = useState<Plan>("FREE");
+  // Plan is read-only at step 3 — chosen from the pricing page via ?plan=.
+  const plan: Plan = initialPlan;
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkingSlug, setCheckingSlug] = useState(false);
+
+  // Action data from the step 3 server action
+  const actionData = useActionData<typeof action>();
 
   useEffect(() => {
     if ((step === 2 || step === 3) && !isAuthed) {
@@ -104,16 +248,19 @@ export default function Signup() {
       setError("Passwords do not match.");
       return;
     }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    const parsedStep1 = step1Schema.safeParse({ name, email, phone, password });
+    if (!parsedStep1.success) {
+      setError(parsedStep1.error.issues[0]?.message ?? "Please check your inputs.");
       return;
     }
+    const normalizedPhone = normalizePhone(phone);
     setLoading(true);
     try {
       const result = await signUp.email({
         email,
         password,
         name,
+        phone: normalizedPhone,
       });
       if (result.error) {
         setError(result.error.message ?? "Unable to create account.");
@@ -181,41 +328,15 @@ export default function Signup() {
     setStep(3);
   };
 
-  const handleFinish = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    try {
-      const orgRes = await fetch("/api/onboarding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orgName: orgName.trim(),
-          slug: slugNormalized,
-          plan,
-        }),
-      });
-      const payload = (await orgRes.json()) as { error?: string };
-      if (!orgRes.ok) {
-        setError(payload.error ?? "Unable to create organization.");
-        if (orgRes.status === 400 && payload.error?.toLowerCase().includes("slug")) {
-          setSlugVerifiedFor(null);
-          setStep(2);
-        }
-        return;
-      }
-      window.location.href = tenantBoardUrlFromRequest(
-        new Request(window.location.href),
-        slugNormalized,
-      );
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const suggestions = suggestOrgSlugsFromName(orgName);
+
+  // If action returned a slug error, go back to step 2
+  useEffect(() => {
+    if (actionData?.field === "slug") {
+      setSlugVerifiedFor(null);
+      setStep(2);
+    }
+  }, [actionData, setStep]);
 
   return (
     <div className="min-h-screen bg-[#0f1414] text-white">
@@ -275,6 +396,15 @@ export default function Signup() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
+                />
+                <label className="text-sm text-white/80">Phone number</label>
+                <Input
+                  type="tel"
+                  placeholder="(555) 123-4567"
+                  required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  autoComplete="tel"
                 />
                 <label className="text-sm text-white/80">Password</label>
                 <Input
@@ -388,76 +518,58 @@ export default function Signup() {
 
           {step === 3 && (
             <>
-              <h1 className="text-2xl font-bold">Choose a plan</h1>
+              <h1 className="text-2xl font-bold">Start your free trial</h1>
               <p className="mt-2 text-sm text-white/65">
-                Trial length is the later of{" "}
-                <strong className="text-white/90">{TRIAL_CALENDAR_DAYS} calendar days</strong> from signup or reaching{" "}
-                <strong className="text-white/90">{TRIAL_QUALIFYING_DAYS} qualifying pickup days</strong> (busy days with
-                enough students on the board)—whichever finishes last.
+                Your 30-day trial starts as soon as you finish setup. No credit
+                card required.
+                {plan === "DISTRICT" && (
+                  <>
+                    {" "}We&apos;ll reach out during your trial to discuss your
+                    district&apos;s pricing and setup.
+                  </>
+                )}
               </p>
-              <form onSubmit={handleFinish} className="mt-6 flex flex-col gap-4">
-                <label className="block cursor-pointer rounded-2xl border border-white/10 bg-black/20 p-4 has-[:checked]:border-[#E9D500]/50">
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="radio"
-                      name="plan"
-                      checked={plan === "FREE"}
-                      onChange={() => setPlan("FREE")}
-                      className="mt-1"
-                    />
-                    <div>
-                      <p className="font-semibold">Free trial</p>
-                      <p className="mt-1 text-sm text-white/65">
-                        Full board on your school subdomain. Usage limits match Car Line; upgrade when you need more capacity
-                        or paid billing.
-                      </p>
-                    </div>
-                  </div>
-                </label>
-                <label className="block cursor-pointer rounded-2xl border border-white/10 bg-black/20 p-4 has-[:checked]:border-[#E9D500]/50">
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="radio"
-                      name="plan"
-                      checked={plan === "CAR_LINE"}
-                      onChange={() => setPlan("CAR_LINE")}
-                      className="mt-1"
-                    />
-                    <div>
-                      <p className="font-semibold text-[#E9D500]">Car Line</p>
-                      <p className="mt-1 text-sm text-white/65">
-                        Stripe subscription — car line + subdomain. See pricing for student, family, and classroom limits.
-                      </p>
-                    </div>
-                  </div>
-                </label>
-                <label className="block cursor-pointer rounded-2xl border border-[#E9D500]/30 bg-[#193B4B]/30 p-4 has-[:checked]:border-[#E9D500]">
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="radio"
-                      name="plan"
-                      checked={plan === "CAMPUS"}
-                      onChange={() => setPlan("CAMPUS")}
-                      className="mt-1"
-                    />
-                    <div>
-                      <p className="font-semibold text-[#E9D500]">Campus</p>
-                      <p className="mt-1 text-sm text-white/65">
-                        Higher limits (e.g. ~300 families / 900 students), forms &amp; custom pages, optional SMS/email add-ons.
-                      </p>
-                    </div>
-                  </div>
-                </label>
-                {error && <p className="text-center text-sm text-red-400">{error}</p>}
+              <div className="mt-6 rounded-2xl border border-[#E9D500]/40 bg-[#193B4B]/30 p-4 text-sm">
+                <p className="text-xs uppercase tracking-wide text-white/50">
+                  Selected plan
+                </p>
+                <p className="mt-1 text-lg font-semibold text-[#E9D500]">
+                  {plan === "DISTRICT"
+                    ? "District"
+                    : plan === "CAMPUS"
+                      ? "Campus"
+                      : "Car Line"}
+                </p>
+                <p className="mt-1 text-xs text-white/60">
+                  {plan === "DISTRICT"
+                    ? "Custom pricing — confirmed with you during the trial."
+                    : plan === "CAMPUS"
+                      ? "$500 / month per school after your 30-day trial."
+                      : "$100 / month per school after your 30-day trial."}
+                </p>
+              </div>
+              {/* Step 3 uses a real Form with server action */}
+              <Form method="post" className="mt-6 flex flex-col gap-4">
+                {/* Hidden fields for data collected in steps 1 & 2 */}
+                <input type="hidden" name="orgName" value={orgName} />
+                <input type="hidden" name="slug" value={slugNormalized} />
+                <input type="hidden" name="plan" value={plan} />
+                {actionData?.error && (
+                  <p className="text-center text-sm text-red-400">{actionData.error}</p>
+                )}
                 <div className="flex gap-2">
                   <Button type="button" variant="outline" className="flex-1 border-white/20 text-white" onPress={() => setStep(2)}>
                     Back
                   </Button>
-                  <Button type="submit" isPending={loading} variant="primary" className="flex-1 bg-[#E9D500] font-semibold text-[#193B4B]">
-                    Finish setup
+                  <Button type="submit" variant="primary" className="flex-1 bg-[#E9D500] font-semibold text-[#193B4B]">
+                    Start free trial
                   </Button>
                 </div>
-              </form>
+                <p className="text-center text-xs text-white/40">
+                  By continuing you agree to our terms. You can change tiers
+                  later by contacting support.
+                </p>
+              </Form>
             </>
           )}
         </div>

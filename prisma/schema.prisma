@@ -14,6 +14,7 @@ model User {
   email                      String    @unique
   emailVerified              Boolean   @default(false)
   name                       String    @default("")
+  phone                      String?
   image                      String?
   role                       String    @default("VIEWER")
   mustChangePassword         Boolean   @default(false)
@@ -26,10 +27,30 @@ model User {
   org                        Org?      @relation(fields: [orgId], references: [id], onDelete: SetNull)
   sessions                   Session[]
   accounts                   Account[]
+  passwordResetTokens        PasswordResetToken[]
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
 
   @@index([orgId])
+}
+
+/// Password-reset tokens for the "forgot password" flow. We store only the
+/// sha256 of the token (never the raw token) so leaking this table alone
+/// cannot be used to take over accounts.
+model PasswordResetToken {
+  id                String    @id @default(uuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// sha256(token) — hex-encoded. The raw token is only ever in the email.
+  tokenHash         String
+  expiresAt         DateTime
+  usedAt            DateTime?
+  requestedAt       DateTime  @default(now())
+  requestIp         String?
+  requestUserAgent  String?
+
+  @@index([tokenHash])
+  @@index([userId])
 }
 
 model Org {
@@ -39,6 +60,11 @@ model Org {
   customDomain           String?                  @unique
   brandColor             String?
   brandAccentColor       String?
+  /// Tenant palette override for --color-primary. Null = use default palette.
+  /// Hex string, validated /^#[0-9a-fA-F]{6}$/ before persist.
+  primaryColor           String?
+  /// Tenant palette override for --color-secondary. Null = use default palette.
+  secondaryColor         String?
   logoUrl                String?
   logoObjectKey          String?
   status                 OrgStatus                @default(ACTIVE)
@@ -60,6 +86,13 @@ model Org {
   billingNote              String?
   /// When set, billing enforcement may treat the org as comped until this instant (UTC).
   compedUntil              DateTime?
+  /// Hard-on comp flag set by staff from the platform admin panel. When true,
+  /// billing enforcement (isOrgStatusAllowedForApp, trial-expiry suspension)
+  /// is bypassed entirely. Use `compedUntil` for time-bounded comps.
+  isComped                 Boolean                  @default(false)
+  /// Whether this org's users can reset their password via email. Orgs using
+  /// SSO should disable this so users are forced through the SSO flow.
+  passwordResetEnabled     Boolean                  @default(true)
   users                  User[]
   appSettings            AppSettings[]
   viewerAccessAttempts   ViewerAccessAttempt[]
@@ -71,8 +104,22 @@ model Org {
   callEvents             CallEvent[]
   fireDrillTemplates     FireDrillTemplate[]
   fireDrillRuns          FireDrillRun[]
+  auditLogs              OrgAuditLog[]
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
+}
+
+model OrgAuditLog {
+  id           String   @id @default(cuid())
+  orgId        String
+  org          Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  actorUserId  String?
+  action       String
+  payload      Json?
+  createdAt    DateTime @default(now())
+
+  @@index([orgId])
+  @@index([orgId, createdAt])
 }
 
 /// Org-configurable checklist template (e.g. fire drill, lockdown).
@@ -104,10 +151,62 @@ model FireDrillRun {
 }
 
 model StripeWebhookEvent {
-  id            String   @id @default(cuid())
-  stripeEventId String   @unique
+  id            String    @id @default(cuid())
+  stripeEventId String    @unique
   type          String
-  createdAt     DateTime @default(now())
+  payload       Json?
+  processedAt   DateTime?
+  lastError     String?
+  createdAt     DateTime  @default(now())
+}
+
+/// Idempotency log for lifecycle/trial emails: prevents double-sends from the
+/// daily cron. (orgId, kind, bucket) is the unique key; bucket encodes the
+/// "slot" (e.g. "daysLeft=7", "day=14") so we can send multiple emails of
+/// the same kind for different milestones.
+model SentEmail {
+  id        String   @id @default(cuid())
+  orgId     String
+  kind      String
+  bucket    String
+  sentAt    DateTime @default(now())
+
+  @@unique([orgId, kind, bucket])
+  @@index([orgId])
+}
+
+/// Single probe result (one row per component per tick). Written by the
+/// 2-minute status cron. Retain for ~90 days for the uptime grid; latency
+/// is stored but never surfaced publicly.
+model StatusCheck {
+  id          String   @id @default(cuid())
+  componentId String
+  /// 'operational' | 'degraded' | 'outage' | 'unknown'
+  status      String
+  latencyMs   Int?
+  detail      String?
+  checkedAt   DateTime @default(now())
+
+  @@index([componentId, checkedAt(sort: Desc)], map: "StatusCheck_component_checkedAt_idx")
+  @@index([checkedAt], map: "StatusCheck_checkedAt_idx")
+}
+
+/// Derived incident state. Opened after 3 consecutive non-operational checks;
+/// closed after 2 consecutive operational checks. See
+/// app/domain/status/runner.server.ts for the state machine.
+model StatusIncident {
+  id          String    @id @default(cuid())
+  componentId String
+  /// 'degraded' | 'outage'
+  severity    String
+  title       String
+  startedAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+  lastFailAt  DateTime?
+  /// 'auto' (from runner) or 'manual' (future: operator posted note).
+  source      String    @default("auto")
+
+  @@index([startedAt(sort: Desc)], map: "StatusIncident_startedAt_idx")
 }
 
 /// Singleton row: use id "default"
@@ -281,13 +380,19 @@ enum Status {
 }
 
 enum BillingPlan {
+  /// Comped / staff-granted accounts only. Never chosen at public signup.
   FREE
-  /// @deprecated Use CAMPUS — migrated in DB; kept for compatibility with old clients.
+  /// @deprecated Use CAR_LINE — migrated in DB; kept for compatibility with old clients.
   STARTER
-  /// Base paid: car line + subdomain (see plan-limits).
+  /// Base paid: single school car-line experience ($100/mo). The public default.
   CAR_LINE
-  /// Full campus tier (families/students/classrooms caps in plan-limits).
+  /// Premium single-school tier ($500/mo): higher caps, dedicated onboarding,
+  /// priority support, SSO. Positioned on the public pricing page between
+  /// CAR_LINE and DISTRICT.
   CAMPUS
+  /// Multi-school district plan with custom pricing. Starts as a trialing org;
+  /// the sales team finalizes pricing during the trial.
+  DISTRICT
   ENTERPRISE
 }
 

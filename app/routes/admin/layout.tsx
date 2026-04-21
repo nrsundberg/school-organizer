@@ -19,7 +19,7 @@ import AdminSidebar from "~/components/admin/AdminSidebar";
 import { AdminUsageBanner } from "~/components/admin/AdminUsageBanner";
 import { PastDuePaymentBanner } from "~/components/admin/PastDuePaymentBanner";
 import Header from "~/components/Header";
-import logo from "/favicon.ico?url";
+import logo from "/logo-icon.svg?url";
 
 export async function loader({ context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
@@ -41,7 +41,11 @@ export async function loader({ context }: Route.LoaderArgs) {
     };
   }
 
-  return { usage, pastDuePaymentBanner };
+  return {
+    usage,
+    pastDuePaymentBanner,
+    compedUntil: org.compedUntil ? org.compedUntil.toISOString() : null,
+  };
 }
 
 export function ErrorBoundary() {
@@ -58,7 +62,7 @@ export function ErrorBoundary() {
         <div className="h-10 w-full bg-blue-300 flex items-center justify-center flex-shrink-0 relative">
           <a href="/" className="text-black font-bold inline-flex items-center">
             <img src={logo} alt="school logo" height={40} width={40} />
-            School Organizer — Car line
+            Pickup Roster — Car line
           </a>
           <a
             href="/login"
@@ -110,7 +114,8 @@ export function ErrorBoundary() {
 
 export default function AdminLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { usage, pastDuePaymentBanner } = useLoaderData<typeof loader>();
+  const { usage, pastDuePaymentBanner, compedUntil } = useLoaderData<typeof loader>();
+  const isComped = !!compedUntil && new Date(compedUntil) > new Date();
   const rootData = useRouteLoaderData("root") as
     | { branding?: { orgName?: string; primaryColor?: string; logoUrl?: string | null } }
     | undefined;
@@ -118,6 +123,17 @@ export default function AdminLayout() {
   return (
     <div className="flex flex-col min-h-screen bg-[#212525] text-white">
       <Header user={true} branding={rootData?.branding} />
+      {isComped && (
+        <div className="bg-emerald-500/10 border-b border-emerald-500/30 text-emerald-200 px-4 py-2 text-sm">
+          Your account is comped through{" "}
+          {new Date(compedUntil!).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+          . Thanks for rolling with Pickup Roster 💛
+        </div>
+      )}
       {pastDuePaymentBanner && (
         <PastDuePaymentBanner suspendOnIso={pastDuePaymentBanner.suspendOnIso} />
       )}

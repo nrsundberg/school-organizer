@@ -1,4 +1,5 @@
 import { Link, useFetcher, useRevalidator } from "react-router";
+import { data } from "react-router";
 import { Button } from "@heroui/react";
 import { ArrowLeft, Check, Plus, Printer, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -51,7 +52,10 @@ export async function loader({ context, params }: Route.LoaderArgs) {
     });
   }
 
-  return { template, run };
+  return {
+    template,
+    run: { ...run, updatedAtIso: run.updatedAt.toISOString() },
+  };
 }
 
 export async function action({ request, context, params }: Route.ActionArgs) {
@@ -68,6 +72,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
 
   if (intent === "saveState") {
     const raw = String(formData.get("state") ?? "");
+    const expectedUpdatedAt = String(formData.get("expectedUpdatedAt") ?? "");
     let parsed: unknown;
     try {
       parsed = JSON.parse(raw);
@@ -75,6 +80,21 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       return dataWithError(null, "Invalid state JSON.");
     }
     const state = parseRunState(parsed as Prisma.JsonValue);
+
+    // Concurrency check: if expectedUpdatedAt is provided, verify no one else has saved more recently
+    if (expectedUpdatedAt) {
+      const currentRun = await prisma.fireDrillRun.findUnique({
+        where: { templateId },
+        select: { updatedAt: true },
+      });
+      if (currentRun && currentRun.updatedAt.toISOString() > expectedUpdatedAt) {
+        return data(
+          { error: "Someone else updated this drill. Reload to see the latest state." },
+          { status: 409 },
+        );
+      }
+    }
+
     await prisma.fireDrillRun.upsert({
       where: { templateId },
       create: {
@@ -117,6 +137,7 @@ export default function FireDrillRunPage({ loaderData }: Route.ComponentProps) {
   const [state, setState] = useState<RunState>(() => parseRunState(run.state));
   const fetcher = useFetcher();
   const revalidator = useRevalidator();
+  const [concurrencyError, setConcurrencyError] = useState<string | null>(null);
 
   useEffect(() => {
     setState(parseRunState(run.state));
@@ -124,7 +145,13 @@ export default function FireDrillRunPage({ loaderData }: Route.ComponentProps) {
 
   useEffect(() => {
     if (fetcher.state === "idle" && fetcher.data != null) {
-      revalidator.revalidate();
+      const d = fetcher.data as { error?: string } | null;
+      if (d && typeof d === "object" && "error" in d && d.error) {
+        setConcurrencyError(d.error);
+      } else {
+        setConcurrencyError(null);
+        revalidator.revalidate();
+      }
     }
   }, [fetcher.state, fetcher.data, revalidator]);
 
@@ -169,9 +196,11 @@ export default function FireDrillRunPage({ loaderData }: Route.ComponentProps) {
   }, []);
 
   const persist = () => {
+    setConcurrencyError(null);
     const fd = new FormData();
     fd.set("intent", "saveState");
     fd.set("state", JSON.stringify(state));
+    fd.set("expectedUpdatedAt", run.updatedAtIso);
     fetcher.submit(fd, { method: "post" });
   };
 
@@ -223,6 +252,25 @@ export default function FireDrillRunPage({ loaderData }: Route.ComponentProps) {
         <h1 className="text-2xl font-bold text-white">{template.name}</h1>
         <p className="text-white/50 text-sm mt-1">Tap toggle cells during the drill. Green means checked.</p>
       </div>
+
+      {concurrencyError && (
+        <div className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-300 flex items-start gap-2">
+          <span className="flex-shrink-0 mt-0.5">⚠</span>
+          <span>
+            {concurrencyError}{" "}
+            <button
+              type="button"
+              className="underline hover:text-amber-200"
+              onClick={() => {
+                setConcurrencyError(null);
+                revalidator.revalidate();
+              }}
+            >
+              Reload now
+            </button>
+          </span>
+        </div>
+      )}
 
       <ChecklistTable definition={def} state={state} onToggle={toggleCell} />
 

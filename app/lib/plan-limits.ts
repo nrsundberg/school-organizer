@@ -41,3 +41,18 @@ export function warnThreshold(cap: number): number {
 export function hardCeiling(cap: number): number {
   return Math.floor(cap * USAGE_GRACE_HARD_FRACTION);
 }
+
+/**
+ * Advanced branding — custom domain mapping + tenant logo upload — is a
+ * CAMPUS+ feature. FREE / CAR_LINE / STARTER tenants see colors only.
+ * Passing an unknown string is treated as disallowed.
+ */
+export function planAllowsAdvancedBranding(
+  billingPlan: string | null | undefined,
+): boolean {
+  return (
+    billingPlan === "CAMPUS" ||
+    billingPlan === "DISTRICT" ||
+    billingPlan === "ENTERPRISE"
+  );
+}

@@ -1,5 +1,5 @@
 import { Button, Input } from "@heroui/react";
-import { Link, redirect } from "react-router";
+import { data, Link, redirect } from "react-router";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
 import { isPlatformAdmin } from "~/domain/utils/host.server";
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
@@ -7,10 +7,15 @@ import type { Route } from "./+types/login";
 import { useState } from "react";
 import { signIn } from "~/lib/auth-client";
 import { MarketingNav } from "~/components/marketing/MarketingNav";
+import {
+  checkRateLimit,
+  clientIpFromRequest,
+  getRateLimiter,
+} from "~/domain/utils/rate-limit.server";
 
 export function meta() {
   return [
-    { title: "Login — School Organizer" },
+    { title: "Login — Pickup Roster" },
     { name: "description", content: "Sign in to your school car line board" },
   ];
 }
@@ -37,6 +42,22 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const boardUrl = await getTenantBoardUrlForRequest(request, context);
   if (boardUrl) throw redirect(boardUrl);
   throw redirect("/");
+}
+
+export async function action({ request, context }: Route.ActionArgs) {
+  const clientIp = clientIpFromRequest(request);
+  const result = await checkRateLimit({
+    limiter: getRateLimiter(context, "RL_AUTH"),
+    key: "auth:" + clientIp,
+  });
+  if (!result.ok) {
+    return data(
+      { error: "Too many attempts. Please try again in a minute." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
+  // login is handled client-side via better-auth; this action is a rate-limit gate
+  return data({ error: null });
 }
 
 type Step = "email" | "password";
@@ -176,6 +197,22 @@ export default function Login() {
               </button>
             </form>
           )}
+
+          <p className="mt-4 text-center text-sm text-white/55">
+            {/*
+              Always render the forgot-password link — we don't yet know the
+              org at step 1 (email hasn't been submitted) and rendering it
+              conditionally would leak tenant membership. The action at
+              /forgot-password gates on the org's `passwordResetEnabled`
+              toggle and returns a generic success regardless.
+            */}
+            <Link
+              to="/forgot-password"
+              className="font-medium text-white/70 hover:text-white hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </p>
 
           <p className="mt-6 text-center text-sm text-white/55">
             Need an account?{" "}

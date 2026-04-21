@@ -34,7 +34,7 @@ export function MarketingLanding() {
               One board for pickups, drills, and daily chaos—without the walkie chatter.
             </h1>
             <p className="text-lg text-white/70">
-              School Organizer gives each school its own live board, viewer access families trust, and admin tools
+              Pickup Roster gives each school its own live board, viewer access families trust, and admin tools
               your front office already understands.
             </p>
             <div className="flex flex-wrap gap-3">
@@ -57,7 +57,7 @@ export function MarketingLanding() {
             <ul className="mt-4 space-y-3 text-sm text-white/70">
               <li className="flex gap-2">
                 <span className="text-[#E9D500]">✓</span>
-                Subdomain per school (yourslug.yourdomain.com) plus optional custom domains.
+                Subdomain per school (yourslug.pickuproster.com); Campus and District plans can bring a custom domain or a subdomain on your school's own domain.
               </li>
               <li className="flex gap-2">
                 <span className="text-[#E9D500]">✓</span>
@@ -119,21 +119,6 @@ export function MarketingLanding() {
           </Link>
         </div>
       </section>
-
-      <footer className="border-t border-white/10 py-10 text-center text-sm text-white/45">
-        <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 md:flex-row md:justify-center md:gap-8">
-          <Link to="/pricing" className="hover:text-white/80">
-            Pricing
-          </Link>
-          <Link to="/faqs" className="hover:text-white/80">
-            FAQs
-          </Link>
-          <Link to="/login" className="hover:text-white/80">
-            Log in
-          </Link>
-        </div>
-        <p className="mt-4">© {new Date().getFullYear()} School Organizer</p>
-      </footer>
     </div>
   );
 }

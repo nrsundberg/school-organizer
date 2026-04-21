@@ -1,10 +1,18 @@
 import type { Route } from "./+types/update.$space";
 import { redirect } from "react-router";
+import { assertTrialAllowsNewPickup } from "~/domain/billing/trial-enforcement.server";
+import { getOptionalOrgFromContext } from "~/domain/utils/global-context.server";
 
 export async function action({ params, context }: Route.ActionArgs) {
   const { space } = params;
   if (space === undefined) {
     throw redirect("/");
+  }
+
+  // Enforce trial expiration for FREE orgs before recording a pickup event.
+  const org = getOptionalOrgFromContext(context);
+  if (org) {
+    await assertTrialAllowsNewPickup(context, org.id);
   }
 
   const spaceNumber = parseInt(space);

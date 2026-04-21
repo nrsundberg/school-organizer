@@ -13,7 +13,7 @@ import {
 } from "~/domain/utils/global-context.server";
 
 export function meta() {
-  return [{ title: "Viewer access — School Organizer" }];
+  return [{ title: "Viewer access — Pickup Roster" }];
 }
 
 function safeRedirect(next: string | null): string {
