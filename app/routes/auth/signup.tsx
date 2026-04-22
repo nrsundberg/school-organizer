@@ -62,13 +62,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     throw redirect("/");
   }
   // Require a plan selection. If absent/invalid, bounce to pricing so the user
-  // picks a tier — there is no public free tier.
+  // picks a tier — there is no public free tier. Exception: users who've
+  // already completed step 1 (authed, no org yet) fall back to car-line so a
+  // lost `?plan=` param mid-flow doesn't strand them.
   const planParam = new URL(request.url).searchParams.get("plan");
   const plan = normalizePublicPlan(planParam);
-  if (!plan) {
+  if (!plan && !user) {
     throw redirect("/pricing");
   }
-  return { plan };
+  return { plan: plan ?? "car-line" };
 }
 
 const VALID_PLANS = ["CAR_LINE", "CAMPUS", "DISTRICT"] as const;
@@ -207,23 +209,40 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
   // Action data from the step 3 server action
   const actionData = useActionData<typeof action>();
 
+  // Preserve all existing search params (notably `?plan=`) when updating the
+  // step — `setSearchParams({...})` replaces the whole param set, which
+  // otherwise wipes the plan and sends the user back to /pricing.
+  const updateStepParam = useCallback(
+    (n: number, opts?: { replace?: boolean }) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("step", String(n));
+          return next;
+        },
+        { replace: opts?.replace ?? n === 1 },
+      );
+    },
+    [setSearchParams],
+  );
+
   useEffect(() => {
     if ((step === 2 || step === 3) && !isAuthed) {
-      setSearchParams({ step: "1" }, { replace: true });
+      updateStepParam(1, { replace: true });
     }
-  }, [step, isAuthed, setSearchParams]);
+  }, [step, isAuthed, updateStepParam]);
 
   useEffect(() => {
     if (hasNoOrg && step === 1) {
-      setSearchParams({ step: "2" }, { replace: true });
+      updateStepParam(2, { replace: true });
     }
-  }, [hasNoOrg, step, setSearchParams]);
+  }, [hasNoOrg, step, updateStepParam]);
 
   const setStep = useCallback(
     (n: number) => {
-      setSearchParams({ step: String(n) }, { replace: n === 1 });
+      updateStepParam(n);
     },
-    [setSearchParams],
+    [updateStepParam],
   );
 
   const slugNormalized = slugifyOrgName(slug);
