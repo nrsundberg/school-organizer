@@ -121,5 +121,91 @@
 				"dead_letter_queue": "pickup-roster-email-dlq"
 			}
 		]
+	},
+
+	// Staging environment — used by scheduled agents (nightly-build /
+	// nightly-polish) to smoke-test their branches before merging to master.
+	// Before first `wrangler deploy --env staging`, create the bound resources:
+	//   wrangler d1 create school-organizer-staging
+	//   wrangler r2 bucket create pickup-roster-org-branding-staging
+	//   wrangler queues create pickup-roster-email-staging
+	//   wrangler queues create pickup-roster-email-staging-dlq
+	// Then paste the printed database_id below in place of the TODO.
+	//
+	// Staging URL: school-organizer-staging.<your-subdomain>.workers.dev
+	// (defined in MARKETING_HOSTS so marketing renders on the staging host).
+	"env": {
+		"staging": {
+			"name": "school-organizer-staging",
+			"vars": {
+				"SENTRY_DSN": "",
+				"ENVIRONMENT": "staging",
+				"PUBLIC_ROOT_DOMAIN": "pickuproster.com",
+				"MARKETING_HOSTS": "localhost,127.0.0.1,school-organizer-staging.sundbergne.workers.dev",
+				"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
+				"SUPPORT_EMAIL": "support@pickuproster.com",
+				"STRIPE_STATUS_URL": "https://www.stripe-status.com/api/v2/status.json"
+			},
+			"d1_databases": [
+				{
+					"binding": "D1_DATABASE",
+					"database_name": "school-organizer-staging",
+					"database_id": "TODO-run-wrangler-d1-create-school-organizer-staging",
+					"migrations_dir": "migrations"
+				}
+			],
+			"r2_buckets": [
+				{
+					"binding": "ORG_BRANDING_BUCKET",
+					"bucket_name": "pickup-roster-org-branding-staging",
+					"preview_bucket_name": "pickup-roster-org-branding-staging"
+				}
+			],
+			"durable_objects": {
+				"bindings": [
+					{
+						"name": "BINGO_BOARD",
+						"class_name": "BingoBoardDO"
+					}
+				]
+			},
+			"migrations": [
+				{
+					"tag": "v1",
+					"new_sqlite_classes": [
+						"BingoBoardDO"
+					]
+				}
+			],
+			"ratelimits": [
+				{
+					"name": "RL_AUTH",
+					"namespace_id": "2001",
+					"simple": { "limit": 30, "period": 60 }
+				},
+				{
+					"name": "RL_BILLING",
+					"namespace_id": "2002",
+					"simple": { "limit": 30, "period": 60 }
+				}
+			],
+			"queues": {
+				"producers": [
+					{
+						"binding": "EMAIL_QUEUE",
+						"queue": "pickup-roster-email-staging"
+					}
+				],
+				"consumers": [
+					{
+						"queue": "pickup-roster-email-staging",
+						"max_batch_size": 10,
+						"max_batch_timeout": 5,
+						"max_retries": 3,
+						"dead_letter_queue": "pickup-roster-email-staging-dlq"
+					}
+				]
+			}
+		}
 	}
 }
