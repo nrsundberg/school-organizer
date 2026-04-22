@@ -90,10 +90,12 @@ export async function parseIntent<Intents extends Record<string, ZodTypeAny>>(
   intents: Intents,
 ): Promise<
   | {
-      success: true;
-      intent: keyof Intents & string;
-      data: { [K in keyof Intents]: z.infer<Intents[K]> }[keyof Intents];
-    }
+      [K in keyof Intents & string]: {
+        success: true;
+        intent: K;
+        data: z.infer<Intents[K]>;
+      };
+    }[keyof Intents & string]
   | { success: false; response: Awaited<ReturnType<typeof dataWithError>> }
 > {
   const formData = await request.formData();
@@ -116,8 +118,14 @@ export async function parseIntent<Intents extends Record<string, ZodTypeAny>>(
   return {
     success: true,
     intent: intent as keyof Intents & string,
-    data: parsed.data as { [K in keyof Intents]: z.infer<Intents[K]> }[keyof Intents],
-  };
+    data: parsed.data,
+  } as {
+    [K in keyof Intents & string]: {
+      success: true;
+      intent: K;
+      data: z.infer<Intents[K]>;
+    };
+  }[keyof Intents & string];
 }
 
 /**

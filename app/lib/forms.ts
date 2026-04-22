@@ -76,9 +76,20 @@ export function useAppForm<Schema extends ZodTypeAny>(
 /**
  * Return the first error on a Conform field, or `undefined` if valid / not
  * yet touched. Encapsulates the `errors?.[0]` dance so callers read cleanly.
+ *
+ * Accepts the broader `errors?: unknown` because Conform's default FormError
+ * generic is `string[]` but the `useForm` return type may widen to `unknown`
+ * when the schema is inferred from a discriminated zod object. We coerce
+ * defensively.
  */
-export function getFieldError(field: { errors?: string[] } | undefined): string | undefined {
-  return field?.errors?.[0];
+export function getFieldError(
+  field: { errors?: unknown } | undefined | null,
+): string | undefined {
+  const errors = field?.errors;
+  if (Array.isArray(errors) && typeof errors[0] === "string") {
+    return errors[0];
+  }
+  return undefined;
 }
 
 /**

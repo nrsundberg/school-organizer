@@ -1,6 +1,9 @@
-import { Link, redirect, useFetcher } from "react-router";
+import { Form, Link, redirect, useFetcher } from "react-router";
 import { ArrowDown, ArrowLeft, ArrowUp, Eye, Plus, Radio, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { z } from "zod";
+import { zfd } from "zod-form-data";
+import { getFormProps, getInputProps } from "@conform-to/react";
 import type { Route } from "./+types/drills.$templateId";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
@@ -8,11 +11,54 @@ import type { Prisma } from "~/db";
 import { type ColumnDef, type TemplateDefinition, parseTemplateDefinition } from "~/domain/drills/types";
 import { ChecklistPreview } from "~/domain/drills/ChecklistTable";
 import { startDrillRun } from "~/domain/drills/live.server";
+import { parseIntent } from "~/lib/forms.server";
+import { formClasses, getFieldError, useAppForm } from "~/lib/forms";
 import { dataWithError, dataWithSuccess } from "remix-toast";
 
 export const meta: Route.MetaFunction = ({ data }) => [
   { title: data?.template ? `Edit – ${data.template.name}` : "Edit checklist" },
 ];
+
+// -----------------------------------------------------------------------------
+// Shared zod schemas — drive both client-side (useAppForm) and server-side
+// (parseIntent) validation. Phase 2 agents mirror this pattern in their routes.
+// -----------------------------------------------------------------------------
+
+const renameSchema = z.object({
+  intent: z.literal("rename"),
+  name: z.string().trim().min(1, "Name is required.").max(120, "Name is too long."),
+});
+
+const startLiveSchema = z.object({
+  intent: z.literal("start-live"),
+});
+
+const saveDefinitionSchema = zfd.formData({
+  intent: zfd.text(z.literal("saveDefinition")),
+  /** The template layout JSON — parsed and structurally validated. */
+  definition: zfd.text(
+    z
+      .string()
+      .min(2, "Definition is empty.")
+      .transform((raw, ctx) => {
+        try {
+          const parsed = JSON.parse(raw) as Prisma.JsonValue;
+          const def = parseTemplateDefinition(parsed);
+          if (def.columns.filter((c) => c.kind === "toggle").length === 0) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Add at least one toggle column (e.g. Check).",
+            });
+            return z.NEVER;
+          }
+          return def;
+        } catch {
+          ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid JSON." });
+          return z.NEVER;
+        }
+      }),
+  ),
+});
 
 export async function loader({ context, params }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
@@ -38,53 +84,56 @@ export async function action({ request, context, params }: Route.ActionArgs) {
   if (!id) {
     return dataWithError(null, "Missing template.");
   }
-  const formData = await request.formData();
-  const intent = String(formData.get("intent") ?? "");
 
-  if (intent === "rename") {
-    const name = String(formData.get("name") ?? "").trim();
-    if (!name) {
-      return dataWithError(null, "Name is required.");
+  const result = await parseIntent(request, {
+    rename: renameSchema,
+    "start-live": startLiveSchema,
+    saveDefinition: saveDefinitionSchema,
+  });
+  if (!result.success) return result.response;
+
+  try {
+    if (result.intent === "rename") {
+      await prisma.drillTemplate.update({
+        where: { id },
+        data: { name: result.data.name },
+      });
+      return dataWithSuccess(null, "Name saved.");
     }
-    await prisma.drillTemplate.update({
-      where: { id },
-      data: { name },
-    });
-    return dataWithSuccess(null, "Name saved.");
-  }
 
-  if (intent === "start-live") {
-    const orgId = getOrgFromContext(context).id;
-    try {
-      await startDrillRun(prisma, orgId, id);
-    } catch (err) {
-      // startDrillRun throws a Response (409) when another drill is already
-      // active. Surface it as a toast instead of crashing the route.
-      if (err instanceof Response && err.status === 409) {
-        return dataWithError(null, "Another drill is already live. End it first.");
+    if (result.intent === "start-live") {
+      const orgId = getOrgFromContext(context).id;
+      try {
+        await startDrillRun(prisma, orgId, id);
+      } catch (err) {
+        // startDrillRun throws a Response (409) when another drill is already
+        // active. Surface it as a toast instead of crashing the route.
+        if (err instanceof Response && err.status === 409) {
+          return dataWithError(null, "Another drill is already live. End it first.");
+        }
+        throw err;
       }
-      throw err;
+      throw redirect("/drills/live");
     }
-    throw redirect("/drills/live");
-  }
 
-  if (intent === "saveDefinition") {
-    const raw = String(formData.get("definition") ?? "");
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return dataWithError(null, "Invalid JSON.");
+    if (result.intent === "saveDefinition") {
+      // result.data.definition is already a validated, normalized
+      // TemplateDefinition because the zod transform ran it through
+      // parseTemplateDefinition + the toggle-column invariant check.
+      await prisma.drillTemplate.update({
+        where: { id },
+        data: { definition: result.data.definition as unknown as Prisma.InputJsonValue },
+      });
+      return dataWithSuccess(null, "Layout saved.");
     }
-    const definition = parseTemplateDefinition(parsed as Prisma.JsonValue);
-    if (definition.columns.filter((c) => c.kind === "toggle").length === 0) {
-      return dataWithError(null, "Add at least one toggle column (e.g. Check).");
-    }
-    await prisma.drillTemplate.update({
-      where: { id },
-      data: { definition: definition as object },
-    });
-    return dataWithSuccess(null, "Layout saved.");
+  } catch (err) {
+    // A redirect from start-live must propagate — React Router surfaces
+    // Response throws itself. Everything else we turn into a toast so the
+    // user sees WHAT failed rather than an opaque crash (this was the
+    // "unexpected server error" on Save layout).
+    if (err instanceof Response) throw err;
+    const msg = err instanceof Error ? err.message : "Unexpected error saving.";
+    return dataWithError(null, msg, { status: 500 });
   }
 
   return dataWithError(null, "Unknown action.");
@@ -101,17 +150,21 @@ function cloneDefinition(def: TemplateDefinition): TemplateDefinition {
   };
 }
 
-const btnPrimary =
-  "inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-const btnSecondary =
-  "inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-
 export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) {
   const { template } = loaderData;
   const [definition, setDefinition] = useState<TemplateDefinition>(() =>
     cloneDefinition(parseTemplateDefinition(template.definition)),
   );
-  const fetcher = useFetcher();
+  const saveFetcher = useFetcher();
+  const liveFetcher = useFetcher();
+
+  // Conform-managed rename form. `useAppForm` wires up zod validation + the
+  // action's `lastResult` automatically. We keep the intent as a hidden input
+  // so the same action signature works for progressive enhancement.
+  const [renameForm, renameFields] = useAppForm(renameSchema, {
+    id: `rename-${template.id}`,
+    defaultValue: { intent: "rename", name: template.name },
+  });
 
   useEffect(() => {
     setDefinition(cloneDefinition(parseTemplateDefinition(template.definition)));
@@ -227,8 +280,10 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
     const fd = new FormData();
     fd.set("intent", "saveDefinition");
     fd.set("definition", JSON.stringify(definition));
-    fetcher.submit(fd, { method: "post" });
+    saveFetcher.submit(fd, { method: "post" });
   };
+
+  const renameError = getFieldError(renameFields.name);
 
   return (
     <div className="p-6 xl:flex xl:items-start xl:gap-8">
@@ -244,38 +299,48 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
       </div>
 
       <div className="flex flex-wrap items-end gap-4 justify-between">
-        <fetcher.Form method="post" className="flex flex-wrap items-end gap-3 flex-1 min-w-[240px]">
+        <Form
+          method="post"
+          {...getFormProps(renameForm)}
+          className="flex flex-wrap items-end gap-3 flex-1 min-w-[240px]"
+        >
           <input type="hidden" name="intent" value="rename" />
-          <label className="text-sm text-white/60 flex flex-col gap-1 flex-1 max-w-md">
+          <label className={`${formClasses.labelStack} flex-1 max-w-md`}>
             Template name
             <input
-              name="name"
+              {...getInputProps(renameFields.name, { type: "text" })}
               key={template.updatedAt.toISOString()}
-              type="text"
               defaultValue={template.name}
-              className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white"
+              className={formClasses.input}
+              aria-invalid={renameError ? true : undefined}
+              aria-describedby={renameError ? `${renameFields.name.id}-error` : undefined}
             />
+            {renameError ? (
+              <span id={`${renameFields.name.id}-error`} className={formClasses.fieldError}>
+                {renameError}
+              </span>
+            ) : null}
           </label>
-          <button type="submit" className={btnSecondary}>
+          <button type="submit" className={formClasses.btnSecondary}>
             Save name
           </button>
-        </fetcher.Form>
+        </Form>
         <div className="flex flex-wrap gap-2">
-          <button type="button" className={btnSecondary} onClick={() => addColumn("text")}>
+          <button type="button" className={formClasses.btnSecondary} onClick={() => addColumn("text")}>
             <Plus className="w-4 h-4 mr-1 inline" />
             Text column
           </button>
-          <button type="button" className={btnSecondary} onClick={() => addColumn("toggle")}>
+          <button type="button" className={formClasses.btnSecondary} onClick={() => addColumn("toggle")}>
             <Plus className="w-4 h-4 mr-1 inline" />
             Toggle column
           </button>
           <button
             type="button"
-            className={btnPrimary}
+            className={formClasses.btnPrimary}
             onClick={saveDefinition}
-            disabled={fetcher.state !== "idle"}
+            disabled={saveFetcher.state !== "idle"}
           >
-            {fetcher.state !== "idle" ? "Saving…" : "Save layout"}
+            {saveFetcher.state !== "idle" ? "Saving…" : "Save layout"}
           </button>
         </div>
       </div>
@@ -391,23 +456,23 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
         </table>
       </div>
 
-      <button type="button" className={`${btnSecondary} self-start`} onClick={addRow}>
+      <button type="button" className={`${formClasses.btnSecondary} self-start`} onClick={addRow}>
         <Plus className="w-4 h-4 mr-1 inline" />
         Add row
       </button>
 
       <div className="flex flex-wrap gap-3">
-        <fetcher.Form method="post">
+        <liveFetcher.Form method="post">
           <input type="hidden" name="intent" value="start-live" />
           <button
             type="submit"
             className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 transition-colors disabled:opacity-50"
-            disabled={fetcher.state !== "idle"}
+            disabled={liveFetcher.state !== "idle"}
           >
             <Radio className="w-4 h-4" />
             Start live drill
           </button>
-        </fetcher.Form>
+        </liveFetcher.Form>
         <Link
           to={`/admin/drills/${template.id}/run`}
           className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
