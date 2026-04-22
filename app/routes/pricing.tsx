@@ -26,8 +26,7 @@ const CAR_LINE_FEATURES = [
   "Up to 150 families, 400 students, 35 classrooms",
   "Teacher & staff viewer only (no parent or family app)",
   "Live dismissal / car-line flow",
-  "Reports and call history",
-  "Custom branding on your school subdomain",
+  "Pick your brand colors (no logo upload)",
   "Standard email support",
   "30-day free trial — no credit card required",
 ];
@@ -35,10 +34,13 @@ const CAR_LINE_FEATURES = [
 const CAMPUS_FEATURES = [
   "Everything in Car Line",
   "Up to 300 families, 900 students, 80 classrooms",
+  "Reports and call history",
+  "Full custom branding — logo upload + custom domain",
   "Parent & family viewer app",
   "Dedicated migration & onboarding support",
   "Microsoft Entra SSO (coming soon)",
   "Priority support",
+  "RFID vehicle-tag auto-arrival available as a custom add-on (pricing scoped per deployment)",
 ];
 
 const DISTRICT_FEATURES = [
@@ -46,6 +48,7 @@ const DISTRICT_FEATURES = [
   "Multi-school dashboard (up to 10 schools included)",
   "Unlimited students, families, and classrooms",
   "Additional schools available as an add-on",
+  "RFID vehicle-tag auto-arrival available as a custom add-on (pricing scoped per deployment)",
 ];
 
 export default function Pricing(_: Route.ComponentProps) {
@@ -65,10 +68,13 @@ export default function Pricing(_: Route.ComponentProps) {
         </div>
 
         <div className="mt-12 grid gap-6 md:grid-cols-3">
-          {/* Car Line card */}
-          <div className="flex flex-col rounded-2xl border border-white/15 bg-[#151a1a] p-6">
-            <h2 className="text-xl font-bold">Car Line</h2>
-            <p className="mt-2 text-sm text-white/65">
+          {/* Car Line card — good starting point */}
+          <div className="relative flex flex-col rounded-2xl border-2 border-[#F97316]/70 bg-[#F97316]/5 p-6 shadow-2xl shadow-[#F97316]/10">
+            <span className="absolute -top-3 left-6 rounded-full bg-[#F97316] px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#0f1414]">
+              A good starting point
+            </span>
+            <h2 className="text-xl font-bold text-[#F97316]">Car Line</h2>
+            <p className="mt-2 text-sm text-white/70">
               Run dismissal smoothly with a staff-only viewer. Best for smaller
               schools.
             </p>
@@ -81,7 +87,7 @@ export default function Pricing(_: Route.ComponentProps) {
             <ul className="mt-6 flex-1 space-y-2 text-sm text-white/80">
               {CAR_LINE_FEATURES.map((f) => (
                 <li key={f} className="flex gap-2">
-                  <span aria-hidden className="text-[#E9D500]">✓</span>
+                  <span aria-hidden className="text-[#F97316]">✓</span>
                   <span>{f}</span>
                 </li>
               ))}

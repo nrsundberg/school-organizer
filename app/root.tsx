@@ -5,6 +5,7 @@ import {
   Meta,
   type MiddlewareFunction,
   Outlet,
+  redirect,
   Scripts,
   ScrollRestoration,
   useRouteError
@@ -19,6 +20,7 @@ import {
   globalStorageMiddleware,
   userContext,
   getOptionalOrgFromContext,
+  getTenantPrisma,
 } from "~/domain/utils/global-context.server";
 import { isMarketingHost } from "~/domain/utils/host.server";
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
@@ -29,6 +31,11 @@ import logo from "/logo-icon.svg?url";
 import { getBrandingFromOrg } from "~/domain/org/branding.server";
 import { HEX_COLOR_RE } from "~/domain/org/branding-constants";
 import { DEFAULT_SITE_NAME, DEFAULT_SUPPORT_EMAIL, getSupportEmail } from "~/lib/site";
+import { getActiveDrillRun } from "~/domain/drills/live.server";
+import {
+  liveDrillRedirectTarget,
+  userIsAdmin,
+} from "~/domain/drills/live-redirect.server";
 
 export const middleware: MiddlewareFunction<Response>[] = [
   globalStorageMiddleware
@@ -99,6 +106,34 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const org = getOptionalOrgFromContext(context);
   const marketing = isMarketingHost(request, context);
   const { toast, headers } = await getToast(request);
+
+  // Live drill takeover: when a drill is LIVE or PAUSED in this org, non-admin
+  // signed-in users are force-redirected to /drills/live. Admins stay on
+  // whatever route they requested so they can manage things. The allow-list
+  // (logout, /api/*, static assets) is encapsulated in liveDrillRedirectTarget
+  // so it's unit-testable and consistent across callers.
+  if (!marketing && user && org && !userIsAdmin(user)) {
+    try {
+      const prisma = getTenantPrisma(context);
+      const activeRun = await getActiveDrillRun(prisma, org.id);
+      if (activeRun) {
+        const url = new URL(request.url);
+        const target = liveDrillRedirectTarget({
+          user,
+          pathname: url.pathname,
+          hasActiveDrill: true,
+          isAdmin: false,
+        });
+        if (target) {
+          throw redirect(target);
+        }
+      }
+    } catch (e) {
+      // Let redirects propagate; swallow DB lookup errors so a transient D1
+      // hiccup doesn't take down the whole app shell.
+      if (e instanceof Response) throw e;
+    }
+  }
 
   let impersonatedBy: string | null = null;
   if (user) {

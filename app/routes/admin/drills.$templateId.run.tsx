@@ -1,21 +1,27 @@
 import { Link, useFetcher, useRevalidator } from "react-router";
 import { data } from "react-router";
-import { Button } from "@heroui/react";
 import { ArrowLeft, Check, Plus, Printer, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import type { Route } from "./+types/fire-drill.$templateId.run";
+import type { Route } from "./+types/drills.$templateId.run";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 import {
   type RunState,
-  type TemplateDefinition,
   emptyRunState,
   parseRunState,
   parseTemplateDefinition,
   toggleKey,
-} from "~/domain/fire-drill/types";
+} from "~/domain/drills/types";
+import { ChecklistTable } from "~/domain/drills/ChecklistTable";
 import { dataWithError, dataWithSuccess } from "remix-toast";
 import type { Prisma } from "~/db";
+
+const btnPrimary =
+  "inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+const btnSecondary =
+  "inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+const btnGhost =
+  "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 
 export const meta: Route.MetaFunction = ({ data }) => [
   { title: data?.template ? `Run – ${data.template.name}` : "Run checklist" },
@@ -28,7 +34,7 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   if (!templateId) {
     throw new Response("Not found", { status: 404 });
   }
-  const template = await prisma.fireDrillTemplate.findFirst({
+  const template = await prisma.drillTemplate.findFirst({
     where: { id: templateId },
     select: { id: true, name: true, definition: true, updatedAt: true },
   });
@@ -36,13 +42,13 @@ export async function loader({ context, params }: Route.LoaderArgs) {
     throw new Response("Not found", { status: 404 });
   }
 
-  let run = await prisma.fireDrillRun.findUnique({
+  let run = await prisma.drillRun.findUnique({
     where: { templateId },
     select: { id: true, state: true, updatedAt: true },
   });
   if (!run) {
     const orgId = getOrgFromContext(context).id;
-    run = await prisma.fireDrillRun.create({
+    run = await prisma.drillRun.create({
       data: {
         orgId,
         templateId,
@@ -83,7 +89,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
 
     // Concurrency check: if expectedUpdatedAt is provided, verify no one else has saved more recently
     if (expectedUpdatedAt) {
-      const currentRun = await prisma.fireDrillRun.findUnique({
+      const currentRun = await prisma.drillRun.findUnique({
         where: { templateId },
         select: { updatedAt: true },
       });
@@ -95,7 +101,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       }
     }
 
-    await prisma.fireDrillRun.upsert({
+    await prisma.drillRun.upsert({
       where: { templateId },
       create: {
         orgId,
@@ -110,7 +116,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
   }
 
   if (intent === "reset") {
-    await prisma.fireDrillRun.upsert({
+    await prisma.drillRun.upsert({
       where: { templateId },
       create: {
         orgId,
@@ -131,7 +137,7 @@ function newId(): string {
   return crypto.randomUUID();
 }
 
-export default function FireDrillRunPage({ loaderData }: Route.ComponentProps) {
+export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
   const { template, run } = loaderData;
   const def = parseTemplateDefinition(template.definition);
   const [state, setState] = useState<RunState>(() => parseRunState(run.state));
@@ -217,27 +223,26 @@ export default function FireDrillRunPage({ loaderData }: Route.ComponentProps) {
     <div className="flex flex-col gap-6 p-6 max-w-[min(100%,56rem)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
-          to={`/admin/fire-drill/${template.id}`}
+          to={`/admin/drills/${template.id}`}
           className="inline-flex items-center gap-1 text-sm text-white/50 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Edit layout
         </Link>
         <div className="flex flex-wrap gap-2">
-          <Button
+          <button
             type="button"
-            variant="secondary"
-            size="sm"
-            onPress={persist}
-            isPending={fetcher.state !== "idle"}
+            className={btnSecondary}
+            onClick={persist}
+            disabled={fetcher.state !== "idle"}
           >
-            Save
-          </Button>
-          <Button type="button" variant="ghost" size="sm" onPress={reset}>
+            {fetcher.state !== "idle" ? "Saving…" : "Save"}
+          </button>
+          <button type="button" className={btnGhost} onClick={reset}>
             Clear all
-          </Button>
+          </button>
           <Link
-            to={`/admin/print/fire-drill/${template.id}`}
+            to={`/admin/print/drills/${template.id}`}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm text-white hover:bg-white/10"
@@ -288,10 +293,10 @@ export default function FireDrillRunPage({ loaderData }: Route.ComponentProps) {
       <section className="rounded-xl border border-white/10 bg-white/5 p-4">
         <div className="flex items-center justify-between gap-2 mb-3">
           <h2 className="text-sm font-semibold text-white">Follow-up items</h2>
-          <Button type="button" size="sm" variant="secondary" onPress={addActionItem}>
+          <button type="button" className={btnSecondary} onClick={addActionItem}>
             <Plus className="w-4 h-4 mr-1 inline" />
             Add
-          </Button>
+          </button>
         </div>
         <ul className="flex flex-col gap-2">
           {state.actionItems.length === 0 ? (
@@ -330,73 +335,14 @@ export default function FireDrillRunPage({ loaderData }: Route.ComponentProps) {
         </ul>
       </section>
 
-      <Button type="button" variant="primary" onPress={persist} isPending={fetcher.state !== "idle"}>
-        Save checklist
-      </Button>
+      <button
+        type="button"
+        className={`${btnPrimary} self-start`}
+        onClick={persist}
+        disabled={fetcher.state !== "idle"}
+      >
+        {fetcher.state !== "idle" ? "Saving…" : "Save checklist"}
+      </button>
     </div>
-  );
-}
-
-function ChecklistTable({
-  definition,
-  state,
-  onToggle,
-}: {
-  definition: TemplateDefinition;
-  state: RunState;
-  onToggle: (rowId: string, colId: string) => void;
-}) {
-  return (
-    <div className="overflow-x-auto rounded-xl border border-white/10">
-      <table className="w-full text-sm min-w-[480px]">
-        <thead>
-          <tr className="border-b border-white/10 bg-white/5">
-            {definition.columns.map((col) => (
-              <th
-                key={col.id}
-                className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-white/60"
-              >
-                {col.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {definition.rows.map((row) => (
-            <tr key={row.id} className="border-b border-white/5">
-              {definition.columns.map((col) => (
-                <td key={col.id} className="px-3 py-2 align-middle">
-                  {col.kind === "text" ? (
-                    <span className="text-white">{row.cells[col.id] ?? ""}</span>
-                  ) : (
-                    <ToggleCell
-                      pressed={!!state.toggles[toggleKey(row.id, col.id)]}
-                      onToggle={() => onToggle(row.id, col.id)}
-                    />
-                  )}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function ToggleCell({ pressed, onToggle }: { pressed: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-pressed={pressed}
-      className={`inline-flex h-10 min-w-[2.5rem] items-center justify-center rounded-lg border-2 transition-colors ${
-        pressed
-          ? "border-emerald-500 bg-emerald-600/35 text-emerald-100"
-          : "border-white/20 bg-white/5 text-white/30 hover:border-white/40"
-      }`}
-    >
-      {pressed ? <Check className="w-5 h-5" /> : <span className="text-xs text-white/30"> </span>}
-    </button>
   );
 }

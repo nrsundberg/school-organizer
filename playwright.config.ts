@@ -1,5 +1,34 @@
 import { defineConfig, devices } from "@playwright/test";
 
+/**
+ * Playwright config — desktop + mobile smoke matrix.
+ *
+ * Projects:
+ *   - `chromium`       : runs every spec EXCEPT `smoke.mobile.spec.ts`.
+ *                        This is the primary desktop-coverage project. It
+ *                        runs all auth/marketing/drills specs and the
+ *                        desktop `smoke.spec.ts` route sweep.
+ *   - `mobile-iphone`  : runs ONLY `smoke.mobile.spec.ts` under the
+ *                        `iPhone 13` device emulation (390×844, WebKit UA,
+ *                        `isMobile: true`).
+ *   - `mobile-pixel`   : runs ONLY `smoke.mobile.spec.ts` under the
+ *                        `Pixel 7` device emulation (412×915, Chrome UA).
+ *
+ * Why mobile projects only run the mobile smoke file: `smoke.mobile.spec.ts`
+ * asserts a viewport-dependent invariant (no horizontal overflow) which
+ * needs the mobile viewport. The desktop auth/marketing specs are
+ * viewport-agnostic and would just double the CI surface.
+ *
+ * Wiring mobile runs into CI is workstream 0c
+ * (`ci-playwright-matrix` in `docs/nightly-queue.md`). Locally, all projects
+ * run by default with `npm run test:e2e`; scope with
+ * `npx playwright test --project=mobile-iphone` etc.
+ *
+ * Note: `Pixel 7` uses Playwright's Chromium emulation, not WebKit — so the
+ * mobile matrix is actually (WebKit on iPhone) × (Chromium on Pixel).
+ * WebKit needs `npx playwright install webkit` on fresh machines; CI already
+ * installs all browsers in `.github/workflows/e2e.yml` via `--with-deps`.
+ */
 export default defineConfig({
   testDir: "./e2e",
   forbidOnly: !!process.env.CI,
@@ -15,7 +44,19 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      // Desktop chromium runs every spec except the mobile-only smoke sweep.
+      testIgnore: /smoke\.mobile\.spec\.ts$/,
       use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "mobile-iphone",
+      testMatch: /smoke\.mobile\.spec\.ts$/,
+      use: { ...devices["iPhone 13"] },
+    },
+    {
+      name: "mobile-pixel",
+      testMatch: /smoke\.mobile\.spec\.ts$/,
+      use: { ...devices["Pixel 7"] },
     },
   ],
   webServer: {

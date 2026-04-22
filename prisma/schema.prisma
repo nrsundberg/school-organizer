@@ -102,8 +102,8 @@ model Org {
   students               Student[]
   spaces                 Space[]
   callEvents             CallEvent[]
-  fireDrillTemplates     FireDrillTemplate[]
-  fireDrillRuns          FireDrillRun[]
+  drillTemplates         DrillTemplate[]
+  drillRuns              DrillRun[]
   auditLogs              OrgAuditLog[]
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
@@ -122,32 +122,53 @@ model OrgAuditLog {
   @@index([orgId, createdAt])
 }
 
-/// Org-configurable checklist template (e.g. fire drill, lockdown).
-model FireDrillTemplate {
-  id          String          @id @default(cuid())
-  orgId       String
-  org         Org             @relation(fields: [orgId], references: [id])
-  name        String
-  definition  Json
-  runs        FireDrillRun[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+/// Org-configurable safety drill template (fire, lockdown, secure, shelter, etc.).
+/// globalKey is set when cloned from the seeded global library (see app/domain/drills/library.ts).
+model DrillTemplate {
+  id           String     @id @default(cuid())
+  orgId        String
+  org          Org        @relation(fields: [orgId], references: [id])
+  name         String
+  /// One of: FIRE | LOCKDOWN | SECURE | HOLD | EVACUATE | SHELTER | SEVERE_WEATHER |
+  /// EARTHQUAKE | REUNIFICATION | BUS | BOMB_THREAT | MEDICAL | OTHER. Stored as TEXT
+  /// because SQLite/D1 enums are awkward; narrowed in TS via DrillType.
+  drillType    String     @default("OTHER")
+  /// Source citation, e.g. "SRP v4.2", "NFPA 101". Null for org-custom templates.
+  authority    String?
+  /// Markdown directive teachers see before/during the drill (e.g. "Locks, Lights, Out of Sight").
+  instructions String?
+  /// Stable slug matching a key in the global library. Null for purely-custom templates.
+  globalKey    String?
+  definition   Json
+  runs         DrillRun[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   @@index([orgId])
+  @@index([globalKey])
 }
 
-/// Latest run state for a template (toggles, notes, action items).
-model FireDrillRun {
-  id         String            @id @default(cuid())
-  orgId      String
-  org        Org               @relation(fields: [orgId], references: [id])
-  templateId String            @unique
-  template   FireDrillTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  state      Json
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+/// A single run of a drill. Status state machine: DRAFT → LIVE → (PAUSED ↔ LIVE) → ENDED.
+/// Note: a partial unique index enforced at the DB layer (see migrations/0021) guarantees
+/// at most one LIVE or PAUSED run per org. Prisma can't model this; app code catches
+/// the unique violation as a 409 "another drill is already live".
+model DrillRun {
+  id          String        @id @default(cuid())
+  orgId       String
+  org         Org           @relation(fields: [orgId], references: [id])
+  templateId  String
+  template    DrillTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  state       Json
+  /// DRAFT | LIVE | PAUSED | ENDED. Backfill default is ENDED so historical runs are archived.
+  status      String        @default("ENDED")
+  activatedAt DateTime?
+  pausedAt    DateTime?
+  endedAt     DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   @@index([orgId])
+  @@index([templateId])
 }
 
 model StripeWebhookEvent {

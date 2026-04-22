@@ -15,16 +15,29 @@ export default [
     route("children", "routes/admin/children.tsx"),
     route("billing", "routes/admin/billing.tsx"),
     route("branding", "routes/admin/branding.tsx"),
-    route("fire-drill", "routes/admin/fire-drill.tsx"),
-    route("fire-drill/:templateId/run", "routes/admin/fire-drill.$templateId.run.tsx"),
-    route("fire-drill/:templateId", "routes/admin/fire-drill.$templateId.tsx"),
+    route("history", "routes/admin/history.tsx"),
+    route("drills", "routes/admin/drills.tsx"),
+    // /admin/drills/library — must come BEFORE the :templateId param route so
+    // it doesn't get swallowed by the dynamic segment.
+    route("drills/library", "routes/admin/drills.library.tsx"),
+    route("drills/:templateId/run", "routes/admin/drills.$templateId.run.tsx"),
+    route("drills/:templateId", "routes/admin/drills.$templateId.tsx"),
   ]),
+
+  // Live drill takeover — every signed-in user gets redirected here when their
+  // org has a LIVE or PAUSED DrillRun (see app/root.tsx loader).
+  route("drills/live", "routes/drills.live.tsx"),
 
   // Print routes — standalone (no admin chrome) so browser Cmd+P output is clean
   route("admin/print/board", "routes/admin/print.board.tsx"),
   route("admin/print/master", "routes/admin/print.master.tsx"),
   route("admin/print/homeroom/:teacherId", "routes/admin/print.homeroom.$teacherId.tsx"),
-  route("admin/print/fire-drill/:templateId", "routes/admin/print.fire-drill.$templateId.tsx"),
+  route("admin/print/drills/:templateId", "routes/admin/print.drills.$templateId.tsx"),
+
+  // Legacy /admin/fire-drill* → /admin/drills* 308 redirects (remove after one release cycle).
+  route("admin/fire-drill", "routes/_redirects/fire-drill.ts", { id: "legacy-fire-drill-index" }),
+  route("admin/fire-drill/*", "routes/_redirects/fire-drill.ts", { id: "legacy-fire-drill-splat" }),
+  route("admin/print/fire-drill/*", "routes/_redirects/fire-drill.ts", { id: "legacy-print-fire-drill-splat" }),
 
   ...prefix("create", [
     route("homeroom", "routes/create/create.homeroom.tsx"),

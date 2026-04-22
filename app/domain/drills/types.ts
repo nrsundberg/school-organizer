@@ -12,11 +12,95 @@ export interface RowDef {
   id: string;
   /** Values for text columns only; keys are column ids */
   cells: Record<string, string>;
+  /** Optional grouping — matches SectionDef.id */
+  sectionId?: string;
+}
+
+export interface SectionDef {
+  id: string;
+  label: string;
 }
 
 export interface TemplateDefinition {
   columns: ColumnDef[];
   rows: RowDef[];
+  /** Optional row groupings — e.g. "During" vs "After" for earthquake drills */
+  sections?: SectionDef[];
+}
+
+/**
+ * Drill categories aligned to Standard Response Protocol (SRP v4.2) +
+ * common school-drill taxonomy (NFPA, FEMA REMS, state DOEs).
+ */
+export type DrillType =
+  | "FIRE"
+  | "LOCKDOWN"
+  | "SECURE"
+  | "HOLD"
+  | "EVACUATE"
+  | "SHELTER"
+  | "SEVERE_WEATHER"
+  | "EARTHQUAKE"
+  | "REUNIFICATION"
+  | "BUS"
+  | "BOMB_THREAT"
+  | "MEDICAL"
+  | "OTHER";
+
+export const DRILL_TYPES: readonly DrillType[] = [
+  "FIRE",
+  "LOCKDOWN",
+  "SECURE",
+  "HOLD",
+  "EVACUATE",
+  "SHELTER",
+  "SEVERE_WEATHER",
+  "EARTHQUAKE",
+  "REUNIFICATION",
+  "BUS",
+  "BOMB_THREAT",
+  "MEDICAL",
+  "OTHER",
+] as const;
+
+export const DRILL_TYPE_LABELS: Record<DrillType, string> = {
+  FIRE: "Fire evacuation",
+  LOCKDOWN: "Lockdown",
+  SECURE: "Secure",
+  HOLD: "Hold",
+  EVACUATE: "Evacuate (non-fire)",
+  SHELTER: "Shelter-in-place",
+  SEVERE_WEATHER: "Severe weather / Tornado",
+  EARTHQUAKE: "Earthquake",
+  REUNIFICATION: "Reunification",
+  BUS: "Bus evacuation",
+  BOMB_THREAT: "Bomb threat",
+  MEDICAL: "Medical / AED",
+  OTHER: "Other",
+};
+
+export function isDrillType(v: unknown): v is DrillType {
+  return typeof v === "string" && (DRILL_TYPES as readonly string[]).includes(v);
+}
+
+/**
+ * DrillRun lifecycle:
+ *   DRAFT  → never activated (initial state)
+ *   LIVE   → active, everyone in org sees + interacts
+ *   PAUSED → frozen, read-only (admins can Resume or End)
+ *   ENDED  → terminal historical record
+ */
+export type DrillRunStatus = "DRAFT" | "LIVE" | "PAUSED" | "ENDED";
+
+export const DRILL_RUN_STATUS_LABELS: Record<DrillRunStatus, string> = {
+  DRAFT: "Draft",
+  LIVE: "Live",
+  PAUSED: "Paused",
+  ENDED: "Ended",
+};
+
+export function isDrillRunStatus(v: unknown): v is DrillRunStatus {
+  return v === "DRAFT" || v === "LIVE" || v === "PAUSED" || v === "ENDED";
 }
 
 export interface ActionItem {
@@ -84,13 +168,32 @@ export function parseTemplateDefinition(raw: Prisma.JsonValue): TemplateDefiniti
           kind: (c.kind === "toggle" ? "toggle" : "text") as ColumnKind,
         }))
     : [];
+  const sections = Array.isArray(def.sections)
+    ? def.sections
+        .filter(
+          (s): s is SectionDef =>
+            !!s && typeof s === "object" && typeof (s as SectionDef).id === "string",
+        )
+        .map((s) => ({
+          id: s.id,
+          label: typeof s.label === "string" ? s.label : "Section",
+        }))
+    : undefined;
+  const validSectionIds = new Set(sections?.map((s) => s.id) ?? []);
+
   const rows = Array.isArray(def.rows)
     ? def.rows
         .filter((r): r is RowDef => !!r && typeof r === "object" && typeof (r as RowDef).id === "string")
-        .map((r) => ({
-          id: r.id,
-          cells: typeof r.cells === "object" && r.cells !== null ? { ...r.cells } : {},
-        }))
+        .map((r) => {
+          const row: RowDef = {
+            id: r.id,
+            cells: typeof r.cells === "object" && r.cells !== null ? { ...r.cells } : {},
+          };
+          if (typeof r.sectionId === "string" && validSectionIds.has(r.sectionId)) {
+            row.sectionId = r.sectionId;
+          }
+          return row;
+        })
     : [];
 
   if (columns.length === 0) {
@@ -106,7 +209,11 @@ export function parseTemplateDefinition(raw: Prisma.JsonValue): TemplateDefiniti
     }
   }
 
-  return { columns, rows };
+  const result: TemplateDefinition = { columns, rows };
+  if (sections && sections.length > 0) {
+    result.sections = sections;
+  }
+  return result;
 }
 
 export function parseRunState(raw: Prisma.JsonValue): RunState {

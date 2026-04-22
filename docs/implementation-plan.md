@@ -244,7 +244,7 @@ This is the biggest track. Splits into C1 (server) and C2 (UI). C1 is the depend
   - Add "Custom domain" field (writable). Action validates host format and writes to `Org.customDomain` (uniqueness is already enforced by `@unique` in schema; surface the friendly error).
   - Add a logo preview before upload using `URL.createObjectURL` (browser API).
 
-- `app/routes/admin/fire-drill.$templateId.run.tsx`
+- `app/routes/admin/drills.$templateId.run.tsx`
   - Add multi-user concurrency: surface `updatedAt` from the run state in the loader, send it back in the action, and reject stale writes (return `409` with toast).
 
 - `app/routes/admin/layout.tsx`
