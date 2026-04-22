@@ -16,6 +16,8 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@conform-to/react": "^1.19.0",
+    "@conform-to/zod": "^1.19.0",
     "@heroui/react": "^3.0.1",
     "@prisma/adapter-d1": "^7.0.0",
     "@prisma/client": "^7.0.0",
