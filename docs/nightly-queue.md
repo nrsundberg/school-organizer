@@ -20,7 +20,7 @@ This file is the single source of truth for autonomous overnight agents. Each wo
 
 ## Priority 0 — Test & CI coverage (start here tonight)
 
-### 0a. `[→]` smoke-test-sweep — Playwright smoke test for every route (started 2026-04-21, build agent)
+### 0a. `[x]` smoke-test-sweep — Playwright smoke test for every route (done 2026-04-21, build agent; 2 bugs flagged as `test.fixme`, see docs/nightly/2026-04-21-build.md)
 
 **Why:** Noah wants "every page works" confirmation. A smoke sweep that visits every route and asserts no 500 + key text present gives us that baseline before we invest in deeper tests. Any page that fails flags a real bug.
 
