@@ -36,7 +36,7 @@ This file is the single source of truth for autonomous overnight agents. Each wo
 
 ---
 
-### 0b. `[ ]` mobile-smoke-sweep — Same sweep at iPhone + Android viewports
+### 0b. `[→]` mobile-smoke-sweep — Same sweep at iPhone + Android viewports (in progress 2026-04-22, build agent)
 
 **Depends on:** 0a.
 
