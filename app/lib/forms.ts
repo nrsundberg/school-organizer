@@ -13,7 +13,7 @@
  */
 
 import { useForm } from "@conform-to/react";
-import { parseWithZod } from "@conform-to/zod";
+import { parseWithZod } from "@conform-to/zod/v4";
 import { useActionData } from "react-router";
 import type { ZodTypeAny, z } from "zod";
 
