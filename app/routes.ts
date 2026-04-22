@@ -77,6 +77,8 @@ export default [
   route("signup", "routes/auth/signup.tsx"),
   route("pricing", "routes/pricing.tsx"),
   route("faqs", "routes/faqs.tsx"),
+  route("blog", "routes/blog._index.tsx"),
+  route("blog/:slug", "routes/blog.$slug.tsx"),
   route("status", "routes/status.tsx"),
 
   route("platform", "routes/platform/layout.tsx", [

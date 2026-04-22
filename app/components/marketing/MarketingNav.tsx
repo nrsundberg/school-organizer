@@ -28,6 +28,9 @@ export function MarketingNav() {
           <Link to="/pricing" className="transition hover:text-white">
             Pricing
           </Link>
+          <Link to="/blog" className="transition hover:text-white">
+            Blog
+          </Link>
           <Link to="/faqs" className="transition hover:text-white">
             FAQs
           </Link>

@@ -29,6 +29,12 @@ export function Footer({ siteName, supportEmail, orgName }: FooterProps) {
             Pricing
           </Link>
           <Link
+            to="/blog"
+            className="hover:text-white transition-colors"
+          >
+            Blog
+          </Link>
+          <Link
             to="/faqs"
             className="hover:text-white transition-colors"
           >
