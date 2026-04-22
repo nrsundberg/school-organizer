@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useActionData, useNavigation } from "react-router";
+import { Link, useActionData, useNavigation } from "react-router";
 import { Button } from "@heroui/react";
 import { data } from "react-router";
 import { dataWithError, dataWithSuccess } from "remix-toast";
@@ -162,10 +162,16 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (primaryColorUpdate !== undefined) updateData.primaryColor = primaryColorUpdate;
   if (secondaryColorUpdate !== undefined) updateData.secondaryColor = secondaryColorUpdate;
 
-  // Handle custom domain update
+  // Handle custom domain update (CAMPUS+ only). For lower tiers we leave
+  // whatever is in the DB untouched — a staff-comped domain on a downgraded
+  // org should not be cleared just because the admin saved colors.
   const prevDomain = org.customDomain ?? null;
-  const nextDomain = rawDomain === "" ? null : rawDomain;
-  updateData.customDomain = nextDomain;
+  const nextDomain = advancedBrandingAllowed
+    ? (rawDomain === "" ? null : rawDomain)
+    : prevDomain;
+  if (advancedBrandingAllowed) {
+    updateData.customDomain = nextDomain;
+  }
 
   try {
     await db.org.update({
@@ -316,66 +322,87 @@ export default function AdminBranding({ loaderData }: Route.ComponentProps) {
           </div>
         </fieldset>
 
-        <div className="flex flex-col gap-2">
-          <label className="text-sm text-white/70 flex flex-col gap-2">
-            Logo (PNG, JPEG, WEBP up to 2MB)
-            <input
-              ref={logoInputRef}
-              type="file"
-              name="logo"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={handleLogoChange}
-              className="rounded border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
-            />
-          </label>
-          {/* Browser-side logo preview before upload */}
-          {logoPreviewUrl && (
-            <div className="mt-2 flex items-center gap-3">
-              <img
-                src={logoPreviewUrl}
-                alt="Logo preview"
-                className="h-14 w-14 rounded bg-black/20 object-contain border border-white/10"
-              />
-              <span className="text-xs text-white/50">Preview (not yet saved)</span>
-            </div>
-          )}
-          {loaderData.logoUrl && !logoPreviewUrl ? (
-            <div className="mt-2 flex items-center gap-3">
-              <img src={loaderData.logoUrl} alt="Current tenant logo" className="h-14 w-14 rounded bg-black/20 object-contain" />
-              <label className="inline-flex items-center gap-2 text-sm text-white/70">
-                <input type="checkbox" name="clearLogo" value="true" />
-                Remove current logo
+        {loaderData.advancedBrandingAllowed ? (
+          <>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm text-white/70 flex flex-col gap-2">
+                Logo (PNG, JPEG, WEBP up to 2MB)
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  name="logo"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleLogoChange}
+                  className="rounded border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+                />
               </label>
+              {/* Browser-side logo preview before upload */}
+              {logoPreviewUrl && (
+                <div className="mt-2 flex items-center gap-3">
+                  <img
+                    src={logoPreviewUrl}
+                    alt="Logo preview"
+                    className="h-14 w-14 rounded bg-black/20 object-contain border border-white/10"
+                  />
+                  <span className="text-xs text-white/50">Preview (not yet saved)</span>
+                </div>
+              )}
+              {loaderData.logoUrl && !logoPreviewUrl ? (
+                <div className="mt-2 flex items-center gap-3">
+                  <img src={loaderData.logoUrl} alt="Current tenant logo" className="h-14 w-14 rounded bg-black/20 object-contain" />
+                  <label className="inline-flex items-center gap-2 text-sm text-white/70">
+                    <input type="checkbox" name="clearLogo" value="true" />
+                    Remove current logo
+                  </label>
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </div>
 
-        {/* Custom domain */}
-        <div className="flex flex-col gap-2">
-          <label className="text-sm text-white/70 flex flex-col gap-2">
-            Custom domain
-            <input
-              type="text"
-              name="customDomain"
-              defaultValue={loaderData.customDomain}
-              placeholder="e.g. pickup.myschool.org"
-              className="rounded border border-white/15 bg-white/5 px-3 py-2 text-white text-sm placeholder:text-white/30"
-            />
-          </label>
-          {domainError ? (
-            <p className="text-sm text-red-400">{domainError}</p>
-          ) : (
-            <p className="text-xs text-white/40">
-              DNS must point to pickuproster.com with a proxied record. Leave blank to use the
-              default subdomain.
+            {/* Custom domain */}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm text-white/70 flex flex-col gap-2">
+                Custom domain
+                <input
+                  type="text"
+                  name="customDomain"
+                  defaultValue={loaderData.customDomain}
+                  placeholder="e.g. pickup.myschool.org"
+                  className="rounded border border-white/15 bg-white/5 px-3 py-2 text-white text-sm placeholder:text-white/30"
+                />
+              </label>
+              {domainError ? (
+                <p className="text-sm text-red-400">{domainError}</p>
+              ) : (
+                <p className="text-xs text-white/40">
+                  DNS must point to pickuproster.com with a proxied record. Leave blank to use the
+                  default subdomain.
+                </p>
+              )}
+              {loaderData.customDomain && !domainError && (
+                <p className="text-xs text-white/50">
+                  Current: <span className="text-white font-mono">{loaderData.customDomain}</span>
+                </p>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.02] p-4">
+            <p className="text-sm font-semibold text-white">
+              Logo upload & custom domain
             </p>
-          )}
-          {loaderData.customDomain && !domainError && (
-            <p className="text-xs text-white/50">
-              Current: <span className="text-white font-mono">{loaderData.customDomain}</span>
+            <p className="text-xs text-white/60">
+              Upload your school logo and point a custom domain like{" "}
+              <span className="font-mono text-white/80">pickup.myschool.org</span> at
+              your board. Available on the Campus and District plans.
             </p>
-          )}
-        </div>
+            <Link
+              to="/admin/billing"
+              className="self-start rounded bg-[#E9D500] px-3 py-1.5 text-xs font-semibold text-[#193B4B] hover:brightness-105"
+            >
+              Upgrade to Campus
+            </Link>
+          </div>
+        )}
 
         <Button type="submit" variant="primary" className="self-start" isPending={isPending}>
           Save branding

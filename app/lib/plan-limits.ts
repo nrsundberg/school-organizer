@@ -56,3 +56,19 @@ export function planAllowsAdvancedBranding(
     billingPlan === "ENTERPRISE"
   );
 }
+
+/**
+ * Full call history and CSV reports are a CAMPUS+ feature. FREE / CAR_LINE /
+ * STARTER tenants still see the last 20 calls on the board but do not get
+ * the admin History & Reports page. Passing an unknown string is treated as
+ * disallowed.
+ */
+export function planAllowsReports(
+  billingPlan: string | null | undefined,
+): boolean {
+  return (
+    billingPlan === "CAMPUS" ||
+    billingPlan === "DISTRICT" ||
+    billingPlan === "ENTERPRISE"
+  );
+}

@@ -1,18 +1,24 @@
 import { Form, Link, redirect } from "react-router";
-import { Button } from "@heroui/react";
-import { ClipboardList } from "lucide-react";
-import type { Route } from "./+types/fire-drill";
+import { ClipboardList, Library } from "lucide-react";
+import type { Route } from "./+types/drills";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
-import { defaultTemplateDefinition } from "~/domain/fire-drill/types";
+import { defaultTemplateDefinition } from "~/domain/drills/types";
 import { dataWithError, dataWithSuccess } from "remix-toast";
 
-export const meta: Route.MetaFunction = () => [{ title: "Admin – Fire drill checklists" }];
+export const meta: Route.MetaFunction = () => [{ title: "Admin – Drill checklists" }];
+
+const btnPrimary =
+  "inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+const btnSecondary =
+  "inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50";
+const btnGhostDanger =
+  "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium text-rose-300 hover:bg-rose-500/10 transition-colors";
 
 export async function loader({ context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
-  const templates = await prisma.fireDrillTemplate.findMany({
+  const templates = await prisma.drillTemplate.findMany({
     orderBy: { updatedAt: "desc" },
     select: { id: true, name: true, updatedAt: true },
   });
@@ -31,14 +37,14 @@ export async function action({ request, context }: Route.ActionArgs) {
       return dataWithError(null, "Name is required.");
     }
     const orgId = getOrgFromContext(context).id;
-    const created = await prisma.fireDrillTemplate.create({
+    const created = await prisma.drillTemplate.create({
       data: {
         orgId,
         name,
         definition: defaultTemplateDefinition() as object,
       },
     });
-    throw redirect(`/admin/fire-drill/${created.id}`);
+    throw redirect(`/admin/drills/${created.id}`);
   }
 
   if (intent === "delete") {
@@ -46,14 +52,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!id) {
       return dataWithError(null, "Missing template id.");
     }
-    await prisma.fireDrillTemplate.delete({ where: { id } });
+    await prisma.drillTemplate.delete({ where: { id } });
     return dataWithSuccess(null, "Checklist deleted.");
   }
 
   return dataWithError(null, "Unknown action.");
 }
 
-export default function AdminFireDrillList({ loaderData }: Route.ComponentProps) {
+export default function AdminDrillList({ loaderData }: Route.ComponentProps) {
   const { templates } = loaderData;
 
   return (
@@ -61,15 +67,25 @@ export default function AdminFireDrillList({ loaderData }: Route.ComponentProps)
       <div className="flex items-start gap-3">
         <ClipboardList className="w-8 h-8 text-blue-400 flex-shrink-0 mt-0.5" />
         <div>
-          <h1 className="text-2xl font-bold text-white">Fire drill checklists</h1>
+          <h1 className="text-2xl font-bold text-white">Drill checklists</h1>
           <p className="text-white/50 text-sm mt-1">
-            Build per-organization templates, run them during a drill, and print when needed.
+            Templates for fire, lockdown, shelter-in-place, reunification, and more. Build your own
+            or start from the global library.
           </p>
         </div>
       </div>
 
       <section className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <h2 className="text-sm font-semibold text-white/70 mb-3">New checklist template</h2>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h2 className="text-sm font-semibold text-white/70">New checklist template</h2>
+          <Link
+            to="/admin/drills/library"
+            className={`${btnSecondary} text-xs`}
+          >
+            <Library className="w-3.5 h-3.5 mr-1.5 inline" />
+            Start from library
+          </Link>
+        </div>
         <Form method="post" className="flex flex-wrap gap-3 items-end">
           <input type="hidden" name="intent" value="create" />
           <label className="text-sm text-white/60 flex flex-col gap-1 flex-1 min-w-[200px]">
@@ -78,13 +94,13 @@ export default function AdminFireDrillList({ loaderData }: Route.ComponentProps)
               name="name"
               type="text"
               required
-              placeholder="e.g. Fire drill, Lockdown"
+              placeholder="e.g. Lockdown, Fire evacuation, Reunification"
               className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white"
             />
           </label>
-          <Button type="submit" variant="primary">
-            Create
-          </Button>
+          <button type="submit" className={btnPrimary}>
+            Create blank
+          </button>
         </Form>
       </section>
 
@@ -101,7 +117,7 @@ export default function AdminFireDrillList({ loaderData }: Route.ComponentProps)
               >
                 <div>
                   <Link
-                    to={`/admin/fire-drill/${t.id}`}
+                    to={`/admin/drills/${t.id}`}
                     className="font-medium text-white hover:text-blue-300 transition-colors"
                   >
                     {t.name}
@@ -112,13 +128,13 @@ export default function AdminFireDrillList({ loaderData }: Route.ComponentProps)
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Link
-                    to={`/admin/fire-drill/${t.id}/run`}
+                    to={`/admin/drills/${t.id}/run`}
                     className="inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
                   >
                     Run
                   </Link>
                   <Link
-                    to={`/admin/fire-drill/${t.id}`}
+                    to={`/admin/drills/${t.id}`}
                     className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
                   >
                     Edit layout
@@ -126,9 +142,9 @@ export default function AdminFireDrillList({ loaderData }: Route.ComponentProps)
                   <Form method="post" onSubmit={(e) => !confirm("Delete this template?") && e.preventDefault()}>
                     <input type="hidden" name="intent" value="delete" />
                     <input type="hidden" name="id" value={t.id} />
-                    <Button type="submit" variant="ghost" size="sm" className="text-rose-300">
+                    <button type="submit" className={btnGhostDanger}>
                       Delete
-                    </Button>
+                    </button>
                   </Form>
                 </div>
               </li>

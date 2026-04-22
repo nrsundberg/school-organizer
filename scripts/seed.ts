@@ -127,13 +127,13 @@ async function seed() {
     const orgId = orgRow.rows[0]?.orgId as string | undefined;
     if (orgId) {
       const exists = await db.execute({
-        sql: `SELECT id FROM "FireDrillTemplate" WHERE "orgId" = ? AND name = ?`,
+        sql: `SELECT id FROM "DrillTemplate" WHERE "orgId" = ? AND name = ?`,
         args: [orgId, "Fire drill"],
       });
       if (exists.rows.length === 0) {
         const templateId = generateId();
         await db.execute({
-          sql: `INSERT INTO "FireDrillTemplate" (id, "orgId", name, definition, "createdAt", "updatedAt")
+          sql: `INSERT INTO "DrillTemplate" (id, "orgId", name, definition, "createdAt", "updatedAt")
                 VALUES (?, ?, ?, ?, ?, ?)`,
           args: [templateId, orgId, "Fire drill", demoDefinition, now, now],
         });
@@ -141,7 +141,7 @@ async function seed() {
       }
     }
   } catch (e) {
-    console.warn("Skipping fire drill template seed (run migrations if the table is missing):", e);
+    console.warn("Skipping drill template seed (run migrations if the table is missing):", e);
   }
 
   db.close();

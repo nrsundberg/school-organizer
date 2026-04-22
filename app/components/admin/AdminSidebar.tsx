@@ -1,11 +1,12 @@
-import { LayoutDashboard, Users, GraduationCap, Palette, ClipboardList, CreditCard } from "lucide-react";
+import { LayoutDashboard, Users, GraduationCap, Palette, ClipboardList, CreditCard, History } from "lucide-react";
 import { NavLink } from "react-router";
 
 const navItems = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/children", label: "Children & Classes", icon: GraduationCap },
-  { to: "/admin/fire-drill", label: "Fire drill", icon: ClipboardList },
+  { to: "/admin/drills", label: "Drills", icon: ClipboardList },
+  { to: "/admin/history", label: "History", icon: History },
   { to: "/admin/branding", label: "Branding", icon: Palette },
   { to: "/admin/billing", label: "Billing", icon: CreditCard },
 ];

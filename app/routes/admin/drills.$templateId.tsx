@@ -1,12 +1,13 @@
-import { Link, useFetcher } from "react-router";
-import { Button } from "@heroui/react";
-import { ArrowDown, ArrowLeft, ArrowUp, Plus, Trash2 } from "lucide-react";
+import { Link, redirect, useFetcher } from "react-router";
+import { ArrowDown, ArrowLeft, ArrowUp, Eye, Plus, Radio, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import type { Route } from "./+types/fire-drill.$templateId";
+import type { Route } from "./+types/drills.$templateId";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
-import { getTenantPrisma } from "~/domain/utils/global-context.server";
+import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 import type { Prisma } from "~/db";
-import { type ColumnDef, type TemplateDefinition, parseTemplateDefinition } from "~/domain/fire-drill/types";
+import { type ColumnDef, type TemplateDefinition, parseTemplateDefinition } from "~/domain/drills/types";
+import { ChecklistPreview } from "~/domain/drills/ChecklistTable";
+import { startDrillRun } from "~/domain/drills/live.server";
 import { dataWithError, dataWithSuccess } from "remix-toast";
 
 export const meta: Route.MetaFunction = ({ data }) => [
@@ -20,7 +21,7 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   if (!id) {
     throw new Response("Not found", { status: 404 });
   }
-  const template = await prisma.fireDrillTemplate.findFirst({
+  const template = await prisma.drillTemplate.findFirst({
     where: { id },
     select: { id: true, name: true, definition: true, updatedAt: true },
   });
@@ -45,11 +46,26 @@ export async function action({ request, context, params }: Route.ActionArgs) {
     if (!name) {
       return dataWithError(null, "Name is required.");
     }
-    await prisma.fireDrillTemplate.update({
+    await prisma.drillTemplate.update({
       where: { id },
       data: { name },
     });
     return dataWithSuccess(null, "Name saved.");
+  }
+
+  if (intent === "start-live") {
+    const orgId = getOrgFromContext(context).id;
+    try {
+      await startDrillRun(prisma, orgId, id);
+    } catch (err) {
+      // startDrillRun throws a Response (409) when another drill is already
+      // active. Surface it as a toast instead of crashing the route.
+      if (err instanceof Response && err.status === 409) {
+        return dataWithError(null, "Another drill is already live. End it first.");
+      }
+      throw err;
+    }
+    throw redirect("/drills/live");
   }
 
   if (intent === "saveDefinition") {
@@ -64,7 +80,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
     if (definition.columns.filter((c) => c.kind === "toggle").length === 0) {
       return dataWithError(null, "Add at least one toggle column (e.g. Check).");
     }
-    await prisma.fireDrillTemplate.update({
+    await prisma.drillTemplate.update({
       where: { id },
       data: { definition: definition as object },
     });
@@ -85,7 +101,12 @@ function cloneDefinition(def: TemplateDefinition): TemplateDefinition {
   };
 }
 
-export default function FireDrillTemplateEdit({ loaderData }: Route.ComponentProps) {
+const btnPrimary =
+  "inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+const btnSecondary =
+  "inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+
+export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) {
   const { template } = loaderData;
   const [definition, setDefinition] = useState<TemplateDefinition>(() =>
     cloneDefinition(parseTemplateDefinition(template.definition)),
@@ -210,10 +231,11 @@ export default function FireDrillTemplateEdit({ loaderData }: Route.ComponentPro
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-[min(100%,56rem)]">
+    <div className="p-6 xl:flex xl:items-start xl:gap-8">
+      <div className="flex flex-col gap-6 max-w-[min(100%,56rem)] xl:flex-1 xl:min-w-0">
       <div className="flex flex-wrap items-center gap-3">
         <Link
-          to="/admin/fire-drill"
+          to="/admin/drills"
           className="inline-flex items-center gap-1 text-sm text-white/50 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -234,28 +256,27 @@ export default function FireDrillTemplateEdit({ loaderData }: Route.ComponentPro
               className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white"
             />
           </label>
-          <Button type="submit" variant="secondary" size="sm">
+          <button type="submit" className={btnSecondary}>
             Save name
-          </Button>
+          </button>
         </fetcher.Form>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="secondary" size="sm" onPress={() => addColumn("text")}>
+          <button type="button" className={btnSecondary} onClick={() => addColumn("text")}>
             <Plus className="w-4 h-4 mr-1 inline" />
             Text column
-          </Button>
-          <Button type="button" variant="secondary" size="sm" onPress={() => addColumn("toggle")}>
+          </button>
+          <button type="button" className={btnSecondary} onClick={() => addColumn("toggle")}>
             <Plus className="w-4 h-4 mr-1 inline" />
             Toggle column
-          </Button>
-          <Button
+          </button>
+          <button
             type="button"
-            variant="primary"
-            size="sm"
-            onPress={saveDefinition}
-            isPending={fetcher.state !== "idle"}
+            className={btnPrimary}
+            onClick={saveDefinition}
+            disabled={fetcher.state !== "idle"}
           >
-            Save layout
-          </Button>
+            {fetcher.state !== "idle" ? "Saving…" : "Save layout"}
+          </button>
         </div>
       </div>
 
@@ -370,20 +391,31 @@ export default function FireDrillTemplateEdit({ loaderData }: Route.ComponentPro
         </table>
       </div>
 
-      <Button type="button" variant="secondary" onPress={addRow}>
+      <button type="button" className={`${btnSecondary} self-start`} onClick={addRow}>
         <Plus className="w-4 h-4 mr-1 inline" />
         Add row
-      </Button>
+      </button>
 
       <div className="flex flex-wrap gap-3">
+        <fetcher.Form method="post">
+          <input type="hidden" name="intent" value="start-live" />
+          <button
+            type="submit"
+            className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 transition-colors disabled:opacity-50"
+            disabled={fetcher.state !== "idle"}
+          >
+            <Radio className="w-4 h-4" />
+            Start live drill
+          </button>
+        </fetcher.Form>
         <Link
-          to={`/admin/fire-drill/${template.id}/run`}
+          to={`/admin/drills/${template.id}/run`}
           className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
         >
           Open run screen
         </Link>
         <Link
-          to={`/admin/print/fire-drill/${template.id}`}
+          to={`/admin/print/drills/${template.id}`}
           className="inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-white hover:bg-white/10 transition-colors"
           target="_blank"
           rel="noreferrer"
@@ -391,6 +423,20 @@ export default function FireDrillTemplateEdit({ loaderData }: Route.ComponentPro
           Print preview
         </Link>
       </div>
+      </div>
+
+      <aside className="hidden xl:block xl:w-[28rem] xl:flex-shrink-0 mt-6 xl:mt-0">
+        <div className="sticky top-6 flex flex-col gap-3">
+          <div className="flex items-center gap-2 text-sm text-white/60">
+            <Eye className="w-4 h-4" />
+            <span className="font-medium">Live preview</span>
+          </div>
+          <ChecklistPreview definition={definition} />
+          <p className="text-xs text-white/40">
+            What teachers see on the run screen. Updates as you edit — save to persist.
+          </p>
+        </div>
+      </aside>
     </div>
   );
 }

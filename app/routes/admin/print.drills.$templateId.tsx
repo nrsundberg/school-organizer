@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Link } from "react-router";
 import { Check } from "lucide-react";
-import type { Route } from "./+types/print.fire-drill.$templateId";
+import type { Route } from "./+types/print.drills.$templateId";
 import { requireRole } from "~/sessions.server";
 import { getTenantPrisma } from "~/domain/utils/global-context.server";
 import {
@@ -9,7 +9,7 @@ import {
   parseTemplateDefinition,
   toggleKey,
   emptyRunState,
-} from "~/domain/fire-drill/types";
+} from "~/domain/drills/types";
 
 export async function loader({ context, params }: Route.LoaderArgs) {
   await requireRole(context, "ADMIN");
@@ -18,14 +18,14 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   if (!templateId) {
     throw new Response("Not found", { status: 404 });
   }
-  const template = await prisma.fireDrillTemplate.findFirst({
+  const template = await prisma.drillTemplate.findFirst({
     where: { id: templateId },
     select: { id: true, name: true, definition: true },
   });
   if (!template) {
     throw new Response("Not found", { status: 404 });
   }
-  const run = await prisma.fireDrillRun.findUnique({
+  const run = await prisma.drillRun.findUnique({
     where: { templateId },
     select: { state: true },
   });
@@ -33,7 +33,7 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   return { template, state };
 }
 
-export default function PrintFireDrill({ loaderData }: Route.ComponentProps) {
+export default function PrintDrill({ loaderData }: Route.ComponentProps) {
   const { template, state } = loaderData;
   const definition = parseTemplateDefinition(template.definition);
 
@@ -54,7 +54,7 @@ export default function PrintFireDrill({ loaderData }: Route.ComponentProps) {
         <div className="flex items-baseline justify-between mb-4 print:mb-3">
           <h1 className="text-xl font-semibold">{template.name}</h1>
           <Link
-            to={`/admin/fire-drill/${template.id}/run`}
+            to={`/admin/drills/${template.id}/run`}
             className="text-sm text-blue-600 hover:underline print:hidden"
           >
             Back to run screen
