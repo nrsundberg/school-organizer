@@ -1,4 +1,7 @@
-/app/db
+# Prisma generated client only — DO NOT ignore /app/db entirely or the
+# hand-written files (browser.ts, tenant-extension.ts, db.ts barrel)
+# fall out of git and every fresh checkout fails to build.
+/app/db/generated
 /.idea
 /node_modules
 /.react-router

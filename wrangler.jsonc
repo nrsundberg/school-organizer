@@ -49,8 +49,8 @@
 	"d1_databases": [
 		{
 			"binding": "D1_DATABASE",
-			"database_name": "school-organizer",
-			"database_id": "399295fb-9f0d-42a9-a271-8619366caa1d",
+			"database_name": "school-organizer-staging",
+			"database_id": "TODO-run-wrangler-d1-create-school-organizer-staging",
 			"migrations_dir": "migrations"
 		}
 	],
@@ -61,8 +61,8 @@
 	"r2_buckets": [
 		{
 			"binding": "ORG_BRANDING_BUCKET",
-			"bucket_name": "pickup-roster-org-branding",
-			"preview_bucket_name": "pickup-roster-org-branding"
+			"bucket_name": "pickup-roster-org-branding-staging",
+			"preview_bucket_name": "pickup-roster-org-branding-staging"
 		}
 	],
 	"durable_objects": {
@@ -122,7 +122,6 @@
 			}
 		]
 	},
-
 	// Staging environment — used by scheduled agents (nightly-build /
 	// nightly-polish) to smoke-test their branches before merging to master.
 	// Before first `wrangler deploy --env staging`, create the bound resources:
@@ -150,7 +149,7 @@
 				{
 					"binding": "D1_DATABASE",
 					"database_name": "school-organizer-staging",
-					"database_id": "TODO-run-wrangler-d1-create-school-organizer-staging",
+					"database_id": "88aac5de-1ee7-42e5-b784-3ecd3a4e331f",
 					"migrations_dir": "migrations"
 				}
 			],
@@ -181,12 +180,18 @@
 				{
 					"name": "RL_AUTH",
 					"namespace_id": "2001",
-					"simple": { "limit": 30, "period": 60 }
+					"simple": {
+						"limit": 30,
+						"period": 60
+					}
 				},
 				{
 					"name": "RL_BILLING",
 					"namespace_id": "2002",
-					"simple": { "limit": 30, "period": 60 }
+					"simple": {
+						"limit": 30,
+						"period": 60
+					}
 				}
 			],
 			"queues": {

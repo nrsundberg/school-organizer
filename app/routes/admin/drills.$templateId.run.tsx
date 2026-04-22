@@ -42,8 +42,11 @@ export async function loader({ context, params }: Route.LoaderArgs) {
     throw new Response("Not found", { status: 404 });
   }
 
-  let run = await prisma.drillRun.findUnique({
+  // Migration 0021 dropped the unique-on-templateId constraint to allow run
+  // history, so we look up the most recent run (if any) instead of findUnique.
+  let run = await prisma.drillRun.findFirst({
     where: { templateId },
+    orderBy: { updatedAt: "desc" },
     select: { id: true, state: true, updatedAt: true },
   });
   if (!run) {
@@ -88,45 +91,49 @@ export async function action({ request, context, params }: Route.ActionArgs) {
     const state = parseRunState(parsed as Prisma.JsonValue);
 
     // Concurrency check: if expectedUpdatedAt is provided, verify no one else has saved more recently
-    if (expectedUpdatedAt) {
-      const currentRun = await prisma.drillRun.findUnique({
-        where: { templateId },
-        select: { updatedAt: true },
-      });
-      if (currentRun && currentRun.updatedAt.toISOString() > expectedUpdatedAt) {
-        return data(
-          { error: "Someone else updated this drill. Reload to see the latest state." },
-          { status: 409 },
-        );
-      }
+    const currentRun = await prisma.drillRun.findFirst({
+      where: { templateId },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, updatedAt: true },
+    });
+    if (expectedUpdatedAt && currentRun && currentRun.updatedAt.toISOString() > expectedUpdatedAt) {
+      return data(
+        { error: "Someone else updated this drill. Reload to see the latest state." },
+        { status: 409 },
+      );
     }
 
-    await prisma.drillRun.upsert({
-      where: { templateId },
-      create: {
-        orgId,
-        templateId,
-        state: state as object,
-      },
-      update: {
-        state: state as object,
-      },
-    });
+    // Migration 0021 dropped the unique-on-templateId constraint, so we can't
+    // use upsert(where: { templateId }) anymore. Find-then-update-or-create.
+    if (currentRun) {
+      await prisma.drillRun.update({
+        where: { id: currentRun.id },
+        data: { state: state as object },
+      });
+    } else {
+      await prisma.drillRun.create({
+        data: { orgId, templateId, state: state as object },
+      });
+    }
     return dataWithSuccess(null, "Saved.");
   }
 
   if (intent === "reset") {
-    await prisma.drillRun.upsert({
+    const existingRun = await prisma.drillRun.findFirst({
       where: { templateId },
-      create: {
-        orgId,
-        templateId,
-        state: emptyRunState() as object,
-      },
-      update: {
-        state: emptyRunState() as object,
-      },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true },
     });
+    if (existingRun) {
+      await prisma.drillRun.update({
+        where: { id: existingRun.id },
+        data: { state: emptyRunState() as object },
+      });
+    } else {
+      await prisma.drillRun.create({
+        data: { orgId, templateId, state: emptyRunState() as object },
+      });
+    }
     return dataWithSuccess(null, "Checklist cleared.");
   }
 
