@@ -36,7 +36,7 @@ This file is the single source of truth for autonomous overnight agents. Each wo
 
 ---
 
-### 0b. `[→]` mobile-smoke-sweep — Same sweep at iPhone + Android viewports (in progress 2026-04-22, build agent)
+### 0b. `[x]` mobile-smoke-sweep — Same sweep at iPhone + Android viewports (done 2026-04-22, build agent; merged to master as f87afe0)
 
 **Depends on:** 0a.
 
@@ -208,3 +208,10 @@ This file is the single source of truth for autonomous overnight agents. Each wo
 ## How to add new workstreams
 
 Append to the appropriate priority section with a `[ ]` status, a slug, a one-line summary, and an inline scope. If research is needed first, note the polish agent should draft a spec in `docs/nightly-specs/{slug}.md`.
+
+---
+
+## [research: 2026-04-23]
+
+- multi-child-batch-ops: One control to apply a dismissal-plan change (early pickup, after-care, sub-driver) to N children at once — direct response to SDM's most-cited parent-app weakness. Source: docs/research/2026-04-23-schools.md.
+- recurring-exception-templates: Set "Mom Mon/Wed, Dad Tue/Thu, after-care Fri" once and let it apply forever with easy override; SDM and PikMyKid users explicitly call out the lack of this. Source: docs/research/2026-04-23-schools.md.
