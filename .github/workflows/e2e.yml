@@ -50,6 +50,13 @@ jobs:
           STRIPE_CAMPUS_PRICE_ID=price_stub_campus_monthly
           EOF
 
+      # wrangler.jsonc points `assets.directory` at ./build/client, so the
+      # Playwright webServer (`npx wrangler dev`) needs the build output to
+      # exist before it boots. Prisma generate already ran above, so skip the
+      # duplicate inside `npm run build` by calling react-router directly.
+      - name: Build client + worker bundle
+        run: npx react-router build
+
       - name: Run E2E tests
         run: npm run test:e2e
 
