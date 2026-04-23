@@ -25,8 +25,12 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   if (!template) {
     throw new Response("Not found", { status: 404 });
   }
-  const run = await prisma.drillRun.findUnique({
+  // Migration 0021 dropped the unique-on-templateId constraint (see
+  // admin/drills.$templateId.run.tsx for the same treatment) — use findFirst
+  // ordered by updatedAt to get the most recent run.
+  const run = await prisma.drillRun.findFirst({
     where: { templateId },
+    orderBy: { updatedAt: "desc" },
     select: { state: true },
   });
   const state = run ? parseRunState(run.state) : emptyRunState();
