@@ -8,47 +8,14 @@
  *   wrangler d1 execute school-organizer --command "<SQL>"
  */
 import { createClient } from "@libsql/client";
-
-// Must match hashPassword/verifyPassword in better-auth.server.ts
-const PBKDF2_ITERATIONS = 100_000;
-const PBKDF2_HASH = "SHA-256";
-const PBKDF2_KEY_LEN = 32;
-
-function toHex(buf: ArrayBuffer): string {
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-async function hashPassword(password: string): Promise<string> {
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password.normalize("NFKC")),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: PBKDF2_HASH, salt, iterations: PBKDF2_ITERATIONS },
-    key,
-    PBKDF2_KEY_LEN * 8,
-  );
-  return `${toHex(salt.buffer)}:${toHex(bits)}`;
-}
+// Password hashing + id helpers live alongside the e2e seeded-tenant
+// fixture so both paths stay in lockstep with the PBKDF2 params in
+// app/domain/auth/better-auth.server.ts.
+import { hashPassword, generateId } from "../e2e/fixtures/seed-helpers";
 
 const db = createClient({
   url: process.env.DATABASE_URL ?? "file:./dev.db",
 });
-
-function generateId(): string {
-  const bytes = new Uint8Array(18);
-  crypto.getRandomValues(bytes);
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, "0")
-    .replace(/\//g, "0")
-    .slice(0, 24);
-}
 
 async function seed() {
   const email = "noahsundberg@gmail.com";

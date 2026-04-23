@@ -58,7 +58,7 @@ This file is the single source of truth for autonomous overnight agents. Each wo
 
 ---
 
-### 0d. `[ ]` interaction-tests-critical-paths — Deeper e2e on user journeys
+### 0d. `[→]` interaction-tests-critical-paths — Deeper e2e on user journeys
 
 **Depends on:** 0a passing.
 
@@ -70,6 +70,50 @@ This file is the single source of truth for autonomous overnight agents. Each wo
 - `e2e/flows/branding-upgrade-gate.spec.ts` — FREE user sees upsell for logo + custom domain; CAMPUS user sees inputs.
 
 **Quality rule (IMPORTANT):** if a test reveals unexpected behavior (a real bug), do NOT paper over it with a matching assertion. Flag it in the summary under "bugs found during testing" and leave the test `.fixme` or `.skip` with a comment. Codifying a bug as "passing" is worse than no test.
+
+**Progress (2026-04-23-manual-1438):** foundation + two specs shipped on `nightly-build/2026-04-23-manual-1438`:
+- `e2e/fixtures/seed-helpers.ts` — shared PBKDF2 / id primitives.
+- `e2e/fixtures/seeded-tenant.ts` — `test.extend()` fixture that stands up a per-spec Org + admin Session + AppSettings + HomeRoom + Space, returns an `adminCookie` ready to add to the browser context.
+- `e2e/flows/admin-roster.spec.ts` — create-student happy path + unknown-homeroom rejection.
+- `e2e/flows/viewer-pin.spec.ts` — correct PIN / wrong PIN / attempts-counter.
+
+Remaining work is split into 0d.1 / 0d.2 / 0d.3 so a flaky single flow doesn't block the others. Flip 0d to `[x]` once all three sub-items land.
+
+---
+
+### 0d.1. `[ ]` interaction-tests-dismissal — Controller/viewer/history loop spec
+
+**Depends on:** `e2e/fixtures/seeded-tenant.ts` (landed in 0d partial).
+
+**Scope:**
+- New file: `e2e/flows/dismissal.spec.ts`.
+- Seeded admin POSTs `/update/:space`, asserts `Space.status` flipped to `ACTIVE` (via a second browser context on `/` or via the fixture's libsql client).
+- POSTs `/empty/:space`, asserts the space returns to `EMPTY` and `/admin/history` shows the call event.
+- `BINGO_BOARD` Durable Object state survives across specs on the same wrangler dev — extend the fixture with an explicit `resetBoardForSpace(slug, spaceNumber)` teardown helper (open-question #3 in the research spec).
+
+---
+
+### 0d.2. `[ ]` interaction-tests-signup-to-paid — Signup → Stripe Checkout redirect spec
+
+**Depends on:** `e2e/fixtures/seeded-tenant.ts` landed.
+
+**Scope:**
+- New file: `e2e/flows/signup-to-paid.spec.ts`.
+- Unauthenticated visitor posts the signup form on the marketing host, follows through to the billing trigger, asserts the response redirect starts with `https://checkout.stripe.com/`. Does NOT drive the hosted Stripe page.
+- If Noah prefers a full Stripe test-card path later, add an `E2E_BYPASS_STRIPE` flag behind `app/domain/billing/checkout.server.ts` (open-question #1 in the research spec). Default for now: stop at the redirect boundary.
+
+---
+
+### 0d.3. `[ ]` interaction-tests-branding-gate — Plan-gated branding admin spec
+
+**Depends on:** `e2e/fixtures/seeded-tenant.ts` landed.
+
+**Scope:**
+- New file: `e2e/flows/branding-upgrade-gate.spec.ts`.
+- Two subtests driving the seeded-tenant fixture with different `billingPlan` project metadata:
+  1. `CAR_LINE` admin on `/admin/branding` sees the "Upgrade to Campus" upsell + no logo/custom-domain inputs.
+  2. `CAMPUS` admin on `/admin/branding` sees the real logo upload + custom-domain input.
+- The fixture currently reads `testInfo.project.metadata.tenantBillingPlan`; add two tagged subtests (or per-test project overrides) to toggle between them.
 
 ---
 

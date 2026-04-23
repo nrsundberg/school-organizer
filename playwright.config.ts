@@ -16,8 +16,11 @@ import { defineConfig, devices } from "@playwright/test";
  *
  * Why mobile projects only run the mobile smoke file: `smoke.mobile.spec.ts`
  * asserts a viewport-dependent invariant (no horizontal overflow) which
- * needs the mobile viewport. The desktop auth/marketing specs are
- * viewport-agnostic and would just double the CI surface.
+ * needs the mobile viewport. The desktop auth/marketing specs and the
+ * `e2e/flows/**` interaction specs are viewport-agnostic and would
+ * just double the CI surface. The mobile projects use `testMatch` (not
+ * `testIgnore`) so they are strictly opt-in — new specs dropped under
+ * `e2e/flows/` or `e2e/` generally run on `chromium` only.
  *
  * Wiring mobile runs into CI is workstream 0c
  * (`ci-playwright-matrix` in `docs/nightly-queue.md`). Locally, all projects
