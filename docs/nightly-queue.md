@@ -47,7 +47,7 @@ This file is the single source of truth for autonomous overnight agents. Each wo
 
 ---
 
-### 0c. `[ ]` ci-playwright-matrix — CI runs mobile + desktop projects
+### 0c. `[x]` ci-playwright-matrix — CI runs mobile + desktop projects (done 2026-04-23; landed from nightly-build/2026-04-22-0c-ci-playwright-matrix as f4d11b6)
 
 **Depends on:** 0b.
 
