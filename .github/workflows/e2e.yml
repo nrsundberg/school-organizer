@@ -57,6 +57,13 @@ jobs:
       - name: Build client + worker bundle
         run: npx react-router build
 
+      # wrangler dev --local spins up a fresh empty SQLite on every CI run.
+      # Without applying migrations, every SSR loader crashes on
+      # `no such table: main.Org` and all Playwright tests timeout on empty
+      # error pages. Seed the local D1 before starting the webServer.
+      - name: Apply D1 migrations to local dev DB
+        run: npx wrangler d1 migrations apply school-organizer-staging --local
+
       - name: Run E2E tests
         run: npm run test:e2e
 
