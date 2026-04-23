@@ -36,7 +36,7 @@ This file is the single source of truth for autonomous overnight agents. Each wo
 
 ---
 
-### 0b. `[→]` mobile-smoke-sweep — Same sweep at iPhone + Android viewports (in progress 2026-04-22, build agent)
+### 0b. `[x]` mobile-smoke-sweep — Same sweep at iPhone + Android viewports (done 2026-04-22, build agent; merged to master as f87afe0)
 
 **Depends on:** 0a.
 
@@ -47,7 +47,7 @@ This file is the single source of truth for autonomous overnight agents. Each wo
 
 ---
 
-### 0c. `[ ]` ci-playwright-matrix — CI runs mobile + desktop projects
+### 0c. `[→]` ci-playwright-matrix — CI runs mobile + desktop projects (in progress 2026-04-22, build agent)
 
 **Depends on:** 0b.
 
