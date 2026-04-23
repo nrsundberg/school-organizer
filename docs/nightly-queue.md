@@ -208,3 +208,38 @@ This file is the single source of truth for autonomous overnight agents. Each wo
 ## How to add new workstreams
 
 Append to the appropriate priority section with a `[ ]` status, a slug, a one-line summary, and an inline scope. If research is needed first, note the polish agent should draft a spec in `docs/nightly-specs/{slug}.md`.
+
+---
+
+## [research: 2026-04-23-manual-1438]
+
+From `docs/research/2026-04-23-manual-1438-schools.md` (safety-drill / accountability / reunification angle). Three strong hypotheses sized S–M worth queueing:
+
+### R1. `[ ]` drill-accountability-roster — "Who is with whom, right now" during drills
+
+**Why:** Every direct competitor (Ruvna, Raptor, CrisisGo) leads with this claim; paper clipboards still dominate. Reuses our existing `organization → child → guardian` model almost unchanged. See TL;DR + Signals in the research brief.
+
+**Scope (research first — write spec):**
+- `docs/nightly-specs/drill-accountability-roster.md`: data model for per-classroom rosters + real-time check-in status; silent-mode UI spec (see R2); incident-commander dashboard that aggregates "checked in" vs "missing" across rooms.
+- Decide: reuse `fireDrill`/`drill-templates-proposal.md` primitives or model as new `accountability-session` entity.
+- Integration surface with SIS imports (if any; otherwise just our own roster).
+- Build size: M.
+
+### R2. `[ ]` silent-lockdown-mode — One-hand, dark-UI, silent roster for lockdown drills
+
+**Why:** Best-practice docs (Texas SSC SRP toolkit, BeSafe) explicitly require silent/discreet attendance during lockdown. No competitor has a UI designed for under-the-desk, one-hand operation with zero sound/vibration/push.
+
+**Scope:**
+- New mode triggered when admin selects SRP "Lockdown" action (presupposes R1).
+- Dark theme, large tap targets, full-screen roster, zero audio/haptics, no system push notifications to the teacher's device while the mode is active.
+- Works offline — last-known roster cached — and syncs when network returns.
+- Build size: S.
+
+### R3. `[ ]` compliant-drill-log-export — One-click state-compliant drill logs
+
+**Why:** MI, GA, CA all have concrete annual requirements; CT SB 298 (Mar 2026) adds trauma-informed drill + advance-parent-notice requirements with documentation. Michigan requires posting drill records on the school website within 30 days and retaining 3 years. A product that prints this log out of the box is an admin-sale unlock on top of R1.
+
+**Scope (research first — write spec):**
+- `docs/nightly-specs/compliant-drill-log-export.md`: inventory per-state required fields (start with MI, GA, CA, CT, NY — 5 highest-signal states), map to our drill data model, design one template per state, PDF + CSV export, optional auto-post to a public page for MI-style publishing rules.
+- Build size: S–M.
+
