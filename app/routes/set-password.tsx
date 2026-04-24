@@ -66,8 +66,9 @@ export default function SetPassword({ loaderData, actionData }: Route.ComponentP
 
       <form method="post" className="flex flex-col gap-3 w-full max-w-sm px-4">
         <p className="text-white/50 text-sm text-center">{email}</p>
-        <label className="text-sm text-gray-400">New Password</label>
+        <label className="text-sm text-gray-400" htmlFor="set-password-new">New Password</label>
         <Input
+          id="set-password-new"
           type="password"
           name="password"
           required
@@ -77,8 +78,9 @@ export default function SetPassword({ loaderData, actionData }: Route.ComponentP
           autoFocus
           placeholder="At least 8 characters"
         />
-        <label className="text-sm text-gray-400">Confirm Password</label>
+        <label className="text-sm text-gray-400" htmlFor="set-password-confirm">Confirm Password</label>
         <Input
+          id="set-password-confirm"
           type="password"
           name="confirm"
           required

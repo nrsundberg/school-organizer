@@ -398,8 +398,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 Use your work email. You&apos;ll set up your school next.
               </p>
               <form onSubmit={handleStep1} className="mt-6 flex flex-col gap-3">
-                <label className="text-sm text-white/80">Your name</label>
+                <label className="text-sm text-white/80" htmlFor="signup-name">Your name</label>
                 <Input
+                  id="signup-name"
                   type="text"
                   placeholder="Jane Coach"
                   required
@@ -407,8 +408,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   onChange={(e) => setName(e.target.value)}
                   autoComplete="name"
                 />
-                <label className="text-sm text-white/80">Email</label>
+                <label className="text-sm text-white/80" htmlFor="signup-email">Email</label>
                 <Input
+                  id="signup-email"
                   type="email"
                   placeholder="you@school.edu"
                   required
@@ -416,8 +418,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
                 />
-                <label className="text-sm text-white/80">Phone number</label>
+                <label className="text-sm text-white/80" htmlFor="signup-phone">Phone number</label>
                 <Input
+                  id="signup-phone"
                   type="tel"
                   placeholder="(555) 123-4567"
                   required
@@ -425,8 +428,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   onChange={(e) => setPhone(e.target.value)}
                   autoComplete="tel"
                 />
-                <label className="text-sm text-white/80">Password</label>
+                <label className="text-sm text-white/80" htmlFor="signup-password">Password</label>
                 <Input
+                  id="signup-password"
                   type="password"
                   placeholder="At least 8 characters"
                   required
@@ -435,8 +439,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="new-password"
                 />
-                <label className="text-sm text-white/80">Confirm password</label>
+                <label className="text-sm text-white/80" htmlFor="signup-confirm-password">Confirm password</label>
                 <Input
+                  id="signup-confirm-password"
                   type="password"
                   placeholder="Repeat password"
                   required
@@ -460,8 +465,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 Your slug becomes part of your school&apos;s web address. It must be unique.
               </p>
               <form onSubmit={handleStep2Next} className="mt-6 flex flex-col gap-3">
-                <label className="text-sm text-white/80">School / organization name</label>
+                <label className="text-sm text-white/80" htmlFor="signup-org-name">School / organization name</label>
                 <Input
+                  id="signup-org-name"
                   type="text"
                   placeholder="Maple Elementary"
                   required
@@ -470,8 +476,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                     setOrgName(e.target.value);
                   }}
                 />
-                <label className="text-sm text-white/80">URL slug</label>
+                <label className="text-sm text-white/80" htmlFor="signup-slug">URL slug</label>
                 <Input
+                  id="signup-slug"
                   type="text"
                   placeholder="maple-elementary"
                   value={slug}
