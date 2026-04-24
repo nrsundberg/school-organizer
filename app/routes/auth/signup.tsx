@@ -1,5 +1,13 @@
 import { Button, Input } from "@heroui/react";
-import { data, Form, redirect, useActionData, useRouteLoaderData, useSearchParams } from "react-router";
+import {
+  data,
+  Form,
+  redirect,
+  useActionData,
+  useRevalidator,
+  useRouteLoaderData,
+  useSearchParams,
+} from "react-router";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import type { Route } from "./+types/signup";
@@ -185,6 +193,13 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const stepParam = Number(searchParams.get("step")) || 1;
   const step = Math.min(3, Math.max(1, stepParam));
+  const revalidator = useRevalidator();
+
+  // Set to true the moment `signUp.email()` resolves so the bounce-back
+  // effect below doesn't kick the user back to step 1 in the window
+  // between "cookie is set" and "root loader has revalidated". See the
+  // 2026-04-23-2317-scan P0 for the full repro.
+  const [justSignedUp, setJustSignedUp] = useState(false);
 
   // The plan is locked in by the ?plan= query param (the signup loader
   // redirects to /pricing if it's missing). We map the public slug to the
@@ -227,10 +242,10 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
   );
 
   useEffect(() => {
-    if ((step === 2 || step === 3) && !isAuthed) {
+    if ((step === 2 || step === 3) && !isAuthed && !justSignedUp) {
       updateStepParam(1, { replace: true });
     }
-  }, [step, isAuthed, updateStepParam]);
+  }, [step, isAuthed, updateStepParam, justSignedUp]);
 
   useEffect(() => {
     if (hasNoOrg && step === 1) {
@@ -285,6 +300,11 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
         setError(result.error.message ?? "Unable to create account.");
         return;
       }
+      // signUp.email() has set the session cookie. Tell the bounce-back
+      // effect not to fire while root re-runs, then force root to
+      // revalidate so `rootData.user` becomes non-null.
+      setJustSignedUp(true);
+      revalidator.revalidate();
       setStep(2);
     } catch {
       setError("Something went wrong. Please try again.");
