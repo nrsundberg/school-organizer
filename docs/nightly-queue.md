@@ -58,9 +58,43 @@ This file is the single source of truth for autonomous overnight agents. Each wo
 
 ---
 
-### 0d. `[→]` interaction-tests-critical-paths — Deeper e2e on user journeys
+### 0d-prereq. `[ ]` seeded-tenant-e2e-harness — Playwright fixture + billing-bypass seed so 0d flows can run
 
-**Depends on:** 0a passing.
+**Why:** Every sub-spec in 0d needs a seeded tenant reachable from
+Playwright. `e2e/smoke.spec.ts` explicitly calls out the blocker:
+wrangler dev serves `localhost` only, so `slug.localhost` and
+`<slug>.pickuproster.com` aren't reachable from the Playwright
+baseURL without extra plumbing, and the real signup flow terminates at
+Stripe checkout. Trying to write flow specs before this harness exists
+forces every test into `.fixme` on the same blocker.
+
+**Scope:**
+- A Playwright fixture that owns tenant seeding: creates an org + admin
+  user + a viewer PIN + a handful of students/homerooms/spaces via
+  Prisma directly, returns credentials, and tears down after the test
+  suite.
+- A Host-header override in the fixture (Playwright `request.extraHTTPHeaders`
+  + `page.context().route()`) so a test can address `http://localhost:8787`
+  with a `Host: <slug>.pickuproster.com` header and the Worker routes
+  it to the tenant. Confirm the Worker's host-parsing in `workers/app.ts`
+  accepts that; adjust if needed with a test-only env flag.
+- A billing-bypass path for test tenants: either a seed-time flag that
+  marks the org PAID without a real Stripe customer, or a Stripe test-mode
+  fixture key. Seed-flag is simpler — add `billingOverride?: "TEST_BYPASS"`
+  on the org, gated behind `env.ENVIRONMENT !== "production"`, and seed
+  tenants with it set.
+- Worked example: one flow spec that uses the harness (start with the
+  simplest — `admin-roster.spec.ts` from 0d's list) to prove the harness
+  is real before 0d gets picked up.
+
+**Out of scope:** the other four 0d flow files — those stay in 0d, which
+becomes unblocked once this ships.
+
+---
+
+### 0d. `[ ]` interaction-tests-critical-paths — Deeper e2e on user journeys
+
+**Depends on:** 0a passing, 0d-prereq landed.
 
 **Scope:** write e2e specs for the critical paths, one file each:
 - `e2e/flows/signup-to-paid.spec.ts` — signup → trial → stripe checkout (test mode) → back on app
@@ -157,7 +191,7 @@ Remaining work is split into 0d.1 / 0d.2 / 0d.3 so a flaky single flow doesn't b
 
 ---
 
-### 4. `[ ]` ops-runbook — Dismissal-time operational runbook
+### 4. `[x]` ops-runbook — Dismissal-time operational runbook (done 2026-04-24, build agent; nightly-build/2026-04-24)
 
 **Why:** A 3pm outage kills reputation. We need a written fallback before anyone depends on the app.
 
