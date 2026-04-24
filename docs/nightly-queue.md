@@ -328,6 +328,7 @@ From `docs/research/2026-04-23-manual-1438-schools.md` (safety-drill / accountab
 - `docs/nightly-specs/compliant-drill-log-export.md`: inventory per-state required fields (start with MI, GA, CA, CT, NY — 5 highest-signal states), map to our drill data model, design one template per state, PDF + CSV export, optional auto-post to a public page for MI-style publishing rules.
 - Build size: S–M.
 
+<<<<<<< HEAD
 ---
 
 ## [research: 2026-04-24]
