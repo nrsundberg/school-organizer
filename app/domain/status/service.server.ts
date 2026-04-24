@@ -11,7 +11,7 @@ import type {
   ComponentStatus,
   IncidentSeverity,
   StatusPageComponent,
-  UptimeDay,
+  UptimeDay
 } from "./types";
 
 /**
@@ -30,16 +30,24 @@ export async function getStatusPageData(context: any): Promise<{
   const now = new Date();
   const windowStart = startOfUtcDay(addDaysUtc(now, -89));
 
-  // Pull last 90 days of checks in a single query; bucket in memory.
-  const recentChecks = await db.statusCheck.findMany({
-    where: { checkedAt: { gte: windowStart } },
-    orderBy: { checkedAt: "asc" },
-    select: {
-      componentId: true,
-      status: true,
-      checkedAt: true,
-    },
-  });
+  // Pull last 90 days of checks in a single query; bucket in memory. The
+  // public page should degrade to "unknown" instead of 500ing if the status
+  // read-side tables are unavailable during a deploy or fresh local setup.
+  const recentChecks = await safeStatusRead<
+    Array<{ componentId: string; status: string; checkedAt: Date }>
+  >(
+    () =>
+      db.statusCheck.findMany({
+        where: { checkedAt: { gte: windowStart } },
+        orderBy: { checkedAt: "asc" },
+        select: {
+          componentId: true,
+          status: true,
+          checkedAt: true
+        }
+      }),
+    []
+  );
 
   // Group by componentId for uptime buckets + latest.
   const byComponent = new Map<
@@ -52,10 +60,22 @@ export async function getStatusPageData(context: any): Promise<{
     byComponent.set(c.componentId, list);
   }
 
-  const openIncidents = await db.statusIncident.findMany({
-    where: { resolvedAt: null },
-    orderBy: { startedAt: "desc" },
-  });
+  const openIncidents = await safeStatusRead<
+    Array<{
+      id: string;
+      componentId: string;
+      severity: string;
+      title: string;
+      startedAt: Date;
+    }>
+  >(
+    () =>
+      db.statusIncident.findMany({
+        where: { resolvedAt: null },
+        orderBy: { startedAt: "desc" }
+      }),
+    []
+  );
 
   const components: StatusPageComponent[] = COMPONENTS.map((def) => {
     const rows = byComponent.get(def.id) ?? [];
@@ -71,26 +91,28 @@ export async function getStatusPageData(context: any): Promise<{
       description: def.description,
       currentStatus,
       note,
-      uptime90d: buildUptimeGrid(rows, now),
+      uptime90d: buildUptimeGrid(rows, now)
     };
   });
 
   const componentNameById = new Map<string, string>(
-    COMPONENTS.map((c) => [c.id, c.name]),
+    COMPONENTS.map((c) => [c.id, c.name])
   );
-  const activeIncidents: ActiveIncident[] = (openIncidents as Array<{
-    id: string;
-    componentId: string;
-    severity: string;
-    title: string;
-    startedAt: Date;
-  }>).map((i) => ({
+  const activeIncidents: ActiveIncident[] = (
+    openIncidents as Array<{
+      id: string;
+      componentId: string;
+      severity: string;
+      title: string;
+      startedAt: Date;
+    }>
+  ).map((i) => ({
     id: i.id,
     componentId: i.componentId as ComponentId,
     componentName: componentNameById.get(i.componentId) ?? i.componentId,
     severity: normalizeSeverity(i.severity),
     title: i.title,
-    startedAt: i.startedAt.toISOString(),
+    startedAt: i.startedAt.toISOString()
   }));
 
   const overall = rollupOverall(components);
@@ -99,14 +121,32 @@ export async function getStatusPageData(context: any): Promise<{
     components,
     activeIncidents,
     overall,
-    renderedAt: now.toISOString(),
+    renderedAt: now.toISOString()
   };
 }
 
 // ---- helpers --------------------------------------------------------------
 
+async function safeStatusRead<T>(
+  read: () => Promise<T>,
+  fallback: T
+): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? String((error as { code?: unknown }).code)
+        : "unknown";
+    console.warn(`status page read failed; rendering unknown status (${code})`);
+    return fallback;
+  }
+}
+
 function startOfUtcDay(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+  );
 }
 
 function addDaysUtc(d: Date, days: number): Date {
@@ -142,7 +182,7 @@ function normalizeSeverity(raw: string): IncidentSeverity {
  */
 function buildUptimeGrid(
   rows: Array<{ status: string; checkedAt: Date }>,
-  now: Date,
+  now: Date
 ): UptimeDay[] {
   const today = startOfUtcDay(now);
   const buckets = new Map<string, ComponentStatus>();
@@ -159,7 +199,7 @@ function buildUptimeGrid(
     const key = utcDateKey(day);
     out.push({
       date: key,
-      status: buckets.get(key) ?? "unknown",
+      status: buckets.get(key) ?? "unknown"
     });
   }
   return out;
@@ -171,7 +211,7 @@ function worstOf(a: ComponentStatus, b: ComponentStatus): ComponentStatus {
     unknown: 0,
     operational: 1,
     degraded: 2,
-    outage: 3,
+    outage: 3
   };
   return rank[a] >= rank[b] ? a : b;
 }
@@ -189,7 +229,7 @@ function rollupOverall(components: StatusPageComponent[]): ComponentStatus {
 
 function staticNoteFor(
   id: ComponentId,
-  current: ComponentStatus,
+  current: ComponentStatus
 ): string | null {
   if (id === "resend" && current === "unknown") {
     return "Resend doesn't publish a status feed — we surface issues indirectly via the Queue probe.";

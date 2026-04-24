@@ -10,7 +10,7 @@ import {
   isMarketingHost,
   isPlatformAdmin,
   marketingOriginFromRequest,
-  resolveTenantSlugFromHost,
+  resolveTenantSlugFromHost
 } from "~/domain/utils/host.server";
 
 export const userContext = createContext<User | null>(null);
@@ -48,7 +48,7 @@ export const getTenantPrisma = (context: any) => {
 async function resolveOrgByHost(
   db: ReturnType<typeof getPrisma>,
   request: Request,
-  context: any,
+  context: any
 ): Promise<Org | null> {
   const host = new URL(request.url).host.toLowerCase().split(":")[0];
 
@@ -72,7 +72,7 @@ async function resolveOrgByHost(
 
 export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   { request, context },
-  next,
+  next
 ) => {
   const db = getPrisma(context);
   let user: User | null = null;
@@ -87,14 +87,14 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   try {
     const auth = getAuth(context);
     const session = await auth.api.getSession({
-      headers: request.headers,
+      headers: request.headers
     });
     if (session?.user?.id) {
       user = await db.user.findUnique({ where: { id: session.user.id } });
       if (user?.role === "CALLER") {
         user = await db.user.update({
           where: { id: user.id },
-          data: { role: "CONTROLLER" },
+          data: { role: "CONTROLLER" }
         });
       }
     }
@@ -138,6 +138,7 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   const publicMarketingPath =
     pathname === "/pricing" ||
     pathname === "/faqs" ||
+    pathname === "/status" ||
     pathname === "/blog" ||
     pathname.startsWith("/blog/") ||
     (pathname === "/signup" && onMarketingHost) ||
@@ -161,7 +162,7 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
       if (user.orgId) {
         const userOrgRow = await db.org.findUnique({
           where: { id: user.orgId },
-          select: { slug: true },
+          select: { slug: true }
         });
         if (userOrgRow?.slug) {
           throw redirect(tenantBoardUrlFromRequest(request, userOrgRow.slug));
@@ -203,7 +204,9 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   if (
     user &&
     org &&
-    !isOrgStatusAllowedForApp(org.status, { isComped: !!(org as any).isComped }) &&
+    !isOrgStatusAllowedForApp(org.status, {
+      isComped: !!(org as any).isComped
+    }) &&
     !isBillingRequired &&
     !isOnboardingApi &&
     !isStripeWebhook &&

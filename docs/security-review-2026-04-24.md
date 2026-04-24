@@ -8,18 +8,9 @@ This file only lists what's still open. Completed items are summarized at the bo
 
 ---
 
-## Currently-open review branches (not yet merged)
+## P0 branch status
 
-Four P0s were attacked in parallel by subagents. Each lives on its own topic branch and needs the full gate from `AGENTS.md` (typecheck + tests + staging smoke) before a human merges.
-
-| Branch | What |
-|---|---|
-| `agent-sec/p0-1-security-headers-2026-04-24-1431` | HSTS, X-CTO, X-Frame-Options, Referrer-Policy, Permissions-Policy enforcing; CSP enforcing for everything except `script-src`/`style-src` (those ship Report-Only until nonce threading lands). 13 new unit tests. |
-| `agent-sec/p0-2-csv-importer-2026-04-24-1437` | CSV roster import rewritten with RFC-4180 parser, strict Zod row validation, 5 MB / 10k row caps, header allow-list, prototype-pollution guard. 17 new tests. |
-| `agent-sec/p0-3-pbkdf2-2026-04-24-1445` | PBKDF2 bumped 100k → 600k. Versioned hash format `v2$sha256$iter$salt$key`; legacy format still verifies and triggers transparent rehash on next login via `ctx.waitUntil`. 11 new tests. |
-| `agent-sec/p0-5-npm-audit-2026-04-24-1453` | All 8 prod advisories (2 HIGH, 6 MODERATE) resolved via scoped `overrides` — no major bumps, no code changes. `npm audit` now clean. |
-
-**Before merge:** each branch needs `npm ci && npm run typecheck && npm test && npm run deploy:staging && playwright test e2e/smoke.spec.ts`. P0-1 also needs a human with a browser on a staging deploy to verify no real CSP violations fire in the Console (that step was skipped by the subagent because the sandbox is headless).
+The P0-1, P0-2, P0-3, and P0-5 branches have been merged. Their completed work is summarized at the bottom of this review. The remaining P0 is MFA / 2FA for privileged roles.
 
 ---
 
@@ -95,7 +86,7 @@ Unchanged from the original review. None of these have been done.
 
 ## Concrete next-step order
 
-1. **This week** — Human: run the pre-merge gate on each of the 4 open branches and merge. Get the browser smoke on P0-1. Then tackle P0-4 (MFA).
+1. **This week** — Tackle P0-4 (MFA). Run a staging browser smoke for the merged P0-1 security-header work and watch for CSP Report-Only violations.
 2. **Next 2 weeks** — P1-1 (Sentry scrubber), P1-2 (`process.env`), P1-6 (logo MIME sniff), P1-7 (`safeRedirect`), P1-8 (Dependabot + audit CI).
 3. **This month** — P1-3 (retention cron), P1-4 (right-to-delete), P1-5 (drop default orgId), P2-3 (security.txt), P2-6 (subprocessors page), and publish the SDPC NDPA v2.
 4. **This quarter** — Sign with Vanta/Drata; SOC 2 Type I; iKeepSafe application; first pen test.
