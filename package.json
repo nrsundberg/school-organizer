@@ -78,5 +78,15 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "overrides": {
+    "@hono/node-server": "^1.19.13",
+    "svix": "^1.92.2",
+    "@sentry/react-router": {
+      "glob": "^11.1.0"
+    },
+    "vite-plugin-devtools-json": {
+      "uuid": "^14.0.0"
+    }
   }
 }

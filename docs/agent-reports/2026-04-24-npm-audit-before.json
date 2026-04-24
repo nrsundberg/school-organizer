@@ -1,0 +1,223 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "@hono/node-server": {
+      "name": "@hono/node-server",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1116281,
+          "name": "@hono/node-server",
+          "dependency": "@hono/node-server",
+          "title": "@hono/node-server: Middleware bypass via repeated slashes in serveStatic",
+          "url": "https://github.com/advisories/GHSA-92pp-h63x-v22m",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-22"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N"
+          },
+          "range": "<1.19.13"
+        }
+      ],
+      "effects": [
+        "@prisma/dev"
+      ],
+      "range": "<1.19.13",
+      "nodes": [
+        "node_modules/@hono/node-server"
+      ],
+      "fixAvailable": {
+        "name": "prisma",
+        "version": "6.19.3",
+        "isSemVerMajor": true
+      }
+    },
+    "@prisma/dev": {
+      "name": "@prisma/dev",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@hono/node-server"
+      ],
+      "effects": [
+        "prisma"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/@prisma/dev"
+      ],
+      "fixAvailable": {
+        "name": "prisma",
+        "version": "6.19.3",
+        "isSemVerMajor": true
+      }
+    },
+    "@sentry/react-router": {
+      "name": "@sentry/react-router",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "glob"
+      ],
+      "effects": [],
+      "range": "<=10.26.0",
+      "nodes": [
+        "node_modules/@sentry/react-router"
+      ],
+      "fixAvailable": {
+        "name": "@sentry/react-router",
+        "version": "10.50.0",
+        "isSemVerMajor": true
+      }
+    },
+    "glob": {
+      "name": "glob",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1109843,
+          "name": "glob",
+          "dependency": "glob",
+          "title": "glob CLI: Command injection via -c/--cmd executes matches with shell:true",
+          "url": "https://github.com/advisories/GHSA-5j98-mcp5-4vw2",
+          "severity": "high",
+          "cwe": [
+            "CWE-78"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:L/UI:N/S:U/C:H/I:H/A:H"
+          },
+          "range": ">=11.0.0 <11.1.0"
+        }
+      ],
+      "effects": [
+        "@sentry/react-router"
+      ],
+      "range": "11.0.0 - 11.0.3",
+      "nodes": [
+        "node_modules/glob"
+      ],
+      "fixAvailable": {
+        "name": "@sentry/react-router",
+        "version": "10.50.0",
+        "isSemVerMajor": true
+      }
+    },
+    "prisma": {
+      "name": "prisma",
+      "severity": "moderate",
+      "isDirect": true,
+      "via": [
+        "@prisma/dev"
+      ],
+      "effects": [],
+      "range": ">=6.20.0-dev.1",
+      "nodes": [
+        "node_modules/prisma"
+      ],
+      "fixAvailable": {
+        "name": "prisma",
+        "version": "6.19.3",
+        "isSemVerMajor": true
+      }
+    },
+    "resend": {
+      "name": "resend",
+      "severity": "moderate",
+      "isDirect": true,
+      "via": [
+        "svix"
+      ],
+      "effects": [],
+      "range": ">=6.2.0-canary.0",
+      "nodes": [
+        "node_modules/resend"
+      ],
+      "fixAvailable": {
+        "name": "resend",
+        "version": "6.1.3",
+        "isSemVerMajor": true
+      }
+    },
+    "svix": {
+      "name": "svix",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "uuid"
+      ],
+      "effects": [
+        "resend"
+      ],
+      "range": "1.68.0 - 1.91.1",
+      "nodes": [
+        "node_modules/svix"
+      ],
+      "fixAvailable": {
+        "name": "resend",
+        "version": "6.1.3",
+        "isSemVerMajor": true
+      }
+    },
+    "uuid": {
+      "name": "uuid",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1116970,
+          "name": "uuid",
+          "dependency": "uuid",
+          "title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+          "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-787",
+            "CWE-1285"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": "<14.0.0"
+        }
+      ],
+      "effects": [
+        "svix"
+      ],
+      "range": "<14.0.0",
+      "nodes": [
+        "node_modules/svix/node_modules/uuid"
+      ],
+      "fixAvailable": {
+        "name": "resend",
+        "version": "6.1.3",
+        "isSemVerMajor": true
+      }
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 6,
+      "high": 2,
+      "critical": 0,
+      "total": 8
+    },
+    "dependencies": {
+      "prod": 513,
+      "dev": 425,
+      "optional": 179,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 1025
+    }
+  }
+}
