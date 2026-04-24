@@ -72,6 +72,24 @@ export const publicMarketingRoutes: RouteSpec[] = [
     landmark: { role: "heading" },
   },
   {
+    // Blog index is linked from the marketing nav + footer on every page, so
+    // signed-out visitors MUST be able to hit it. The middleware in
+    // app/domain/utils/global-context.server.ts gates `publicMarketingPath`;
+    // if `/blog` and `/blog/*` aren't whitelisted there, this sweep will
+    // catch the regression before staging smoke does.
+    path: "/blog",
+    expect: "self",
+    landmark: { role: "heading", name: /Field notes/i },
+  },
+  {
+    // Sample post path — exercises the `/blog/$slug` loader on marketing host
+    // for signed-out visitors. Slug tracks the most recently dated file in
+    // content/blog/. If this post is ever removed, swap for another.
+    path: "/blog/parent-communication-confirming-pickup-changes-without-chaos",
+    expect: "self",
+    landmark: { role: "heading" },
+  },
+  {
     // BUG: /status redirects to /login?next=/status on marketing host +
     // no session. The middleware in
     // app/domain/utils/global-context.server.ts does not list /status in

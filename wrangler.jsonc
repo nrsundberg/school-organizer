@@ -50,7 +50,7 @@
 		{
 			"binding": "D1_DATABASE",
 			"database_name": "school-organizer-staging",
-			"database_id": "TODO-run-wrangler-d1-create-school-organizer-staging",
+			"database_id": "88aac5de-1ee7-42e5-b784-3ecd3a4e331f",
 			"migrations_dir": "migrations"
 		}
 	],
@@ -135,7 +135,9 @@
 	// (defined in MARKETING_HOSTS so marketing renders on the staging host).
 	"env": {
 		"staging": {
+			"routes": [],  // staging does not bind pickuproster.com routes; prod owns them (fixes wrangler 10020 on deploy)
 			"name": "school-organizer-staging",
+			"workers_dev": true,
 			"vars": {
 				"SENTRY_DSN": "",
 				"ENVIRONMENT": "staging",

@@ -58,7 +58,7 @@ This file is the single source of truth for autonomous overnight agents. Each wo
 
 ---
 
-### 0d. `[ ]` interaction-tests-critical-paths — Deeper e2e on user journeys
+### 0d. `[→]` interaction-tests-critical-paths — Deeper e2e on user journeys
 
 **Depends on:** 0a passing.
 
@@ -70,6 +70,50 @@ This file is the single source of truth for autonomous overnight agents. Each wo
 - `e2e/flows/branding-upgrade-gate.spec.ts` — FREE user sees upsell for logo + custom domain; CAMPUS user sees inputs.
 
 **Quality rule (IMPORTANT):** if a test reveals unexpected behavior (a real bug), do NOT paper over it with a matching assertion. Flag it in the summary under "bugs found during testing" and leave the test `.fixme` or `.skip` with a comment. Codifying a bug as "passing" is worse than no test.
+
+**Progress (2026-04-23-manual-1438):** foundation + two specs shipped on `nightly-build/2026-04-23-manual-1438`:
+- `e2e/fixtures/seed-helpers.ts` — shared PBKDF2 / id primitives.
+- `e2e/fixtures/seeded-tenant.ts` — `test.extend()` fixture that stands up a per-spec Org + admin Session + AppSettings + HomeRoom + Space, returns an `adminCookie` ready to add to the browser context.
+- `e2e/flows/admin-roster.spec.ts` — create-student happy path + unknown-homeroom rejection.
+- `e2e/flows/viewer-pin.spec.ts` — correct PIN / wrong PIN / attempts-counter.
+
+Remaining work is split into 0d.1 / 0d.2 / 0d.3 so a flaky single flow doesn't block the others. Flip 0d to `[x]` once all three sub-items land.
+
+---
+
+### 0d.1. `[ ]` interaction-tests-dismissal — Controller/viewer/history loop spec
+
+**Depends on:** `e2e/fixtures/seeded-tenant.ts` (landed in 0d partial).
+
+**Scope:**
+- New file: `e2e/flows/dismissal.spec.ts`.
+- Seeded admin POSTs `/update/:space`, asserts `Space.status` flipped to `ACTIVE` (via a second browser context on `/` or via the fixture's libsql client).
+- POSTs `/empty/:space`, asserts the space returns to `EMPTY` and `/admin/history` shows the call event.
+- `BINGO_BOARD` Durable Object state survives across specs on the same wrangler dev — extend the fixture with an explicit `resetBoardForSpace(slug, spaceNumber)` teardown helper (open-question #3 in the research spec).
+
+---
+
+### 0d.2. `[ ]` interaction-tests-signup-to-paid — Signup → Stripe Checkout redirect spec
+
+**Depends on:** `e2e/fixtures/seeded-tenant.ts` landed.
+
+**Scope:**
+- New file: `e2e/flows/signup-to-paid.spec.ts`.
+- Unauthenticated visitor posts the signup form on the marketing host, follows through to the billing trigger, asserts the response redirect starts with `https://checkout.stripe.com/`. Does NOT drive the hosted Stripe page.
+- If Noah prefers a full Stripe test-card path later, add an `E2E_BYPASS_STRIPE` flag behind `app/domain/billing/checkout.server.ts` (open-question #1 in the research spec). Default for now: stop at the redirect boundary.
+
+---
+
+### 0d.3. `[ ]` interaction-tests-branding-gate — Plan-gated branding admin spec
+
+**Depends on:** `e2e/fixtures/seeded-tenant.ts` landed.
+
+**Scope:**
+- New file: `e2e/flows/branding-upgrade-gate.spec.ts`.
+- Two subtests driving the seeded-tenant fixture with different `billingPlan` project metadata:
+  1. `CAR_LINE` admin on `/admin/branding` sees the "Upgrade to Campus" upsell + no logo/custom-domain inputs.
+  2. `CAMPUS` admin on `/admin/branding` sees the real logo upload + custom-domain input.
+- The fixture currently reads `testInfo.project.metadata.tenantBillingPlan`; add two tagged subtests (or per-test project overrides) to toggle between them.
 
 ---
 
@@ -215,3 +259,38 @@ Append to the appropriate priority section with a `[ ]` status, a slug, a one-li
 
 - multi-child-batch-ops: One control to apply a dismissal-plan change (early pickup, after-care, sub-driver) to N children at once — direct response to SDM's most-cited parent-app weakness. Source: docs/research/2026-04-23-schools.md.
 - recurring-exception-templates: Set "Mom Mon/Wed, Dad Tue/Thu, after-care Fri" once and let it apply forever with easy override; SDM and PikMyKid users explicitly call out the lack of this. Source: docs/research/2026-04-23-schools.md.
+
+---
+
+## [research: 2026-04-23-manual-1438]
+
+From `docs/research/2026-04-23-manual-1438-schools.md` (safety-drill / accountability / reunification angle). Three strong hypotheses sized S–M worth queueing:
+
+### R1. `[ ]` drill-accountability-roster — "Who is with whom, right now" during drills
+
+**Why:** Every direct competitor (Ruvna, Raptor, CrisisGo) leads with this claim; paper clipboards still dominate. Reuses our existing `organization → child → guardian` model almost unchanged. See TL;DR + Signals in the research brief.
+
+**Scope (research first — write spec):**
+- `docs/nightly-specs/drill-accountability-roster.md`: data model for per-classroom rosters + real-time check-in status; silent-mode UI spec (see R2); incident-commander dashboard that aggregates "checked in" vs "missing" across rooms.
+- Decide: reuse `fireDrill`/`drill-templates-proposal.md` primitives or model as new `accountability-session` entity.
+- Integration surface with SIS imports (if any; otherwise just our own roster).
+- Build size: M.
+
+### R2. `[ ]` silent-lockdown-mode — One-hand, dark-UI, silent roster for lockdown drills
+
+**Why:** Best-practice docs (Texas SSC SRP toolkit, BeSafe) explicitly require silent/discreet attendance during lockdown. No competitor has a UI designed for under-the-desk, one-hand operation with zero sound/vibration/push.
+
+**Scope:**
+- New mode triggered when admin selects SRP "Lockdown" action (presupposes R1).
+- Dark theme, large tap targets, full-screen roster, zero audio/haptics, no system push notifications to the teacher's device while the mode is active.
+- Works offline — last-known roster cached — and syncs when network returns.
+- Build size: S.
+
+### R3. `[ ]` compliant-drill-log-export — One-click state-compliant drill logs
+
+**Why:** MI, GA, CA all have concrete annual requirements; CT SB 298 (Mar 2026) adds trauma-informed drill + advance-parent-notice requirements with documentation. Michigan requires posting drill records on the school website within 30 days and retaining 3 years. A product that prints this log out of the box is an admin-sale unlock on top of R1.
+
+**Scope (research first — write spec):**
+- `docs/nightly-specs/compliant-drill-log-export.md`: inventory per-state required fields (start with MI, GA, CA, CT, NY — 5 highest-signal states), map to our drill data model, design one template per state, PDF + CSV export, optional auto-post to a public page for MI-style publishing rules.
+- Build size: S–M.
+
