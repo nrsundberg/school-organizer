@@ -17,3 +17,8 @@ playwright-report/
 test-results/
 /blob-report/
 /playwright/.cache/
+.worktrees/
+docs/agent-reports/*.patch
+flow-tmp.mjs
+scan-tmp.mjs
+.trash-untracked-*
