@@ -33,6 +33,18 @@ REPO=$(find /sessions -maxdepth 6 -name 'nightly-queue.md' -path '*/docs/*' \
         -not -path '*/node_modules/*' 2>/dev/null | head -1 | xargs dirname | xargs dirname)
 cd "$REPO" || { echo "FATAL: repo not found"; exit 1; }
 
+# Load CLOUDFLARE_API_TOKEN from the workspace's mise.toml so wrangler is
+# authenticated for deploy:staging / d1:migrate:staging without the
+# OAuth-interactive `wrangler login` (which wouldn't persist across sandbox
+# sessions anyway). mise.toml lives at <workspace>/mise.toml, two levels
+# above $REPO (<workspace>/dev/<repo>).
+MISE_TOML="$(dirname "$(dirname "$REPO")")/mise.toml"
+if [ -f "$MISE_TOML" ]; then
+  tok=$(grep -E '^[[:space:]]*CLOUDFLARE_API_TOKEN[[:space:]]*=' "$MISE_TOML" \
+        | head -1 | sed -E 's/^[^=]*=[[:space:]]*"?([^"[:space:]]+)"?.*$/\1/')
+  [ -n "$tok" ] && export CLOUDFLARE_API_TOKEN="$tok"
+fi
+
 # Clear any stale locks from previous runs (fuse mount blocks unlink,
 # so MV within the same filesystem, never rm).
 for lock in .git/index.lock .git/HEAD.lock .git/refs/heads/*.lock \
