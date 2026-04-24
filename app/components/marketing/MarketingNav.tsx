@@ -21,8 +21,8 @@ export function MarketingNav() {
   return (
     <nav className="sticky top-0 z-30 border-b border-white/10 bg-[#0f1414]/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-        <Link to="/" className="inline-flex items-center" aria-label="PickupRoster home">
-          <img src={wordmark} alt="PickupRoster" className="h-8 w-auto" />
+        <Link to="/" className="inline-flex items-center" aria-label="Pickup Roster home">
+          <img src={wordmark} alt="Pickup Roster" className="h-8 w-auto" />
         </Link>
         <div className="flex flex-wrap items-center justify-end gap-4 text-sm font-medium text-white/80">
           <Link to="/pricing" className="transition hover:text-white">
