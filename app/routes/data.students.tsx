@@ -1,6 +1,4 @@
-import { z } from "zod";
 import invariant from "tiny-invariant";
-import { convertToDataType, headerBody } from "~/csvParser/utils";
 import type { Route } from "./+types/data.students";
 import {
   getOrgFromContext,
@@ -13,13 +11,7 @@ import {
   syncUsageGracePeriod,
 } from "~/domain/billing/plan-usage.server";
 import { dataWithError, dataWithSuccess } from "remix-toast";
-
-const schema = z.object({
-  "Last Name": z.string().min(1),
-  First: z.string().min(1),
-  "Carline Number": z.number(),
-  Homeroom: z.string().min(1)
-});
+import { parseStudentRoster } from "~/domain/csv/student-roster.server";
 
 export async function action({ request, context }: Route.ActionArgs) {
   const prisma = getTenantPrisma(context);
@@ -30,14 +22,33 @@ export async function action({ request, context }: Route.ActionArgs) {
   const file = formData.get("file");
   invariant(file instanceof File, "Must include file");
 
-  const h = headerBody(await file.text());
-  const allCsvData = convertToDataType<typeof schema>(h.header, h.body);
+  // Parse, size-cap, row-cap, header-validate, and Zod-validate in one call.
+  const parseResult = await parseStudentRoster(file);
+  if (!parseResult.ok) {
+    const detail =
+      parseResult.rowErrors && parseResult.rowErrors.length > 0
+        ? parseResult.rowErrors
+            .slice(0, 5)
+            .map((e) => `Row ${e.row}: ${e.message}`)
+            .join("; ")
+        : "";
+    const message = detail
+      ? `${parseResult.error} ${detail}${
+          parseResult.rowErrors!.length > 5
+            ? ` (+${parseResult.rowErrors!.length - 5} more)`
+            : ""
+        }`
+      : parseResult.error;
+    return dataWithError({ result: "invalid" }, message);
+  }
 
-  const homeRooms = new Set(h.body.map((it) => it[3]));
+  const allCsvData = parseResult.rows;
+
+  const homeRooms = new Set(allCsvData.map((row) => row.Homeroom));
   let newClassrooms = 0;
   for (const room of homeRooms) {
     const exists = await prisma.teacher.findFirst({
-      where: { homeRoom: room }
+      where: { homeRoom: room },
     });
     if (!exists) {
       newClassrooms += 1;
@@ -61,7 +72,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   for (const room of homeRooms) {
     const exists = await prisma.teacher.findFirst({
-      where: { homeRoom: room }
+      where: { homeRoom: room },
     });
     if (!exists) {
       await prisma.teacher.create({ data: { homeRoom: room } });
@@ -69,10 +80,10 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   const rows = allCsvData.map((row) => ({
-    firstName: row.First as string,
-    lastName: row["Last Name"] as string,
-    spaceNumber: row["Carline Number"] as number,
-    homeRoom: row.Homeroom as string,
+    firstName: row.First,
+    lastName: row["Last Name"],
+    spaceNumber: row["Carline Number"],
+    homeRoom: row.Homeroom,
   }));
 
   const CHUNK_SIZE = 50;
@@ -88,8 +99,13 @@ export async function action({ request, context }: Route.ActionArgs) {
     await syncUsageGracePeriod(prisma, freshOrg, nextCounts);
   }
 
+  const skipNote =
+    parseResult.skippedBlank > 0
+      ? ` (skipped ${parseResult.skippedBlank} blank row${parseResult.skippedBlank === 1 ? "" : "s"})`
+      : "";
+
   return dataWithSuccess(
     { result: "Created student records from csv" },
-    { message: "Created student records from csv" }
+    { message: `Created ${rows.length} student records from csv${skipNote}` }
   );
 }
