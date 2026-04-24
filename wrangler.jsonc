@@ -50,7 +50,7 @@
 		{
 			"binding": "D1_DATABASE",
 			"database_name": "school-organizer-staging",
-			"database_id": "TODO-run-wrangler-d1-create-school-organizer-staging",
+			"database_id": "88aac5de-1ee7-42e5-b784-3ecd3a4e331f",
 			"migrations_dir": "migrations"
 		}
 	],
