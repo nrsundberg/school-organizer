@@ -233,12 +233,21 @@ After that, any agent can `npm run deploy:staging` to ship its branch.
 
 ## Subagents (Agent tool)
 
-When a main-session agent spawns subagents, use
-`isolation: "worktree"` — the harness creates the worktree, runs the
-subagent in it, and returns the branch/path. The subagent should still
-run the gating (`typecheck`, `test`, staging deploy + smoke) before
-reporting success. The main session then does the merge using the
-returned branch.
+**Mandatory: every `Agent`/`Task` subagent spawned from a main session
+MUST be launched with `isolation: "worktree"`.** No exceptions for
+"small" tasks, and no exceptions for read-only exploration — the cost
+is a few seconds of worktree setup, the benefit is that sibling
+subagents never race on `.git/index` and a cancelled subagent can
+never leave a lock file in the shared checkout.
+
+The harness creates the worktree, runs the subagent in it, and returns
+the branch/path. The subagent should still run the gating (`typecheck`,
+`test`, staging deploy + smoke) before reporting success. The main
+session then does the merge using the returned branch.
+
+If a task truly cannot be worktree-isolated (e.g., it must observe live
+state in the main checkout), the main session performs it directly —
+do not spawn a non-isolated subagent.
 
 ## Main sessions (interactive Claude)
 

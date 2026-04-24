@@ -294,3 +294,28 @@ From `docs/research/2026-04-23-manual-1438-schools.md` (safety-drill / accountab
 - `docs/nightly-specs/compliant-drill-log-export.md`: inventory per-state required fields (start with MI, GA, CA, CT, NY — 5 highest-signal states), map to our drill data model, design one template per state, PDF + CSV export, optional auto-post to a public page for MI-style publishing rules.
 - Build size: S–M.
 
+---
+
+## [research: 2026-04-24]
+
+From `docs/research/2026-04-24-schools.md` (admin onboarding / first-week-of-school setup angle). Two high-leverage hypotheses sized S–M worth queueing:
+
+### R4. `[ ]` first-week-readiness-checklist — Day-1 preparedness dashboard
+
+**Why:** Every onboarding narrative (PikMyKid's 10-day promise, SDM's "few hours with a roster file") is gated on the admin getting the roster + parent data + transportation modes + tags done before Day 1. No competitor surfaces this as a percent-complete state to the admin. Doubles as the renewal/ROI artifact later. Source: docs/research/2026-04-24-schools.md, TL;DR bullets 2 + 4, hypothesis #2.
+
+**Scope (research first — write spec):**
+- `docs/nightly-specs/first-week-readiness-checklist.md`: one admin dashboard panel enumerating (roster uploaded, transportation mode set per child, guardians verified, authorized pickups added, parent invites sent + accepted, pickup tags printed, teacher classroom-door sheets printed). Each row shows `X/Y` with a CTA button that opens the relevant existing screen.
+- Derive everything from existing `organization → child → guardian` tables; no new primary entities. Add a single "ready-for-day-1" computed view.
+- Build size: S.
+
+### R5. `[ ]` inline-parent-data-confirmation — Kill the paper back-to-school packet
+
+**Why:** Aeries' own ideas forum has 126 upvotes on inline fill/sign with a verbatim admin quote: "parents print our forms but they just don't bring them in." Districts nationwide run a mandatory annual back-to-school verification flow and it leaks. A dismissal app that owns this flow eats real SIS-portal surface area and lands the authorized-pickup list the office needs on Day 1. Source: docs/research/2026-04-24-schools.md, hypothesis #3.
+
+**Scope (research first — write spec):**
+- `docs/nightly-specs/inline-parent-data-confirmation.md`: single-page-per-family flow — verify name/phone/email, edit emergency contacts, add authorized pickups + PINs, pick default transportation mode per child, check policy acknowledgments. No PDFs, no uploads for v1.
+- Reuses existing guardian + child models; adds a `dataConfirmation` completion record per family per school year.
+- Admin-side: family adoption report (who's logged in / verified / missing email) with CSV export for phone-call follow-up.
+- Build size: M.
+
