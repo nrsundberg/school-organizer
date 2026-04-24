@@ -135,6 +135,7 @@
 	// (defined in MARKETING_HOSTS so marketing renders on the staging host).
 	"env": {
 		"staging": {
+			"routes": [],  // staging does not bind pickuproster.com routes; prod owns them (fixes wrangler 10020 on deploy)
 			"name": "school-organizer-staging",
 			"workers_dev": true,
 			"vars": {
