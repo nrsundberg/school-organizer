@@ -90,8 +90,9 @@ export default function SetPassword() {
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-3">
-            <label className="text-sm text-white/80">Temporary password</label>
+            <label className="text-sm text-white/80" htmlFor="set-password-current">Temporary password</label>
             <Input
+              id="set-password-current"
               type="password"
               placeholder="Enter your temporary password"
               required
@@ -100,8 +101,9 @@ export default function SetPassword() {
               autoComplete="current-password"
               autoFocus
             />
-            <label className="text-sm text-white/80">New password</label>
+            <label className="text-sm text-white/80" htmlFor="set-password-new">New password</label>
             <Input
+              id="set-password-new"
               type="password"
               placeholder="At least 8 characters"
               required
@@ -109,8 +111,9 @@ export default function SetPassword() {
               onChange={(e) => setNewPassword(e.target.value)}
               autoComplete="new-password"
             />
-            <label className="text-sm text-white/80">Confirm new password</label>
+            <label className="text-sm text-white/80" htmlFor="set-password-confirm">Confirm new password</label>
             <Input
+              id="set-password-confirm"
               type="password"
               placeholder="Re-enter your new password"
               required
