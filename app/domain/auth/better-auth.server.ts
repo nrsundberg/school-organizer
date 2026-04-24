@@ -3,52 +3,27 @@ import { admin } from "better-auth/plugins";
 import { adminAc } from "better-auth/plugins/admin/access";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { getPrisma } from "~/db.server";
+import {
+  hashPassword,
+  verifyPassword,
+  verifyPasswordBool,
+  parseStoredHash,
+  type VerifyResult,
+  type ParsedHash,
+  type HashAlgo,
+} from "~/domain/auth/password-hash";
 
-// Use native Web Crypto PBKDF2 — runs in native code, not pure JS,
-// so it fits within Cloudflare Workers CPU limits unlike scrypt.
-const PBKDF2_ITERATIONS = 100_000;
-const PBKDF2_HASH = "SHA-256";
-const PBKDF2_KEY_LEN = 32; // bytes
-
-function toHex(buf: ArrayBuffer): string {
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-async function pbkdf2Key(password: string, salt: Uint8Array): Promise<ArrayBuffer> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password.normalize("NFKC")),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  return crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: PBKDF2_HASH, salt: salt.buffer as ArrayBuffer, iterations: PBKDF2_ITERATIONS },
-    key,
-    PBKDF2_KEY_LEN * 8,
-  );
-}
-
-export async function hashPassword(password: string): Promise<string> {
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const bits = await pbkdf2Key(password, salt);
-  return `${toHex(salt.buffer)}:${toHex(bits)}`;
-}
-
-export async function verifyPassword(hash: string, password: string): Promise<boolean> {
-  const [saltHex, keyHex] = hash.split(":");
-  if (!saltHex || !keyHex) return false;
-  const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
-  const bits = await pbkdf2Key(password, salt);
-  const target = new Uint8Array(bits);
-  const stored = new Uint8Array(keyHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
-  if (target.length !== stored.length) return false;
-  let diff = 0;
-  for (let i = 0; i < target.length; i++) diff |= target[i] ^ stored[i];
-  return diff === 0;
-}
+// Re-export so existing callers that import { hashPassword,
+// verifyPassword } from "~/domain/auth/better-auth.server" keep working.
+export {
+  hashPassword,
+  verifyPassword,
+  verifyPasswordBool,
+  parseStoredHash,
+  type VerifyResult,
+  type ParsedHash,
+  type HashAlgo,
+};
 
 function normalizeRootDomain(env: Record<string, string | undefined>): string {
   return (env.PUBLIC_ROOT_DOMAIN ?? "").trim().toLowerCase();
@@ -119,6 +94,55 @@ export function getAuth(context: any) {
         }
       : {};
 
+  const cfCtx = (context as any)?.cloudflare?.ctx;
+
+  /**
+   * better-auth expects `verify` to return a plain boolean. This
+   * closure wraps verifyPassword() so it can (a) return the boolean
+   * better-auth wants, and (b) opportunistically rehash the Account
+   * row when the stored hash is legacy-format or below the current
+   * iteration target. The persistence is fire-and-forget via
+   * ctx.waitUntil on Workers, otherwise awaited inline (safe — login
+   * already round-trips in the hundreds of ms so a few extra ms is
+   * immaterial). Errors while persisting the new hash are swallowed
+   * so a DB write failure can never turn a good password into a login
+   * error; the next successful login will retry.
+   */
+  const verifyForBetterAuth = async ({
+    hash,
+    password,
+  }: {
+    hash: string;
+    password: string;
+  }): Promise<boolean> => {
+    const result = await verifyPassword(hash, password);
+    if (result.ok && result.needsRehash) {
+      const task = (async () => {
+        try {
+          const newHash = await hashPassword(password);
+          // Scope by the exact stored hash so we touch only the Account
+          // rows that actually held this credential. In practice each
+          // user has one credentials Account but scoping by hash keeps
+          // unrelated rows untouched even if two users share a password.
+          await db.account.updateMany({
+            where: { password: hash },
+            data: { password: newHash },
+          });
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.error("[pbkdf2-rehash] failed to persist new hash", err);
+        }
+      })();
+
+      if (cfCtx && typeof cfCtx.waitUntil === "function") {
+        cfCtx.waitUntil(task);
+      } else {
+        await task;
+      }
+    }
+    return result.ok;
+  };
+
   const auth = betterAuth({
     basePath: "/api/auth",
     secret,
@@ -134,15 +158,15 @@ export function getAuth(context: any) {
             },
           }
         : {}),
-      ...(context as any)?.cloudflare?.ctx
+      ...(cfCtx
         ? {
             backgroundTasks: {
               handler: (promise: Promise<unknown>) => {
-                (context as any).cloudflare.ctx.waitUntil(promise);
+                cfCtx.waitUntil(promise);
               },
             },
           }
-        : {},
+        : {}),
     },
     database: prismaAdapter(db, {
       provider: "sqlite",
@@ -154,7 +178,7 @@ export function getAuth(context: any) {
       requireEmailVerification: false,
       password: {
         hash: hashPassword,
-        verify: ({ hash, password }) => verifyPassword(hash, password),
+        verify: verifyForBetterAuth,
       },
     },
     session: {

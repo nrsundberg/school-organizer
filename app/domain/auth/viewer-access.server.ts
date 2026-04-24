@@ -145,9 +145,34 @@ export async function verifyViewerPinAndIssueSession(ctx: Ctx, pin: string): Pro
     return { ok: false, message: "Viewer PIN is not configured yet. Contact an admin.", headers };
   }
 
-  const valid = await verifyPassword(pinHash, pin);
+  const { ok: valid, needsRehash } = await verifyPassword(pinHash, pin);
   const { clientKey, ipHint: hint } = await getOrCreateFingerprint(ctx);
   const now = new Date();
+
+  if (valid && needsRehash) {
+    // Transparent upgrade: legacy / low-iter hash verified, rotate to
+    // the current PBKDF2_ITERATIONS target. Fire-and-forget via
+    // waitUntil on Workers, otherwise await.
+    const task = (async () => {
+      try {
+        const newHash = await hashPassword(pin);
+        await prisma.appSettings.updateMany({
+          where: { id: "default", viewerPinHash: pinHash },
+          data: { viewerPinHash: newHash },
+        });
+      } catch (err) {
+        // Best-effort; the next successful PIN entry will retry.
+        // eslint-disable-next-line no-console
+        console.error("[viewer-pin-rehash] failed to persist", err);
+      }
+    })();
+    const cfCtx = (ctx.context as any)?.cloudflare?.ctx;
+    if (cfCtx && typeof cfCtx.waitUntil === "function") {
+      cfCtx.waitUntil(task);
+    } else {
+      await task;
+    }
+  }
 
   if (!valid) {
     const existing = await prisma.viewerAccessAttempt.findUnique({ where: { clientKey } });
