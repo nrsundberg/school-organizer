@@ -9,6 +9,7 @@ import { pruneExpiredPasswordResetTokens } from "../app/domain/auth/password-res
 import { runStatusProbes } from "../app/domain/status/runner.server";
 import type { EmailMessage } from "../app/domain/email/types";
 import { isMarketingHost } from "../app/domain/utils/host.server";
+import { applySecurityHeaders } from "../app/lib/security-headers.server";
 export { BingoBoardDO } from "./bingo-board";
 
 // @ts-expect-error - build output has no type declarations
@@ -57,7 +58,14 @@ export default withSentry(
         (env as any).ENVIRONMENT === "development"
           ? "development"
           : "production";
-      return createRequestHandler(buildImport, serverMode)(request, context);
+      const response = await createRequestHandler(buildImport, serverMode)(
+        request,
+        context,
+      );
+      // NB: the WebSocket upgrade branch above returns before reaching here,
+      // so we never try to mutate a 101-switching-protocols response. The
+      // `scheduled` and `queue` handlers also never pass through this path.
+      return applySecurityHeaders(response, env as { ENVIRONMENT?: string });
     },
 
     async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
