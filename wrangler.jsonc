@@ -136,6 +136,7 @@
 	"env": {
 		"staging": {
 			"name": "school-organizer-staging",
+			"workers_dev": true,
 			"vars": {
 				"SENTRY_DSN": "",
 				"ENVIRONMENT": "staging",
