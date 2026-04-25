@@ -2,6 +2,7 @@ import type { Route } from "./+types/auth";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { getPrisma } from "~/db.server";
 import { isPlatformAdmin } from "~/domain/utils/host.server";
+import { assertNotAlreadyImpersonating } from "~/domain/auth/impersonate-gate.server";
 
 /**
  * Better-auth's admin plugin authorizes `/api/auth/admin/impersonate-user`
@@ -47,6 +48,16 @@ async function gateImpersonateOrPassThrough(
       { status: 401, headers: { "Content-Type": "application/json" } },
     );
   }
+
+  // Audit invariant: refuse nested impersonation. Even platform admins must
+  // stop the current impersonation before starting a new one — otherwise
+  // Session.impersonatedBy gets overwritten and the original admin's
+  // identity is lost.
+  const currentImpersonatedBy =
+    (session?.session as { impersonatedBy?: string | null } | undefined)
+      ?.impersonatedBy ?? null;
+  const nested = assertNotAlreadyImpersonating(currentImpersonatedBy);
+  if (nested) return nested;
 
   // Staff bypass — platform admins can impersonate across tenants.
   if (isPlatformAdmin({ email: actor.email, role: actor.role ?? "" }, context)) {
