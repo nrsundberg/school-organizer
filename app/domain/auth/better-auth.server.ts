@@ -3,6 +3,7 @@ import { admin } from "better-auth/plugins";
 import { adminAc } from "better-auth/plugins/admin/access";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { getPrisma } from "~/db.server";
+import { assertUserScopeXor } from "./user-scope.server";
 import {
   hashPassword,
   verifyPassword,
@@ -208,6 +209,34 @@ export function getAuth(context: any) {
         phone: {
           type: "string",
           required: false,
+        },
+      },
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user: {
+            orgId?: string | null;
+            districtId?: string | null;
+            role?: string | null;
+          }) => {
+            // Many flows (e.g. better-auth signup) create a User with no
+            // scope and immediately update — the application layer attaches
+            // orgId/districtId in a follow-up step. We only enforce the
+            // invariant when at least one scope field is present in the
+            // payload, so those flows still work.
+            const isPlatformAdmin = user.role === "PLATFORM_ADMIN";
+            const hasScopeField =
+              user.orgId != null || user.districtId != null || isPlatformAdmin;
+            if (hasScopeField) {
+              assertUserScopeXor({
+                orgId: user.orgId ?? null,
+                districtId: user.districtId ?? null,
+                isPlatformAdmin,
+              });
+            }
+            return { data: user };
+          },
         },
       },
     },
