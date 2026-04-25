@@ -1,0 +1,66 @@
+{
+  "common": {
+    "greetingFallback": "there",
+    "signOff": "Noah",
+    "signOffTitle": "Founder, PickupRoster"
+  },
+  "welcome": {
+    "subject": "thanks for trying PickupRoster, {{firstName}}",
+    "preview": "a quick note from the founder — and a small ask.",
+    "greeting": "Hi {{firstName}},",
+    "para1": "Thank you for signing up. Helping schools run a calmer pickup is the whole reason I started PickupRoster, so it genuinely means a lot that {{orgName}} gave it a shot.",
+    "para2": "I'd love to hear what dismissal actually looks like at your school right now — what's working, what's not, and what you wish someone would fix. Could we grab 15 minutes on the phone in the next week or two?",
+    "para3": "Just hit reply with a couple of times that work for you and I'll send an invite.",
+    "para4": "Either way, I'm glad you're here."
+  },
+  "passwordReset": {
+    "subject": "Reset your PickupRoster password",
+    "preview": "Use this link to choose a new password.",
+    "greeting": "Hi {{firstName}},",
+    "intro": "We got a request to reset the password for your PickupRoster account. Click the button below to choose a new one.",
+    "buttonLabel": "Reset password",
+    "fallbackPrefix": "Or paste this link into your browser:",
+    "expires": "This link expires in {{expiryMinutes}} minutes.",
+    "didNotRequest": "If you didn't request this, you can ignore this email — your password won't change{{requestIpSuffix}}.",
+    "textIntro": "We got a request to reset the password for your PickupRoster account. Use the link below to choose a new one:",
+    "requestIpSuffix": " (request came from {{ip}})"
+  },
+  "midTrialCheckin": {
+    "subject": "how's pickup going, {{firstName}}?",
+    "preview": "checking in — no agenda, just want to make sure it's useful.",
+    "greeting": "Hi {{firstName}},",
+    "para1": "You're about halfway through your trial. I wanted to check in — not to sell you anything, just to see how it's going.",
+    "para2": "If something's confusing, clunky, or missing, hit reply and tell me. I read every email and I'd rather hear it now than not at all.",
+    "para3": "If you want to poke around some more, you can jump back in here: {{appLink}}",
+    "para3Html": "If you want to poke around some more, you can jump back in here: <a href=\"{{appLink}}\">{{appLink}}</a>"
+  },
+  "trialExpiring": {
+    "seven": {
+      "subject": "a week left on your PickupRoster trial",
+      "preview": "{{daysLeft}} days to keep your setup — here's how.",
+      "greeting": "Hi {{firstName}},",
+      "para1": "Quick heads up: your trial ends on {{trialEndDate}}, about a week from now.",
+      "para2": "If pickup has felt a little less chaotic at {{orgName}} lately, that's the thing worth keeping. Upgrading now means no interruption, your roster stays put, and tomorrow's dismissal runs exactly like today's.",
+      "para3": "You can upgrade in a couple of clicks here: {{appLink}}",
+      "para3Html": "You can upgrade in a couple of clicks here: <a href=\"{{appLink}}\">{{appLink}}</a>",
+      "para4": "Questions? Just reply — I'll answer."
+    },
+    "three": {
+      "subject": "3 days left, {{firstName}}",
+      "preview": "don't want you to lose your setup at {{orgName}}.",
+      "greeting": "Hi {{firstName}},",
+      "para1": "Your trial wraps on {{trialEndDate}} — just 3 days out.",
+      "para2": "I don't want you to lose the setup you've built for {{orgName}}, or wake up next week to a dismissal line that's back to the old way. Upgrading takes about a minute and everything keeps running.",
+      "para3": "Upgrade here: {{appLink}}",
+      "para3Html": "Upgrade here: <a href=\"{{appLink}}\">{{appLink}}</a>",
+      "para4": "If there's a reason you're holding off, tell me. I want to know."
+    },
+    "one": {
+      "subject": "your trial ends tomorrow",
+      "preview": "one click to keep PickupRoster running at {{orgName}}.",
+      "greeting": "Hi {{firstName}},",
+      "para1": "Your trial ends tomorrow. To keep PickupRoster running at {{orgName}} without a gap, upgrade here: {{appLink}}",
+      "para1Html": "Your trial ends tomorrow. To keep PickupRoster running at {{orgName}} without a gap, upgrade here: <a href=\"{{appLink}}\">{{appLink}}</a>"
+    }
+  }
+}

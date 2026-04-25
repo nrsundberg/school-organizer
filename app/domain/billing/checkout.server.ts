@@ -73,6 +73,13 @@ export async function createCheckoutSessionForOrg(params: {
   cancelUrl: string;
   db?: BillingDb;
   stripeConfig?: StripeConfig;
+  /**
+   * Optional BCP-47 short locale (e.g. "en", "es") for Stripe-hosted
+   * Checkout. Stripe accepts a fixed list of values plus "auto"; we pass
+   * the caller's value through and fall back to "auto" when omitted so
+   * Stripe picks based on the visitor's browser preferences.
+   */
+  locale?: string;
 }): Promise<{ url: string }> {
   const {
     context,
@@ -82,6 +89,7 @@ export async function createCheckoutSessionForOrg(params: {
     email,
     successUrl,
     cancelUrl,
+    locale,
   } = params;
   const stripe = params.stripeConfig ?? requireStripeConfig(context);
   const customer = await ensureStripeCustomerForOrg({
@@ -100,6 +108,9 @@ export async function createCheckoutSessionForOrg(params: {
     ],
     success_url: successUrl,
     cancel_url: cancelUrl,
+    // Stripe Checkout localizes its own UI when a `locale` is provided. Map
+    // our supported codes through; everything else falls back to "auto".
+    locale: stripeCheckoutLocale(locale),
     metadata: { orgId, billingPlan: plan, billingCycle },
     subscription_data: {
       metadata: { orgId, billingPlan: plan, billingCycle },
@@ -111,6 +122,24 @@ export async function createCheckoutSessionForOrg(params: {
   }
 
   return { url: session.url };
+}
+
+/**
+ * Map our internal BCP-47 short codes to Stripe Checkout's `locale` enum.
+ * Returns `"auto"` for unknown / missing values so Stripe falls back to the
+ * visitor's browser language.
+ */
+function stripeCheckoutLocale(
+  lng: string | null | undefined,
+): "auto" | "en" | "es" {
+  switch (lng) {
+    case "en":
+      return "en";
+    case "es":
+      return "es";
+    default:
+      return "auto";
+  }
 }
 
 export async function createBillingPortalSessionForOrg(params: {

@@ -1,6 +1,14 @@
+// Print route — DO NOT use the user's UI locale for translations.
+// The drill printout is for staff use during/after a drill (same audience
+// as master roster), so it follows `org.defaultLocale`. We reuse the
+// `usePrintLocale("master")` rule for that reason; the loader resolves
+// the locale via `getOrgDefaultLocale` and the component pins
+// `useTranslation("admin", { lng: printLocale })`.
+
 import { useEffect } from "react";
 import { Link } from "react-router";
-import { Check } from "lucide-react";
+import { Check, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/print.drills.$templateId";
 import { requireRole } from "~/sessions.server";
 import { getTenantPrisma } from "~/domain/utils/global-context.server";
@@ -10,6 +18,10 @@ import {
   toggleKey,
   emptyRunState,
 } from "~/domain/drills/types";
+import { getOrgDefaultLocale } from "~/i18n.server";
+import { usePrintLocale } from "~/hooks/usePrintLocale";
+
+export const handle = { i18n: ["admin"] };
 
 export async function loader({ context, params }: Route.LoaderArgs) {
   await requireRole(context, "ADMIN");
@@ -34,16 +46,20 @@ export async function loader({ context, params }: Route.LoaderArgs) {
     select: { state: true },
   });
   const state = run ? parseRunState(run.state) : emptyRunState();
-  return { template, state };
+  const printLocale = getOrgDefaultLocale(context);
+  return { template, state, printLocale };
 }
 
 export default function PrintDrill({ loaderData }: Route.ComponentProps) {
   const { template, state } = loaderData;
+  // Drill prints share the master-roster audience; reuse that rule.
+  const printLocale = usePrintLocale("master");
+  const { t } = useTranslation("admin", { lng: printLocale });
   const definition = parseTemplateDefinition(template.definition);
 
   useEffect(() => {
-    const t = setTimeout(() => window.print(), 400);
-    return () => clearTimeout(t);
+    const tm = setTimeout(() => window.print(), 400);
+    return () => clearTimeout(tm);
   }, []);
 
   const pageCss = `@page { size: letter portrait; margin: 0.4in; }
@@ -52,16 +68,16 @@ export default function PrintDrill({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
-      <title>Print – {template.name}</title>
+      <title>{t("drills.print.title", { name: template.name })}</title>
       <style>{pageCss}</style>
-      <div className="p-4 text-black bg-white font-sans min-h-screen print:p-0">
+      <div lang={printLocale} className="p-4 text-black bg-white font-sans min-h-screen print:p-0">
         <div className="flex items-baseline justify-between mb-4 print:mb-3">
           <h1 className="text-xl font-semibold">{template.name}</h1>
           <Link
             to={`/admin/drills/${template.id}/run`}
             className="text-sm text-blue-600 hover:underline print:hidden"
           >
-            Back to run screen
+            {t("drills.print.back")}
           </Link>
         </div>
 
@@ -85,13 +101,29 @@ export default function PrintDrill({ loaderData }: Route.ComponentProps) {
                   <td key={col.id} className="border border-neutral-400 px-2 py-2 align-middle">
                     {col.kind === "text" ? (
                       row.cells[col.id] ?? ""
-                    ) : state.toggles[toggleKey(row.id, col.id)] ? (
-                      <span className="inline-flex items-center justify-center text-emerald-700 font-semibold gap-1">
-                        <Check className="w-4 h-4" /> Check
-                      </span>
-                    ) : (
-                      <span className="text-neutral-300">—</span>
-                    )}
+                    ) : (() => {
+                      // Tri-state print rendering. A naive truthy check would
+                      // render the same green check for "positive" AND
+                      // "negative" (both are truthy strings). Branch on the
+                      // explicit value so the printout matches what the
+                      // teacher clicked.
+                      const val = state.toggles[toggleKey(row.id, col.id)];
+                      if (val === "positive") {
+                        return (
+                          <span className="inline-flex items-center justify-center text-emerald-700 font-semibold gap-1">
+                            <Check className="w-4 h-4" /> {t("drills.print.yes")}
+                          </span>
+                        );
+                      }
+                      if (val === "negative") {
+                        return (
+                          <span className="inline-flex items-center justify-center text-rose-700 font-semibold gap-1">
+                            <X className="w-4 h-4" /> {t("drills.print.no")}
+                          </span>
+                        );
+                      }
+                      return <span className="text-neutral-300">—</span>;
+                    })()}
                   </td>
                 ))}
               </tr>
@@ -100,7 +132,7 @@ export default function PrintDrill({ loaderData }: Route.ComponentProps) {
         </table>
 
         <section className="mb-6">
-          <h2 className="text-sm font-bold uppercase tracking-wide border-b border-neutral-400 pb-1 mb-2">Notes</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wide border-b border-neutral-400 pb-1 mb-2">{t("drills.print.notesHeading")}</h2>
           <p className="whitespace-pre-wrap text-sm min-h-[4rem] border border-neutral-300 rounded p-2 bg-neutral-50">
             {state.notes || " "}
           </p>
@@ -108,10 +140,10 @@ export default function PrintDrill({ loaderData }: Route.ComponentProps) {
 
         <section>
           <h2 className="text-sm font-bold uppercase tracking-wide border-b border-neutral-400 pb-1 mb-2">
-            Follow-up items
+            {t("drills.print.followUpHeading")}
           </h2>
           {state.actionItems.length === 0 ? (
-            <p className="text-sm text-neutral-400">None</p>
+            <p className="text-sm text-neutral-400">{t("drills.print.none")}</p>
           ) : (
             <ul className="text-sm space-y-1">
               {state.actionItems.map((item) => (

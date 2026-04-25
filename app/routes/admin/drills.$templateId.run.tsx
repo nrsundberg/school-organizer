@@ -2,11 +2,13 @@ import { Link, useFetcher, useRevalidator } from "react-router";
 import { data } from "react-router";
 import { ArrowLeft, Check, Plus, Printer, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills.$templateId.run";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 import {
   type RunState,
+  cycleToggle,
   emptyRunState,
   parseRunState,
   parseTemplateDefinition,
@@ -15,6 +17,10 @@ import {
 import { ChecklistTable } from "~/domain/drills/ChecklistTable";
 import { dataWithError, dataWithSuccess } from "remix-toast";
 import type { Prisma } from "~/db";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
+
+export const handle = { i18n: ["admin", "common"] };
 
 const btnPrimary =
   "inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
@@ -24,10 +30,10 @@ const btnGhost =
   "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 
 export const meta: Route.MetaFunction = ({ data }) => [
-  { title: data?.template ? `Run – ${data.template.name}` : "Run checklist" },
+  { title: data?.metaTitle ?? (data?.template ? `Run – ${data.template.name}` : "Run checklist") },
 ];
 
-export async function loader({ context, params }: Route.LoaderArgs) {
+export async function loader({ context, params, request }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const templateId = params.templateId;
@@ -61,8 +67,12 @@ export async function loader({ context, params }: Route.LoaderArgs) {
     });
   }
 
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+
   return {
     template,
+    metaTitle: t("drills.metaRun", { name: template.name }),
     run: { ...run, updatedAtIso: run.updatedAt.toISOString() },
   };
 }
@@ -71,8 +81,10 @@ export async function action({ request, context, params }: Route.ActionArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const templateId = params.templateId;
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
   if (!templateId) {
-    return dataWithError(null, "Missing template.");
+    return dataWithError(null, t("drills.run.errors.missingTemplate"));
   }
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
@@ -86,7 +98,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      return dataWithError(null, "Invalid state JSON.");
+      return dataWithError(null, t("drills.run.errors.invalidStateJson"));
     }
     const state = parseRunState(parsed as Prisma.JsonValue);
 
@@ -98,7 +110,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
     });
     if (expectedUpdatedAt && currentRun && currentRun.updatedAt.toISOString() > expectedUpdatedAt) {
       return data(
-        { error: "Someone else updated this drill. Reload to see the latest state." },
+        { error: t("drills.run.errors.concurrency") },
         { status: 409 },
       );
     }
@@ -115,7 +127,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         data: { orgId, templateId, state: state as object },
       });
     }
-    return dataWithSuccess(null, "Saved.");
+    return dataWithSuccess(null, t("drills.run.toasts.saved"));
   }
 
   if (intent === "reset") {
@@ -134,10 +146,10 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         data: { orgId, templateId, state: emptyRunState() as object },
       });
     }
-    return dataWithSuccess(null, "Checklist cleared.");
+    return dataWithSuccess(null, t("drills.run.toasts.cleared"));
   }
 
-  return dataWithError(null, "Unknown action.");
+  return dataWithError(null, t("drills.run.errors.unknown"));
 }
 
 function newId(): string {
@@ -146,6 +158,7 @@ function newId(): string {
 
 export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
   const { template, run } = loaderData;
+  const { t } = useTranslation("admin");
   const def = parseTemplateDefinition(template.definition);
   const [state, setState] = useState<RunState>(() => parseRunState(run.state));
   const fetcher = useFetcher();
@@ -170,10 +183,18 @@ export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
 
   const toggleCell = useCallback((rowId: string, colId: string) => {
     const key = toggleKey(rowId, colId);
-    setState((s) => ({
-      ...s,
-      toggles: { ...s.toggles, [key]: !s.toggles[key] },
-    }));
+    setState((s) => {
+      const next = cycleToggle(s.toggles[key]);
+      const toggles = { ...s.toggles };
+      // Store explicit positive/negative; drop the key entirely on blank so
+      // saves stay compact and the payload matches parseRunState's model.
+      if (next === null) {
+        delete toggles[key];
+      } else {
+        toggles[key] = next;
+      }
+      return { ...s, toggles };
+    });
   }, []);
 
   const setNotes = useCallback((notes: string) => {
@@ -218,7 +239,7 @@ export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
   };
 
   const reset = () => {
-    if (!confirm("Clear all checks, notes, and follow-up items for this template?")) {
+    if (!confirm(t("drills.run.confirmReset"))) {
       return;
     }
     const fd = new FormData();
@@ -234,7 +255,7 @@ export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
           className="inline-flex items-center gap-1 text-sm text-white/50 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Edit layout
+          {t("drills.run.back")}
         </Link>
         <div className="flex flex-wrap gap-2">
           <button
@@ -243,10 +264,10 @@ export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
             onClick={persist}
             disabled={fetcher.state !== "idle"}
           >
-            {fetcher.state !== "idle" ? "Saving…" : "Save"}
+            {fetcher.state !== "idle" ? t("drills.run.saving") : t("drills.run.save")}
           </button>
           <button type="button" className={btnGhost} onClick={reset}>
-            Clear all
+            {t("drills.run.clearAll")}
           </button>
           <Link
             to={`/admin/print/drills/${template.id}`}
@@ -255,14 +276,14 @@ export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
             className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm text-white hover:bg-white/10"
           >
             <Printer className="w-4 h-4" />
-            Print
+            {t("drills.run.print")}
           </Link>
         </div>
       </div>
 
       <div>
         <h1 className="text-2xl font-bold text-white">{template.name}</h1>
-        <p className="text-white/50 text-sm mt-1">Tap toggle cells during the drill. Green means checked.</p>
+        <p className="text-white/50 text-sm mt-1">{t("drills.run.tap")}</p>
       </div>
 
       {concurrencyError && (
@@ -278,7 +299,7 @@ export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
                 revalidator.revalidate();
               }}
             >
-              Reload now
+              {t("drills.run.concurrencyReload")}
             </button>
           </span>
         </div>
@@ -287,27 +308,27 @@ export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
       <ChecklistTable definition={def} state={state} onToggle={toggleCell} />
 
       <section className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <h2 className="text-sm font-semibold text-white mb-2">Notes</h2>
+        <h2 className="text-sm font-semibold text-white mb-2">{t("drills.run.notesHeading")}</h2>
         <textarea
           value={state.notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={4}
           className="w-full rounded-lg border border-white/20 bg-[#1a1f1f] px-3 py-2 text-white text-sm placeholder:text-white/30"
-          placeholder="Incidents, headcount issues, etc."
+          placeholder={t("drills.run.notesPlaceholder")}
         />
       </section>
 
       <section className="rounded-xl border border-white/10 bg-white/5 p-4">
         <div className="flex items-center justify-between gap-2 mb-3">
-          <h2 className="text-sm font-semibold text-white">Follow-up items</h2>
+          <h2 className="text-sm font-semibold text-white">{t("drills.run.followUpHeading")}</h2>
           <button type="button" className={btnSecondary} onClick={addActionItem}>
             <Plus className="w-4 h-4 mr-1 inline" />
-            Add
+            {t("drills.run.addItem")}
           </button>
         </div>
         <ul className="flex flex-col gap-2">
           {state.actionItems.length === 0 ? (
-            <li className="text-white/40 text-sm">No items yet. Add reminders (e.g. check who has Johnny).</li>
+            <li className="text-white/40 text-sm">{t("drills.run.noItems")}</li>
           ) : (
             state.actionItems.map((item) => (
               <li key={item.id} className="flex flex-wrap items-center gap-2">
@@ -318,7 +339,7 @@ export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
                     item.done ? "border-emerald-500 bg-emerald-600/30 text-emerald-200" : "border-white/20 bg-white/5 text-white/40"
                   }`}
                   aria-pressed={item.done}
-                  aria-label={item.done ? "Mark not done" : "Mark done"}
+                  aria-label={item.done ? t("drills.run.markNotDone") : t("drills.run.markDone")}
                 >
                   {item.done && <Check className="w-4 h-4" />}
                 </button>
@@ -326,13 +347,13 @@ export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
                   value={item.text}
                   onChange={(e) => updateActionItem(item.id, e.target.value)}
                   className="flex-1 min-w-[12rem] rounded border border-white/15 bg-[#1a1f1f] px-2 py-1.5 text-sm text-white"
-                  placeholder="Follow-up task…"
+                  placeholder={t("drills.run.itemPlaceholder")}
                 />
                 <button
                   type="button"
                   onClick={() => removeActionItem(item.id)}
                   className="p-2 text-rose-300 hover:bg-rose-500/10 rounded"
-                  aria-label="Remove item"
+                  aria-label={t("drills.run.removeItem")}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -348,7 +369,7 @@ export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
         onClick={persist}
         disabled={fetcher.state !== "idle"}
       >
-        {fetcher.state !== "idle" ? "Saving…" : "Save checklist"}
+        {fetcher.state !== "idle" ? t("drills.run.saving") : t("drills.run.saveChecklist")}
       </button>
     </div>
   );

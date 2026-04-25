@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { ActiveIncident } from "~/domain/status/types";
 import { StatusPill } from "./StatusPill";
 
@@ -6,10 +7,13 @@ import { StatusPill } from "./StatusPill";
  * only when there's at least one open incident.
  */
 export function IncidentList({ incidents }: { incidents: ActiveIncident[] }) {
+  const { t } = useTranslation("common");
   if (incidents.length === 0) return null;
   return (
     <section className="rounded-2xl border border-amber-400/25 bg-amber-500/5 p-5">
-      <h2 className="text-lg font-bold text-amber-200">Active incidents</h2>
+      <h2 className="text-lg font-bold text-amber-200">
+        {t("status.incidents.heading")}
+      </h2>
       <ul className="mt-4 space-y-3">
         {incidents.map((i) => (
           <li
@@ -29,7 +33,7 @@ export function IncidentList({ incidents }: { incidents: ActiveIncident[] }) {
               className="shrink-0 text-xs text-white/50"
               dateTime={i.startedAt}
             >
-              Since {formatStarted(i.startedAt)}
+              {t("status.incidents.since", { when: formatStarted(i.startedAt) })}
             </time>
           </li>
         ))}

@@ -1,0 +1,179 @@
+{
+  "languageSwitcher": {
+    "label": "Language",
+    "ariaLabel": "Change language",
+    "currentLanguage": "Current language: {{name}}"
+  },
+  "marketing": {
+    "languageCount_one": "Available in {{count}} language",
+    "languageCount_other": "Available in {{count}} languages",
+    "languageList": "Now available in: {{names}}",
+    "everyPlanSuffix": "— included on every plan.",
+    "faqLanguageQuestion": "What languages do you support?",
+    "faqLanguageAnswerSuffix": "If your school needs a language we don't yet ship, contact support — we add languages based on customer demand."
+  },
+  "blog": {
+    "metaTitleIndex": "Blog — PickupRoster",
+    "metaDescriptionIndex": "Field notes on school dismissal, car-line operations, and district rollouts from the PickupRoster team.",
+    "metaDescriptionEmpty": "PickupRoster blog — field notes on dismissal, car lines, and district rollouts.",
+    "ogTitle": "PickupRoster Blog",
+    "ogDescription": "Field notes on school dismissal, car-line operations, and district rollouts.",
+    "kicker": "The PickupRoster blog",
+    "headline": "Field notes from the car line",
+    "lede": "Practical writing for school front offices, principals, and district IT — on dismissal, parent communication, safety, and the messy middle of rolling a system across multiple campuses.",
+    "read": "Read →",
+    "empty": {
+      "headline": "Nothing published yet.",
+      "body": "We're working on the first post. In the meantime, take a look at how PickupRoster works.",
+      "cta": "See pricing"
+    },
+    "post": {
+      "metaNotFound": "Post not found — PickupRoster",
+      "metaTitle": "{{title}} — PickupRoster Blog",
+      "back": "Back to blog",
+      "minRead": "{{count}} min read"
+    },
+    "errors": {
+      "notFoundTitle": "We can't find that post.",
+      "notFoundBody": "It may have been renamed or unpublished. The full archive is one click away.",
+      "errorTitle": "We hit a snag loading this post.",
+      "errorBody": "Try refreshing; if the problem sticks, let us know.",
+      "back": "Back to blog"
+    }
+  },
+  "guides": {
+    "metaTitleIndex": "Guides — PickupRoster",
+    "metaDescriptionIndex": "How-to guides for setting up and running PickupRoster — roster imports, drill templates, branding, billing, and dismissal-day operations.",
+    "metaDescriptionEmpty": "PickupRoster guides — how-to articles for school administrators.",
+    "ogTitle": "PickupRoster Guides",
+    "ogDescription": "How-to guides for setting up and running PickupRoster across your school or district.",
+    "kicker": "PickupRoster guides",
+    "headline": "How to set up and run PickupRoster",
+    "lede": "Step-by-step guides for school administrators — from importing your first roster to running a fire drill from your phone.",
+    "readGuide": "Read guide →",
+    "allGuides": "All guides",
+    "empty": {
+      "headline": "No guides published yet.",
+      "body": "We're working on the first batch. In the meantime, see how PickupRoster is priced.",
+      "cta": "See pricing"
+    },
+    "post": {
+      "metaNotFound": "Guide not found — PickupRoster",
+      "metaTitle": "{{title}} — PickupRoster Guides",
+      "minRead": "{{count}} min read"
+    },
+    "errors": {
+      "notFoundTitle": "We can't find that guide.",
+      "notFoundBody": "It may have been renamed or unpublished. The full library is one click away.",
+      "errorTitle": "We hit a snag loading this guide.",
+      "errorBody": "Try refreshing; if the problem sticks, let us know.",
+      "back": "All guides"
+    }
+  },
+  "trialCta": {
+    "kicker": "Try PickupRoster",
+    "headline": "Get structured dismissal up and running in a week.",
+    "body": "30-day free trial. No credit card required. Built for schools running dismissal for 300 to 3,000 students.",
+    "seePricing": "See pricing",
+    "startFreeTrial": "Start free trial"
+  },
+  "faqs": {
+    "metaTitle": "FAQs — Pickup Roster",
+    "metaDescription": "Common questions about car line boards, trials, and security.",
+    "heading": "FAQs",
+    "lede": "Straight answers for admins and IT.",
+    "readyToTry": "Ready to try it?",
+    "createAccount": "Create an account",
+    "items": {
+      "where": {
+        "q": "Where does my school live?",
+        "a": "Each organization gets its own subdomain like yourslug.pickuproster.com. The main domain shows this marketing site; the board never mixes tenants. On Campus and District plans you can instead use a custom domain or a subdomain on your school's own domain (for example, pickup.yourschool.edu)."
+      },
+      "trial": {
+        "q": "How does the trial work?",
+        "a": "Your trial ends on the later of 30 calendar days from signup or 25 qualifying pickup days. A qualifying day is a day with more than 10 distinct students marked as called."
+      },
+      "viewer": {
+        "q": "How do families view the board?",
+        "a": "Share the viewer PIN or a magic link. Viewer sessions are scoped to your organization and respect lockouts after failed attempts."
+      },
+      "domain": {
+        "q": "Can we use our own domain?",
+        "a": "Yes — custom domains (or a subdomain on your school's own domain) are available on Campus and District plans. Point DNS to the same Worker as your other hosts. Car Line uses a yourslug.pickuproster.com subdomain."
+      }
+    }
+  },
+  "header": {
+    "logoAlt": "{{orgName}} logo",
+    "tenantTitle": "{{orgName}} - Car Line Bingo",
+    "wordmarkAlt": "PickupRoster",
+    "admin": "Admin",
+    "logout": "Logout",
+    "login": "Login"
+  },
+  "buttons": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back",
+    "continue": "Continue",
+    "selectFile": "Select File",
+    "markEmpty": "Mark Empty"
+  },
+  "fileChooser": {
+    "fileLabel": "File: {{name}}",
+    "lastModified": "Last Modified: {{value}}"
+  },
+  "impersonation": {
+    "label": "Impersonating",
+    "stop": "Stop Impersonating",
+    "stopping": "Stopping..."
+  },
+  "status": {
+    "title": "Pickup Roster Status",
+    "description": "Live health of the platform and its third-party dependencies.",
+    "metaTitle": "Status — Pickup Roster",
+    "metaDescription": "Live status of the Pickup Roster platform, including board infrastructure and third-party dependencies.",
+    "renderedAt": "Rendered {{when}}. Updated every 2 minutes.",
+    "ninetyDaysAgo": "90 days ago",
+    "today": "Today",
+    "sections": {
+      "application": "Application",
+      "data": "Data",
+      "email": "Email",
+      "payments": "Payments",
+      "tenants": "Tenants"
+    },
+    "overall": {
+      "operational": "All systems operational",
+      "degraded": "Degraded performance",
+      "outage": "Major outage",
+      "unknown": "Status collecting"
+    },
+    "pill": {
+      "operational": "Operational",
+      "degraded": "Degraded",
+      "outage": "Outage",
+      "unknown": "Unknown",
+      "ariaLabel": "Status: {{label}}"
+    },
+    "uptime": {
+      "ariaLabel": "90-day uptime history. {{summary}}.",
+      "noData": "No data yet",
+      "allOperational": "{{withData}} of {{total}} days with data — all operational",
+      "withIncidents": "{{bad}} of {{withData}} days with incidents over the last {{total}} days",
+      "operational": "operational",
+      "degraded": "degraded",
+      "outage": "outage",
+      "noDataLabel": "no data",
+      "cellTitle": "{{date}} — {{label}}"
+    },
+    "incidents": {
+      "heading": "Active incidents",
+      "since": "Since {{when}}"
+    }
+  },
+  "errors": {
+    "notFound": "404",
+    "somethingBroke": "Something broke"
+  }
+}

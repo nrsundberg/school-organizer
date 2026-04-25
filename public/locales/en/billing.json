@@ -1,0 +1,23 @@
+{
+  "trial": {
+    "expired": "Your free trial has ended. Upgrade to continue recording pickups.",
+    "ctaUpgrade": "Upgrade now"
+  },
+  "suspension": {
+    "pastDue": "Your subscription is past due. Update your payment method to avoid suspension.",
+    "suspended": "Your account is suspended. Contact support or update billing to restore access."
+  },
+  "planLimits": {
+    "warnApproaching": "You're approaching your plan's {{name}} limit ({{count}} of {{cap}}).",
+    "overCap": "You're {{count}} {{name}} over your plan cap.",
+    "graceActive": "You're over your plan cap, with {{daysLeft}} days left in your grace period.",
+    "graceExpired": "Your grace period has ended. Reduce usage or upgrade your plan."
+  },
+  "checkout": {
+    "couldNotStart": "Could not start checkout. Please try again.",
+    "missingCustomer": "No Stripe customer for this organization."
+  },
+  "portal": {
+    "couldNotOpen": "Could not open the billing portal. Please try again."
+  }
+}

@@ -10,26 +10,35 @@ import {
   Users,
 } from "lucide-react";
 import { NavLink } from "react-router";
+import { useTranslation } from "react-i18next";
 
-const navItems = [
-  { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/admin/users", label: "Users", icon: Users },
-  { to: "/admin/households", label: "Households", icon: Home },
-  { to: "/admin/children", label: "Children & Classes", icon: GraduationCap },
-  { to: "/admin/roster-import", label: "Roster Import", icon: FileSpreadsheet },
-  { to: "/admin/drills", label: "Drills", icon: ClipboardList },
-  { to: "/admin/history", label: "History", icon: History },
-  { to: "/admin/branding", label: "Branding", icon: Palette },
-  { to: "/admin/billing", label: "Billing", icon: CreditCard },
+type NavItem = {
+  to: string;
+  labelKey: string;
+  icon: typeof LayoutDashboard;
+  end?: boolean;
+};
+
+const navItems: NavItem[] = [
+  { to: "/admin", labelKey: "sidebar.dashboard", icon: LayoutDashboard, end: true },
+  { to: "/admin/users", labelKey: "sidebar.users", icon: Users },
+  { to: "/admin/households", labelKey: "sidebar.households", icon: Home },
+  { to: "/admin/children", labelKey: "sidebar.children", icon: GraduationCap },
+  { to: "/admin/roster-import", labelKey: "sidebar.rosterImport", icon: FileSpreadsheet },
+  { to: "/admin/drills", labelKey: "sidebar.drills", icon: ClipboardList },
+  { to: "/admin/history", labelKey: "sidebar.history", icon: History },
+  { to: "/admin/branding", labelKey: "sidebar.branding", icon: Palette },
+  { to: "/admin/billing", labelKey: "sidebar.billing", icon: CreditCard },
 ];
 
 export default function AdminSidebar({ onLinkClick }: { onLinkClick?: () => void }) {
+  const { t } = useTranslation("admin");
   return (
     <nav className="flex flex-col gap-1 p-4">
       <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-2 px-2">
-        Admin Panel
+        {t("sidebar.panelTitle")}
       </p>
-      {navItems.map(({ to, label, icon: Icon, end }) => (
+      {navItems.map(({ to, labelKey, icon: Icon, end }) => (
         <NavLink
           key={to}
           to={to}
@@ -44,7 +53,7 @@ export default function AdminSidebar({ onLinkClick }: { onLinkClick?: () => void
           }
         >
           <Icon className="w-4 h-4 flex-shrink-0" />
-          {label}
+          {t(labelKey)}
         </NavLink>
       ))}
     </nav>

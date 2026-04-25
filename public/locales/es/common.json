@@ -1,0 +1,179 @@
+{
+  "languageSwitcher": {
+    "label": "[ES] Language",
+    "ariaLabel": "[ES] Change language",
+    "currentLanguage": "[ES] Current language: {{name}}"
+  },
+  "marketing": {
+    "languageCount_one": "[ES] Available in {{count}} language",
+    "languageCount_other": "[ES] Available in {{count}} languages",
+    "languageList": "[ES] Now available in: {{names}}",
+    "everyPlanSuffix": "[ES] — included on every plan.",
+    "faqLanguageQuestion": "[ES] What languages do you support?",
+    "faqLanguageAnswerSuffix": "[ES] If your school needs a language we don't yet ship, contact support — we add languages based on customer demand."
+  },
+  "blog": {
+    "metaTitleIndex": "[ES] Blog — PickupRoster",
+    "metaDescriptionIndex": "[ES] Field notes on school dismissal, car-line operations, and district rollouts from the PickupRoster team.",
+    "metaDescriptionEmpty": "[ES] PickupRoster blog — field notes on dismissal, car lines, and district rollouts.",
+    "ogTitle": "[ES] PickupRoster Blog",
+    "ogDescription": "[ES] Field notes on school dismissal, car-line operations, and district rollouts.",
+    "kicker": "[ES] The PickupRoster blog",
+    "headline": "[ES] Field notes from the car line",
+    "lede": "[ES] Practical writing for school front offices, principals, and district IT — on dismissal, parent communication, safety, and the messy middle of rolling a system across multiple campuses.",
+    "read": "[ES] Read →",
+    "empty": {
+      "headline": "[ES] Nothing published yet.",
+      "body": "[ES] We're working on the first post. In the meantime, take a look at how PickupRoster works.",
+      "cta": "[ES] See pricing"
+    },
+    "post": {
+      "metaNotFound": "[ES] Post not found — PickupRoster",
+      "metaTitle": "[ES] {{title}} — PickupRoster Blog",
+      "back": "[ES] Back to blog",
+      "minRead": "[ES] {{count}} min read"
+    },
+    "errors": {
+      "notFoundTitle": "[ES] We can't find that post.",
+      "notFoundBody": "[ES] It may have been renamed or unpublished. The full archive is one click away.",
+      "errorTitle": "[ES] We hit a snag loading this post.",
+      "errorBody": "[ES] Try refreshing; if the problem sticks, let us know.",
+      "back": "[ES] Back to blog"
+    }
+  },
+  "guides": {
+    "metaTitleIndex": "[ES] Guides — PickupRoster",
+    "metaDescriptionIndex": "[ES] How-to guides for setting up and running PickupRoster — roster imports, drill templates, branding, billing, and dismissal-day operations.",
+    "metaDescriptionEmpty": "[ES] PickupRoster guides — how-to articles for school administrators.",
+    "ogTitle": "[ES] PickupRoster Guides",
+    "ogDescription": "[ES] How-to guides for setting up and running PickupRoster across your school or district.",
+    "kicker": "[ES] PickupRoster guides",
+    "headline": "[ES] How to set up and run PickupRoster",
+    "lede": "[ES] Step-by-step guides for school administrators — from importing your first roster to running a fire drill from your phone.",
+    "readGuide": "[ES] Read guide →",
+    "allGuides": "[ES] All guides",
+    "empty": {
+      "headline": "[ES] No guides published yet.",
+      "body": "[ES] We're working on the first batch. In the meantime, see how PickupRoster is priced.",
+      "cta": "[ES] See pricing"
+    },
+    "post": {
+      "metaNotFound": "[ES] Guide not found — PickupRoster",
+      "metaTitle": "[ES] {{title}} — PickupRoster Guides",
+      "minRead": "[ES] {{count}} min read"
+    },
+    "errors": {
+      "notFoundTitle": "[ES] We can't find that guide.",
+      "notFoundBody": "[ES] It may have been renamed or unpublished. The full library is one click away.",
+      "errorTitle": "[ES] We hit a snag loading this guide.",
+      "errorBody": "[ES] Try refreshing; if the problem sticks, let us know.",
+      "back": "[ES] All guides"
+    }
+  },
+  "trialCta": {
+    "kicker": "[ES] Try PickupRoster",
+    "headline": "[ES] Get structured dismissal up and running in a week.",
+    "body": "[ES] 30-day free trial. No credit card required. Built for schools running dismissal for 300 to 3,000 students.",
+    "seePricing": "[ES] See pricing",
+    "startFreeTrial": "[ES] Start free trial"
+  },
+  "faqs": {
+    "metaTitle": "[ES] FAQs — Pickup Roster",
+    "metaDescription": "[ES] Common questions about car line boards, trials, and security.",
+    "heading": "[ES] FAQs",
+    "lede": "[ES] Straight answers for admins and IT.",
+    "readyToTry": "[ES] Ready to try it?",
+    "createAccount": "[ES] Create an account",
+    "items": {
+      "where": {
+        "q": "[ES] Where does my school live?",
+        "a": "[ES] Each organization gets its own subdomain like yourslug.pickuproster.com. The main domain shows this marketing site; the board never mixes tenants. On Campus and District plans you can instead use a custom domain or a subdomain on your school's own domain (for example, pickup.yourschool.edu)."
+      },
+      "trial": {
+        "q": "[ES] How does the trial work?",
+        "a": "[ES] Your trial ends on the later of 30 calendar days from signup or 25 qualifying pickup days. A qualifying day is a day with more than 10 distinct students marked as called."
+      },
+      "viewer": {
+        "q": "[ES] How do families view the board?",
+        "a": "[ES] Share the viewer PIN or a magic link. Viewer sessions are scoped to your organization and respect lockouts after failed attempts."
+      },
+      "domain": {
+        "q": "[ES] Can we use our own domain?",
+        "a": "[ES] Yes — custom domains (or a subdomain on your school's own domain) are available on Campus and District plans. Point DNS to the same Worker as your other hosts. Car Line uses a yourslug.pickuproster.com subdomain."
+      }
+    }
+  },
+  "header": {
+    "logoAlt": "[ES] {{orgName}} logo",
+    "tenantTitle": "[ES] {{orgName}} - Car Line Bingo",
+    "wordmarkAlt": "[ES] PickupRoster",
+    "admin": "[ES] Admin",
+    "logout": "[ES] Logout",
+    "login": "[ES] Login"
+  },
+  "buttons": {
+    "save": "[ES] Save",
+    "cancel": "[ES] Cancel",
+    "back": "[ES] Back",
+    "continue": "[ES] Continue",
+    "selectFile": "[ES] Select File",
+    "markEmpty": "[ES] Mark Empty"
+  },
+  "fileChooser": {
+    "fileLabel": "[ES] File: {{name}}",
+    "lastModified": "[ES] Last Modified: {{value}}"
+  },
+  "impersonation": {
+    "label": "[ES] Impersonating",
+    "stop": "[ES] Stop Impersonating",
+    "stopping": "[ES] Stopping..."
+  },
+  "status": {
+    "title": "[ES] Pickup Roster Status",
+    "description": "[ES] Live health of the platform and its third-party dependencies.",
+    "metaTitle": "[ES] Status — Pickup Roster",
+    "metaDescription": "[ES] Live status of the Pickup Roster platform, including board infrastructure and third-party dependencies.",
+    "renderedAt": "[ES] Rendered {{when}}. Updated every 2 minutes.",
+    "ninetyDaysAgo": "[ES] 90 days ago",
+    "today": "[ES] Today",
+    "sections": {
+      "application": "[ES] Application",
+      "data": "[ES] Data",
+      "email": "[ES] Email",
+      "payments": "[ES] Payments",
+      "tenants": "[ES] Tenants"
+    },
+    "overall": {
+      "operational": "[ES] All systems operational",
+      "degraded": "[ES] Degraded performance",
+      "outage": "[ES] Major outage",
+      "unknown": "[ES] Status collecting"
+    },
+    "pill": {
+      "operational": "[ES] Operational",
+      "degraded": "[ES] Degraded",
+      "outage": "[ES] Outage",
+      "unknown": "[ES] Unknown",
+      "ariaLabel": "[ES] Status: {{label}}"
+    },
+    "uptime": {
+      "ariaLabel": "[ES] 90-day uptime history. {{summary}}.",
+      "noData": "[ES] No data yet",
+      "allOperational": "[ES] {{withData}} of {{total}} days with data — all operational",
+      "withIncidents": "[ES] {{bad}} of {{withData}} days with incidents over the last {{total}} days",
+      "operational": "[ES] operational",
+      "degraded": "[ES] degraded",
+      "outage": "[ES] outage",
+      "noDataLabel": "[ES] no data",
+      "cellTitle": "[ES] {{date}} — {{label}}"
+    },
+    "incidents": {
+      "heading": "[ES] Active incidents",
+      "since": "[ES] Since {{when}}"
+    }
+  },
+  "errors": {
+    "notFound": "[ES] 404",
+    "somethingBroke": "[ES] Something broke"
+  }
+}

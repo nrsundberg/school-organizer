@@ -1,0 +1,62 @@
+{
+  "generic": {
+    "unknown": "Something went wrong. Please try again.",
+    "badRequest": "Invalid request.",
+    "unauthorized": "You must be signed in to do that.",
+    "forbidden": "You don't have permission to do that.",
+    "notFound": "Not found.",
+    "internalError": "Internal server error."
+  },
+  "zod": {
+    "invalidType": "Expected {{expected}}, received {{received}}.",
+    "invalidTypeRequired": "This field is required.",
+    "tooSmall": "Must be at least {{minimum}}.",
+    "tooSmallString": "Must be at least {{minimum}} character(s).",
+    "tooSmallStringEmpty": "This field is required.",
+    "tooSmallNumber": "Must be at least {{minimum}}.",
+    "tooSmallArray": "Must contain at least {{minimum}} item(s).",
+    "tooBig": "Must be at most {{maximum}}.",
+    "tooBigString": "Must be at most {{maximum}} character(s).",
+    "tooBigNumber": "Must be at most {{maximum}}.",
+    "tooBigArray": "Must contain at most {{maximum}} item(s).",
+    "invalidString": "Invalid value.",
+    "invalidStringEmail": "Enter a valid email address.",
+    "invalidStringUrl": "Enter a valid URL.",
+    "invalidStringUuid": "Enter a valid identifier.",
+    "invalidStringRegex": "Invalid format.",
+    "invalidEnum": "Must be one of: {{options}}.",
+    "invalidUnion": "Invalid input.",
+    "invalidLiteral": "Expected {{expected}}.",
+    "invalidDate": "Enter a valid date.",
+    "custom": "Invalid input.",
+    "fallback": "Invalid input."
+  },
+  "auth": {
+    "invalidEmailOrPassword": "Invalid email or password.",
+    "userAlreadyExists": "An account already exists for that email.",
+    "userNotFound": "No account found for that email.",
+    "emailNotVerified": "Please verify your email before continuing.",
+    "passwordTooShort": "Password is too short.",
+    "passwordTooLong": "Password is too long.",
+    "sessionExpired": "Your session has expired. Sign in again.",
+    "rateLimited": "Too many attempts. Please try again in a minute.",
+    "invalidToken": "This link is invalid or has expired.",
+    "tokenExpired": "This link has expired. Request a new one.",
+    "accountBanned": "This account has been suspended.",
+    "unknownError": "Something went wrong. Please try again."
+  },
+  "form": {
+    "unknownAction": "Unknown action.",
+    "invalidFormData": "Invalid form data."
+  },
+  "billing": {
+    "trialExpired": "Your free trial has ended. Upgrade to continue recording pickups.",
+    "stripeNotConfigured": "Billing is not configured for this environment.",
+    "noStripeCustomer": "No Stripe customer for this org.",
+    "stripeCheckoutFailed": "Could not start checkout. Please try again.",
+    "stripePortalFailed": "Could not open the billing portal. Please try again.",
+    "orgNotFound": "Organization not found.",
+    "planLimitExceededHard": "This change would exceed your plan's maximum ({{name}}: {{hard}} during the grace window, {{cap}} after). Upgrade your plan or remove records.",
+    "planLimitExceededAfterGrace": "Your plan allows up to {{cap}} {{name}} (30-day grace period ended). Upgrade your plan or reduce usage."
+  }
+}

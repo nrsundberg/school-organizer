@@ -109,8 +109,40 @@ export interface ActionItem {
   done: boolean;
 }
 
+/**
+ * A toggle cell's explicit state. Absence of the key in `RunState.toggles`
+ * means "blank / not yet answered" — the tri-state has three visible
+ * values: blank, positive (check), negative (X). We store only the two
+ * explicit values and omit the key for blank, so saves stay compact and
+ * the migration from the old boolean shape is trivial (true → positive,
+ * false → dropped = blank).
+ */
+export type ToggleValue = "positive" | "negative";
+
+export const TOGGLE_CYCLE: readonly (ToggleValue | null)[] = [
+  null,
+  "positive",
+  "negative",
+] as const;
+
+/**
+ * Next state in the blank → positive → negative → blank cycle. Used by
+ * both the admin run screen and the live drill screen so the behavior is
+ * identical everywhere teachers click.
+ */
+export function cycleToggle(cur: ToggleValue | null | undefined): ToggleValue | null {
+  if (cur === "positive") return "negative";
+  if (cur === "negative") return null;
+  return "positive";
+}
+
 export interface RunState {
-  toggles: Record<string, boolean>;
+  /**
+   * Map of `${rowId}:${colId}` → ToggleValue. Keys missing from the map
+   * are treated as blank. Old runs stored booleans here; `parseRunState`
+   * migrates them on read.
+   */
+  toggles: Record<string, ToggleValue>;
   notes: string;
   actionItems: ActionItem[];
 }
@@ -222,10 +254,25 @@ export function parseRunState(raw: Prisma.JsonValue): RunState {
     return emptyRunState();
   }
   const s = obj as Partial<RunState>;
-  const toggles =
-    s.toggles && typeof s.toggles === "object" && s.toggles !== null && !Array.isArray(s.toggles)
-      ? { ...(s.toggles as Record<string, boolean>) }
-      : {};
+  // Migrate legacy boolean toggles while tolerating the new string form.
+  //   - `true`       → "positive"
+  //   - `false`      → dropped (blank)
+  //   - "positive"   → kept
+  //   - "negative"   → kept
+  //   - anything else → dropped (defensive — don't poison state if the
+  //     stored JSON is corrupt)
+  // Absence of a key means blank in the tri-state model.
+  const toggles: Record<string, ToggleValue> = {};
+  if (s.toggles && typeof s.toggles === "object" && !Array.isArray(s.toggles)) {
+    for (const [key, val] of Object.entries(s.toggles as Record<string, unknown>)) {
+      if (val === true || val === "positive") {
+        toggles[key] = "positive";
+      } else if (val === "negative") {
+        toggles[key] = "negative";
+      }
+      // `false` and everything else → blank (omit).
+    }
+  }
   const notes = typeof s.notes === "string" ? s.notes : "";
   const actionItems = Array.isArray(s.actionItems)
     ? s.actionItems

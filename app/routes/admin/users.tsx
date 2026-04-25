@@ -2,6 +2,7 @@ import { useFetcher } from "react-router";
 import { Button, Input, Table, TableBody, TableCell, TableColumn, TableContent, TableHeader, TableRow } from "@heroui/react";
 import { Ban, KeyRound, Link as LinkIcon, LogIn, RotateCcw, ShieldX, Trash2, UserCheck } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/users";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getPrisma } from "~/db.server";
@@ -18,7 +19,11 @@ import {
   type AdminUsersFetcherData,
 } from "~/domain/admin-users/admin-users.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Admin – Users" }];
+export const handle = { i18n: ["admin", "common"] };
+
+export const meta: Route.MetaFunction = ({ data }) => [
+  { title: data?.metaTitle ?? "Admin – Users" },
+];
 
 export async function loader({ context }: Route.LoaderArgs) {
   const me = await protectToAdminAndGetPermissions(context);
@@ -70,6 +75,8 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 function BanButton({ user, currentUserId }: { user: { id: string; name: string; banned: boolean; banReason: string | null }; currentUserId: string }) {
+  const { t } = useTranslation("admin");
+  const { t: tCommon } = useTranslation("common");
   const fetcher = useFetcher();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -84,7 +91,7 @@ function BanButton({ user, currentUserId }: { user: { id: string; name: string; 
         <input type="hidden" name="action" value="unban" />
         <Button size="sm" variant="ghost" type="submit" isDisabled={fetcher.state !== "idle"}>
           <UserCheck className="w-3 h-3" />
-          Unban
+          {t("users.table.unban")}
         </Button>
       </fetcher.Form>
     );
@@ -94,28 +101,28 @@ function BanButton({ user, currentUserId }: { user: { id: string; name: string; 
     <>
       <Button size="sm" variant="ghost" onPress={() => setOpen(true)}>
         <Ban className="w-3 h-3" />
-        Ban
+        {t("users.table.ban")}
       </Button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setOpen(false)}>
           <div className="bg-[#1a1f1f] border border-white/10 rounded-xl p-6 w-80" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-white font-semibold mb-1">Ban {user.name}?</h3>
-            <p className="text-white/50 text-sm mb-4">This will revoke their active sessions immediately.</p>
-            <label className="text-sm text-white/60 mb-1 block">Reason</label>
+            <h3 className="text-white font-semibold mb-1">{t("users.ban.heading", { name: user.name })}</h3>
+            <p className="text-white/50 text-sm mb-4">{t("users.ban.body")}</p>
+            <label className="text-sm text-white/60 mb-1 block">{t("users.ban.reasonLabel")}</label>
             <input
               className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white text-sm mb-4 outline-none focus:border-blue-500"
-              placeholder="Enter ban reason..."
+              placeholder={t("users.ban.reasonPlaceholder")}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
             <div className="flex gap-2 justify-end">
-              <Button size="sm" variant="ghost" onPress={() => setOpen(false)}>Cancel</Button>
+              <Button size="sm" variant="ghost" onPress={() => setOpen(false)}>{tCommon("buttons.cancel")}</Button>
               <fetcher.Form method="post" onSubmit={() => setOpen(false)}>
                 <input type="hidden" name="action" value="ban" />
                 <input type="hidden" name="userId" value={user.id} />
                 <input type="hidden" name="banReason" value={reason} />
                 <Button size="sm" variant="danger" type="submit" isDisabled={!reason || fetcher.state !== "idle"}>
-                  Ban User
+                  {t("users.ban.submit")}
                 </Button>
               </fetcher.Form>
             </div>
@@ -127,6 +134,7 @@ function BanButton({ user, currentUserId }: { user: { id: string; name: string; 
 }
 
 function ImpersonateButton({ user, currentUserId }: { user: { id: string; name: string }; currentUserId: string }) {
+  const { t } = useTranslation("admin");
   const [isLoading, setIsLoading] = useState(false);
   if (user.id === currentUserId) return null;
 
@@ -146,13 +154,14 @@ function ImpersonateButton({ user, currentUserId }: { user: { id: string; name: 
       }}
     >
       <LogIn className="w-3 h-3" />
-      {isLoading ? "..." : "Impersonate"}
+      {isLoading ? t("users.table.impersonating") : t("users.table.impersonate")}
     </Button>
   );
 }
 
 export default function AdminUsers({ loaderData }: Route.ComponentProps) {
   const { users, locks, currentUserId, passwordResetEnabled } = loaderData;
+  const { t, i18n } = useTranslation("admin");
   const userFetcher = useFetcher();
   const [newUserName, setNewUserName] = useState("");
   const [newUserEmail, setNewUserEmail] = useState("");
@@ -165,10 +174,10 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="flex flex-col gap-8 p-6">
-      <h1 className="text-2xl font-bold text-white">Users</h1>
+      <h1 className="text-2xl font-bold text-white">{t("users.heading")}</h1>
 
       <section className="rounded-xl border border-white/10 p-4 bg-white/[0.02]">
-        <h2 className="text-white font-semibold text-base mb-3">Password reset</h2>
+        <h2 className="text-white font-semibold text-base mb-3">{t("users.passwordReset.heading")}</h2>
         <userFetcher.Form method="post" className="flex flex-col gap-2">
           <input type="hidden" name="action" value="setPasswordResetEnabled" />
           {/*
@@ -184,22 +193,21 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
               defaultChecked={passwordResetEnabled}
               onChange={(e) => e.currentTarget.form?.requestSubmit()}
             />
-            Allow users to reset their password via email.
+            {t("users.passwordReset.label")}
           </label>
           {!passwordResetEnabled && (
             <p className="text-xs text-white/55">
-              Users will need to sign in via your SSO provider when that&apos;s
-              configured.
+              {t("users.passwordReset.ssoHint")}
             </p>
           )}
         </userFetcher.Form>
       </section>
 
       <section className="rounded-xl border border-white/10 p-4 bg-white/[0.02]">
-        <h2 className="text-white font-semibold text-base mb-3">Viewer Privacy Access</h2>
+        <h2 className="text-white font-semibold text-base mb-3">{t("users.viewer.heading")}</h2>
         <div className="grid md:grid-cols-2 gap-6">
           <div className="space-y-3">
-            <h3 className="text-sm text-white/70 font-medium">Reset Global 4-Digit PIN</h3>
+            <h3 className="text-sm text-white/70 font-medium">{t("users.viewer.resetPin")}</h3>
             <userFetcher.Form method="post" className="space-y-3">
               <input type="hidden" name="action" value="setViewerPin" />
               <Input
@@ -207,17 +215,17 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                 required
                 minLength={4}
                 maxLength={32}
-                placeholder="New access code..."
+                placeholder={t("users.viewer.pinPlaceholder")}
                 value={viewerPin}
                 onChange={(e) => setViewerPinState(e.target.value)}
               />
               <label className="inline-flex items-center gap-2 text-sm text-white/70">
                 <input type="checkbox" name="revokeViewerSessions" value="on" />
-                Revoke all current viewer sessions after resetting PIN
+                {t("users.viewer.revokeSessions")}
               </label>
               <Button type="submit" variant="primary" isDisabled={userFetcher.state !== "idle" || viewerPin.trim().length < 4}>
                 <KeyRound className="w-4 h-4" />
-                Save PIN
+                {t("users.viewer.savePin")}
               </Button>
             </userFetcher.Form>
             {fetcherData?.viewerPin ? (
@@ -226,7 +234,7 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
           </div>
 
           <div className="space-y-3">
-            <h3 className="text-sm text-white/70 font-medium">Create Viewer Magic Link</h3>
+            <h3 className="text-sm text-white/70 font-medium">{t("users.viewer.createMagicLink")}</h3>
             <userFetcher.Form method="post" className="space-y-3">
               <input type="hidden" name="action" value="createViewerMagicLink" />
               <Input
@@ -236,14 +244,14 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                 max={30}
                 value={daysValid}
                 onChange={(e) => setDaysValid(e.target.value)}
-                placeholder="Days valid (default 7)"
+                placeholder={t("users.viewer.daysValidPlaceholder")}
               />
               <p className="text-xs text-white/60">
-                This link will be valid for {daysValid || "7"} day(s).
+                {t("users.viewer.linkValid", { days: daysValid || "7" })}
               </p>
               <Button type="submit" variant="primary" isDisabled={userFetcher.state !== "idle"}>
                 <LinkIcon className="w-4 h-4" />
-                Generate Link
+                {t("users.viewer.generateLink")}
               </Button>
             </userFetcher.Form>
             {fetcherData?.magicLink ? (
@@ -253,22 +261,28 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
         </div>
 
         <div className="mt-5">
-          <h3 className="text-sm text-white/70 font-medium mb-2">Locked Viewer Clients</h3>
+          <h3 className="text-sm text-white/70 font-medium mb-2">{t("users.viewer.lockedClients")}</h3>
           {locks.length === 0 ? (
-            <p className="text-sm text-white/50">No active lockouts.</p>
+            <p className="text-sm text-white/50">{t("users.viewer.noLockouts")}</p>
           ) : (
             <div className="space-y-2">
               {locks.map((lock: { clientKey: string; ipHint: string | null; requiresAdminReset: boolean; lockedUntil: string | Date | null }) => (
                 <div key={lock.clientKey} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 px-3 py-2">
                   <div className="text-sm text-white/80">
-                    {lock.ipHint ?? "Unknown network"} - {lock.requiresAdminReset ? "Admin reset required" : `Locked until ${lock.lockedUntil ? new Date(lock.lockedUntil).toLocaleString() : "unknown"}`}
+                    {lock.ipHint ?? t("users.viewer.unknownNetwork")} - {lock.requiresAdminReset
+                      ? t("users.viewer.adminResetRequired")
+                      : t("users.viewer.lockedUntil", {
+                          when: lock.lockedUntil
+                            ? new Date(lock.lockedUntil).toLocaleString(i18n.language)
+                            : t("users.viewer.lockedUntilUnknown"),
+                        })}
                   </div>
                   <userFetcher.Form method="post">
                     <input type="hidden" name="action" value="resetViewerLock" />
                     <input type="hidden" name="clientKey" value={lock.clientKey} />
                     <Button size="sm" variant="ghost" type="submit" isDisabled={userFetcher.state !== "idle"}>
                       <ShieldX className="w-3 h-3" />
-                      Reset Lock
+                      {t("users.viewer.resetLock")}
                     </Button>
                   </userFetcher.Form>
                 </div>
@@ -280,46 +294,46 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
 
       {/* Create user form */}
       <section>
-        <h2 className="text-white font-semibold text-base mb-3">Create User</h2>
+        <h2 className="text-white font-semibold text-base mb-3">{t("users.create.heading")}</h2>
         <userFetcher.Form method="post" className="flex flex-wrap gap-3 items-end">
           <input type="hidden" name="action" value="createUser" />
           <div className="flex flex-col gap-1">
-            <label className="text-sm text-white/50">Full Name</label>
+            <label className="text-sm text-white/50">{t("users.create.fullName")}</label>
             <Input name="name" required className="w-44" value={newUserName} onChange={(e) => setNewUserName(e.target.value)} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-sm text-white/50">Email</label>
+            <label className="text-sm text-white/50">{t("users.create.email")}</label>
             <Input type="email" name="email" required className="w-52" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-sm text-white/50">Role</label>
+            <label className="text-sm text-white/50">{t("users.create.role")}</label>
             <select
               name="role"
               value={newUserRole}
               onChange={(e) => setNewUserRole(e.target.value)}
               className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white w-32 text-sm"
             >
-              <option value="CONTROLLER">Controller</option>
-              <option value="ADMIN">Admin</option>
-              <option value="VIEWER">Viewer</option>
+              <option value="CONTROLLER">{t("users.create.controller")}</option>
+              <option value="ADMIN">{t("users.create.admin")}</option>
+              <option value="VIEWER">{t("users.create.viewer")}</option>
             </select>
           </div>
           <Button type="submit" variant="primary" isDisabled={userFetcher.state !== "idle"}>
-            Create User
+            {t("users.create.submit")}
           </Button>
         </userFetcher.Form>
       </section>
 
       {/* Users table */}
       <section>
-        <Table aria-label="Users">
+        <Table aria-label={t("users.table.ariaLabel")}>
           <TableContent>
             <TableHeader>
-              <TableColumn isRowHeader>Name</TableColumn>
-              <TableColumn>Email</TableColumn>
-              <TableColumn>Role</TableColumn>
-              <TableColumn>Status</TableColumn>
-              <TableColumn>Actions</TableColumn>
+              <TableColumn isRowHeader>{t("users.table.name")}</TableColumn>
+              <TableColumn>{t("users.table.email")}</TableColumn>
+              <TableColumn>{t("users.table.role")}</TableColumn>
+              <TableColumn>{t("users.table.status")}</TableColumn>
+              <TableColumn>{t("users.table.actions")}</TableColumn>
             </TableHeader>
             <TableBody<AdminUserTableRow> items={users}>
               {(user) => (
@@ -336,20 +350,20 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                         onChange={(e) => e.currentTarget.form?.requestSubmit()}
                         className="rounded-lg border border-white/20 bg-white/5 px-2 py-1 text-white text-sm"
                       >
-                        <option value="VIEWER">Viewer</option>
-                        <option value="CONTROLLER">Controller</option>
-                        <option value="ADMIN">Admin</option>
+                        <option value="VIEWER">{t("users.create.viewer")}</option>
+                        <option value="CONTROLLER">{t("users.create.controller")}</option>
+                        <option value="ADMIN">{t("users.create.admin")}</option>
                       </select>
                     </userFetcher.Form>
                   </TableCell>
                   <TableCell>
                     {user.banned ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-xs text-red-400">
-                        Banned
+                        {t("users.table.banned")}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 rounded-full bg-green-500/20 px-2 py-0.5 text-xs text-green-400">
-                        Active
+                        {t("users.table.active")}
                       </span>
                     )}
                   </TableCell>
@@ -360,7 +374,7 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                         <input type="hidden" name="userId" value={user.id} />
                         <Button size="sm" variant="ghost" type="submit" isDisabled={userFetcher.state !== "idle"}>
                           <RotateCcw className="w-3 h-3" />
-                          Reset PW
+                          {t("users.table.resetPw")}
                         </Button>
                       </userFetcher.Form>
                       <BanButton user={user} currentUserId={currentUserId} />
@@ -369,7 +383,7 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                         <input type="hidden" name="userId" value={user.id} />
                         <Button size="sm" variant="ghost" type="submit" isDisabled={userFetcher.state !== "idle"}>
                           <ShieldX className="w-3 h-3" />
-                          Revoke Sessions
+                          {t("users.table.revokeSessions")}
                         </Button>
                       </userFetcher.Form>
                       <ImpersonateButton user={user} currentUserId={currentUserId} />
@@ -379,7 +393,7 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                           <input type="hidden" name="userId" value={user.id} />
                           <Button size="sm" variant="danger" type="submit" isDisabled={userFetcher.state !== "idle"}>
                             <Trash2 className="w-3 h-3" />
-                            Delete
+                            {t("users.table.delete")}
                           </Button>
                         </userFetcher.Form>
                       )}

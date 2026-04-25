@@ -1,5 +1,6 @@
 import { Form, Link, useFetcher } from "react-router";
 import { Button } from "@heroui/react";
+import { useTranslation } from "react-i18next";
 import { Status } from "~/db/browser";
 import { protectToAdminAndGetPermissions, requireRole } from "~/sessions.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
@@ -9,10 +10,16 @@ import { MinimalCsvFileChooser } from "~/components/FileChooser";
 import type { Route } from "./+types/dashboard";
 import { dataWithError, dataWithInfo, dataWithSuccess, dataWithWarning } from "remix-toast";
 import { broadcastBoardReset } from "~/lib/broadcast.server";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Admin Dashboard" }];
+export const handle = { i18n: ["admin", "common"] };
 
-export async function loader({ context }: Route.LoaderArgs) {
+export const meta: Route.MetaFunction = ({ data }) => [
+  { title: data?.metaTitle ?? "Admin Dashboard" },
+];
+
+export async function loader({ request, context }: Route.LoaderArgs) {
   const me = await protectToAdminAndGetPermissions(context);
   const org = getOrgFromContext(context);
   const prisma = getTenantPrisma(context);
@@ -25,7 +32,10 @@ export async function loader({ context }: Route.LoaderArgs) {
     countOrgUsage(prisma, org.id),
   ]);
   const usage = buildUsageSnapshot(org, counts, new Date());
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
   return {
+    metaTitle: t("dashboard.metaTitle"),
     studentCount,
     spaceCount,
     viewerDrawingEnabled: appSettings?.viewerDrawingEnabled ?? false,
@@ -39,9 +49,13 @@ export async function loader({ context }: Route.LoaderArgs) {
 
 export async function action({ request, context }: Route.ActionArgs) {
   await protectToAdminAndGetPermissions(context);
+  const org = getOrgFromContext(context);
   const prisma = getTenantPrisma(context);
   const formData = await request.formData();
   const action = formData.get("action") as string;
+
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
 
   if (action === "create") {
     const raw = formData.get("gridSize") as string;
@@ -54,7 +68,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     for (let i = 0; i < data.length; i += 50) {
       await prisma.space.createMany({ data: data.slice(i, i + 50) });
     }
-    return dataWithSuccess(null, `Created grid (${gridSize} spaces)`);
+    return dataWithSuccess(null, t("dashboard.actions.createdGrid", { n: gridSize }));
   }
 
   if (action === "extendGrid") {
@@ -65,7 +79,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const maxRow = await prisma.space.aggregate({ _max: { spaceNumber: true } });
     const currentMax = maxRow._max.spaceNumber ?? 0;
     if (target <= currentMax) {
-      return dataWithError(null, "Target must be greater than current max space number.");
+      return dataWithError(null, t("dashboard.actions.extendError"));
     }
     const batch = [];
     for (let i = currentMax + 1; i <= target; i++) {
@@ -74,7 +88,10 @@ export async function action({ request, context }: Route.ActionArgs) {
     for (let i = 0; i < batch.length; i += 50) {
       await prisma.space.createMany({ data: batch.slice(i, i + 50) });
     }
-    return dataWithSuccess(null, `Added spaces ${currentMax + 1}–${target}`);
+    return dataWithSuccess(
+      null,
+      t("dashboard.actions.addedSpaces", { from: currentMax + 1, to: target }),
+    );
   }
 
   if (action === "reduceGrid") {
@@ -85,7 +102,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const maxRow = await prisma.space.aggregate({ _max: { spaceNumber: true } });
     const currentMax = maxRow._max.spaceNumber ?? 0;
     if (target >= currentMax) {
-      return dataWithError(null, "Reduce target must be lower than current max space number.");
+      return dataWithError(null, t("dashboard.actions.reduceError"));
     }
 
     // Keep students, but detach them from spaces that are being removed.
@@ -98,7 +115,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       where: { spaceNumber: { gt: target } },
     });
 
-    return dataWithSuccess(null, `Reduced grid to spaces 1–${target}`);
+    return dataWithSuccess(null, t("dashboard.actions.reducedGrid", { to: target }));
   }
 
   if (action === "toggleViewerDrawing") {
@@ -109,7 +126,12 @@ export async function action({ request, context }: Route.ActionArgs) {
       create: { id: "default", viewerDrawingEnabled: enabled },
       update: { viewerDrawingEnabled: enabled },
     });
-    return dataWithSuccess(null, enabled ? "Viewer drawing enabled" : "Viewer drawing disabled");
+    return dataWithSuccess(
+      null,
+      enabled
+        ? t("dashboard.actions.viewerDrawingEnabled")
+        : t("dashboard.actions.viewerDrawingDisabled"),
+    );
   }
 
   if (action === "clear") {
@@ -118,19 +140,19 @@ export async function action({ request, context }: Route.ActionArgs) {
       prisma.callEvent.deleteMany(),
     ]);
     try {
-      await broadcastBoardReset((context as any).cloudflare.env);
+      await broadcastBoardReset((context as any).cloudflare.env, org.id);
     } catch {
       // Broadcast failure should not break the action
     }
-    return dataWithInfo(null, "Reset grid!");
+    return dataWithInfo(null, t("dashboard.actions.resetGrid"));
   }
 
   if (action === "deleteStudents") {
     await prisma.student.deleteMany();
-    return dataWithWarning(null, "Deleted all student records");
+    return dataWithWarning(null, t("dashboard.actions.deletedAll"));
   }
 
-  return dataWithError(null, "Unknown action");
+  return dataWithError(null, t("dashboard.actions.unknown"));
 }
 
 function usageBarColor(ratio: number): string {
@@ -146,42 +168,43 @@ function PlanUsagePanel({
   usage: UsageSnapshot;
   billingPlan: string;
 }) {
+  const { t } = useTranslation("admin");
   const isAtOrNearLimit =
     usage.worstLevel === "over_cap" ||
     usage.worstLevel === "grace" ||
     usage.worstLevel === "grace_expired";
 
-  const dims: { key: "students" | "families" | "classrooms"; label: string }[] = [
-    { key: "students", label: "Students" },
-    { key: "families", label: "Families" },
-    { key: "classrooms", label: "Classrooms" },
+  const dims: { key: "students" | "families" | "classrooms"; labelKey: string }[] = [
+    { key: "students", labelKey: "dashboard.planUsage.students" },
+    { key: "families", labelKey: "dashboard.planUsage.families" },
+    { key: "classrooms", labelKey: "dashboard.planUsage.classrooms" },
   ];
 
   return (
     <section className="rounded-xl bg-white/5 border border-white/10 p-5">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-white font-semibold text-base">Plan usage</h2>
+          <h2 className="text-white font-semibold text-base">{t("dashboard.planUsage.heading")}</h2>
           <p className="text-white/50 text-xs mt-0.5">
-            Plan: <span className="text-white">{billingPlan}</span>
+            {t("dashboard.planUsage.planLine")}<span className="text-white">{billingPlan}</span>
             {" · "}
             <Link to="/admin/billing" className="text-blue-400 hover:underline">
-              Manage billing
+              {t("dashboard.planUsage.manageBilling")}
             </Link>
           </p>
         </div>
         {isAtOrNearLimit && (
           <p className="text-sm text-amber-300 text-right max-w-xs">
-            You&apos;re at or near your plan limit.{" "}
+            {t("dashboard.planUsage.atOrNearLimit")}{" "}
             <Link to="/admin/billing" className="underline hover:text-amber-200">
-              View billing
+              {t("dashboard.planUsage.viewBilling")}
             </Link>
           </p>
         )}
       </div>
       {usage.limits ? (
         <div className="flex flex-col gap-4">
-          {dims.map(({ key, label }) => {
+          {dims.map(({ key, labelKey }) => {
             const count = usage.counts[key];
             const cap = usage.limits![key];
             const ratio = cap > 0 ? count / cap : 0;
@@ -189,7 +212,7 @@ function PlanUsagePanel({
             return (
               <div key={key}>
                 <div className="flex items-center justify-between text-xs text-white/60 mb-1">
-                  <span>{label}</span>
+                  <span>{t(labelKey)}</span>
                   <span>
                     {count} / {cap}
                   </span>
@@ -205,7 +228,7 @@ function PlanUsagePanel({
           })}
         </div>
       ) : (
-        <p className="text-white/50 text-sm">Enterprise plan — no usage limits apply.</p>
+        <p className="text-white/50 text-sm">{t("dashboard.planUsage.enterpriseNote")}</p>
       )}
     </section>
   );
@@ -222,6 +245,7 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
     usage,
     billingPlan,
   } = loaderData;
+  const { t } = useTranslation("admin");
   const fetcher = useFetcher();
   const deleteFetcher = useFetcher({ key: "deleteStudents" });
   const settingsFetcher = useFetcher({ key: "viewerDrawing" });
@@ -233,16 +257,16 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="flex flex-col gap-8 p-6 max-w-2xl">
-      <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+      <h1 className="text-2xl font-bold text-white">{t("dashboard.heading")}</h1>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-          <p className="text-white/50 text-sm">Students</p>
+          <p className="text-white/50 text-sm">{t("dashboard.stats.students")}</p>
           <p className="text-3xl font-bold text-white">{studentCount}</p>
         </div>
         <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-          <p className="text-white/50 text-sm">Grid Spaces</p>
+          <p className="text-white/50 text-sm">{t("dashboard.stats.gridSpaces")}</p>
           <p className="text-3xl font-bold text-white">{spaceCount}</p>
         </div>
       </div>
@@ -252,15 +276,14 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
 
       {/* Grid Controls */}
       <section>
-        <h2 className="text-white font-semibold text-base mb-3">Grid Controls</h2>
+        <h2 className="text-white font-semibold text-base mb-3">{t("dashboard.grid.heading")}</h2>
         <p className="text-white/50 text-sm mb-2">
-          Max space number: <span className="text-white font-mono">{maxSpaceNumber}</span> ({spaceCount}{" "}
-          spaces)
+          {t("dashboard.grid.maxLabel", { max: maxSpaceNumber, count: spaceCount })}
         </p>
         <Form method="post" className="flex flex-col gap-3 max-w-md">
           <div className="flex flex-wrap gap-3 items-end">
             <label className="text-sm text-white/60 flex flex-col gap-1">
-              Spaces for new grid (1–5000)
+              {t("dashboard.grid.newGridLabel")}
               <input
                 name="gridSize"
                 type="number"
@@ -273,64 +296,68 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
               />
             </label>
             <Button variant="primary" type="submit" value="create" name="action" isDisabled={hasExistingGrid}>
-              Create Grid
+              {t("dashboard.grid.createGrid")}
             </Button>
             <Button variant="secondary" type="submit" value="clear" name="action">
-              Clear Grid
+              {t("dashboard.grid.clearGrid")}
             </Button>
           </div>
           <p className="text-xs text-amber-200/80">
             {hasExistingGrid
-              ? "Create Grid is disabled because a grid already exists. Use Extend or Reduce."
-              : "Create Grid builds spaces 1..N for initial setup."}
+              ? t("dashboard.grid.disabledHint")
+              : t("dashboard.grid.newHint")}
           </p>
         </Form>
         <Form method="post" className="flex flex-wrap gap-3 items-end mt-4 max-w-md">
           <input type="hidden" name="action" value="extendGrid" />
           <label className="text-sm text-white/60 flex flex-col gap-1">
-            Extend to space #
+            {t("dashboard.grid.extendLabel")}
             <input
               name="extendTo"
               type="number"
               min={1}
               max={5000}
-              placeholder={`e.g. ${Math.max(maxSpaceNumber + 50, 350)}`}
+              placeholder={t("dashboard.grid.extendPlaceholder", {
+                number: Math.max(maxSpaceNumber + 50, 350),
+              })}
               value={extendTo}
               onChange={(e) => setExtendTo(e.target.value)}
               className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white w-36"
             />
           </label>
           <Button variant="secondary" type="submit">
-            Add Spaces
+            {t("dashboard.grid.addSpaces")}
           </Button>
         </Form>
         <Form method="post" className="flex flex-wrap gap-3 items-end mt-3 max-w-md">
           <input type="hidden" name="action" value="reduceGrid" />
           <label className="text-sm text-white/60 flex flex-col gap-1">
-            Reduce to space #
+            {t("dashboard.grid.reduceLabel")}
             <input
               name="reduceTo"
               type="number"
               min={1}
               max={5000}
-              placeholder={`e.g. ${Math.max(maxSpaceNumber - 5, 1)}`}
+              placeholder={t("dashboard.grid.reducePlaceholder", {
+                number: Math.max(maxSpaceNumber - 5, 1),
+              })}
               value={reduceTo}
               onChange={(e) => setReduceTo(e.target.value)}
               className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white w-36"
             />
           </label>
           <Button variant="danger" type="submit">
-            Reduce Grid
+            {t("dashboard.grid.reduceGrid")}
           </Button>
           <p className="w-full text-xs text-amber-200/80">
-            Students assigned above the new max are kept and automatically detached from their space number.
+            {t("dashboard.grid.reduceHint")}
           </p>
         </Form>
       </section>
 
       <section>
         <div className="flex items-center gap-2 mb-3">
-          <h2 className="text-white font-semibold text-base">Viewer board drawing</h2>
+          <h2 className="text-white font-semibold text-base">{t("dashboard.viewerDrawing.heading")}</h2>
           <span
             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
               viewerDrawingEnabled
@@ -338,14 +365,16 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
                 : "bg-white/10 text-white/70"
             }`}
           >
-            {viewerDrawingEnabled ? "Enabled" : "Disabled"}
+            {viewerDrawingEnabled
+              ? t("dashboard.viewerDrawing.enabled")
+              : t("dashboard.viewerDrawing.disabled")}
           </span>
         </div>
         <p className="text-white/50 text-sm mb-2">
-          When enabled, viewers can draw light lines on the public board (stored on their device only).
+          {t("dashboard.viewerDrawing.body")}
         </p>
         <p className="text-white/40 text-xs mb-3">
-          This affects the board seen by viewer accounts and logged-out visitors on the home page.
+          {t("dashboard.viewerDrawing.subtle")}
         </p>
         {isAdmin ? (
           <settingsFetcher.Form method="post" className="flex items-center gap-3">
@@ -356,22 +385,24 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
               variant={viewerDrawingEnabled ? "danger" : "primary"}
               isPending={settingsFetcher.state !== "idle"}
             >
-              {viewerDrawingEnabled ? "Disable drawing" : "Enable drawing"}
+              {viewerDrawingEnabled
+                ? t("dashboard.viewerDrawing.disable")
+                : t("dashboard.viewerDrawing.enable")}
             </Button>
           </settingsFetcher.Form>
         ) : (
           <p className="text-sm text-amber-200/80">
-            Only admins can change this setting. Ask an admin to enable or disable viewer drawing.
+            {t("dashboard.viewerDrawing.nonAdmin")}
           </p>
         )}
       </section>
 
       <section>
-        <h2 className="text-white font-semibold text-base mb-3">Print backups (PDF)</h2>
-        <p className="text-white/50 text-sm mb-3">Opens in the browser for preview and printing.</p>
+        <h2 className="text-white font-semibold text-base mb-3">{t("dashboard.print.heading")}</h2>
+        <p className="text-white/50 text-sm mb-3">{t("dashboard.print.subtitle")}</p>
         <div className="flex flex-col gap-2 text-sm">
           <div>
-            <p className="text-white/70 mb-1">Full board grid</p>
+            <p className="text-white/70 mb-1">{t("dashboard.print.fullBoard")}</p>
             <div className="flex gap-3 text-sm">
               <a
                 className="text-blue-400 hover:underline"
@@ -379,7 +410,7 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
                 target="_blank"
                 rel="noreferrer"
               >
-                Fit to one page
+                {t("dashboard.print.fitPage")}
               </a>
               <span className="text-white/30">·</span>
               <a
@@ -388,7 +419,7 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
                 target="_blank"
                 rel="noreferrer"
               >
-                Natural size (may span pages)
+                {t("dashboard.print.naturalSize")}
               </a>
             </div>
           </div>
@@ -398,21 +429,21 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
             target="_blank"
             rel="noreferrer"
           >
-            Master list — all students by car space + homeroom
+            {t("dashboard.print.masterList")}
           </a>
           {teachers.length > 0 && (
             <div className="mt-2">
-              <p className="text-white/50 mb-1">Per homeroom</p>
+              <p className="text-white/50 mb-1">{t("dashboard.print.perHomeroom")}</p>
               <ul className="list-disc list-inside space-y-1 text-white/80 max-h-48 overflow-y-auto">
-                {teachers.map((t) => (
-                  <li key={t.id}>
-                    <span className="text-white">{t.homeRoom}</span> —{" "}
-                    <a className="text-blue-400 hover:underline" href={`/admin/print/homeroom/${t.id}?sort=name`} target="_blank" rel="noreferrer">
-                      A–Z
+                {teachers.map((tch) => (
+                  <li key={tch.id}>
+                    <span className="text-white">{tch.homeRoom}</span> —{" "}
+                    <a className="text-blue-400 hover:underline" href={`/admin/print/homeroom/${tch.id}?sort=name`} target="_blank" rel="noreferrer">
+                      {t("dashboard.print.azSort")}
                     </a>
                     {" · "}
-                    <a className="text-blue-400 hover:underline" href={`/admin/print/homeroom/${t.id}?sort=space`} target="_blank" rel="noreferrer">
-                      By space #
+                    <a className="text-blue-400 hover:underline" href={`/admin/print/homeroom/${tch.id}?sort=space`} target="_blank" rel="noreferrer">
+                      {t("dashboard.print.spaceSort")}
                     </a>
                   </li>
                 ))}
@@ -424,7 +455,7 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
 
       {/* CSV Import */}
       <section>
-        <h2 className="text-white font-semibold text-base mb-3">Import Students</h2>
+        <h2 className="text-white font-semibold text-base mb-3">{t("dashboard.import.heading")}</h2>
         <fetcher.Form encType="multipart/form-data" action="/data/students" method="post" className="flex flex-col gap-2">
           <MinimalCsvFileChooser file={file} setFile={setFile} />
           <Button
@@ -433,20 +464,20 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
             isDisabled={file === null || fetcher.state !== "idle"}
             className="self-start mt-1"
           >
-            Create Records
+            {t("dashboard.import.createRecords")}
           </Button>
         </fetcher.Form>
       </section>
 
       {/* Danger zone */}
       <section>
-        <h2 className="text-white font-semibold text-base mb-3">Danger Zone</h2>
+        <h2 className="text-white font-semibold text-base mb-3">{t("dashboard.danger.heading")}</h2>
         <Button
           variant="danger"
           onPress={() => deleteFetcher.submit({ action: "deleteStudents" }, { method: "post" })}
           isDisabled={studentCount === 0 || deleteFetcher.state !== "idle"}
         >
-          Delete All Student Records
+          {t("dashboard.danger.deleteAll")}
         </Button>
       </section>
     </div>

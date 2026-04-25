@@ -4,16 +4,44 @@
  * it without pulling in Prisma / Cloudflare bindings.
  *
  * OWASP 2026 Password Storage Cheat Sheet recommends >= 600,000
- * iterations for PBKDF2-SHA-256. crypto.subtle.deriveBits is native in
- * the Cloudflare Workers runtime (and in Node 22+) so 600k finishes
- * comfortably under the Workers 30 ms CPU limit. If a given deployment
- * shows P50 > 8 ms on the free tier, drop to 300_000 — still above
- * the legacy 100k count and above OWASP's older 310k recommendation.
- * Because the iteration count is embedded in the stored hash, the
- * verifier tolerates any mix of old and new hashes.
+ * iterations for PBKDF2-SHA-256. Cloudflare Workers (workerd) has
+ * historically refused any single `crypto.subtle.deriveBits` call with
+ * `iterations` > 100_000 (see cloudflare/workerd#1346) — exceeding the
+ * cap throws a DOMException that surfaces to clients as a bare 500.
+ * The cap appears to have been lifted in recent open-source workerd
+ * builds (a 2026-04-24 build accepts 1M iterations locally), but the
+ * Cloudflare production fleet may still enforce it at any point in
+ * time since the OSS tip rolls to prod on Cloudflare's own schedule.
+ *
+ * Rather than gamble on runtime version, we do the derivation in
+ * chunks of ≤ PBKDF2_MAX_ITERATIONS_PER_CALL and feed each chunk's
+ * output forward as the salt for the next (salt-chained PBKDF2). This
+ * works on both capped and uncapped runtimes for the same total CPU
+ * cost, and removes the iteration cap as a failure mode permanently.
+ *
+ * Why salt-chaining instead of a single deriveBits(600_000) call:
+ * splitting the work into N sequential PBKDF2 chunks forces an
+ * attacker to perform the same N chunks to test any candidate
+ * password, so the effective work factor is the SUM of the chunk
+ * iterations (600k here). The PRF (HMAC-SHA-256) is deterministic in
+ * (key, message), and we never expose intermediate outputs, so
+ * chaining via salt is cryptographically sound for password
+ * verification. It is *not* byte-equivalent to a single
+ * deriveBits(600000) call — the hash bytes differ — which is why
+ * the verifier uses the same chunking routine as the hasher.
+ *
+ * Because the total iteration count is embedded in the stored hash,
+ * the verifier tolerates any mix of old and new hashes and the
+ * `needsRehash` flag drives transparent upgrades on login.
  */
 
 export const PBKDF2_ITERATIONS = 600_000;
+/**
+ * workerd's hard cap on a single PBKDF2 deriveBits call. Node has no
+ * such cap, so the same chunked routine runs in both environments —
+ * tests and production share the code path.
+ */
+export const PBKDF2_MAX_ITERATIONS_PER_CALL = 100_000;
 const PBKDF2_HASH: HashAlgo = "sha256";
 const PBKDF2_KEY_LEN = 32; // bytes
 
@@ -64,13 +92,36 @@ function algoToSubtle(algo: HashAlgo): string {
   }
 }
 
-async function pbkdf2Key(
+function uint8ArrayToArrayBuffer(u: Uint8Array): ArrayBuffer {
+  return u.buffer.slice(
+    u.byteOffset,
+    u.byteOffset + u.byteLength,
+  ) as ArrayBuffer;
+}
+
+/**
+ * Derive `keyLenBytes` bytes by chaining sequential PBKDF2 calls, each
+ * capped at PBKDF2_MAX_ITERATIONS_PER_CALL. The first call uses `salt`;
+ * each subsequent call uses the previous call's output as its salt.
+ * Sum of per-call iteration counts equals the requested total.
+ *
+ * Exported for tests so synthetic stored hashes at arbitrary iteration
+ * counts exactly match what the production verifier will compute.
+ * @internal
+ */
+export async function pbkdf2KeyBytes(
   password: string,
   salt: Uint8Array,
-  iterations: number,
+  totalIterations: number,
   algo: HashAlgo,
   keyLenBytes: number,
 ): Promise<ArrayBuffer> {
+  if (!Number.isInteger(totalIterations) || totalIterations < 1) {
+    throw new Error(
+      `pbkdf2KeyBytes: iterations must be a positive integer, got ${totalIterations}`,
+    );
+  }
+
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password.normalize("NFKC")),
@@ -78,19 +129,30 @@ async function pbkdf2Key(
     false,
     ["deriveBits"],
   );
-  return crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      hash: algoToSubtle(algo),
-      salt: salt.buffer.slice(
-        salt.byteOffset,
-        salt.byteOffset + salt.byteLength,
-      ) as ArrayBuffer,
-      iterations,
-    },
-    key,
-    keyLenBytes * 8,
-  );
+  const hash = algoToSubtle(algo);
+  const keyLenBits = keyLenBytes * 8;
+
+  let currentSalt: ArrayBuffer = uint8ArrayToArrayBuffer(salt);
+  let remaining = totalIterations;
+  let lastOutput: ArrayBuffer | null = null;
+
+  while (remaining > 0) {
+    const chunk = Math.min(remaining, PBKDF2_MAX_ITERATIONS_PER_CALL);
+    lastOutput = await crypto.subtle.deriveBits(
+      { name: "PBKDF2", hash, salt: currentSalt, iterations: chunk },
+      key,
+      keyLenBits,
+    );
+    currentSalt = lastOutput;
+    remaining -= chunk;
+  }
+
+  // Loop runs at least once because totalIterations >= 1, so lastOutput
+  // is never null. Assert for the type checker.
+  if (lastOutput === null) {
+    throw new Error("pbkdf2KeyBytes: derivation produced no output");
+  }
+  return lastOutput;
 }
 
 /**
@@ -132,7 +194,7 @@ export function parseStoredHash(stored: string): ParsedHash | null {
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const bits = await pbkdf2Key(
+  const bits = await pbkdf2KeyBytes(
     password,
     salt,
     PBKDF2_ITERATIONS,
@@ -149,7 +211,7 @@ export async function verifyPassword(
   const parsed = parseStoredHash(hash);
   if (!parsed) return { ok: false, needsRehash: false };
 
-  const bits = await pbkdf2Key(
+  const bits = await pbkdf2KeyBytes(
     password,
     parsed.salt,
     parsed.iterations,

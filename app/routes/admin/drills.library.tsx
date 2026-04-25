@@ -1,5 +1,6 @@
 import { Form, Link, redirect } from "react-router";
 import { ArrowLeft, Check, Library } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills.library";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
@@ -7,15 +8,21 @@ import { GLOBAL_TEMPLATES, getGlobalTemplate } from "~/domain/drills/library";
 import { DRILL_TYPE_LABELS, type DrillType } from "~/domain/drills/types";
 import { cloneGlobalTemplateToOrg } from "~/domain/drills/clone.server";
 import { dataWithError } from "remix-toast";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Admin – Drill template library" }];
+export const handle = { i18n: ["admin", "common"] };
+
+export const meta: Route.MetaFunction = ({ data }) => [
+  { title: data?.metaTitle ?? "Admin – Drill template library" },
+];
 
 const btnPrimary =
   "inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 const btnSecondary =
   "inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50";
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const cloned = await prisma.drillTemplate.findMany({
@@ -29,7 +36,13 @@ export async function loader({ context }: Route.LoaderArgs) {
       clonedByKey[row.globalKey] = row.id;
     }
   }
-  return { templates: GLOBAL_TEMPLATES, clonedByKey };
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+  return {
+    templates: GLOBAL_TEMPLATES,
+    clonedByKey,
+    metaTitle: t("drills.metaLibrary"),
+  };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -39,27 +52,30 @@ export async function action({ request, context }: Route.ActionArgs) {
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
 
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+
   if (intent === "clone") {
     const globalKey = String(formData.get("globalKey") ?? "").trim();
     if (!globalKey) {
-      return dataWithError(null, "Missing template key.");
+      return dataWithError(null, t("drills.library.errors.missingKey"));
     }
     const source = getGlobalTemplate(globalKey);
     if (!source) {
-      throw new Response("Template not found in library.", { status: 404 });
+      throw new Response(t("drills.library.errors.notFound"), { status: 404 });
     }
     const existing = await prisma.drillTemplate.findFirst({
       where: { globalKey },
       select: { id: true },
     });
     if (existing) {
-      return dataWithError(null, "Already cloned — it's in your templates list.");
+      return dataWithError(null, t("drills.library.errors.alreadyCloned"));
     }
     const created = await cloneGlobalTemplateToOrg(prisma, orgId, globalKey);
     throw redirect(`/admin/drills/${created.id}`);
   }
 
-  return dataWithError(null, "Unknown action.");
+  return dataWithError(null, t("drills.library.errors.unknown"));
 }
 
 interface CardTemplate {
@@ -99,13 +115,14 @@ function summarize(t: (typeof GLOBAL_TEMPLATES)[number]): CardTemplate {
 
 export default function AdminDrillLibrary({ loaderData }: Route.ComponentProps) {
   const { templates, clonedByKey } = loaderData;
+  const { t } = useTranslation("admin");
 
   // Group by DrillType, preserving the canonical label-map order.
   const grouped = new Map<DrillType, CardTemplate[]>();
-  for (const t of templates) {
-    const list = grouped.get(t.drillType) ?? [];
-    list.push(summarize(t));
-    grouped.set(t.drillType, list);
+  for (const tpl of templates) {
+    const list = grouped.get(tpl.drillType) ?? [];
+    list.push(summarize(tpl));
+    grouped.set(tpl.drillType, list);
   }
   const orderedGroups = (Object.keys(DRILL_TYPE_LABELS) as DrillType[])
     .filter((dt) => grouped.has(dt))
@@ -117,16 +134,15 @@ export default function AdminDrillLibrary({ loaderData }: Route.ComponentProps) 
         <div className="flex items-start gap-3">
           <Library className="w-8 h-8 text-blue-400 flex-shrink-0 mt-0.5" />
           <div>
-            <h1 className="text-2xl font-bold text-white">Drill template library</h1>
+            <h1 className="text-2xl font-bold text-white">{t("drills.library.heading")}</h1>
             <p className="text-white/50 text-sm mt-1">
-              Pre-built templates aligned to NFPA, SRP v4.2, FEMA, NWS, and other safety
-              standards. Clone one to make it editable in your org.
+              {t("drills.library.subtitle")}
             </p>
           </div>
         </div>
         <Link to="/admin/drills" className={btnSecondary}>
           <ArrowLeft className="w-3.5 h-3.5 mr-1.5 inline" />
-          Back to checklists
+          {t("drills.library.back")}
         </Link>
       </div>
 
@@ -136,36 +152,36 @@ export default function AdminDrillLibrary({ loaderData }: Route.ComponentProps) 
             {DRILL_TYPE_LABELS[drillType]}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map((t) => {
-              const clonedId = clonedByKey[t.globalKey];
-              const stepLabel = `${t.rowCount} step${t.rowCount === 1 ? "" : "s"}`;
+            {items.map((tpl) => {
+              const clonedId = clonedByKey[tpl.globalKey];
+              const stepLabel = t("drills.library.step", { count: tpl.rowCount });
               const sectionLabel =
-                t.sectionCount > 0
-                  ? ` · ${t.sectionCount} section${t.sectionCount === 1 ? "" : "s"}`
+                tpl.sectionCount > 0
+                  ? t("drills.library.section", { count: tpl.sectionCount })
                   : "";
               return (
                 <article
-                  key={t.globalKey}
+                  key={tpl.globalKey}
                   className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/5 p-4"
                 >
                   <header className="flex flex-col gap-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold text-white">{t.name}</h3>
+                      <h3 className="font-semibold text-white">{tpl.name}</h3>
                       <span className="inline-flex items-center rounded-md bg-blue-500/15 text-blue-300 text-xs font-medium px-2 py-0.5">
-                        {DRILL_TYPE_LABELS[t.drillType]}
+                        {DRILL_TYPE_LABELS[tpl.drillType]}
                       </span>
                     </div>
-                    <p className="text-xs text-white/40">{t.authority}</p>
+                    <p className="text-xs text-white/40">{tpl.authority}</p>
                   </header>
 
-                  <p className="text-sm text-white/70">{t.description}</p>
+                  <p className="text-sm text-white/70">{tpl.description}</p>
 
                   <div className="rounded-lg border border-white/5 bg-black/20 p-3">
                     <p
                       className="text-xs text-white/50 line-clamp-2"
-                      title={t.instructionsPeek}
+                      title={tpl.instructionsPeek}
                     >
-                      {t.instructionsPeek}
+                      {tpl.instructionsPeek}
                     </p>
                     <p className="text-[11px] text-white/40 mt-2">
                       {stepLabel}
@@ -178,18 +194,18 @@ export default function AdminDrillLibrary({ loaderData }: Route.ComponentProps) 
                       <div className="flex items-center justify-between gap-2">
                         <span className="inline-flex items-center text-xs text-emerald-300">
                           <Check className="w-3.5 h-3.5 mr-1" />
-                          Already cloned
+                          {t("drills.library.alreadyCloned")}
                         </span>
                         <Link to={`/admin/drills/${clonedId}`} className={btnSecondary}>
-                          Open your copy
+                          {t("drills.library.openCopy")}
                         </Link>
                       </div>
                     ) : (
                       <Form method="post">
                         <input type="hidden" name="intent" value="clone" />
-                        <input type="hidden" name="globalKey" value={t.globalKey} />
+                        <input type="hidden" name="globalKey" value={tpl.globalKey} />
                         <button type="submit" className={`${btnPrimary} w-full`}>
-                          Clone to my templates
+                          {t("drills.library.clone")}
                         </button>
                       </Form>
                     )}

@@ -1,4 +1,5 @@
 import { redirect } from "react-router";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/billing.success";
 import { Page } from "~/components/Page";
 import { getPrisma } from "~/db.server";
@@ -6,9 +7,13 @@ import { getOptionalUserFromContext } from "~/domain/utils/global-context.server
 import { requireStripeConfig } from "~/domain/billing/stripe.server";
 import { applySubscriptionToOrg } from "~/domain/billing/sync.server";
 import type Stripe from "stripe";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 
-export function meta() {
-  return [{ title: "Upgrade complete — Pickup Roster" }];
+export const handle = { i18n: ["auth"] };
+
+export function meta({ data }: { data?: { metaTitle?: string } }) {
+  return [{ title: data?.metaTitle ?? "Upgrade complete — Pickup Roster" }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -61,39 +66,43 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const refreshed = await db.org.findUnique({ where: { id: user.orgId } });
 
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "auth");
+
   return {
     orgName: refreshed?.name ?? org.name,
     plan: refreshed?.billingPlan ?? org.billingPlan,
+    metaTitle: t("billingSuccess.metaTitle"),
   };
 }
 
 export default function BillingSuccess({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation("auth");
   const { orgName, plan } = loaderData;
   const planLabel =
     plan === "CAR_LINE"
-      ? "Car Line"
+      ? t("billingSuccess.planNames.carLine")
       : plan === "CAMPUS"
-        ? "Campus"
+        ? t("billingSuccess.planNames.campus")
         : plan === "ENTERPRISE"
-          ? "Enterprise"
-          : "Free";
+          ? t("billingSuccess.planNames.enterprise")
+          : t("billingSuccess.planNames.free");
 
   return (
     <Page user={true}>
       <div className="min-h-[calc(100vh-40px)] flex items-center justify-center bg-[#212525] text-white px-4">
         <div className="max-w-xl text-center">
           <h1 className="text-3xl font-semibold mb-3">
-            You're upgraded — welcome to Pickup Roster {planLabel}!
+            {t("billingSuccess.title", { plan: planLabel })}
           </h1>
           <p className="text-white/70 mb-6">
-            {orgName} is now on the {planLabel} plan. Your receipt is on its
-            way from Stripe.
+            {t("billingSuccess.body", { orgName, plan: planLabel })}
           </p>
           <a
             href="/admin"
             className="inline-block rounded-md bg-white px-5 py-2.5 font-medium text-[#212525] hover:bg-white/90"
           >
-            Go to admin
+            {t("billingSuccess.goToAdmin")}
           </a>
         </div>
       </div>

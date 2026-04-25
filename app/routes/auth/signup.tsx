@@ -8,6 +8,7 @@ import {
   useRouteLoaderData,
   useSearchParams
 } from "react-router";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import type { Route } from "./+types/signup";
@@ -51,7 +52,9 @@ import {
 import { createCheckoutSessionForOrg } from "~/domain/billing/checkout.server";
 import { redirectWithError } from "remix-toast";
 
-export function meta() {
+export const handle = { i18n: ["auth"] };
+
+export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
   return [
     { title: "Signup — Pickup Roster" },
     { name: "description", content: "Create your organization and account" }
@@ -106,7 +109,7 @@ function countDigits(input: string): number {
 }
 
 const step1Schema = z.object({
-  name: z.string().min(1, "Please enter your name."),
+  name: z.string().min(1, "auth:signup.errors.enterName"),
   email: z.string().email(),
   phone: z
     .string()
@@ -131,6 +134,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (!isMarketingHost(request, context)) {
     throw redirect(`${marketingOriginFromRequest(request, context)}/`);
   }
+
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "auth");
 
   // 0. Rate limit by IP
   const clientIp = clientIpFromRequest(request);
@@ -253,6 +259,7 @@ type RootLoader = {
 };
 
 export default function Signup({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation("auth");
   const rootData = useRouteLoaderData("root") as RootLoader | undefined;
   const authedUser = rootData?.user ?? null;
   const isAuthed = !!authedUser;
@@ -354,11 +361,20 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
     );
   }, [slugNormalized]);
 
+  // Translate Zod issue keys (we encoded "auth:signup.errors.*" sentinels
+  // as the message above) — fall back to the raw issue if it doesn't look
+  // like one of our keys.
+  const translateZodMessage = (message: string | undefined): string => {
+    if (!message) return t("signup.errors.checkInputs");
+    if (message.startsWith("auth:")) return t(message.slice("auth:".length));
+    return message;
+  };
+
   const handleStep1 = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError(t("signup.errors.passwordsDoNotMatch"));
       return;
     }
     const parsedStep1 = step1Schema.safeParse({ name, email, phone, password });
@@ -378,7 +394,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
         phone: normalizedPhone
       });
       if (result.error) {
-        setError(result.error.message ?? "Unable to create account.");
+        setError(result.error.message ?? t("signup.errors.createAccountFailed"));
         return;
       }
       // signUp.email() has set the session cookie. Tell the bounce-back
@@ -388,7 +404,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
       revalidator.revalidate();
       setStep(2);
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("signup.errors.generic"));
     } finally {
       setLoading(false);
     }
@@ -398,7 +414,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
     setError(null);
     const normalized = slugifyOrgName(slug);
     if (!normalized) {
-      setError("Enter a valid slug (letters, numbers, and hyphens).");
+      setError(t("signup.errors.invalidSlug"));
       return;
     }
     setCheckingSlug(true);
@@ -414,11 +430,11 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
         slug?: string;
       };
       if (res.status === 401) {
-        setError("Your session expired. Refresh and sign in again.");
+        setError(t("signup.errors.sessionExpiredShort"));
         return;
       }
       if (!res.ok) {
-        setError(payload.error ?? "Could not check slug.");
+        setError(payload.error ?? t("signup.errors.couldNotCheckSlug"));
         return;
       }
       if (payload.available) {
@@ -430,7 +446,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
         );
       }
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("signup.errors.generic"));
     } finally {
       setCheckingSlug(false);
     }
@@ -440,7 +456,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
     e.preventDefault();
     setError(null);
     if (orgName.trim().length < 2) {
-      setError("School name must be at least 2 characters.");
+      setError(t("signup.errors.schoolNameTooShort"));
       return;
     }
     if (!slugIsVerified) {
@@ -462,13 +478,33 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
     }
   }, [actionData, setStep]);
 
+  const stepLabels = [
+    t("signup.stepper.account"),
+    t("signup.stepper.school"),
+    t("signup.stepper.plan"),
+  ];
+
+  const planNameLabel =
+    plan === "DISTRICT"
+      ? t("signup.step3.planNames.district")
+      : plan === "CAMPUS"
+        ? t("signup.step3.planNames.campus")
+        : t("signup.step3.planNames.carLine");
+
+  const planDescription =
+    plan === "DISTRICT"
+      ? t("signup.step3.planDescriptions.district")
+      : plan === "CAMPUS"
+        ? t("signup.step3.planDescriptions.campus")
+        : t("signup.step3.planDescriptions.carLine");
+
   return (
     <div className="min-h-screen bg-[#0f1414] text-white">
       <MarketingNav />
 
       <div className="mx-auto max-w-lg px-4 py-10">
         <div className="mb-8 flex justify-center gap-2 text-sm">
-          {(["Account", "School", "Plan"] as const).map((label, i) => {
+          {stepLabels.map((label, i) => {
             const n = i + 1;
             const active = step === n;
             const done = step > n;
@@ -498,9 +534,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
         <div className="rounded-2xl border border-white/10 bg-[#151a1a] p-6 shadow-xl">
           {step === 1 && (
             <>
-              <h1 className="text-2xl font-bold">Create your account</h1>
+              <h1 className="text-2xl font-bold">{t("signup.step1.title")}</h1>
               <p className="mt-2 text-sm text-white/65">
-                Use your work email. You&apos;ll set up your school next.
+                {t("signup.step1.subtitle")}
               </p>
               <form onSubmit={handleStep1} className="mt-6 flex flex-col gap-3">
                 <label className="text-sm text-white/80" htmlFor="signup-name">
@@ -509,7 +545,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 <Input
                   id="signup-name"
                   type="text"
-                  placeholder="Jane Coach"
+                  placeholder={t("signup.step1.namePlaceholder")}
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -521,7 +557,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 <Input
                   id="signup-email"
                   type="email"
-                  placeholder="you@school.edu"
+                  placeholder={t("signup.step1.emailPlaceholder")}
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -533,7 +569,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 <Input
                   id="signup-phone"
                   type="tel"
-                  placeholder="(555) 123-4567"
+                  placeholder={t("signup.step1.phonePlaceholder")}
                   required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
@@ -548,7 +584,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 <Input
                   id="signup-password"
                   type="password"
-                  placeholder="At least 8 characters"
+                  placeholder={t("signup.step1.passwordPlaceholder")}
                   required
                   minLength={8}
                   value={password}
@@ -564,7 +600,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 <Input
                   id="signup-confirm-password"
                   type="password"
-                  placeholder="Repeat password"
+                  placeholder={t("signup.step1.confirmPlaceholder")}
                   required
                   minLength={8}
                   value={confirmPassword}
@@ -588,7 +624,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
 
           {step === 2 && (
             <>
-              <h1 className="text-2xl font-bold">Your school</h1>
+              <h1 className="text-2xl font-bold">{t("signup.step2.title")}</h1>
               <p className="mt-2 text-sm text-white/65">
                 Your slug becomes part of your school&apos;s web address. It
                 must be unique.
@@ -606,7 +642,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 <Input
                   id="signup-org-name"
                   type="text"
-                  placeholder="Maple Elementary"
+                  placeholder={t("signup.step2.orgNamePlaceholder")}
                   required
                   value={orgName}
                   onChange={(e) => {
@@ -619,7 +655,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 <Input
                   id="signup-slug"
                   type="text"
-                  placeholder="maple-elementary"
+                  placeholder={t("signup.step2.slugPlaceholder")}
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
                 />
@@ -628,7 +664,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 </p>
                 {suggestions.length > 0 && (
                   <div>
-                    <p className="mb-2 text-xs text-white/50">Suggestions</p>
+                    <p className="mb-2 text-xs text-white/50">{t("signup.step2.suggestions")}</p>
                     <div className="flex flex-wrap gap-2">
                       {suggestions.map((s) => (
                         <button
@@ -647,7 +683,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   </div>
                 )}
                 <div className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-white/75">
-                  <p className="font-medium text-white/90">Your board URL</p>
+                  <p className="font-medium text-white/90">{t("signup.step2.boardUrlLabel")}</p>
                   <p className="mt-1 break-all font-mono text-xs text-[#E9D500]/90">
                     https://{previewHost ?? "…"}
                   </p>
@@ -659,7 +695,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                     className="bg-[#193B4B] font-semibold text-white"
                     onPress={handleCheckSlug}
                   >
-                    Check availability
+                    {t("signup.step2.checkAvailability")}
                   </Button>
                   {slugIsVerified && (
                     <span className="text-sm text-emerald-400">
@@ -685,7 +721,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                     variant="primary"
                     className="flex-1 bg-[#E9D500] font-semibold text-[#193B4B]"
                   >
-                    Continue
+                    {t("signup.step2.continue")}
                   </Button>
                 </div>
               </form>
@@ -713,7 +749,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
               </p>
               <div className="mt-6 rounded-2xl border border-[#E9D500]/40 bg-[#193B4B]/30 p-4 text-sm">
                 <p className="text-xs uppercase tracking-wide text-white/50">
-                  Selected plan
+                  {t("signup.step3.selectedPlan")}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-[#E9D500]">
                   {planLabel(plan)}

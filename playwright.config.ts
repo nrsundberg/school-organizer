@@ -34,15 +34,29 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
+  // Pin artifact location so cleanup hooks (CI / scheduled-task wrappers)
+  // can `rm -rf` it deterministically after each run.
+  outputDir: "./test-results",
+  // Drop traces / videos / screenshots on passing tests so a green run
+  // leaves zero on-disk debris. Combined with the `use` block below,
+  // only failure artifacts survive the run.
+  preserveOutput: "failures-only",
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI
-    ? [["github"], ["html", { open: "never" }]]
+    ? [
+        ["github"],
+        ["html", { open: "never", outputFolder: "./playwright-report" }],
+      ]
     : "list",
   use: {
     baseURL: "http://localhost:8787",
-    trace: "on-first-retry",
+    // `retain-on-failure` instead of `on-first-retry` — slightly more
+    // useful debugging signal, still cleaned up by `preserveOutput`.
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+    video: "retain-on-failure",
   },
   projects: [
     {

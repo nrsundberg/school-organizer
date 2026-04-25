@@ -2,11 +2,16 @@ import { Button, Input } from "@heroui/react";
 import { useFetcher } from "react-router";
 import { useState } from "react";
 import { SaveIcon, Trash2Icon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/edit.student.$value";
 import { countOrgUsage, syncUsageGracePeriod } from "~/domain/billing/plan-usage.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 import { Page } from "~/components/Page";
 import { redirectWithInfo, redirectWithSuccess } from "remix-toast";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
+
+export const handle = { i18n: ["admin", "common"] };
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const prisma = getTenantPrisma(context);
@@ -32,8 +37,11 @@ export async function action({ request, context }: Route.ActionArgs) {
   const action = formData.get("action") as string;
   const id = formData.get("id") as string;
 
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+
   if (!id || isNaN(parseInt(id))) {
-    throw new Error("Invalid student ID");
+    throw new Error(t("edit.student.errors.invalidId"));
   }
 
   try {
@@ -44,7 +52,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         const nextCounts = await countOrgUsage(prisma, org.id);
         await syncUsageGracePeriod(prisma, freshOrg, nextCounts);
       }
-      return redirectWithInfo("/admin", "Student deleted successfully");
+      return redirectWithInfo("/admin", t("edit.student.deleted"));
     }
 
     const firstName = formData.get("firstName") as string;
@@ -53,7 +61,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const homeRoom = formData.get("homeRoom") as string;
 
     if (!firstName?.trim() || !lastName?.trim()) {
-      throw new Error("First name and last name are required");
+      throw new Error(t("edit.student.errors.namesRequired"));
     }
 
     const spaceNumber = spaceNumberStr ? parseInt(spaceNumberStr) : null;
@@ -72,7 +80,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         where: { homeRoom: trimmedHomeRoom }
       });
       if (!existingHomeroom) {
-        throw new Error("Please choose an existing homeroom from suggestions");
+        throw new Error(t("edit.student.errors.homeroomMustExist"));
       }
     }
 
@@ -86,16 +94,17 @@ export async function action({ request, context }: Route.ActionArgs) {
       }
     });
 
-    return redirectWithSuccess("/admin", { message: "Student updated successfully" });
+    return redirectWithSuccess("/admin", { message: t("edit.student.updated") });
   } catch (error) {
     console.error("Error updating student:", error);
-    return { error: error instanceof Error ? error.message : "Failed to update student" };
+    return { error: error instanceof Error ? error.message : t("edit.student.errors.updateFailed") };
   }
 }
 
 export default function EditStudent({ loaderData }: Route.ComponentProps) {
   const { student, homerooms } = loaderData;
   const fetcher = useFetcher();
+  const { t } = useTranslation("admin");
 
   const [firstName, setFirstName] = useState(student?.firstName ?? "");
   const [lastName, setLastName] = useState(student?.lastName ?? "");
@@ -109,43 +118,43 @@ export default function EditStudent({ loaderData }: Route.ComponentProps) {
     <Page user={false}>
       <div className="max-w-2xl mx-auto p-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold">Edit Student</h1>
+          <h1 className="text-2xl font-bold">{t("edit.student.heading")}</h1>
         </div>
 
         <fetcher.Form method="post" className="space-y-6">
           <input type="hidden" name="id" value={student?.id?.toString() ?? ""} />
 
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold">Basic Information</h2>
+            <h2 className="text-lg font-semibold">{t("edit.student.basicInfo")}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1">
-                <label className="text-sm text-gray-400">First Name</label>
+                <label className="text-sm text-gray-400">{t("edit.student.firstName")}</label>
                 <Input name="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} required disabled={isSubmitting} />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-sm text-gray-400">Last Name</label>
+                <label className="text-sm text-gray-400">{t("edit.student.lastName")}</label>
                 <Input name="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} required disabled={isSubmitting} />
               </div>
             </div>
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold">Assignments</h2>
+            <h2 className="text-lg font-semibold">{t("edit.student.assignments")}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1">
-                <label className="text-sm text-gray-400">Parking Space Number</label>
+                <label className="text-sm text-gray-400">{t("edit.student.spaceLabel")}</label>
                 <Input type="number" name="spaceNumber" value={spaceNumber} onChange={(e) => setSpaceNumber(e.target.value)} disabled={isSubmitting} />
-                <p className="text-xs text-gray-400">Leave empty if not assigned</p>
+                <p className="text-xs text-gray-400">{t("edit.student.leaveEmpty")}</p>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-sm text-gray-400">Homeroom</label>
+                <label className="text-sm text-gray-400">{t("edit.student.homeroomLabel")}</label>
                 <input
                   name="homeRoom"
                   list="homeroom-options"
                   value={homeRoom}
                   onChange={(e) => setHomeRoom(e.target.value)}
                   disabled={isSubmitting}
-                  placeholder="Select existing homeroom"
+                  placeholder={t("edit.student.homeroomPlaceholder")}
                   className="rounded-lg border border-gray-500 bg-gray-900 px-3 py-2 text-gray-100 focus:border-primary focus:outline-none disabled:opacity-60"
                 />
                 <datalist id="homeroom-options">
@@ -153,7 +162,7 @@ export default function EditStudent({ loaderData }: Route.ComponentProps) {
                     <option key={teacher.homeRoom} value={teacher.homeRoom} />
                   ))}
                 </datalist>
-                <p className="text-xs text-gray-400">Leave empty if not assigned</p>
+                <p className="text-xs text-gray-400">{t("edit.student.leaveEmpty")}</p>
               </div>
             </div>
           </div>
@@ -166,10 +175,12 @@ export default function EditStudent({ loaderData }: Route.ComponentProps) {
 
           <div className="flex justify-between items-center pt-6 border-t">
             <Button type="submit" variant="primary" isPending={isSubmitting && !isDeleting} isDisabled={isSubmitting}>
-              {!isSubmitting && <SaveIcon size={16} />} {isSubmitting && !isDeleting ? "Updating..." : "Update Student"}
+              {!isSubmitting && <SaveIcon size={16} />}{" "}
+              {isSubmitting && !isDeleting ? t("edit.student.submitting") : t("edit.student.submit")}
             </Button>
             <Button type="submit" variant="danger" name="action" value="delete" isPending={isSubmitting && isDeleting} isDisabled={isSubmitting}>
-              {!isSubmitting && <Trash2Icon size={16} />} {isSubmitting && isDeleting ? "Deleting..." : "Delete Student"}
+              {!isSubmitting && <Trash2Icon size={16} />}{" "}
+              {isSubmitting && isDeleting ? t("edit.student.deleting") : t("edit.student.delete")}
             </Button>
           </div>
         </fetcher.Form>

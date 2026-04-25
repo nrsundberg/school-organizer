@@ -87,6 +87,27 @@ export const publicMarketingRoutes: RouteSpec[] = [
     landmark: { role: "heading" }
   },
   {
+    // Guides index is linked from the marketing nav. Same gating concern as
+    // /blog — `publicMarketingPath` in
+    // app/domain/utils/global-context.server.ts must include /guides and
+    // /guides/*, or signed-out visitors get bounced to /login.
+    path: "/guides",
+    expect: "self",
+    landmark: { role: "heading", name: /How to set up/i },
+  },
+  {
+    // Sample guide slug — exercises the `/guides/$slug` loader. Tracks the
+    // most recently dated file in content/guides/. Swap if removed.
+    path: "/guides/setting-up-your-first-drill-template",
+    expect: "self",
+    landmark: { role: "heading" },
+  },
+  {
+    // BUG: /status redirects to /login?next=/status on marketing host +
+    // no session. The middleware in
+    // app/domain/utils/global-context.server.ts does not list /status in
+    // `publicMarketingPath`, so unauthenticated visitors get kicked to
+    // login. Status pages must be publicly visible.
     path: "/status",
     expect: "self",
     landmark: { role: "heading" }

@@ -101,9 +101,22 @@ describe("parseTemplateDefinition", () => {
 });
 
 describe("parseRunState", () => {
-  it("parses valid run state", () => {
+  it("parses tri-state run state and migrates legacy booleans", () => {
+    // Mixed input exercises the full migration matrix:
+    //   - true       → "positive" (legacy "checked")
+    //   - false      → dropped to blank (legacy "unchecked")
+    //   - "positive" → kept as-is
+    //   - "negative" → kept as-is
+    //   - garbage    → dropped to blank (defensive)
     const input = {
-      toggles: { "r1:c1": true, "r2:c2": false },
+      toggles: {
+        "r1:c1": true,
+        "r2:c2": false,
+        "r3:c3": "positive",
+        "r4:c4": "negative",
+        "r5:c5": "garbage",
+        "r6:c6": 7,
+      },
       notes: "some notes",
       actionItems: [
         { id: "a1", text: "Refill water", done: false },
@@ -111,7 +124,11 @@ describe("parseRunState", () => {
       ],
     };
     const out = parseRunState(input as object);
-    assert.deepEqual(out.toggles, { "r1:c1": true, "r2:c2": false });
+    assert.deepEqual(out.toggles, {
+      "r1:c1": "positive",
+      "r3:c3": "positive",
+      "r4:c4": "negative",
+    });
     assert.equal(out.notes, "some notes");
     assert.equal(out.actionItems.length, 2);
     assert.equal(out.actionItems[0].text, "Refill water");

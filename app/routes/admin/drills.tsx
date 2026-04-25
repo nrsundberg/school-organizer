@@ -1,12 +1,20 @@
 import { Form, Link, redirect } from "react-router";
-import { ClipboardList, Library } from "lucide-react";
+import { ClipboardList, Library, Radio } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 import { defaultTemplateDefinition } from "~/domain/drills/types";
+import { startDrillRun } from "~/domain/drills/live.server";
 import { dataWithError, dataWithSuccess } from "remix-toast";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Admin – Drill checklists" }];
+export const handle = { i18n: ["admin", "common"] };
+
+export const meta: Route.MetaFunction = ({ data }) => [
+  { title: data?.metaTitle ?? "Admin – Drill checklists" },
+];
 
 const btnPrimary =
   "inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
@@ -15,14 +23,16 @@ const btnSecondary =
 const btnGhostDanger =
   "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium text-rose-300 hover:bg-rose-500/10 transition-colors";
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const templates = await prisma.drillTemplate.findMany({
     orderBy: { updatedAt: "desc" },
     select: { id: true, name: true, updatedAt: true },
   });
-  return { templates };
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+  return { templates, metaTitle: t("drills.metaList") };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -31,10 +41,13 @@ export async function action({ request, context }: Route.ActionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
 
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+
   if (intent === "create") {
     const name = String(formData.get("name") ?? "").trim();
     if (!name) {
-      return dataWithError(null, "Name is required.");
+      return dataWithError(null, t("drills.list.errors.nameRequired"));
     }
     const orgId = getOrgFromContext(context).id;
     const created = await prisma.drillTemplate.create({
@@ -50,100 +63,144 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "delete") {
     const id = String(formData.get("id") ?? "");
     if (!id) {
-      return dataWithError(null, "Missing template id.");
+      return dataWithError(null, t("drills.list.errors.missingId"));
     }
     await prisma.drillTemplate.delete({ where: { id } });
-    return dataWithSuccess(null, "Checklist deleted.");
+    return dataWithSuccess(null, t("drills.list.errors.deleted"));
   }
 
-  return dataWithError(null, "Unknown action.");
+  // "Run" on the list page now *starts a live drill* instead of opening the
+  // edit-and-run screen — matches the red "Start live drill" button on the
+  // edit page. We keep the flow in one place (startDrillRun) so the unique
+  // "at most one live drill per org" invariant surfaces the same 409 toast.
+  if (intent === "start-live") {
+    const id = String(formData.get("id") ?? "");
+    if (!id) {
+      return dataWithError(null, t("drills.list.errors.missingId"));
+    }
+    const orgId = getOrgFromContext(context).id;
+    try {
+      await startDrillRun(prisma, orgId, id);
+    } catch (err) {
+      if (err instanceof Response && err.status === 409) {
+        return dataWithError(null, t("drills.list.errors.anotherLive"));
+      }
+      // Surface the real error to logs so "it just 500s" is never the whole
+      // story — wrangler tail will show what actually threw.
+      console.error("[drills.list] start-live failed", err);
+      throw err;
+    }
+    throw redirect("/drills/live");
+  }
+
+  return dataWithError(null, t("drills.list.errors.unknown"));
 }
 
 export default function AdminDrillList({ loaderData }: Route.ComponentProps) {
   const { templates } = loaderData;
+  const { t, i18n } = useTranslation("admin");
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-3xl">
       <div className="flex items-start gap-3">
         <ClipboardList className="w-8 h-8 text-blue-400 flex-shrink-0 mt-0.5" />
         <div>
-          <h1 className="text-2xl font-bold text-white">Drill checklists</h1>
+          <h1 className="text-2xl font-bold text-white">{t("drills.list.heading")}</h1>
           <p className="text-white/50 text-sm mt-1">
-            Templates for fire, lockdown, shelter-in-place, reunification, and more. Build your own
-            or start from the global library.
+            {t("drills.list.subtitle")}
           </p>
         </div>
       </div>
 
       <section className="rounded-xl border border-white/10 bg-white/5 p-4">
         <div className="flex items-center justify-between gap-3 mb-3">
-          <h2 className="text-sm font-semibold text-white/70">New checklist template</h2>
+          <h2 className="text-sm font-semibold text-white/70">{t("drills.list.newHeading")}</h2>
           <Link
             to="/admin/drills/library"
             className={`${btnSecondary} text-xs`}
           >
             <Library className="w-3.5 h-3.5 mr-1.5 inline" />
-            Start from library
+            {t("drills.list.startFromLibrary")}
           </Link>
         </div>
         <Form method="post" className="flex flex-wrap gap-3 items-end">
           <input type="hidden" name="intent" value="create" />
           <label className="text-sm text-white/60 flex flex-col gap-1 flex-1 min-w-[200px]">
-            Name
+            {t("drills.list.nameLabel")}
             <input
               name="name"
               type="text"
               required
-              placeholder="e.g. Lockdown, Fire evacuation, Reunification"
+              placeholder={t("drills.list.namePlaceholder")}
               className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white"
             />
           </label>
           <button type="submit" className={btnPrimary}>
-            Create blank
+            {t("drills.list.createBlank")}
           </button>
         </Form>
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold text-white/70 mb-3">Your templates</h2>
+        <h2 className="text-sm font-semibold text-white/70 mb-3">{t("drills.list.yourTemplates")}</h2>
         {templates.length === 0 ? (
-          <p className="text-white/40 text-sm">No templates yet. Create one above.</p>
+          <p className="text-white/40 text-sm">{t("drills.list.empty")}</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {templates.map((t) => (
+            {templates.map((tpl) => (
               <li
-                key={t.id}
+                key={tpl.id}
                 className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3"
               >
                 <div>
                   <Link
-                    to={`/admin/drills/${t.id}`}
+                    to={`/admin/drills/${tpl.id}`}
                     className="font-medium text-white hover:text-blue-300 transition-colors"
                   >
-                    {t.name}
+                    {tpl.name}
                   </Link>
                   <p className="text-xs text-white/40 mt-0.5">
-                    Updated {new Date(t.updatedAt).toLocaleString()}
+                    {t("drills.list.updated", {
+                      when: new Date(tpl.updatedAt).toLocaleString(i18n.language),
+                    })}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Link
-                    to={`/admin/drills/${t.id}/run`}
-                    className="inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors"
+                  {/*
+                    "Run" starts a live drill — same red button treatment as
+                    the edit page so it's unmistakably the "real" action,
+                    not a preview. Posts to the list action which calls
+                    startDrillRun and redirects to /drills/live.
+                  */}
+                  <Form
+                    method="post"
+                    onSubmit={(e) =>
+                      !confirm(
+                        t("drills.list.confirmStartLive", { name: tpl.name }),
+                      ) && e.preventDefault()
+                    }
                   >
-                    Run
-                  </Link>
+                    <input type="hidden" name="intent" value="start-live" />
+                    <input type="hidden" name="id" value={tpl.id} />
+                    <button
+                      type="submit"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-rose-500 transition-colors"
+                    >
+                      <Radio className="w-3.5 h-3.5" />
+                      {t("drills.list.startLive")}
+                    </button>
+                  </Form>
                   <Link
-                    to={`/admin/drills/${t.id}`}
+                    to={`/admin/drills/${tpl.id}`}
                     className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
                   >
-                    Edit layout
+                    {t("drills.list.editLayout")}
                   </Link>
-                  <Form method="post" onSubmit={(e) => !confirm("Delete this template?") && e.preventDefault()}>
+                  <Form method="post" onSubmit={(e) => !confirm(t("drills.list.confirmDelete")) && e.preventDefault()}>
                     <input type="hidden" name="intent" value="delete" />
-                    <input type="hidden" name="id" value={t.id} />
+                    <input type="hidden" name="id" value={tpl.id} />
                     <button type="submit" className={btnGhostDanger}>
-                      Delete
+                      {t("drills.list.delete")}
                     </button>
                   </Form>
                 </div>

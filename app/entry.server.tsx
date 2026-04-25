@@ -3,6 +3,7 @@ import { ServerRouter } from "react-router";
 import { renderToReadableStream } from "react-dom/server";
 import { isbot } from "isbot";
 import { captureException } from "~/lib/sentry.server";
+import { getCspNonceFromRequest } from "~/lib/csp";
 
 export const handleError: HandleErrorFunction = (error, { request }) => {
   // Don't report aborted requests (e.g. user navigated away mid-stream)
@@ -18,23 +19,25 @@ export default async function handleRequest(
   request: Request,
   responseStatusCode: number,
   responseHeaders: Headers,
-  routerContext: EntryContext,
+  routerContext: EntryContext
 ) {
   const userAgent = request.headers.get("user-agent");
   const waitForAll = (userAgent && isbot(userAgent)) || routerContext.isSpaMode;
+  const cspNonce = getCspNonceFromRequest(request) ?? undefined;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), ABORT_DELAY);
 
   const body = await renderToReadableStream(
-    <ServerRouter context={routerContext} url={request.url} />,
+    <ServerRouter context={routerContext} nonce={cspNonce} url={request.url} />,
     {
+      nonce: cspNonce,
       signal: controller.signal,
       onError(error: unknown) {
         console.error(error);
         responseStatusCode = 500;
-      },
-    },
+      }
+    }
   );
 
   if (waitForAll) {
@@ -46,6 +49,6 @@ export default async function handleRequest(
 
   return new Response(body, {
     headers: responseHeaders,
-    status: responseStatusCode,
+    status: responseStatusCode
   });
 }

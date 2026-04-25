@@ -12,10 +12,15 @@ import {
 } from "~/domain/billing/plan-usage.server";
 import { dataWithError, dataWithSuccess } from "remix-toast";
 import { parseStudentRoster } from "~/domain/csv/student-roster.server";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 
 export async function action({ request, context }: Route.ActionArgs) {
   const prisma = getTenantPrisma(context);
   const org = getOrgFromContext(context);
+
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "roster");
 
   // Use native Web API for multipart form data (works on Cloudflare Workers)
   const formData = await request.formData();
@@ -29,13 +34,13 @@ export async function action({ request, context }: Route.ActionArgs) {
       parseResult.rowErrors && parseResult.rowErrors.length > 0
         ? parseResult.rowErrors
             .slice(0, 5)
-            .map((e) => `Row ${e.row}: ${e.message}`)
+            .map((e) => t("csvUpload.rowError", { row: e.row, message: e.message }))
             .join("; ")
         : "";
     const message = detail
       ? `${parseResult.error} ${detail}${
           parseResult.rowErrors!.length > 5
-            ? ` (+${parseResult.rowErrors!.length - 5} more)`
+            ? t("csvUpload.moreErrors", { count: parseResult.rowErrors!.length - 5 })
             : ""
         }`
       : parseResult.error;
@@ -101,11 +106,11 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   const skipNote =
     parseResult.skippedBlank > 0
-      ? ` (skipped ${parseResult.skippedBlank} blank row${parseResult.skippedBlank === 1 ? "" : "s"})`
+      ? t("csvUpload.skipNote", { count: parseResult.skippedBlank })
       : "";
 
   return dataWithSuccess(
     { result: "Created student records from csv" },
-    { message: `Created ${rows.length} student records from csv${skipNote}` }
+    { message: t("csvUpload.createdRecords", { count: rows.length, skipNote }) },
   );
 }

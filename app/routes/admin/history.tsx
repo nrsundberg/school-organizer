@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@heroui/react";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/history";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import {
@@ -17,9 +18,13 @@ import {
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
 import { planAllowsReports } from "~/lib/plan-limits";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 
-export const meta: Route.MetaFunction = () => [
-  { title: "Admin – History & Reports" },
+export const handle = { i18n: ["admin", "common"] };
+
+export const meta: Route.MetaFunction = ({ data }) => [
+  { title: data?.metaTitle ?? "Admin – History & Reports" },
 ];
 
 /**
@@ -225,12 +230,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const reportsAllowed = planAllowsReports(org.billingPlan);
 
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+
   // Plan gate: upsell card for anything under CAMPUS.
   if (!reportsAllowed) {
     if (isCsv) {
       // Be explicit for crafted CSV links rather than silently serving
       // an empty file.
-      return new Response("CSV export requires the Campus plan.", {
+      return new Response(t("history.upgrade.csvForbidden"), {
         status: 403,
         headers: { "Content-Type": "text/plain; charset=utf-8" },
       });
@@ -239,6 +247,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       upgradeRequired: true as const,
       orgName: org.name,
       billingPlan: org.billingPlan,
+      metaTitle: t("history.metaTitle"),
     };
   }
 
@@ -284,6 +293,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     orgName: org.name,
     orgSlug: org.slug,
     billingPlan: org.billingPlan,
+    metaTitle: t("history.metaTitle"),
     filters: {
       from: filters.fromIso,
       to: filters.toIso,
@@ -308,16 +318,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   };
 }
 
-function formatTime(iso: string): string {
+function formatTime(iso: string, locale: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   // Example output: "Apr 21, 2026 3:42 PM"
-  const datePart = d.toLocaleDateString(undefined, {
+  const datePart = d.toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
-  const timePart = d.toLocaleTimeString(undefined, {
+  const timePart = d.toLocaleTimeString(locale, {
     hour: "numeric",
     minute: "2-digit",
   });
@@ -325,29 +335,29 @@ function formatTime(iso: string): string {
 }
 
 export default function AdminHistory({ loaderData }: Route.ComponentProps) {
+  const { t, i18n } = useTranslation("admin");
+
   if (loaderData.upgradeRequired) {
     return (
       <div className="flex flex-col gap-6 p-6 max-w-2xl">
         <div>
-          <h1 className="text-2xl font-bold text-white">History & Reports</h1>
+          <h1 className="text-2xl font-bold text-white">{t("history.heading")}</h1>
           <p className="text-sm text-white/60">
-            Tenant: <span className="text-white">{loaderData.orgName}</span>
+            {t("history.tenant")}<span className="text-white">{loaderData.orgName}</span>
           </p>
         </div>
         <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.02] p-4">
           <p className="text-sm font-semibold text-white">
-            Full call history & CSV reports
+            {t("history.upgrade.title")}
           </p>
           <p className="text-xs text-white/60">
-            See every car-line call with filters by date, homeroom, and
-            student, plus summary stats and CSV export for record-keeping.
-            Available on the Campus and District plans.
+            {t("history.upgrade.body")}
           </p>
           <Link
             to="/admin/billing"
             className="self-start rounded bg-[#E9D500] px-3 py-1.5 text-xs font-semibold text-[#193B4B] hover:brightness-105"
           >
-            Upgrade to Campus
+            {t("history.upgrade.cta")}
           </Link>
         </div>
       </div>
@@ -369,16 +379,16 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
   return (
     <div className="flex flex-col gap-6 p-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">History & Reports</h1>
+        <h1 className="text-2xl font-bold text-white">{t("history.heading")}</h1>
         <p className="text-sm text-white/60">
-          Tenant: <span className="text-white">{orgName}</span>
+          {t("history.tenant")}<span className="text-white">{orgName}</span>
         </p>
       </div>
 
       {/* Filter bar */}
       <Form method="get" className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1 text-xs text-white/60">
-          From
+          {t("history.filters.from")}
           <Input
             type="date"
             name="from"
@@ -387,7 +397,7 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-white/60">
-          To
+          {t("history.filters.to")}
           <Input
             type="date"
             name="to"
@@ -396,7 +406,7 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-white/60">
-          Homeroom
+          {t("history.filters.homeroom")}
           {/*
             HeroUI's Select is a compound / data-driven component; using a
             plain <select> keeps this a simple GET form and matches the
@@ -407,7 +417,7 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
             defaultValue={filters.room}
             className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white text-sm w-48"
           >
-            <option value="">All homerooms</option>
+            <option value="">{t("history.filters.allHomerooms")}</option>
             {homerooms.map((room) => (
               <option key={room} value={room}>
                 {room}
@@ -416,47 +426,47 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
           </select>
         </label>
         <label className="flex flex-col gap-1 text-xs text-white/60">
-          Student name
+          {t("history.filters.studentName")}
           <Input
             type="text"
             name="q"
             defaultValue={filters.q}
-            placeholder="Search name..."
+            placeholder={t("history.filters.searchPlaceholder")}
             className="w-52"
           />
         </label>
         <Button type="submit" variant="primary">
-          Apply
+          {t("history.filters.apply")}
         </Button>
         <a
           href={csvHref}
           className="inline-flex items-center rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white hover:bg-white/10"
         >
-          Export CSV
+          {t("history.filters.exportCsv")}
         </a>
       </Form>
 
       {/* Summary stat cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total calls" value={String(summary.totalCalls)} />
+        <StatCard label={t("history.stats.totalCalls")} value={String(summary.totalCalls)} />
         <StatCard
-          label="Unique students"
+          label={t("history.stats.uniqueStudents")}
           value={String(summary.uniqueStudents)}
         />
         <StatCard
-          label="Busiest day"
+          label={t("history.stats.busiestDay")}
           value={
             summary.busiestDay
               ? `${summary.busiestDay.date} (${summary.busiestDay.count})`
-              : "—"
+              : t("history.stats.dash")
           }
         />
         <StatCard
-          label="Top homeroom"
+          label={t("history.stats.topHomeroom")}
           value={
             summary.topHomeroom
               ? `${summary.topHomeroom.name} (${summary.topHomeroom.count})`
-              : "—"
+              : t("history.stats.dash")
           }
         />
       </div>
@@ -464,21 +474,21 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
       {/* Events table */}
       <section>
         {rows.length === 0 ? (
-          <p className="text-sm text-white/60">No calls in this range.</p>
+          <p className="text-sm text-white/60">{t("history.table.noCalls")}</p>
         ) : (
           <>
-            <Table aria-label="Call history">
+            <Table aria-label={t("history.table.ariaLabel")}>
               <TableContent>
                 <TableHeader>
-                  <TableColumn isRowHeader>Time</TableColumn>
-                  <TableColumn>Student</TableColumn>
-                  <TableColumn>Homeroom</TableColumn>
-                  <TableColumn>Space</TableColumn>
+                  <TableColumn isRowHeader>{t("history.table.time")}</TableColumn>
+                  <TableColumn>{t("history.table.student")}</TableColumn>
+                  <TableColumn>{t("history.table.homeroom")}</TableColumn>
+                  <TableColumn>{t("history.table.space")}</TableColumn>
                 </TableHeader>
                 <TableBody items={rows as any[]}>
                   {(row: any) => (
                     <TableRow id={String(row.id)} key={row.id}>
-                      <TableCell>{formatTime(row.createdAt)}</TableCell>
+                      <TableCell>{formatTime(row.createdAt, i18n.language)}</TableCell>
                       <TableCell>{row.studentName}</TableCell>
                       <TableCell>
                         {row.homeRoomSnapshot ?? (
@@ -493,8 +503,7 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
             </Table>
             {truncated && (
               <p className="mt-3 text-xs text-amber-200/80">
-                Showing the most recent {rowCap} calls. Narrow the filters or
-                use Export CSV to get the full set.
+                {t("history.table.truncated", { cap: rowCap })}
               </p>
             )}
           </>

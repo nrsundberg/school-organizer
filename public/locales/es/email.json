@@ -1,0 +1,66 @@
+{
+  "common": {
+    "greetingFallback": "[ES] there",
+    "signOff": "[ES] Noah",
+    "signOffTitle": "[ES] Founder, PickupRoster"
+  },
+  "welcome": {
+    "subject": "[ES] thanks for trying PickupRoster, {{firstName}}",
+    "preview": "[ES] a quick note from the founder — and a small ask.",
+    "greeting": "[ES] Hi {{firstName}},",
+    "para1": "[ES] Thank you for signing up. Helping schools run a calmer pickup is the whole reason I started PickupRoster, so it genuinely means a lot that {{orgName}} gave it a shot.",
+    "para2": "[ES] I'd love to hear what dismissal actually looks like at your school right now — what's working, what's not, and what you wish someone would fix. Could we grab 15 minutes on the phone in the next week or two?",
+    "para3": "[ES] Just hit reply with a couple of times that work for you and I'll send an invite.",
+    "para4": "[ES] Either way, I'm glad you're here."
+  },
+  "passwordReset": {
+    "subject": "[ES] Reset your PickupRoster password",
+    "preview": "[ES] Use this link to choose a new password.",
+    "greeting": "[ES] Hi {{firstName}},",
+    "intro": "[ES] We got a request to reset the password for your PickupRoster account. Click the button below to choose a new one.",
+    "buttonLabel": "[ES] Reset password",
+    "fallbackPrefix": "[ES] Or paste this link into your browser:",
+    "expires": "[ES] This link expires in {{expiryMinutes}} minutes.",
+    "didNotRequest": "[ES] If you didn't request this, you can ignore this email — your password won't change{{requestIpSuffix}}.",
+    "textIntro": "[ES] We got a request to reset the password for your PickupRoster account. Use the link below to choose a new one:",
+    "requestIpSuffix": "[ES]  (request came from {{ip}})"
+  },
+  "midTrialCheckin": {
+    "subject": "[ES] how's pickup going, {{firstName}}?",
+    "preview": "[ES] checking in — no agenda, just want to make sure it's useful.",
+    "greeting": "[ES] Hi {{firstName}},",
+    "para1": "[ES] You're about halfway through your trial. I wanted to check in — not to sell you anything, just to see how it's going.",
+    "para2": "[ES] If something's confusing, clunky, or missing, hit reply and tell me. I read every email and I'd rather hear it now than not at all.",
+    "para3": "[ES] If you want to poke around some more, you can jump back in here: {{appLink}}",
+    "para3Html": "[ES] If you want to poke around some more, you can jump back in here: <a href=\"{{appLink}}\">{{appLink}}</a>"
+  },
+  "trialExpiring": {
+    "seven": {
+      "subject": "[ES] a week left on your PickupRoster trial",
+      "preview": "[ES] {{daysLeft}} days to keep your setup — here's how.",
+      "greeting": "[ES] Hi {{firstName}},",
+      "para1": "[ES] Quick heads up: your trial ends on {{trialEndDate}}, about a week from now.",
+      "para2": "[ES] If pickup has felt a little less chaotic at {{orgName}} lately, that's the thing worth keeping. Upgrading now means no interruption, your roster stays put, and tomorrow's dismissal runs exactly like today's.",
+      "para3": "[ES] You can upgrade in a couple of clicks here: {{appLink}}",
+      "para3Html": "[ES] You can upgrade in a couple of clicks here: <a href=\"{{appLink}}\">{{appLink}}</a>",
+      "para4": "[ES] Questions? Just reply — I'll answer."
+    },
+    "three": {
+      "subject": "[ES] 3 days left, {{firstName}}",
+      "preview": "[ES] don't want you to lose your setup at {{orgName}}.",
+      "greeting": "[ES] Hi {{firstName}},",
+      "para1": "[ES] Your trial wraps on {{trialEndDate}} — just 3 days out.",
+      "para2": "[ES] I don't want you to lose the setup you've built for {{orgName}}, or wake up next week to a dismissal line that's back to the old way. Upgrading takes about a minute and everything keeps running.",
+      "para3": "[ES] Upgrade here: {{appLink}}",
+      "para3Html": "[ES] Upgrade here: <a href=\"{{appLink}}\">{{appLink}}</a>",
+      "para4": "[ES] If there's a reason you're holding off, tell me. I want to know."
+    },
+    "one": {
+      "subject": "[ES] your trial ends tomorrow",
+      "preview": "[ES] one click to keep PickupRoster running at {{orgName}}.",
+      "greeting": "[ES] Hi {{firstName}},",
+      "para1": "[ES] Your trial ends tomorrow. To keep PickupRoster running at {{orgName}} without a gap, upgrade here: {{appLink}}",
+      "para1Html": "[ES] Your trial ends tomorrow. To keep PickupRoster running at {{orgName}} without a gap, upgrade here: <a href=\"{{appLink}}\">{{appLink}}</a>"
+    }
+  }
+}

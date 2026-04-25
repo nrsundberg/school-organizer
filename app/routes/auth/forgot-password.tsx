@@ -3,6 +3,7 @@ import { data, Form, Link } from "react-router";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/forgot-password";
 import { MarketingNav } from "~/components/marketing/MarketingNav";
 import { getPrisma } from "~/db.server";
@@ -14,15 +15,28 @@ import {
   getRateLimiter,
 } from "~/domain/utils/rate-limit.server";
 import { marketingOriginFromRequest } from "~/domain/utils/host.server";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 
-export function meta() {
+export const handle = { i18n: ["auth"] };
+
+export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
   return [
-    { title: "Forgot password — Pickup Roster" },
+    { title: data?.metaTitle ?? "Forgot password — Pickup Roster" },
     {
       name: "description",
-      content: "Start a password reset for your PickupRoster account.",
+      content: data?.metaDescription ?? "Start a password reset for your PickupRoster account.",
     },
   ];
+}
+
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "auth");
+  return {
+    metaTitle: t("forgotPassword.metaTitle"),
+    metaDescription: t("forgotPassword.metaDescription"),
+  };
 }
 
 const schema = zfd.formData({
@@ -44,6 +58,9 @@ function resetUrlFor(request: Request, context: any, rawToken: string): string {
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "auth");
+
   // Rate limit by IP using the existing auth limiter. Forgotten-password is
   // a cheap user-enum vector if unmetered.
   const clientIp = clientIpFromRequest(request);
@@ -53,7 +70,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   });
   if (!rl.ok) {
     return data(
-      { ok: false as const, error: "Too many attempts. Try again in a minute." },
+      { ok: false as const, error: t("forgotPassword.errors.rateLimited") },
       { status: 429, headers: { "Retry-After": "60" } },
     );
   }
@@ -76,6 +93,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       id: true,
       email: true,
       name: true,
+      locale: true,
       orgId: true,
       org: { select: { passwordResetEnabled: true } },
     },
@@ -100,6 +118,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       resetUrl,
       expiryMinutes: 60,
       requestIp: clientIp,
+      locale: user.locale ?? locale,
     });
   }
 
@@ -107,6 +126,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function ForgotPassword({ actionData }: Route.ComponentProps) {
+  const { t } = useTranslation("auth");
   const [email, setEmail] = useState("");
   const submitted = actionData?.ok === true;
   const rlError = actionData?.ok === false ? actionData.error : null;
@@ -117,34 +137,31 @@ export default function ForgotPassword({ actionData }: Route.ComponentProps) {
 
       <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-lg flex-col justify-center px-4 py-10">
         <div className="rounded-2xl border border-white/10 bg-[#151a1a] p-6 shadow-xl">
-          <h1 className="text-2xl font-bold">Forgot your password?</h1>
+          <h1 className="text-2xl font-bold">{t("forgotPassword.title")}</h1>
           <p className="mt-2 text-sm text-white/65">
-            Enter the email on your account and we&apos;ll send you a link to pick
-            a new password.
+            {t("forgotPassword.subtitle")}
           </p>
 
           {submitted ? (
             <div className="mt-6 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-200">
-              <p className="font-medium">Check your inbox.</p>
+              <p className="font-medium">{t("forgotPassword.submitted.headline")}</p>
               <p className="mt-1 text-emerald-100/80">
-                If an account matches that email and password reset is enabled for
-                your organization, we just sent a link. It expires in 60 minutes.
+                {t("forgotPassword.submitted.body")}
               </p>
               <p className="mt-3 text-xs text-emerald-100/60">
-                Didn&apos;t get one? Your organization may use single sign-on — ask
-                your admin how to get in.
+                {t("forgotPassword.submitted.ssoNote")}
               </p>
             </div>
           ) : (
             <Form method="post" className="mt-6 flex w-full flex-col gap-3">
               <label className="text-sm text-white/80" htmlFor="email">
-                Email
+                {t("forgotPassword.emailLabel")}
               </label>
               <Input
                 id="email"
                 type="email"
                 name="email"
-                placeholder="you@school.edu"
+                placeholder={t("forgotPassword.emailPlaceholder")}
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -158,15 +175,15 @@ export default function ForgotPassword({ actionData }: Route.ComponentProps) {
                 variant="primary"
                 className="mt-1 bg-[#E9D500] font-semibold text-[#193B4B]"
               >
-                Send reset link
+                {t("forgotPassword.submit")}
               </Button>
             </Form>
           )}
 
           <p className="mt-6 text-center text-sm text-white/55">
-            Remembered it?{" "}
+            {t("forgotPassword.rememberedIt")}{" "}
             <Link to="/login" className="font-medium text-[#E9D500] hover:underline">
-              Back to login
+              {t("forgotPassword.backToLogin")}
             </Link>
           </p>
         </div>

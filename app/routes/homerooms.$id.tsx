@@ -1,6 +1,9 @@
+import { useTranslation } from "react-i18next";
 import { Status } from "~/db/browser";
 import type { Route } from "./+types/homerooms.$id";
 import { getTenantPrisma } from "~/domain/utils/global-context.server";
+
+export const handle = { i18n: ["roster"] };
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const prisma = getTenantPrisma(context);
@@ -39,6 +42,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 }
 
 export default function StudentList({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation("roster");
   return (
     <div>
       <div className="grid grid-cols-5 lg:grid-cols-10 auto-rows-fr h-fit">
@@ -53,7 +57,7 @@ export default function StudentList({ loaderData }: Route.ComponentProps) {
             <div className="text-lg">
               {student.firstName + " " + student.lastName}
             </div>
-            <div>{"Space " + student.spaceNumber}</div>
+            <div>{t("homerooms.spaceLabel", { number: student.spaceNumber ?? "" })}</div>
           </div>
         ))}
       </div>

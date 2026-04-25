@@ -18,7 +18,7 @@ export async function sendEmail(env: Env, msg: SendableEmailMessage): Promise<vo
     );
   }
 
-  const rendered = renderEmail(msg);
+  const rendered = await renderEmail(msg);
   const resend = new Resend(apiKey);
 
   const { error } = await resend.emails.send({

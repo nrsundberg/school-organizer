@@ -1,7 +1,20 @@
+// Print route — DO NOT use the user's UI locale for translations.
+// The board printout is posted publicly and read by anyone, so it follows
+// `org.defaultLocale` (resolved server-side via `getOrgDefaultLocale`).
+// Component-side, `usePrintLocale("board")` reads that resolved value
+// from loader data; we then pass `lng` to `useTranslation("admin", { lng })`
+// so the strings render in the chosen print locale even when the admin
+// clicking Print has a different UI language.
+
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/print.board";
 import { getTenantPrisma } from "~/domain/utils/global-context.server";
 import { requireRole } from "~/sessions.server";
+import { getOrgDefaultLocale } from "~/i18n.server";
+import { usePrintLocale } from "~/hooks/usePrintLocale";
+
+export const handle = { i18n: ["admin"] };
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   await requireRole(context, "ADMIN");
@@ -24,15 +37,20 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // Sanity clamp
   cols = Math.min(cols, Math.max(n, 1));
 
-  return { spaces, fit, cols };
+  // Print locale rule: board prints follow org default (audience is generic).
+  const printLocale = getOrgDefaultLocale(context);
+
+  return { spaces, fit, cols, printLocale };
 }
 
 export default function PrintBoard({ loaderData }: Route.ComponentProps) {
   const { spaces, fit, cols } = loaderData;
+  const printLocale = usePrintLocale("board");
+  const { t } = useTranslation("admin", { lng: printLocale });
 
   useEffect(() => {
-    const t = setTimeout(() => window.print(), 400);
-    return () => clearTimeout(t);
+    const tm = setTimeout(() => window.print(), 400);
+    return () => clearTimeout(tm);
   }, []);
 
   const pageCss =
@@ -44,9 +62,10 @@ export default function PrintBoard({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
-      <title>Car line bingo board (backup)</title>
+      <title>{t("print.board.title")}</title>
       <style>{pageCss}</style>
       <div
+        lang={printLocale}
         className={
           fit === "page"
             ? "h-screen w-screen flex flex-col p-4 text-black bg-white font-sans print:h-[7.7in] print:w-[10.2in] print:p-0"
@@ -54,19 +73,19 @@ export default function PrintBoard({ loaderData }: Route.ComponentProps) {
         }
       >
         <div className="flex items-baseline justify-between mb-2 print:mb-1">
-          <h1 className="text-lg font-semibold">Car line bingo board (backup)</h1>
+          <h1 className="text-lg font-semibold">{t("print.board.title")}</h1>
           <div className="flex gap-3 text-xs print:hidden">
             <a
               className={fit === "page" ? "font-semibold underline" : "text-blue-600 hover:underline"}
               href="?fit=page"
             >
-              Fit to one page
+              {t("print.board.fitPage")}
             </a>
             <a
               className={fit === "grow" ? "font-semibold underline" : "text-blue-600 hover:underline"}
               href="?fit=grow"
             >
-              Natural size (multi-page)
+              {t("print.board.naturalSize")}
             </a>
           </div>
         </div>

@@ -1,19 +1,22 @@
 import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/blog.$slug";
 import { MarketingNav } from "~/components/marketing/MarketingNav";
 import { formatPostDate } from "~/lib/blog";
 import { getPost } from "~/lib/blog.server";
+import { detectLocale } from "~/i18n.server";
+import { getFixedT } from "~/lib/t.server";
 
 export function meta({ data }: Route.MetaArgs) {
   if (!data?.post) {
     return [
-      { title: "Post not found — PickupRoster" },
-      { name: "robots", content: "noindex" }
+      { title: data?.metaNotFound ?? "Post not found — PickupRoster" },
+      { name: "robots", content: "noindex" },
     ];
   }
-  const { post, canonical } = data;
+  const { post, canonical, metaTitle } = data;
   return [
-    { title: `${post.title} — PickupRoster Blog` },
+    { title: metaTitle ?? `${post.title} — PickupRoster Blog` },
     { name: "description", content: post.excerpt },
     { property: "og:title", content: post.title },
     { property: "og:description", content: post.excerpt },
@@ -24,7 +27,10 @@ export function meta({ data }: Route.MetaArgs) {
   ];
 }
 
-export async function loader({ params, request }: Route.LoaderArgs) {
+export async function loader({ params, request, context }: Route.LoaderArgs) {
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "common");
+
   const post = getPost(params.slug);
   if (!post) {
     throw new Response("Post not found", { status: 404 });
@@ -33,10 +39,16 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // search indexing of shared blog content.
   const url = new URL(request.url);
   const canonical = `${url.protocol}//pickuproster.com/blog/${post.slug}`;
-  return { post, canonical };
+  return {
+    post,
+    canonical,
+    metaTitle: t("blog.post.metaTitle", { title: post.title }),
+    metaNotFound: t("blog.post.metaNotFound"),
+  };
 }
 
 export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation("common");
   const { post } = loaderData;
 
   return (
@@ -50,7 +62,7 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
             to="/blog"
             className="inline-flex items-center gap-1.5 text-sm text-white/60 transition hover:text-white"
           >
-            <span aria-hidden>←</span> Back to blog
+            <span aria-hidden>←</span> {t("blog.post.back")}
           </Link>
         </div>
 
@@ -76,7 +88,7 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
             <span aria-hidden>·</span>
             <time dateTime={post.date}>{formatPostDate(post.date)}</time>
             <span aria-hidden>·</span>
-            <span>{post.readingTimeMinutes} min read</span>
+            <span>{t("blog.post.minRead", { count: post.readingTimeMinutes })}</span>
           </div>
         </header>
 
@@ -93,30 +105,30 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
 }
 
 function TrialCta() {
+  const { t } = useTranslation("common");
   return (
     <aside className="mt-14 rounded-2xl border border-[#E9D500]/30 bg-[#E9D500]/5 p-6 sm:p-8">
       <p className="text-xs font-semibold uppercase tracking-wider text-[#E9D500]">
-        Try PickupRoster
+        {t("trialCta.kicker")}
       </p>
       <h2 className="mt-2 text-2xl font-bold leading-snug">
-        Get structured dismissal up and running in a week.
+        {t("trialCta.headline")}
       </h2>
       <p className="mt-3 text-base text-white/75">
-        30-day free trial. No credit card required. Built for schools running
-        dismissal for 300 to 3,000 students.
+        {t("trialCta.body")}
       </p>
       <div className="mt-5 flex flex-wrap gap-3">
         <Link
           to="/pricing"
           className="inline-flex items-center justify-center rounded-xl bg-[#E9D500] px-4 py-2.5 text-sm font-semibold text-[#193B4B] transition hover:bg-[#f5e047]"
         >
-          See pricing
+          {t("trialCta.seePricing")}
         </Link>
         <Link
           to="/signup?plan=car-line"
           className="inline-flex items-center justify-center rounded-xl border border-white/15 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/5"
         >
-          Start free trial
+          {t("trialCta.startFreeTrial")}
         </Link>
       </div>
     </aside>
@@ -188,6 +200,7 @@ function ProseStyles() {
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  const { t } = useTranslation("common");
   const isNotFound =
     error &&
     typeof error === "object" &&
@@ -199,24 +212,22 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       <MarketingNav />
       <div className="mx-auto max-w-2xl px-4 py-24 text-center">
         <p className="text-sm font-semibold uppercase tracking-wider text-[#E9D500]">
-          {isNotFound ? "404" : "Something broke"}
+          {isNotFound ? t("errors.notFound") : t("errors.somethingBroke")}
         </p>
         <h1 className="mt-3 text-3xl font-extrabold">
-          {isNotFound
-            ? "We can't find that post."
-            : "We hit a snag loading this post."}
+          {isNotFound ? t("blog.errors.notFoundTitle") : t("blog.errors.errorTitle")}
         </h1>
         <p className="mt-3 text-white/70">
           {isNotFound
-            ? "It may have been renamed or unpublished. The full archive is one click away."
-            : "Try refreshing; if the problem sticks, let us know."}
+            ? t("blog.errors.notFoundBody")
+            : t("blog.errors.errorBody")}
         </p>
         <div className="mt-8">
           <Link
             to="/blog"
             className="inline-flex items-center justify-center rounded-xl bg-[#E9D500] px-4 py-2.5 text-sm font-semibold text-[#193B4B] transition hover:bg-[#f5e047]"
           >
-            Back to blog
+            {t("blog.errors.back")}
           </Link>
         </div>
       </div>
