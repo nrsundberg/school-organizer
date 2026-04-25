@@ -1,23 +1,118 @@
 {
-  "trial": {
-    "expired": "Your free trial has ended. Upgrade to continue recording pickups.",
-    "ctaUpgrade": "Upgrade now"
+  "checkout": {
+    "couldNotStart": "Could not start checkout. Please try again.",
+    "missingCustomer": "No Stripe customer for this organization."
+  },
+  "planLimits": {
+    "graceActive": "You're over your plan cap, with {{daysLeft}} days left in your grace period.",
+    "graceExpired": "Your grace period has ended. Reduce usage or upgrade your plan.",
+    "overCap": "You're {{count}} {{name}} over your plan cap.",
+    "warnApproaching": "You're approaching your plan's {{name}} limit ({{count}} of {{cap}})."
+  },
+  "portal": {
+    "couldNotOpen": "Could not open the billing portal. Please try again."
+  },
+  "pricing": {
+    "amount": {
+      "month": "${{value}}",
+      "year": "${{value}}"
+    },
+    "cardFooter": {
+      "activateOnly": "Stripe Checkout opens only when you choose to activate billing.",
+      "createFirst": "Create your account first, then continue to Stripe Checkout."
+    },
+    "cards": {
+      "campus": {
+        "name": "Campus",
+        "tagline": "Premium tier for a single school — adds the parent & family app, higher caps, and dedicated support."
+      },
+      "carLine": {
+        "badge": "A good starting point",
+        "name": "Car Line",
+        "tagline": "Run dismissal smoothly with a staff-only viewer. Best for smaller schools."
+      },
+      "district": {
+        "amount": "Custom pricing",
+        "amountNote": "Up to 10 schools included",
+        "badge": "Recommended for districts",
+        "contactCta": "Contact us",
+        "footer": "No credit card required. We'll reach out during your trial to discuss your district's setup.",
+        "name": "District",
+        "startTrialCta": "Start Free Trial",
+        "tagline": "For districts running more than one school."
+      }
+    },
+    "cta": {
+      "continueSignup": "Continue to Signup",
+      "continueStripe": "Continue to Stripe",
+      "redirecting": "Redirecting…"
+    },
+    "cycle": {
+      "annual": "Annual",
+      "monthly": "Monthly"
+    },
+    "faq": {
+      "afterTrial": {
+        "a": "If you haven't converted, your site is suspended. No surprise charges.",
+        "q": "What happens after 30 days?"
+      },
+      "creditCard": {
+        "a": "No.",
+        "q": "Do I need a credit card to start?"
+      },
+      "heading": "Questions, answered",
+      "switchTiers": {
+        "a": "Yes, contact us to upgrade or downgrade anytime.",
+        "q": "Can I switch tiers?"
+      }
+    },
+    "features": {
+      "campus": {
+        "brand": "Full custom branding — logo upload + custom domain",
+        "caps": "Up to 300 families, 900 students, 80 classrooms",
+        "everythingCarLine": "Everything in Car Line",
+        "familyApp": "Parent & family viewer app",
+        "onboarding": "Dedicated migration & onboarding support",
+        "reports": "Reports and call history",
+        "rfid": "RFID vehicle-tag auto-arrival available as a custom add-on (pricing scoped per deployment)",
+        "sso": "Microsoft Entra SSO (coming soon)",
+        "support": "Priority support"
+      },
+      "carLine": {
+        "brand": "Pick your brand colors (no logo upload)",
+        "caps": "Up to 150 families, 400 students, 35 classrooms",
+        "live": "Live dismissal / car-line flow",
+        "selfServe": "Self-serve monthly or annual billing",
+        "staffViewer": "Teacher & staff viewer only (no parent or family app)",
+        "support": "Standard email support"
+      },
+      "district": {
+        "addOn": "Additional schools available as an add-on",
+        "dashboard": "Multi-school dashboard (up to 10 schools included)",
+        "everythingCampus": "Everything in Campus",
+        "rfid": "RFID vehicle-tag auto-arrival available as a custom add-on (pricing scoped per deployment)",
+        "unlimited": "Unlimited students, families, and classrooms"
+      }
+    },
+    "heading": "Pricing",
+    "lede": "Pick the tier that matches your school or district, then continue through signup. Self-serve plans can move straight into checkout, and district setups stay custom.",
+    "metaDescription": "Simple pricing for schools and districts. Pick a plan, create your account, and continue through signup or checkout.",
+    "metaTitle": "Pricing — Pickup Roster",
+    "note": {
+      "annual": "per school, billed annually",
+      "monthly": "per school"
+    },
+    "period": {
+      "month": "/ month",
+      "year": "/ year"
+    }
   },
   "suspension": {
     "pastDue": "Your subscription is past due. Update your payment method to avoid suspension.",
     "suspended": "Your account is suspended. Contact support or update billing to restore access."
   },
-  "planLimits": {
-    "warnApproaching": "You're approaching your plan's {{name}} limit ({{count}} of {{cap}}).",
-    "overCap": "You're {{count}} {{name}} over your plan cap.",
-    "graceActive": "You're over your plan cap, with {{daysLeft}} days left in your grace period.",
-    "graceExpired": "Your grace period has ended. Reduce usage or upgrade your plan."
-  },
-  "checkout": {
-    "couldNotStart": "Could not start checkout. Please try again.",
-    "missingCustomer": "No Stripe customer for this organization."
-  },
-  "portal": {
-    "couldNotOpen": "Could not open the billing portal. Please try again."
+  "trial": {
+    "ctaUpgrade": "Upgrade now",
+    "expired": "Your free trial has ended. Upgrade to continue recording pickups."
   }
 }

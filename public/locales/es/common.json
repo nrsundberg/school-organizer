@@ -1,179 +1,343 @@
 {
-  "languageSwitcher": {
-    "label": "[ES] Language",
-    "ariaLabel": "[ES] Change language",
-    "currentLanguage": "[ES] Current language: {{name}}"
-  },
-  "marketing": {
-    "languageCount_one": "[ES] Available in {{count}} language",
-    "languageCount_other": "[ES] Available in {{count}} languages",
-    "languageList": "[ES] Now available in: {{names}}",
-    "everyPlanSuffix": "[ES] — included on every plan.",
-    "faqLanguageQuestion": "[ES] What languages do you support?",
-    "faqLanguageAnswerSuffix": "[ES] If your school needs a language we don't yet ship, contact support — we add languages based on customer demand."
+  "billing": {
+    "cancel": {
+      "backToPricing": "Volver a precios",
+      "body": "Saliste del Checkout de Stripe antes de completar la compra. No se creó ninguna suscripción.",
+      "goToAdmin": "Ir al panel de administración",
+      "metaTitle": "Pago cancelado — Pickup Roster",
+      "title": "No se realizó ningún cargo"
+    },
+    "required": {
+      "bodyAction": "El estado de facturación de tu organización no está activo. Actualiza la suscripción para recuperar el acceso completo a la aplicación.",
+      "bodySuspended": "Esta organización fue suspendida tras un periodo prolongado de falta de pago. Actualiza tu método de pago y paga cualquier factura pendiente para restaurar el acceso.",
+      "choosePlan": "Elige un plan",
+      "freePlanNote": "Si estás en el plan gratuito, contacta a soporte para reactivar tu organización.",
+      "needHelp": "¿Necesitas ayuda?",
+      "titleAction": "Acción de facturación requerida",
+      "titleSuspended": "Cuenta suspendida",
+      "updatePayment": "Actualizar método de pago"
+    },
+    "success": {
+      "body": "{{orgName}} ahora está en el plan {{plan}}. Tu recibo está en camino desde Stripe.",
+      "goToAdmin": "Ir al panel de administración",
+      "metaTitle": "Mejora completada — Pickup Roster",
+      "planNames": {
+        "campus": "Campus",
+        "carLine": "Car Line",
+        "enterprise": "Enterprise",
+        "free": "Gratis"
+      },
+      "title": "¡Listo, has mejorado tu plan — bienvenido a Pickup Roster {{plan}}!"
+    }
   },
   "blog": {
-    "metaTitleIndex": "[ES] Blog — PickupRoster",
-    "metaDescriptionIndex": "[ES] Field notes on school dismissal, car-line operations, and district rollouts from the PickupRoster team.",
-    "metaDescriptionEmpty": "[ES] PickupRoster blog — field notes on dismissal, car lines, and district rollouts.",
-    "ogTitle": "[ES] PickupRoster Blog",
-    "ogDescription": "[ES] Field notes on school dismissal, car-line operations, and district rollouts.",
-    "kicker": "[ES] The PickupRoster blog",
-    "headline": "[ES] Field notes from the car line",
-    "lede": "[ES] Practical writing for school front offices, principals, and district IT — on dismissal, parent communication, safety, and the messy middle of rolling a system across multiple campuses.",
-    "read": "[ES] Read →",
     "empty": {
-      "headline": "[ES] Nothing published yet.",
-      "body": "[ES] We're working on the first post. In the meantime, take a look at how PickupRoster works.",
-      "cta": "[ES] See pricing"
-    },
-    "post": {
-      "metaNotFound": "[ES] Post not found — PickupRoster",
-      "metaTitle": "[ES] {{title}} — PickupRoster Blog",
-      "back": "[ES] Back to blog",
-      "minRead": "[ES] {{count}} min read"
+      "body": "Estamos trabajando en la primera publicación. Mientras tanto, mira cómo funciona PickupRoster.",
+      "cta": "Ver precios",
+      "headline": "Aún no hay nada publicado."
     },
     "errors": {
-      "notFoundTitle": "[ES] We can't find that post.",
-      "notFoundBody": "[ES] It may have been renamed or unpublished. The full archive is one click away.",
-      "errorTitle": "[ES] We hit a snag loading this post.",
-      "errorBody": "[ES] Try refreshing; if the problem sticks, let us know.",
-      "back": "[ES] Back to blog"
+      "back": "Volver al blog",
+      "errorBody": "Intenta recargar; si el problema persiste, avísanos.",
+      "errorTitle": "Tuvimos un problema cargando esta publicación.",
+      "notFoundBody": "Es posible que se haya renombrado o despublicado. El archivo completo está a un clic.",
+      "notFoundTitle": "No encontramos esa publicación."
+    },
+    "headline": "Notas desde la fila de autos",
+    "kicker": "El blog de PickupRoster",
+    "lede": "Lectura práctica para oficinas escolares, directores y equipos de TI distritales — sobre salida, comunicación con familias, seguridad y los detalles de implementar un sistema en varios planteles.",
+    "metaDescriptionEmpty": "Blog de PickupRoster — notas de campo sobre salida, filas de autos y despliegues distritales.",
+    "metaDescriptionIndex": "Notas de campo sobre la salida escolar, la operación de la fila de autos y despliegues distritales del equipo de PickupRoster.",
+    "metaTitleIndex": "Blog — PickupRoster",
+    "ogDescription": "Notas de campo sobre la salida escolar, la operación de la fila de autos y despliegues distritales.",
+    "ogTitle": "Blog de PickupRoster",
+    "post": {
+      "back": "Volver al blog",
+      "metaNotFound": "Publicación no encontrada — PickupRoster",
+      "metaTitle": "{{title}} — Blog de PickupRoster",
+      "minRead": "{{count}} min de lectura",
+      "minRead_one": "{{count}} min de lectura",
+      "minRead_other": "{{count}} min de lectura"
+    },
+    "read": "Leer →"
+  },
+  "buttons": {
+    "back": "Atrás",
+    "cancel": "Cancelar",
+    "continue": "Continuar",
+    "markEmpty": "Marcar vacío",
+    "save": "Guardar",
+    "selectFile": "Seleccionar archivo"
+  },
+  "common": {
+    "greetingFallback": "Hola",
+    "signOff": "Noah",
+    "signOffTitle": "Fundador, PickupRoster"
+  },
+  "csvUpload": {
+    "createdRecords_one": "Se creó {{count}} registro de estudiante desde el CSV{{skipNote}}",
+    "createdRecords_other": "Se crearon {{count}} registros de estudiantes desde el CSV{{skipNote}}",
+    "moreErrors_one": " (+{{count}} más)",
+    "moreErrors_other": " (+{{count}} más)",
+    "rowError": "Fila {{row}}: {{message}}",
+    "skipNote_one": " (se omitió {{count}} fila en blanco)",
+    "skipNote_other": " (se omitieron {{count}} filas en blanco)"
+  },
+  "errors": {
+    "notFound": "404",
+    "somethingBroke": "Algo salió mal"
+  },
+  "faqs": {
+    "createAccount": "Crear una cuenta",
+    "heading": "Preguntas frecuentes",
+    "items": {
+      "domain": {
+        "a": "Sí — los dominios personalizados (o un subdominio en el dominio propio de tu escuela) están disponibles en los planes Campus y Distrito. Apunta el DNS al mismo Worker que tus otros sitios. Car Line usa un subdominio tuslug.pickuproster.com.",
+        "q": "¿Podemos usar nuestro propio dominio?"
+      },
+      "trial": {
+        "a": "Tu prueba termina cuando se cumpla lo último entre 30 días naturales desde el registro o 25 días de recogida válidos. Un día válido es un día con más de 10 estudiantes distintos marcados como llamados.",
+        "q": "¿Cómo funciona la prueba?"
+      },
+      "viewer": {
+        "a": "Comparte el PIN del observador o un enlace mágico. Las sesiones de observador están restringidas a tu organización y respetan los bloqueos tras intentos fallidos.",
+        "q": "¿Cómo ven el tablero las familias?"
+      },
+      "where": {
+        "a": "Cada organización recibe su propio subdominio, como tuslug.pickuproster.com. El dominio principal muestra este sitio de marketing; el tablero nunca mezcla a distintos clientes. En los planes Campus y Distrito puedes usar un dominio personalizado o un subdominio en el dominio propio de tu escuela (por ejemplo, recogida.tuescuela.edu).",
+        "q": "¿Dónde vive mi escuela?"
+      }
+    },
+    "lede": "Respuestas claras para administradores y equipos de TI.",
+    "metaDescription": "Preguntas frecuentes sobre tableros de fila de autos, periodos de prueba y seguridad.",
+    "metaTitle": "Preguntas frecuentes — Pickup Roster",
+    "readyToTry": "¿Listo para probarlo?"
+  },
+  "fileChooser": {
+    "fileLabel": "Archivo: {{name}}",
+    "lastModified": "Última modificación: {{value}}"
+  },
+  "footer": {
+    "copyright": "© {{year}} {{siteName}}",
+    "nav": {
+      "blog": "Blog",
+      "faqs": "Preguntas frecuentes",
+      "login": "Iniciar sesión",
+      "pricing": "Precios",
+      "status": "Estado",
+      "support": "Soporte"
     }
   },
   "guides": {
-    "metaTitleIndex": "[ES] Guides — PickupRoster",
-    "metaDescriptionIndex": "[ES] How-to guides for setting up and running PickupRoster — roster imports, drill templates, branding, billing, and dismissal-day operations.",
-    "metaDescriptionEmpty": "[ES] PickupRoster guides — how-to articles for school administrators.",
-    "ogTitle": "[ES] PickupRoster Guides",
-    "ogDescription": "[ES] How-to guides for setting up and running PickupRoster across your school or district.",
-    "kicker": "[ES] PickupRoster guides",
-    "headline": "[ES] How to set up and run PickupRoster",
-    "lede": "[ES] Step-by-step guides for school administrators — from importing your first roster to running a fire drill from your phone.",
-    "readGuide": "[ES] Read guide →",
-    "allGuides": "[ES] All guides",
+    "allGuides": "Todas las guías",
     "empty": {
-      "headline": "[ES] No guides published yet.",
-      "body": "[ES] We're working on the first batch. In the meantime, see how PickupRoster is priced.",
-      "cta": "[ES] See pricing"
-    },
-    "post": {
-      "metaNotFound": "[ES] Guide not found — PickupRoster",
-      "metaTitle": "[ES] {{title}} — PickupRoster Guides",
-      "minRead": "[ES] {{count}} min read"
+      "body": "Estamos trabajando en el primer grupo. Mientras tanto, revisa los precios de PickupRoster.",
+      "cta": "Ver precios",
+      "headline": "Aún no hay guías publicadas."
     },
     "errors": {
-      "notFoundTitle": "[ES] We can't find that guide.",
-      "notFoundBody": "[ES] It may have been renamed or unpublished. The full library is one click away.",
-      "errorTitle": "[ES] We hit a snag loading this guide.",
-      "errorBody": "[ES] Try refreshing; if the problem sticks, let us know.",
-      "back": "[ES] All guides"
+      "back": "Todas las guías",
+      "errorBody": "Intenta recargar; si el problema persiste, avísanos.",
+      "errorTitle": "Tuvimos un problema cargando esta guía.",
+      "notFoundBody": "Es posible que se haya renombrado o despublicado. La biblioteca completa está a un clic.",
+      "notFoundTitle": "No encontramos esa guía."
+    },
+    "headline": "Cómo configurar y usar PickupRoster",
+    "kicker": "Guías de PickupRoster",
+    "lede": "Guías paso a paso para administradores escolares — desde importar tu primera lista de estudiantes hasta dirigir un simulacro de incendio desde tu teléfono.",
+    "metaDescriptionEmpty": "Guías de PickupRoster — artículos prácticos para administradores escolares.",
+    "metaDescriptionIndex": "Guías prácticas para configurar y usar PickupRoster — importación de listas, plantillas de simulacros, branding, facturación y operaciones del día de salida.",
+    "metaTitleIndex": "Guías — PickupRoster",
+    "ogDescription": "Guías prácticas para configurar y usar PickupRoster en tu escuela o distrito.",
+    "ogTitle": "Guías de PickupRoster",
+    "post": {
+      "metaNotFound": "Guía no encontrada — PickupRoster",
+      "metaTitle": "{{title}} — Guías de PickupRoster",
+      "minRead": "{{count}} min de lectura",
+      "minRead_one": "{{count}} min de lectura",
+      "minRead_other": "{{count}} min de lectura"
+    },
+    "readGuide": "Leer guía →"
+  },
+  "header": {
+    "admin": "Administración",
+    "login": "Iniciar sesión",
+    "logoAlt": "Logo de {{orgName}}",
+    "logout": "Cerrar sesión",
+    "tenantTitle": "{{orgName}} - Bingo de fila de autos",
+    "wordmarkAlt": "PickupRoster"
+  },
+  "impersonation": {
+    "label": "Suplantando a",
+    "stop": "Dejar de suplantar",
+    "stopping": "Deteniendo..."
+  },
+  "languageSwitcher": {
+    "ariaLabel": "Cambiar idioma",
+    "currentLanguage": "Idioma actual: {{name}}",
+    "label": "Idioma"
+  },
+  "marketing": {
+    "everyPlanSuffix": "— incluido en todos los planes.",
+    "faqLanguageAnswerSuffix": "Si tu escuela necesita un idioma que aún no ofrecemos, contacta a soporte — agregamos idiomas según la demanda de los clientes.",
+    "faqLanguageQuestion": "¿Qué idiomas admiten?",
+    "languageCount_one": "Disponible en {{count}} idioma",
+    "languageCount_other": "Disponible en {{count}} idiomas",
+    "languageList": "Ahora disponible en: {{names}}"
+  },
+  "marketingLanding": {
+    "features": {
+      "liveBoard": "Tablero en vivo con actualizaciones por WebSocket y acceso de observadores con PIN o enlaces mágicos.",
+      "subdomain": "Un subdominio por escuela (tuslug.pickuproster.com); los planes Campus y Distrito pueden usar un dominio personalizado o un subdominio en el dominio propio de tu escuela.",
+      "trial": "Una prueba que respeta el uso real: tiempo natural y días de recogida válidos."
+    },
+    "footerCta": {
+      "body": "Inicia una prueba desde el sitio de marketing. Tu tablero en vivo vive en el subdominio de tu escuela — nunca se mezcla con otros clientes.",
+      "createAccount": "Crea tu cuenta",
+      "heading": "Listos cuando tu escuela lo esté"
+    },
+    "headline": "Un solo tablero para recogidas, simulacros y el caos diario — sin radios encendidos.",
+    "kicker": "Fila de autos escolar, simplificada",
+    "lede": "Pickup Roster le da a cada escuela su propio tablero en vivo, un acceso para familias en el que pueden confiar y herramientas de administración que tu oficina ya entiende.",
+    "startFreeTrial": "Comenzar prueba gratuita",
+    "videos": {
+      "carLine": {
+        "description": "Cómo los controladores mueven la fila y cómo las familias ven el estado en tiempo real.",
+        "title": "Recogidas en la fila de autos"
+      },
+      "fireDrills": {
+        "description": "Usa las mismas herramientas de visibilidad cuando cada segundo cuenta.",
+        "title": "Simulacros de incendio y seguridad"
+      },
+      "gettingStarted": {
+        "description": "Crea tu escuela, invita al personal y pon el tablero en marcha en minutos.",
+        "title": "Primeros pasos"
+      },
+      "heading": "Míralo en acción",
+      "subtitle": "Recorridos cortos que puedes compartir con el personal y las familias."
+    },
+    "viewPricing": "Ver precios",
+    "whatYouGet": "Lo que obtienes"
+  },
+  "marketingNav": {
+    "blog": "Blog",
+    "dashboard": "Panel",
+    "faqs": "Preguntas frecuentes",
+    "guides": "Guías",
+    "homeAriaLabel": "Inicio de Pickup Roster",
+    "login": "Iniciar sesión",
+    "pricing": "Precios",
+    "signup": "Registrarse",
+    "wordmarkAlt": "Pickup Roster"
+  },
+  "midTrialCheckin": {
+    "greeting": "Hola {{firstName}},",
+    "para1": "Estás aproximadamente a la mitad de tu prueba. Quería pasar a saludar — no a venderte nada, solo para ver cómo va.",
+    "para2": "Si algo te resulta confuso, incómodo o le falta algo, responde y cuéntame. Leo todos los correos y prefiero saberlo ahora a no saberlo.",
+    "para3": "Si quieres seguir explorando, puedes volver aquí: {{appLink}}",
+    "para3Html": "Si quieres seguir explorando, puedes volver aquí: <a href=\"{{appLink}}\">{{appLink}}</a>",
+    "preview": "Pasando a saludar — sin agenda, solo quiero asegurarme de que te resulte útil.",
+    "subject": "¿cómo va la recogida, {{firstName}}?"
+  },
+  "passwordReset": {
+    "buttonLabel": "Restablecer contraseña",
+    "didNotRequest": "Si no solicitaste esto, puedes ignorar este correo — tu contraseña no cambiará{{requestIpSuffix}}.",
+    "expires": "Este enlace expira en {{expiryMinutes}} minutos.",
+    "fallbackPrefix": "O pega este enlace en tu navegador:",
+    "greeting": "Hola {{firstName}},",
+    "intro": "Recibimos una solicitud para restablecer la contraseña de tu cuenta de PickupRoster. Haz clic en el botón de abajo para elegir una nueva.",
+    "preview": "Usa este enlace para elegir una nueva contraseña.",
+    "requestIpSuffix": " (la solicitud vino desde {{ip}})",
+    "subject": "Restablece tu contraseña de PickupRoster",
+    "textIntro": "Recibimos una solicitud para restablecer la contraseña de tu cuenta de PickupRoster. Usa el enlace de abajo para elegir una nueva:"
+  },
+  "status": {
+    "description": "Estado en vivo de la plataforma y sus dependencias externas.",
+    "incidents": {
+      "heading": "Incidentes activos",
+      "since": "Desde {{when}}"
+    },
+    "metaDescription": "Estado en vivo de la plataforma Pickup Roster, incluida la infraestructura del tablero y las dependencias externas.",
+    "metaTitle": "Estado — Pickup Roster",
+    "ninetyDaysAgo": "Hace 90 días",
+    "overall": {
+      "degraded": "Rendimiento degradado",
+      "operational": "Todos los sistemas operativos",
+      "outage": "Interrupción mayor",
+      "unknown": "Recopilando estado"
+    },
+    "pill": {
+      "ariaLabel": "Estado: {{label}}",
+      "degraded": "Degradado",
+      "operational": "Operativo",
+      "outage": "Interrupción",
+      "unknown": "Desconocido"
+    },
+    "renderedAt": "Renderizado {{when}}. Se actualiza cada 2 minutos.",
+    "sections": {
+      "application": "Aplicación",
+      "data": "Datos",
+      "email": "Correo",
+      "payments": "Pagos",
+      "tenants": "Clientes"
+    },
+    "title": "Estado de Pickup Roster",
+    "today": "Hoy",
+    "uptime": {
+      "allOperational": "{{withData}} de {{total}} días con datos — todos operativos",
+      "ariaLabel": "Historial de disponibilidad de 90 días. {{summary}}.",
+      "cellTitle": "{{date}} — {{label}}",
+      "degraded": "degradado",
+      "noData": "Aún no hay datos",
+      "noDataLabel": "sin datos",
+      "operational": "operativo",
+      "outage": "interrupción",
+      "withIncidents": "{{bad}} de {{withData}} días con incidentes en los últimos {{total}} días"
     }
   },
   "trialCta": {
-    "kicker": "[ES] Try PickupRoster",
-    "headline": "[ES] Get structured dismissal up and running in a week.",
-    "body": "[ES] 30-day free trial. No credit card required. Built for schools running dismissal for 300 to 3,000 students.",
-    "seePricing": "[ES] See pricing",
-    "startFreeTrial": "[ES] Start free trial"
+    "body": "Prueba gratuita de 30 días. Sin tarjeta de crédito. Hecho para escuelas que manejan la salida de 300 a 3,000 estudiantes.",
+    "headline": "Pon en marcha una salida estructurada en una semana.",
+    "kicker": "Prueba PickupRoster",
+    "seePricing": "Ver precios",
+    "startFreeTrial": "Comenzar prueba gratuita"
   },
-  "faqs": {
-    "metaTitle": "[ES] FAQs — Pickup Roster",
-    "metaDescription": "[ES] Common questions about car line boards, trials, and security.",
-    "heading": "[ES] FAQs",
-    "lede": "[ES] Straight answers for admins and IT.",
-    "readyToTry": "[ES] Ready to try it?",
-    "createAccount": "[ES] Create an account",
-    "items": {
-      "where": {
-        "q": "[ES] Where does my school live?",
-        "a": "[ES] Each organization gets its own subdomain like yourslug.pickuproster.com. The main domain shows this marketing site; the board never mixes tenants. On Campus and District plans you can instead use a custom domain or a subdomain on your school's own domain (for example, pickup.yourschool.edu)."
-      },
-      "trial": {
-        "q": "[ES] How does the trial work?",
-        "a": "[ES] Your trial ends on the later of 30 calendar days from signup or 25 qualifying pickup days. A qualifying day is a day with more than 10 distinct students marked as called."
-      },
-      "viewer": {
-        "q": "[ES] How do families view the board?",
-        "a": "[ES] Share the viewer PIN or a magic link. Viewer sessions are scoped to your organization and respect lockouts after failed attempts."
-      },
-      "domain": {
-        "q": "[ES] Can we use our own domain?",
-        "a": "[ES] Yes — custom domains (or a subdomain on your school's own domain) are available on Campus and District plans. Point DNS to the same Worker as your other hosts. Car Line uses a yourslug.pickuproster.com subdomain."
-      }
+  "trialExpiring": {
+    "one": {
+      "greeting": "Hola {{firstName}},",
+      "para1": "Tu prueba termina mañana. Para que PickupRoster siga funcionando en {{orgName}} sin interrupción, mejora tu plan aquí: {{appLink}}",
+      "para1Html": "Tu prueba termina mañana. Para que PickupRoster siga funcionando en {{orgName}} sin interrupción, mejora tu plan aquí: <a href=\"{{appLink}}\">{{appLink}}</a>",
+      "preview": "un clic para mantener PickupRoster funcionando en {{orgName}}.",
+      "subject": "tu prueba termina mañana"
+    },
+    "seven": {
+      "greeting": "Hola {{firstName}},",
+      "para1": "Aviso rápido: tu prueba termina el {{trialEndDate}}, en aproximadamente una semana.",
+      "para2": "Si la recogida ha sido un poco menos caótica en {{orgName}} últimamente, eso es lo que vale la pena conservar. Mejorar tu plan ahora significa que no hay interrupción, tu lista de estudiantes se mantiene y la salida de mañana corre exactamente como la de hoy.",
+      "para3": "Puedes mejorar tu plan en un par de clics aquí: {{appLink}}",
+      "para3Html": "Puedes mejorar tu plan en un par de clics aquí: <a href=\"{{appLink}}\">{{appLink}}</a>",
+      "para4": "¿Preguntas? Solo responde — yo te contesto.",
+      "preview": "{{daysLeft}} días para conservar tu configuración — así se hace.",
+      "subject": "queda una semana en tu prueba de PickupRoster"
+    },
+    "three": {
+      "greeting": "Hola {{firstName}},",
+      "para1": "Tu prueba termina el {{trialEndDate}} — solo en 3 días.",
+      "para2": "No quiero que pierdas la configuración que armaste para {{orgName}} ni que la próxima semana la fila de salida vuelva a ser como antes. Mejorar tu plan toma un minuto y todo sigue funcionando.",
+      "para3": "Mejora tu plan aquí: {{appLink}}",
+      "para3Html": "Mejora tu plan aquí: <a href=\"{{appLink}}\">{{appLink}}</a>",
+      "para4": "Si hay alguna razón por la que estás dudando, cuéntame. Quiero saber.",
+      "preview": "no quiero que pierdas tu configuración en {{orgName}}.",
+      "subject": "quedan 3 días, {{firstName}}"
     }
   },
-  "header": {
-    "logoAlt": "[ES] {{orgName}} logo",
-    "tenantTitle": "[ES] {{orgName}} - Car Line Bingo",
-    "wordmarkAlt": "[ES] PickupRoster",
-    "admin": "[ES] Admin",
-    "logout": "[ES] Logout",
-    "login": "[ES] Login"
-  },
-  "buttons": {
-    "save": "[ES] Save",
-    "cancel": "[ES] Cancel",
-    "back": "[ES] Back",
-    "continue": "[ES] Continue",
-    "selectFile": "[ES] Select File",
-    "markEmpty": "[ES] Mark Empty"
-  },
-  "fileChooser": {
-    "fileLabel": "[ES] File: {{name}}",
-    "lastModified": "[ES] Last Modified: {{value}}"
-  },
-  "impersonation": {
-    "label": "[ES] Impersonating",
-    "stop": "[ES] Stop Impersonating",
-    "stopping": "[ES] Stopping..."
-  },
-  "status": {
-    "title": "[ES] Pickup Roster Status",
-    "description": "[ES] Live health of the platform and its third-party dependencies.",
-    "metaTitle": "[ES] Status — Pickup Roster",
-    "metaDescription": "[ES] Live status of the Pickup Roster platform, including board infrastructure and third-party dependencies.",
-    "renderedAt": "[ES] Rendered {{when}}. Updated every 2 minutes.",
-    "ninetyDaysAgo": "[ES] 90 days ago",
-    "today": "[ES] Today",
-    "sections": {
-      "application": "[ES] Application",
-      "data": "[ES] Data",
-      "email": "[ES] Email",
-      "payments": "[ES] Payments",
-      "tenants": "[ES] Tenants"
-    },
-    "overall": {
-      "operational": "[ES] All systems operational",
-      "degraded": "[ES] Degraded performance",
-      "outage": "[ES] Major outage",
-      "unknown": "[ES] Status collecting"
-    },
-    "pill": {
-      "operational": "[ES] Operational",
-      "degraded": "[ES] Degraded",
-      "outage": "[ES] Outage",
-      "unknown": "[ES] Unknown",
-      "ariaLabel": "[ES] Status: {{label}}"
-    },
-    "uptime": {
-      "ariaLabel": "[ES] 90-day uptime history. {{summary}}.",
-      "noData": "[ES] No data yet",
-      "allOperational": "[ES] {{withData}} of {{total}} days with data — all operational",
-      "withIncidents": "[ES] {{bad}} of {{withData}} days with incidents over the last {{total}} days",
-      "operational": "[ES] operational",
-      "degraded": "[ES] degraded",
-      "outage": "[ES] outage",
-      "noDataLabel": "[ES] no data",
-      "cellTitle": "[ES] {{date}} — {{label}}"
-    },
-    "incidents": {
-      "heading": "[ES] Active incidents",
-      "since": "[ES] Since {{when}}"
-    }
-  },
-  "errors": {
-    "notFound": "[ES] 404",
-    "somethingBroke": "[ES] Something broke"
+  "welcome": {
+    "greeting": "Hola {{firstName}},",
+    "para1": "Gracias por registrarte. Ayudar a las escuelas a tener una recogida más tranquila es la razón por la que empecé PickupRoster, así que de verdad significa mucho que {{orgName}} le diera una oportunidad.",
+    "para2": "Me encantaría escuchar cómo se ve la salida hoy en tu escuela — qué funciona, qué no y qué te gustaría que alguien arreglara. ¿Podríamos charlar 15 minutos por teléfono en la próxima semana o dos?",
+    "para3": "Solo responde con un par de horarios que te funcionen y te enviaré la invitación.",
+    "para4": "De cualquier manera, me alegra que estés aquí.",
+    "preview": "una nota rápida del fundador — y un pequeño favor.",
+    "subject": "gracias por probar PickupRoster, {{firstName}}"
   }
 }

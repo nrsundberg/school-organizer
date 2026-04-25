@@ -1,90 +1,92 @@
 {
-  "index": {
-    "metaTitle": "{{name}} — Car line made clear",
-    "metaDescription": "Live car line board, viewer access, and school admin tools.",
-    "tenantMetaTitle": "{{orgName}} — Car line",
-    "tenantMetaDescription": "{{orgName}} car line board.",
-    "filterHomeroom": "Filter Homeroom",
-    "homeroomPlaceholder": "Homeroom...",
-    "recentQueue": "Most Recent Queue",
-    "spaceNowActive": "Space {{spaceNumber}} is now active!",
-    "tabs": {
-      "board": "Board",
-      "controller": "Controller"
-    },
-    "popover": {
-      "markEmptyConfirm": "Mark this spot empty?",
-      "markEmpty": "Mark Empty"
-    },
-    "drawing": {
-      "clear": "Clear ({{count}})"
-    },
-    "tile": {
-      "ariaEmpty": "Space {{spaceNumber}} — empty. Activate to mark active.",
-      "ariaActive": "Space {{spaceNumber}} — active. Open actions.",
-      "ariaViewerActive": "Space {{spaceNumber}} — active",
-      "ariaViewerEmpty": "Space {{spaceNumber}} — empty"
-    }
-  },
   "caller": {
-    "displayPlaceholder": "---",
-    "alreadyActive": "Space {{spaceNumber}} is already active",
-    "spaceEmpty": "Space {{spaceNumber}} is empty",
-    "outOfRange": "Enter 1–{{max}}",
     "activeHeading": "Active — tap to clear",
-    "spaceLabel": "Space {{spaceNumber}}",
+    "alreadyActive": "Space {{spaceNumber}} is already active",
+    "displayPlaceholder": "---",
+    "markEmpty": "Mark Empty",
     "markEmptyConfirm": "Mark this spot empty?",
-    "markEmpty": "Mark Empty"
+    "outOfRange": "Enter 1–{{max}}",
+    "spaceEmpty": "Space {{spaceNumber}} is empty",
+    "spaceLabel": "Space {{spaceNumber}}"
   },
-  "homerooms": {
-    "heading": "Homerooms",
-    "spaceLabel": "Space {{number}}"
+  "csvUpload": {
+    "createdRecords": "Created {{count}} student records from csv{{skipNote}}",
+    "moreErrors": " (+{{count}} more)",
+    "rowError": "Row {{row}}: {{message}}",
+    "skipNote_one": " (skipped {{count}} blank row)",
+    "skipNote_other": " (skipped {{count}} blank rows)"
   },
   "drillsLive": {
-    "metaLive": "LIVE – {{name}}",
-    "metaPaused": "Paused – {{name}}",
-    "metaFallback": "Live drill",
-    "bannerPaused": "PAUSED",
-    "bannerLive": "LIVE DRILL",
-    "elapsedFrozen": "frozen at",
-    "elapsedRunning": "elapsed",
-    "subtitlePaused": "Drill is paused — checklist is read-only until an admin resumes.",
-    "subtitleLive": "Tap toggle cells as units check in. Changes sync to everyone signed in.",
-    "adminLink": "Admin",
-    "notesHeading": "Notes",
-    "notesPlaceholder": "Incidents, headcount issues, etc.",
-    "followUpHeading": "Follow-up items",
     "addFollowUp": "Add",
-    "noFollowUp": "No items yet.",
-    "markDone": "Mark done",
-    "markNotDone": "Mark not done",
-    "removeItem": "Remove item",
-    "followUpPlaceholder": "Follow-up task…",
     "adminControls": "Admin controls",
     "adminHelper": "You're an admin — non-admins see the checklist only.",
-    "resume": "Resume drill",
-    "pause": "Pause drill",
-    "endConfirm": "End this drill? Everyone signed in will return to the normal app. The run will be archived as history.",
+    "adminLink": "Admin",
+    "bannerLive": "LIVE DRILL",
+    "bannerPaused": "PAUSED",
+    "elapsedFrozen": "frozen at",
+    "elapsedRunning": "elapsed",
     "end": "End drill",
-    "source": "Source: {{authority}}",
+    "endConfirm": "End this drill? Everyone signed in will return to the normal app. The run will be archived as history.",
     "errors": {
+      "invalidStateJson": "Invalid state JSON.",
       "missingRunId": "Missing run id.",
       "notAuthenticated": "Not authenticated",
-      "invalidStateJson": "Invalid state JSON.",
-      "unknownAction": "Unknown action.",
-      "unexpected": "Unexpected error."
+      "unexpected": "Unexpected error.",
+      "unknownAction": "Unknown action."
     },
+    "followUpHeading": "Follow-up items",
+    "followUpPlaceholder": "Follow-up task…",
+    "markDone": "Mark done",
+    "markNotDone": "Mark not done",
+    "metaFallback": "Live drill",
+    "metaLive": "LIVE – {{name}}",
+    "metaPaused": "Paused – {{name}}",
+    "noFollowUp": "No items yet.",
+    "notesHeading": "Notes",
+    "notesPlaceholder": "Incidents, headcount issues, etc.",
+    "pause": "Pause drill",
+    "removeItem": "Remove item",
+    "resume": "Resume drill",
+    "source": "Source: {{authority}}",
+    "subtitleLive": "Tap toggle cells as units check in. Changes sync to everyone signed in.",
+    "subtitlePaused": "Drill is paused — checklist is read-only until an admin resumes.",
     "toasts": {
       "paused": "Drill paused.",
       "resumed": "Drill resumed.",
       "saved": "Saved."
     }
   },
-  "csvUpload": {
-    "createdRecords": "Created {{count}} student records from csv{{skipNote}}",
-    "skipNote_one": " (skipped {{count}} blank row)",
-    "skipNote_other": " (skipped {{count}} blank rows)",
-    "rowError": "Row {{row}}: {{message}}",
-    "moreErrors": " (+{{count}} more)"
+  "homerooms": {
+    "heading": "Homerooms",
+    "spaceLabel": "Space {{number}}"
+  },
+  "index": {
+    "drawing": {
+      "clear": "Clear ({{count}})",
+      "clear_one": "Clear ({{count}})",
+      "clear_other": "Clear ({{count}})"
+    },
+    "filterHomeroom": "Filter Homeroom",
+    "homeroomPlaceholder": "Homeroom...",
+    "metaDescription": "Live car line board, viewer access, and school admin tools.",
+    "metaTitle": "{{name}} — Car line made clear",
+    "popover": {
+      "markEmpty": "Mark Empty",
+      "markEmptyConfirm": "Mark this spot empty?"
+    },
+    "recentQueue": "Most Recent Queue",
+    "spaceNowActive": "Space {{spaceNumber}} is now active!",
+    "tabs": {
+      "board": "Board",
+      "controller": "Controller"
+    },
+    "tenantMetaDescription": "{{orgName}} car line board.",
+    "tenantMetaTitle": "{{orgName}} — Car line",
+    "tile": {
+      "ariaActive": "Space {{spaceNumber}} — active. Open actions.",
+      "ariaEmpty": "Space {{spaceNumber}} — empty. Activate to mark active.",
+      "ariaViewerActive": "Space {{spaceNumber}} — active",
+      "ariaViewerEmpty": "Space {{spaceNumber}} — empty"
+    }
   }
 }

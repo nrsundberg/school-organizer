@@ -5,6 +5,7 @@ import {
   toDateInputValue,
   type DateRange,
 } from "~/domain/dismissal/schedule";
+import type { ServerResult } from "~/domain/types/server-message";
 
 export const ROI_ASSUMPTIONS = {
   minutesPerAvoidedCall: 3,
@@ -198,4 +199,62 @@ export async function buildRoiDashboardSnapshot(
     minutesSaved: totalAvoidedCalls * ROI_ASSUMPTIONS.minutesPerAvoidedCall,
     assumptions: ROI_ASSUMPTIONS,
   };
+}
+
+/**
+ * Translation-ready wrapper around {@link buildRoiDashboardSnapshot}.
+ *
+ * The dashboard snapshot is loader data (not a user-facing toast), so the
+ * route boundary normally calls `buildRoiDashboardSnapshot` directly. This
+ * variant exists for cases where the caller wants a `ServerResult` (e.g.
+ * an admin dashboard panel that displays the failure inline) — internal
+ * Prisma errors are converted to the `errors:roi.snapshotFailed` key
+ * with the original error message attached as `{{detail}}` for admin
+ * triage. End-user copy never includes the raw detail string verbatim;
+ * the translated key controls how it surfaces.
+ */
+export async function safeBuildRoiDashboardSnapshot(
+  prisma: RoiPrisma,
+  range: DateRange,
+): Promise<ServerResult<RoiDashboardSnapshot>> {
+  try {
+    const snapshot = await buildRoiDashboardSnapshot(prisma, range);
+    return { ok: true, data: snapshot };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        key: "errors:roi.snapshotFailed",
+        params: {
+          detail: error instanceof Error ? error.message : String(error),
+        },
+      },
+    };
+  }
+}
+
+/**
+ * Validate a parsed date range before passing it to
+ * {@link buildRoiDashboardSnapshot}. Returns translation-ready errors for
+ * the two common bad-input shapes: missing/invalid endpoints and reversed
+ * order (`from` after `to`). Internal logs may keep English; user-facing
+ * copy always flows through `errors:roi.*`.
+ */
+export function validateRoiRange(range: {
+  from: Date | null | undefined;
+  to: Date | null | undefined;
+}): ServerResult<DateRange> {
+  if (!range.from || !range.to) {
+    return {
+      ok: false,
+      error: { key: "errors:roi.invalidRange" },
+    };
+  }
+  if (range.from.getTime() > range.to.getTime()) {
+    return {
+      ok: false,
+      error: { key: "errors:roi.rangeReversed" },
+    };
+  }
+  return { ok: true, data: { from: range.from, to: range.to } };
 }

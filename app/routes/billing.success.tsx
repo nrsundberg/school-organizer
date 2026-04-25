@@ -10,7 +10,7 @@ import type Stripe from "stripe";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
 
-export const handle = { i18n: ["auth"] };
+export const handle = { i18n: ["common"] };
 
 export function meta({ data }: { data?: { metaTitle?: string } }) {
   return [{ title: data?.metaTitle ?? "Upgrade complete — Pickup Roster" }];
@@ -67,42 +67,42 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const refreshed = await db.org.findUnique({ where: { id: user.orgId } });
 
   const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "auth");
+  const t = await getFixedT(locale, "common");
 
   return {
     orgName: refreshed?.name ?? org.name,
     plan: refreshed?.billingPlan ?? org.billingPlan,
-    metaTitle: t("billingSuccess.metaTitle"),
+    metaTitle: t("billing.success.metaTitle"),
   };
 }
 
 export default function BillingSuccess({ loaderData }: Route.ComponentProps) {
-  const { t } = useTranslation("auth");
+  const { t } = useTranslation("common");
   const { orgName, plan } = loaderData;
   const planLabel =
     plan === "CAR_LINE"
-      ? t("billingSuccess.planNames.carLine")
+      ? t("billing.success.planNames.carLine")
       : plan === "CAMPUS"
-        ? t("billingSuccess.planNames.campus")
+        ? t("billing.success.planNames.campus")
         : plan === "ENTERPRISE"
-          ? t("billingSuccess.planNames.enterprise")
-          : t("billingSuccess.planNames.free");
+          ? t("billing.success.planNames.enterprise")
+          : t("billing.success.planNames.free");
 
   return (
     <Page user={true}>
       <div className="min-h-[calc(100vh-40px)] flex items-center justify-center bg-[#212525] text-white px-4">
         <div className="max-w-xl text-center">
           <h1 className="text-3xl font-semibold mb-3">
-            {t("billingSuccess.title", { plan: planLabel })}
+            {t("billing.success.title", { plan: planLabel })}
           </h1>
           <p className="text-white/70 mb-6">
-            {t("billingSuccess.body", { orgName, plan: planLabel })}
+            {t("billing.success.body", { orgName, plan: planLabel })}
           </p>
           <a
             href="/admin"
             className="inline-block rounded-md bg-white px-5 py-2.5 font-medium text-[#212525] hover:bg-white/90"
           >
-            {t("billingSuccess.goToAdmin")}
+            {t("billing.success.goToAdmin")}
           </a>
         </div>
       </div>

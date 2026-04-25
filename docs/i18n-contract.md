@@ -560,6 +560,137 @@ Migration: `migrations/0022_add-locale-fields.sql`.
 
 ---
 
+## Server-side message contract
+
+Server-domain functions (anything under `app/domain/**`) MUST NOT call
+`t()` themselves — by the time they run, the request locale has already
+been resolved at the route boundary, and translating in two places is
+exactly how copy ends up half-Spanish. Instead, server functions return
+**translation-ready** objects: a fully-qualified i18next key plus an
+optional params bag for interpolation.
+
+Canonical types live in `app/domain/types/server-message.ts`:
+
+```ts
+export type ServerMessage = {
+  key: string;                                      // e.g. "errors:households.invalidRoom"
+  params?: Record<string, string | number>;
+};
+
+export type ServerResult<T> =
+  | { ok: true; data: T; successMessage?: ServerMessage }
+  | { ok: false; error: ServerMessage };
+```
+
+### How callers use it
+
+The route action / loader wrapper resolves the message:
+
+```ts
+import { detectLocale } from "~/i18n.server";
+import { getFixedT } from "~/lib/t.server";
+import { dataWithError, dataWithSuccess } from "remix-toast";
+
+export async function action({ request, context }: Route.ActionArgs) {
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, ["admin", "errors"]);
+
+  const result = await createHousehold({ prisma, orgId, formData });
+
+  if (!result.ok) {
+    return dataWithError(null, t(result.error.key, result.error.params ?? {}));
+  }
+  if (result.successMessage) {
+    return dataWithSuccess(
+      result.data,
+      t(result.successMessage.key, result.successMessage.params ?? {}),
+    );
+  }
+  return { ok: true, data: result.data };
+}
+```
+
+### Action outcomes with three flavours
+
+The admin-users action handler returns an `AdminUsersActionOutcome`
+(success / warning / error variants, all carrying a `ServerMessage`).
+The route boundary picks the right `dataWith*` helper:
+
+```ts
+function dataWithToast(outcome: AdminUsersActionOutcome, t: TFunction) {
+  const message = t(outcome.message.key, outcome.message.params ?? {});
+  if (outcome.kind === "success") return dataWithSuccess(outcome.data, message);
+  if (outcome.kind === "warning") return dataWithWarning(outcome.data, message);
+  return dataWithError(outcome.data, message);
+}
+```
+
+### Per-row validation messages
+
+For things that produce many errors (CSV import row-by-row), keep the
+`{ row, message }` shape but make `message` a `ServerMessage`:
+
+```ts
+export type RosterRowError = {
+  row: number;
+  message: ServerMessage;
+};
+```
+
+The route boundary maps over the array and calls
+`t(error.message.key, error.message.params ?? {})` per row.
+
+### Internal logs stay English
+
+`console.error`, audit-log strings, Sentry breadcrumbs, dev-tools panels
+— anything that doesn't surface to an end user — stays in English.
+Translation overhead for engineering surfaces is pure cost.
+
+### Where keys live
+
+| Sub-tree under `errors:*` | Owner / consumer |
+|---|---|
+| `errors.adminUsers.*`     | `app/domain/admin-users/*.server.ts` (most keys reuse `admin:users.*`) |
+| `errors.households.*`     | `app/domain/households/households-actions.server.ts` |
+| `errors.csvImport.*`      | `app/domain/csv/roster-import.server.ts` |
+| `errors.roi.*`            | `app/domain/dismissal/roi.server.ts` |
+
+When a server function naturally maps to an existing namespace key (e.g.
+`admin:users.errors.notFound`), reuse the namespaced key directly
+instead of duplicating it under `errors.*`.
+
+### Throwing vs returning
+
+Prefer returning `{ ok: false, error }` over throwing. Two reasons:
+
+1. Throwing forces the route boundary to catch + introspect the error —
+   the contract is harder to enforce.
+2. Type narrowing on `ServerResult<T>` gives the route's TypeScript a
+   strong signal about which branch carries `data` vs `error`.
+
+When deeper code (Prisma client, Better-auth) does throw, wrap the
+public function boundary in `try/catch` and convert:
+
+```ts
+try {
+  return { ok: true, data: await prisma.thing.create(...) };
+} catch (e) {
+  return {
+    ok: false,
+    error: {
+      key: "errors:something.unexpected",
+      params: { detail: e instanceof Error ? e.message : String(e) },
+    },
+  };
+}
+```
+
+The translated string controls how `{{detail}}` is surfaced — most
+end-user copy quietly drops it; admin-only diagnostics may include it
+verbatim.
+
+---
+
 ## Questions / contradictions
 
 If anything in this doc disagrees with the live code, the **doc wins** —

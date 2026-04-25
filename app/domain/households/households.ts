@@ -1,3 +1,14 @@
+/**
+ * Pure household utilities — used by both the route's component (for
+ * display) and its server action handlers (for parsing). This file MUST
+ * stay free of server-only dependencies (Prisma, Cloudflare env, etc.) so
+ * React Router's bundler can include it on the client side without
+ * tripping the "server module referenced by client" guard.
+ *
+ * Translation-ready action handlers that touch Prisma live in
+ * `households-actions.server.ts`.
+ */
+
 type StudentName = {
   firstName: string;
   lastName: string;

@@ -15,8 +15,9 @@ import {
 } from "~/domain/utils/rate-limit.server";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
+import { readAuthErrorShape, translateAuthError } from "~/lib/auth-errors";
 
-export const handle = { i18n: ["auth"] };
+export const handle = { i18n: ["auth", "errors"] };
 
 export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
   return [
@@ -78,7 +79,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 type Step = "email" | "password";
 
 export default function Login() {
-  const { t } = useTranslation("auth");
+  const { t } = useTranslation(["auth", "errors"]);
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -120,13 +121,20 @@ export default function Login() {
     try {
       const result = await signIn.email({ email, password });
       if (result.error) {
-        setError(t("login.errors.invalidPassword"));
+        const { code, message } = readAuthErrorShape(result.error);
+        setError(
+          translateAuthError(
+            code,
+            t,
+            message ?? t("auth:login.errors.invalidPassword"),
+          ),
+        );
         setLoading(false);
       } else {
         window.location.reload();
       }
     } catch {
-      setError(t("login.errors.generic"));
+      setError(t("auth:login.errors.generic"));
       setLoading(false);
     }
   };

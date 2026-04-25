@@ -1,141 +1,279 @@
 {
-  "languageSwitcher": {
-    "label": "Language",
-    "ariaLabel": "Change language",
-    "currentLanguage": "Current language: {{name}}"
-  },
-  "marketing": {
-    "languageCount_one": "Available in {{count}} language",
-    "languageCount_other": "Available in {{count}} languages",
-    "languageList": "Now available in: {{names}}",
-    "everyPlanSuffix": "— included on every plan.",
-    "faqLanguageQuestion": "What languages do you support?",
-    "faqLanguageAnswerSuffix": "If your school needs a language we don't yet ship, contact support — we add languages based on customer demand."
+  "billing": {
+    "cancel": {
+      "backToPricing": "Back to pricing",
+      "body": "You backed out of Stripe Checkout before completing the purchase. No subscription was created.",
+      "goToAdmin": "Go to admin",
+      "metaTitle": "Checkout canceled — Pickup Roster",
+      "title": "No charge made"
+    },
+    "required": {
+      "bodyAction": "Your organization billing status is not active. Update the subscription to regain full app access.",
+      "bodySuspended": "This organization was suspended after extended non-payment. Update your payment method and pay any outstanding invoice to restore access.",
+      "choosePlan": "Choose a plan",
+      "freePlanNote": "If you are on the free plan, contact support to re-activate your org.",
+      "needHelp": "Need help?",
+      "titleAction": "Billing Action Required",
+      "titleSuspended": "Account suspended",
+      "updatePayment": "Update payment method"
+    },
+    "success": {
+      "body": "{{orgName}} is now on the {{plan}} plan. Your receipt is on its way from Stripe.",
+      "goToAdmin": "Go to admin",
+      "metaTitle": "Upgrade complete — Pickup Roster",
+      "planNames": {
+        "campus": "Campus",
+        "carLine": "Car Line",
+        "enterprise": "Enterprise",
+        "free": "Free"
+      },
+      "title": "You're upgraded — welcome to Pickup Roster {{plan}}!"
+    }
   },
   "blog": {
-    "metaTitleIndex": "Blog — PickupRoster",
-    "metaDescriptionIndex": "Field notes on school dismissal, car-line operations, and district rollouts from the PickupRoster team.",
-    "metaDescriptionEmpty": "PickupRoster blog — field notes on dismissal, car lines, and district rollouts.",
-    "ogTitle": "PickupRoster Blog",
-    "ogDescription": "Field notes on school dismissal, car-line operations, and district rollouts.",
-    "kicker": "The PickupRoster blog",
-    "headline": "Field notes from the car line",
-    "lede": "Practical writing for school front offices, principals, and district IT — on dismissal, parent communication, safety, and the messy middle of rolling a system across multiple campuses.",
-    "read": "Read →",
     "empty": {
-      "headline": "Nothing published yet.",
       "body": "We're working on the first post. In the meantime, take a look at how PickupRoster works.",
-      "cta": "See pricing"
+      "cta": "See pricing",
+      "headline": "Nothing published yet."
     },
+    "errors": {
+      "back": "Back to blog",
+      "errorBody": "Try refreshing; if the problem sticks, let us know.",
+      "errorTitle": "We hit a snag loading this post.",
+      "notFoundBody": "It may have been renamed or unpublished. The full archive is one click away.",
+      "notFoundTitle": "We can't find that post."
+    },
+    "headline": "Field notes from the car line",
+    "kicker": "The PickupRoster blog",
+    "lede": "Practical writing for school front offices, principals, and district IT — on dismissal, parent communication, safety, and the messy middle of rolling a system across multiple campuses.",
+    "metaDescriptionEmpty": "PickupRoster blog — field notes on dismissal, car lines, and district rollouts.",
+    "metaDescriptionIndex": "Field notes on school dismissal, car-line operations, and district rollouts from the PickupRoster team.",
+    "metaTitleIndex": "Blog — PickupRoster",
+    "ogDescription": "Field notes on school dismissal, car-line operations, and district rollouts.",
+    "ogTitle": "PickupRoster Blog",
     "post": {
+      "back": "Back to blog",
       "metaNotFound": "Post not found — PickupRoster",
       "metaTitle": "{{title}} — PickupRoster Blog",
-      "back": "Back to blog",
-      "minRead": "{{count}} min read"
+      "minRead": "{{count}} min read",
+      "minRead_one": "{{count}} min read",
+      "minRead_other": "{{count}} min read"
     },
-    "errors": {
-      "notFoundTitle": "We can't find that post.",
-      "notFoundBody": "It may have been renamed or unpublished. The full archive is one click away.",
-      "errorTitle": "We hit a snag loading this post.",
-      "errorBody": "Try refreshing; if the problem sticks, let us know.",
-      "back": "Back to blog"
-    }
-  },
-  "guides": {
-    "metaTitleIndex": "Guides — PickupRoster",
-    "metaDescriptionIndex": "How-to guides for setting up and running PickupRoster — roster imports, drill templates, branding, billing, and dismissal-day operations.",
-    "metaDescriptionEmpty": "PickupRoster guides — how-to articles for school administrators.",
-    "ogTitle": "PickupRoster Guides",
-    "ogDescription": "How-to guides for setting up and running PickupRoster across your school or district.",
-    "kicker": "PickupRoster guides",
-    "headline": "How to set up and run PickupRoster",
-    "lede": "Step-by-step guides for school administrators — from importing your first roster to running a fire drill from your phone.",
-    "readGuide": "Read guide →",
-    "allGuides": "All guides",
-    "empty": {
-      "headline": "No guides published yet.",
-      "body": "We're working on the first batch. In the meantime, see how PickupRoster is priced.",
-      "cta": "See pricing"
-    },
-    "post": {
-      "metaNotFound": "Guide not found — PickupRoster",
-      "metaTitle": "{{title}} — PickupRoster Guides",
-      "minRead": "{{count}} min read"
-    },
-    "errors": {
-      "notFoundTitle": "We can't find that guide.",
-      "notFoundBody": "It may have been renamed or unpublished. The full library is one click away.",
-      "errorTitle": "We hit a snag loading this guide.",
-      "errorBody": "Try refreshing; if the problem sticks, let us know.",
-      "back": "All guides"
-    }
-  },
-  "trialCta": {
-    "kicker": "Try PickupRoster",
-    "headline": "Get structured dismissal up and running in a week.",
-    "body": "30-day free trial. No credit card required. Built for schools running dismissal for 300 to 3,000 students.",
-    "seePricing": "See pricing",
-    "startFreeTrial": "Start free trial"
-  },
-  "faqs": {
-    "metaTitle": "FAQs — Pickup Roster",
-    "metaDescription": "Common questions about car line boards, trials, and security.",
-    "heading": "FAQs",
-    "lede": "Straight answers for admins and IT.",
-    "readyToTry": "Ready to try it?",
-    "createAccount": "Create an account",
-    "items": {
-      "where": {
-        "q": "Where does my school live?",
-        "a": "Each organization gets its own subdomain like yourslug.pickuproster.com. The main domain shows this marketing site; the board never mixes tenants. On Campus and District plans you can instead use a custom domain or a subdomain on your school's own domain (for example, pickup.yourschool.edu)."
-      },
-      "trial": {
-        "q": "How does the trial work?",
-        "a": "Your trial ends on the later of 30 calendar days from signup or 25 qualifying pickup days. A qualifying day is a day with more than 10 distinct students marked as called."
-      },
-      "viewer": {
-        "q": "How do families view the board?",
-        "a": "Share the viewer PIN or a magic link. Viewer sessions are scoped to your organization and respect lockouts after failed attempts."
-      },
-      "domain": {
-        "q": "Can we use our own domain?",
-        "a": "Yes — custom domains (or a subdomain on your school's own domain) are available on Campus and District plans. Point DNS to the same Worker as your other hosts. Car Line uses a yourslug.pickuproster.com subdomain."
-      }
-    }
-  },
-  "header": {
-    "logoAlt": "{{orgName}} logo",
-    "tenantTitle": "{{orgName}} - Car Line Bingo",
-    "wordmarkAlt": "PickupRoster",
-    "admin": "Admin",
-    "logout": "Logout",
-    "login": "Login"
+    "read": "Read →"
   },
   "buttons": {
-    "save": "Save",
-    "cancel": "Cancel",
     "back": "Back",
+    "cancel": "Cancel",
     "continue": "Continue",
-    "selectFile": "Select File",
-    "markEmpty": "Mark Empty"
+    "markEmpty": "Mark Empty",
+    "save": "Save",
+    "selectFile": "Select File"
+  },
+  "common": {
+    "greetingFallback": "Hi there",
+    "signOff": "Noah",
+    "signOffTitle": "Founder, PickupRoster"
+  },
+  "csvUpload": {
+    "createdRecords_one": "Created {{count}} student record from the CSV{{skipNote}}",
+    "createdRecords_other": "Created {{count}} student records from the CSV{{skipNote}}",
+    "moreErrors_one": " (+{{count}} more)",
+    "moreErrors_other": " (+{{count}} more)",
+    "rowError": "Row {{row}}: {{message}}",
+    "skipNote_one": " (skipped {{count}} blank row)",
+    "skipNote_other": " (skipped {{count}} blank rows)"
+  },
+  "errors": {
+    "notFound": "404",
+    "somethingBroke": "Something broke"
+  },
+  "faqs": {
+    "createAccount": "Create an account",
+    "heading": "FAQs",
+    "items": {
+      "domain": {
+        "a": "Yes — custom domains (or a subdomain on your school's own domain) are available on Campus and District plans. Point DNS to the same Worker as your other hosts. Car Line uses a yourslug.pickuproster.com subdomain.",
+        "q": "Can we use our own domain?"
+      },
+      "trial": {
+        "a": "Your trial ends on the later of 30 calendar days from signup or 25 qualifying pickup days. A qualifying day is a day with more than 10 distinct students marked as called.",
+        "q": "How does the trial work?"
+      },
+      "viewer": {
+        "a": "Share the viewer PIN or a magic link. Viewer sessions are scoped to your organization and respect lockouts after failed attempts.",
+        "q": "How do families view the board?"
+      },
+      "where": {
+        "a": "Each organization gets its own subdomain like yourslug.pickuproster.com. The main domain shows this marketing site; the board never mixes tenants. On Campus and District plans you can instead use a custom domain or a subdomain on your school's own domain (for example, pickup.yourschool.edu).",
+        "q": "Where does my school live?"
+      }
+    },
+    "lede": "Straight answers for admins and IT.",
+    "metaDescription": "Common questions about car line boards, trials, and security.",
+    "metaTitle": "FAQs — Pickup Roster",
+    "readyToTry": "Ready to try it?"
   },
   "fileChooser": {
     "fileLabel": "File: {{name}}",
     "lastModified": "Last Modified: {{value}}"
+  },
+  "footer": {
+    "copyright": "© {{year}} {{siteName}}",
+    "nav": {
+      "blog": "Blog",
+      "faqs": "FAQs",
+      "login": "Login",
+      "pricing": "Pricing",
+      "status": "Status",
+      "support": "Support"
+    }
+  },
+  "guides": {
+    "allGuides": "All guides",
+    "empty": {
+      "body": "We're working on the first batch. In the meantime, see how PickupRoster is priced.",
+      "cta": "See pricing",
+      "headline": "No guides published yet."
+    },
+    "errors": {
+      "back": "All guides",
+      "errorBody": "Try refreshing; if the problem sticks, let us know.",
+      "errorTitle": "We hit a snag loading this guide.",
+      "notFoundBody": "It may have been renamed or unpublished. The full library is one click away.",
+      "notFoundTitle": "We can't find that guide."
+    },
+    "headline": "How to set up and run PickupRoster",
+    "kicker": "PickupRoster guides",
+    "lede": "Step-by-step guides for school administrators — from importing your first roster to running a fire drill from your phone.",
+    "metaDescriptionEmpty": "PickupRoster guides — how-to articles for school administrators.",
+    "metaDescriptionIndex": "How-to guides for setting up and running PickupRoster — roster imports, drill templates, branding, billing, and dismissal-day operations.",
+    "metaTitleIndex": "Guides — PickupRoster",
+    "ogDescription": "How-to guides for setting up and running PickupRoster across your school or district.",
+    "ogTitle": "PickupRoster Guides",
+    "post": {
+      "metaNotFound": "Guide not found — PickupRoster",
+      "metaTitle": "{{title}} — PickupRoster Guides",
+      "minRead": "{{count}} min read",
+      "minRead_one": "{{count}} min read",
+      "minRead_other": "{{count}} min read"
+    },
+    "readGuide": "Read guide →"
+  },
+  "header": {
+    "admin": "Admin",
+    "login": "Login",
+    "logoAlt": "{{orgName}} logo",
+    "logout": "Logout",
+    "tenantTitle": "{{orgName}} - Car Line Bingo",
+    "wordmarkAlt": "PickupRoster"
   },
   "impersonation": {
     "label": "Impersonating",
     "stop": "Stop Impersonating",
     "stopping": "Stopping..."
   },
+  "languageSwitcher": {
+    "ariaLabel": "Change language",
+    "currentLanguage": "Current language: {{name}}",
+    "label": "Language"
+  },
+  "marketing": {
+    "everyPlanSuffix": "— included on every plan.",
+    "faqLanguageAnswerSuffix": "If your school needs a language we don't yet ship, contact support — we add languages based on customer demand.",
+    "faqLanguageQuestion": "What languages do you support?",
+    "languageCount_one": "Available in {{count}} language",
+    "languageCount_other": "Available in {{count}} languages",
+    "languageList": "Now available in: {{names}}"
+  },
+  "marketingLanding": {
+    "features": {
+      "liveBoard": "Live board with WebSocket updates and viewer PINs or magic links.",
+      "subdomain": "Subdomain per school (yourslug.pickuproster.com); Campus and District plans can bring a custom domain or a subdomain on your school's own domain.",
+      "trial": "Trial that respects real usage: calendar time and qualifying pickup days."
+    },
+    "footerCta": {
+      "body": "Start a trial from the marketing site. Your live board lives on your school subdomain—never mixed with other tenants.",
+      "createAccount": "Create your account",
+      "heading": "Ready when your school is"
+    },
+    "headline": "One board for pickups, drills, and daily chaos—without the walkie chatter.",
+    "kicker": "School car line, simplified",
+    "lede": "Pickup Roster gives each school its own live board, viewer access families trust, and admin tools your front office already understands.",
+    "startFreeTrial": "Start free trial",
+    "videos": {
+      "carLine": {
+        "description": "How controllers move the line and how families see status in real time.",
+        "title": "Car line pickups"
+      },
+      "fireDrills": {
+        "description": "Use the same visibility tools when every second counts.",
+        "title": "Fire drills and safety"
+      },
+      "gettingStarted": {
+        "description": "Create your school, invite staff, and go live with the board in minutes.",
+        "title": "Getting started"
+      },
+      "heading": "See it in action",
+      "subtitle": "Short walkthroughs you can share with staff and families."
+    },
+    "viewPricing": "View pricing",
+    "whatYouGet": "What you get"
+  },
+  "marketingNav": {
+    "blog": "Blog",
+    "dashboard": "Dashboard",
+    "faqs": "FAQs",
+    "guides": "Guides",
+    "homeAriaLabel": "Pickup Roster home",
+    "login": "Log in",
+    "pricing": "Pricing",
+    "signup": "Sign up",
+    "wordmarkAlt": "Pickup Roster"
+  },
+  "midTrialCheckin": {
+    "greeting": "Hi {{firstName}},",
+    "para1": "You're about halfway through your trial. Just wanted to check in — not to sell you anything, just to see how it's going.",
+    "para2": "If anything's confusing, awkward, or missing, hit reply and tell me. I read every email, and I'd rather hear about it now than not at all.",
+    "para3": "If you'd like to keep poking around, you can jump back in here: {{appLink}}",
+    "para3Html": "If you'd like to keep poking around, you can jump back in here: <a href=\"{{appLink}}\">{{appLink}}</a>",
+    "preview": "Just checking in — no agenda, just want to make sure it's useful.",
+    "subject": "how's pickup going, {{firstName}}?"
+  },
+  "passwordReset": {
+    "buttonLabel": "Reset password",
+    "didNotRequest": "If you didn't request this, you can ignore this email — your password won't change{{requestIpSuffix}}.",
+    "expires": "This link expires in {{expiryMinutes}} minutes.",
+    "fallbackPrefix": "Or paste this link into your browser:",
+    "greeting": "Hi {{firstName}},",
+    "intro": "We received a request to reset the password on your PickupRoster account. Click the button below to choose a new one.",
+    "preview": "Use this link to choose a new password.",
+    "requestIpSuffix": " (the request came from {{ip}})",
+    "subject": "Reset your PickupRoster password",
+    "textIntro": "We received a request to reset the password on your PickupRoster account. Use the link below to choose a new one:"
+  },
   "status": {
-    "title": "Pickup Roster Status",
     "description": "Live health of the platform and its third-party dependencies.",
-    "metaTitle": "Status — Pickup Roster",
+    "incidents": {
+      "heading": "Active incidents",
+      "since": "Since {{when}}"
+    },
     "metaDescription": "Live status of the Pickup Roster platform, including board infrastructure and third-party dependencies.",
-    "renderedAt": "Rendered {{when}}. Updated every 2 minutes.",
+    "metaTitle": "Status — Pickup Roster",
     "ninetyDaysAgo": "90 days ago",
-    "today": "Today",
+    "overall": {
+      "degraded": "Degraded performance",
+      "operational": "All systems operational",
+      "outage": "Major outage",
+      "unknown": "Status collecting"
+    },
+    "pill": {
+      "ariaLabel": "Status: {{label}}",
+      "degraded": "Degraded",
+      "operational": "Operational",
+      "outage": "Outage",
+      "unknown": "Unknown"
+    },
+    "renderedAt": "Rendered {{when}}. Updated every 2 minutes.",
     "sections": {
       "application": "Application",
       "data": "Data",
@@ -143,37 +281,63 @@
       "payments": "Payments",
       "tenants": "Tenants"
     },
-    "overall": {
-      "operational": "All systems operational",
-      "degraded": "Degraded performance",
-      "outage": "Major outage",
-      "unknown": "Status collecting"
-    },
-    "pill": {
-      "operational": "Operational",
-      "degraded": "Degraded",
-      "outage": "Outage",
-      "unknown": "Unknown",
-      "ariaLabel": "Status: {{label}}"
-    },
+    "title": "Pickup Roster Status",
+    "today": "Today",
     "uptime": {
-      "ariaLabel": "90-day uptime history. {{summary}}.",
-      "noData": "No data yet",
       "allOperational": "{{withData}} of {{total}} days with data — all operational",
-      "withIncidents": "{{bad}} of {{withData}} days with incidents over the last {{total}} days",
-      "operational": "operational",
+      "ariaLabel": "90-day uptime history. {{summary}}.",
+      "cellTitle": "{{date}} — {{label}}",
       "degraded": "degraded",
-      "outage": "outage",
+      "noData": "No data yet",
       "noDataLabel": "no data",
-      "cellTitle": "{{date}} — {{label}}"
-    },
-    "incidents": {
-      "heading": "Active incidents",
-      "since": "Since {{when}}"
+      "operational": "operational",
+      "outage": "outage",
+      "withIncidents": "{{bad}} of {{withData}} days with incidents over the last {{total}} days"
     }
   },
-  "errors": {
-    "notFound": "404",
-    "somethingBroke": "Something broke"
+  "trialCta": {
+    "body": "30-day free trial. No credit card required. Built for schools running dismissal for 300 to 3,000 students.",
+    "headline": "Get structured dismissal up and running in a week.",
+    "kicker": "Try PickupRoster",
+    "seePricing": "See pricing",
+    "startFreeTrial": "Start free trial"
+  },
+  "trialExpiring": {
+    "one": {
+      "greeting": "Hi {{firstName}},",
+      "para1": "Your trial ends tomorrow. To keep PickupRoster running for {{orgName}} without interruption, upgrade here: {{appLink}}",
+      "para1Html": "Your trial ends tomorrow. To keep PickupRoster running for {{orgName}} without interruption, upgrade here: <a href=\"{{appLink}}\">{{appLink}}</a>",
+      "preview": "one click to keep PickupRoster running for {{orgName}}.",
+      "subject": "your trial ends tomorrow"
+    },
+    "seven": {
+      "greeting": "Hi {{firstName}},",
+      "para1": "Quick heads-up: your trial ends on {{trialEndDate}}, about a week from now.",
+      "para2": "If pickup at {{orgName}} has felt a little less chaotic lately, that's the part worth keeping. Upgrading now means no interruption, your roster stays put, and tomorrow's dismissal runs exactly like today's.",
+      "para3": "You can upgrade in a couple of clicks here: {{appLink}}",
+      "para3Html": "You can upgrade in a couple of clicks here: <a href=\"{{appLink}}\">{{appLink}}</a>",
+      "para4": "Questions? Just reply — I'll get back to you.",
+      "preview": "{{daysLeft}} days to keep your setup — here's how.",
+      "subject": "one week left on your PickupRoster trial"
+    },
+    "three": {
+      "greeting": "Hi {{firstName}},",
+      "para1": "Your trial ends on {{trialEndDate}} — just 3 days away.",
+      "para2": "I don't want you to lose the setup you've built for {{orgName}} or have next week's dismissal line go back to the way it used to be. Upgrading takes a minute and everything keeps working.",
+      "para3": "Upgrade here: {{appLink}}",
+      "para3Html": "Upgrade here: <a href=\"{{appLink}}\">{{appLink}}</a>",
+      "para4": "If something's giving you pause, tell me what it is. I want to know.",
+      "preview": "I don't want you to lose your setup at {{orgName}}.",
+      "subject": "3 days left, {{firstName}}"
+    }
+  },
+  "welcome": {
+    "greeting": "Hi {{firstName}},",
+    "para1": "Thanks for signing up. Helping schools have a calmer pickup is the reason I started PickupRoster, so it really means a lot that {{orgName}} gave it a try.",
+    "para2": "I'd love to hear what dismissal looks like at your school today — what's working, what isn't, and what you wish someone would fix. Could we grab 15 minutes on the phone in the next week or two?",
+    "para3": "Just reply with a couple of times that work for you and I'll send over an invite.",
+    "para4": "Either way, glad to have you here.",
+    "preview": "a quick note from the founder — and a small ask.",
+    "subject": "thanks for trying PickupRoster, {{firstName}}"
   }
 }

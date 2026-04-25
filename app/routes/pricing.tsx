@@ -1,21 +1,27 @@
 import { Form, Link, useNavigation, useRouteLoaderData } from "react-router";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/pricing";
 import { MarketingNav } from "~/components/marketing/MarketingNav";
 import { getSupportEmail } from "~/lib/site";
+import { SUPPORTED_LANGUAGES } from "~/lib/i18n-config";
 import {
-  billingCycleLabel,
   normalizePublicBillingCycle,
   signupPathForPlan,
   type PublicBillingCycle,
   type SelfServeBillingPlan
 } from "~/domain/billing/public-plans";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 
-export function meta() {
+export const handle = { i18n: ["common", "billing"] };
+
+export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
   return [
-    { title: "Pricing — Pickup Roster" },
+    { title: data?.metaTitle ?? "Pricing — Pickup Roster" },
     {
       name: "description",
       content:
+        data?.metaDescription ??
         "Simple pricing for schools and districts. Pick a plan, create your account, and continue through signup or checkout."
     }
   ];
@@ -23,9 +29,13 @@ export function meta() {
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "billing");
   return {
     supportEmail: getSupportEmail(context),
-    billingCycle: normalizePublicBillingCycle(url.searchParams.get("cycle"))
+    billingCycle: normalizePublicBillingCycle(url.searchParams.get("cycle")),
+    metaTitle: t("pricing.metaTitle"),
+    metaDescription: t("pricing.metaDescription"),
   };
 }
 
@@ -33,58 +43,16 @@ type RootLoader = {
   user?: { id: string; orgId: string | null } | null;
 };
 
-const CAR_LINE_FEATURES = [
-  "Up to 150 families, 400 students, 35 classrooms",
-  "Teacher & staff viewer only (no parent or family app)",
-  "Live dismissal / car-line flow",
-  "Pick your brand colors (no logo upload)",
-  "Standard email support",
-  "Self-serve monthly or annual billing"
-];
-
-const CAMPUS_FEATURES = [
-  "Everything in Car Line",
-  "Up to 300 families, 900 students, 80 classrooms",
-  "Reports and call history",
-  "Full custom branding — logo upload + custom domain",
-  "Parent & family viewer app",
-  "Dedicated migration & onboarding support",
-  "Microsoft Entra SSO (coming soon)",
-  "Priority support",
-  "RFID vehicle-tag auto-arrival available as a custom add-on (pricing scoped per deployment)"
-];
-
-const DISTRICT_FEATURES = [
-  "Everything in Campus",
-  "Multi-school dashboard (up to 10 schools included)",
-  "Unlimited students, families, and classrooms",
-  "Additional schools available as an add-on",
-  "RFID vehicle-tag auto-arrival available as a custom add-on (pricing scoped per deployment)"
-];
-
-function priceForCycle(monthlyPrice: number, billingCycle: PublicBillingCycle) {
-  if (billingCycle === "annual") {
-    return {
-      amount: `$${(monthlyPrice * 12).toLocaleString()}`,
-      period: "/ year",
-      note: "per school, billed annually"
-    };
-  }
-
-  return {
-    amount: `$${monthlyPrice.toLocaleString()}`,
-    period: "/ month",
-    note: "per school"
-  };
-}
-
 function CheckoutOrSignupCta({
   billingCycle,
   buttonClassName,
   isCheckoutPending,
   isSignedInOrgAdmin,
   plan,
-  signupPlan
+  signupPlan,
+  signupLabel,
+  checkoutLabel,
+  redirectingLabel
 }: {
   billingCycle: PublicBillingCycle;
   buttonClassName: string;
@@ -92,6 +60,9 @@ function CheckoutOrSignupCta({
   isSignedInOrgAdmin: boolean;
   plan: SelfServeBillingPlan;
   signupPlan: "car-line" | "campus";
+  signupLabel: string;
+  checkoutLabel: string;
+  redirectingLabel: string;
 }) {
   if (!isSignedInOrgAdmin) {
     return (
@@ -99,7 +70,7 @@ function CheckoutOrSignupCta({
         to={signupPathForPlan(signupPlan, billingCycle)}
         className={buttonClassName}
       >
-        Continue to Signup
+        {signupLabel}
       </Link>
     );
   }
@@ -113,17 +84,35 @@ function CheckoutOrSignupCta({
         disabled={isCheckoutPending}
         className={buttonClassName}
       >
-        {isCheckoutPending ? "Redirecting..." : "Continue to Stripe"}
+        {isCheckoutPending ? redirectingLabel : checkoutLabel}
       </button>
     </Form>
   );
 }
 
 export default function Pricing({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation(["billing", "common"]);
   const rootData = useRouteLoaderData("root") as RootLoader | undefined;
   const navigation = useNavigation();
   const isSignedInOrgAdmin = !!rootData?.user?.orgId;
   const { billingCycle, supportEmail } = loaderData;
+  const languageCount = SUPPORTED_LANGUAGES.length;
+
+  const priceForCycle = (monthlyPrice: number, cycle: PublicBillingCycle) => {
+    if (cycle === "annual") {
+      return {
+        amount: t("pricing.amount.year", { value: (monthlyPrice * 12).toLocaleString() }),
+        period: t("pricing.period.year"),
+        note: t("pricing.note.annual"),
+      };
+    }
+    return {
+      amount: t("pricing.amount.month", { value: monthlyPrice.toLocaleString() }),
+      period: t("pricing.period.month"),
+      note: t("pricing.note.monthly"),
+    };
+  };
+
   const carLinePrice = priceForCycle(100, billingCycle);
   const campusPrice = priceForCycle(500, billingCycle);
   const isCheckoutPending =
@@ -132,19 +121,56 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
   const cyclePath = (cycle: PublicBillingCycle) =>
     `/pricing?${new URLSearchParams({ cycle }).toString()}`;
 
+  const cycles: PublicBillingCycle[] = ["monthly", "annual"];
+
+  const carLineFeatures = [
+    t("pricing.features.carLine.caps"),
+    t("pricing.features.carLine.staffViewer"),
+    t("pricing.features.carLine.live"),
+    t("pricing.features.carLine.brand"),
+    t("pricing.features.carLine.support"),
+    t("pricing.features.carLine.selfServe"),
+  ];
+
+  const campusFeatures = [
+    t("pricing.features.campus.everythingCarLine"),
+    t("pricing.features.campus.caps"),
+    t("pricing.features.campus.reports"),
+    t("pricing.features.campus.brand"),
+    t("pricing.features.campus.familyApp"),
+    t("pricing.features.campus.onboarding"),
+    t("pricing.features.campus.sso"),
+    t("pricing.features.campus.support"),
+    t("pricing.features.campus.rfid"),
+  ];
+
+  const districtFeatures = [
+    t("pricing.features.district.everythingCampus"),
+    t("pricing.features.district.dashboard"),
+    t("pricing.features.district.unlimited"),
+    t("pricing.features.district.addOn"),
+    t("pricing.features.district.rfid"),
+  ];
+
+  const signupLabel = t("pricing.cta.continueSignup");
+  const checkoutLabel = t("pricing.cta.continueStripe");
+  const redirectingLabel = t("pricing.cta.redirecting");
+
   return (
     <div className="min-h-screen bg-[#0f1414] text-white">
       <MarketingNav />
       <div className="mx-auto max-w-6xl px-4 py-14">
         <div className="text-center">
-          <h1 className="text-4xl font-extrabold">Pricing</h1>
+          <h1 className="text-4xl font-extrabold">{t("pricing.heading")}</h1>
           <p className="mx-auto mt-3 max-w-2xl text-lg text-white/70">
-            Pick the tier that matches your school or district, then continue
-            through signup. Self-serve plans can move straight into checkout,
-            and district setups stay custom.
+            {t("pricing.lede")}
+          </p>
+          <p className="mx-auto mt-3 text-sm text-white/55">
+            {t("common:marketing.languageCount", { count: languageCount })}{" "}
+            {t("common:marketing.everyPlanSuffix")}
           </p>
           <div className="mt-6 inline-flex rounded-full border border-white/15 bg-white/5 p-1 text-sm">
-            {(["monthly", "annual"] as const).map((cycle) => (
+            {cycles.map((cycle) => (
               <Link
                 key={cycle}
                 to={cyclePath(cycle)}
@@ -154,7 +180,7 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
                     : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                {billingCycleLabel(cycle)}
+                {t(`pricing.cycle.${cycle}`)}
               </Link>
             ))}
           </div>
@@ -164,12 +190,11 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
           {/* Car Line card — good starting point */}
           <div className="relative flex flex-col rounded-2xl border-2 border-[#F97316]/70 bg-[#F97316]/5 p-6 shadow-2xl shadow-[#F97316]/10">
             <span className="absolute -top-3 left-6 rounded-full bg-[#F97316] px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#0f1414]">
-              A good starting point
+              {t("pricing.cards.carLine.badge")}
             </span>
-            <h2 className="text-xl font-bold text-[#F97316]">Car Line</h2>
+            <h2 className="text-xl font-bold text-[#F97316]">{t("pricing.cards.carLine.name")}</h2>
             <p className="mt-2 text-sm text-white/70">
-              Run dismissal smoothly with a staff-only viewer. Best for smaller
-              schools.
+              {t("pricing.cards.carLine.tagline")}
             </p>
             <div className="mt-6">
               <p className="text-3xl font-extrabold">
@@ -181,7 +206,7 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
               <p className="mt-1 text-xs text-white/50">{carLinePrice.note}</p>
             </div>
             <ul className="mt-6 flex-1 space-y-2 text-sm text-white/80">
-              {CAR_LINE_FEATURES.map((f) => (
+              {carLineFeatures.map((f) => (
                 <li key={f} className="flex gap-2">
                   <span aria-hidden className="text-[#F97316]">
                     ✓
@@ -198,21 +223,23 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
                 isSignedInOrgAdmin={isSignedInOrgAdmin}
                 plan="CAR_LINE"
                 signupPlan="car-line"
+                signupLabel={signupLabel}
+                checkoutLabel={checkoutLabel}
+                redirectingLabel={redirectingLabel}
               />
               <p className="mt-3 text-center text-xs text-white/50">
                 {isSignedInOrgAdmin
-                  ? "Stripe Checkout opens only when you choose to activate billing."
-                  : "Create your account first, then continue to Stripe Checkout."}
+                  ? t("pricing.cardFooter.activateOnly")
+                  : t("pricing.cardFooter.createFirst")}
               </p>
             </div>
           </div>
 
           {/* Campus card — premium single school */}
           <div className="flex flex-col rounded-2xl border border-white/15 bg-[#151a1a] p-6">
-            <h2 className="text-xl font-bold">Campus</h2>
+            <h2 className="text-xl font-bold">{t("pricing.cards.campus.name")}</h2>
             <p className="mt-2 text-sm text-white/65">
-              Premium tier for a single school — adds the parent & family app,
-              higher caps, and dedicated support.
+              {t("pricing.cards.campus.tagline")}
             </p>
             <div className="mt-6">
               <p className="text-3xl font-extrabold">
@@ -224,7 +251,7 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
               <p className="mt-1 text-xs text-white/50">{campusPrice.note}</p>
             </div>
             <ul className="mt-6 flex-1 space-y-2 text-sm text-white/80">
-              {CAMPUS_FEATURES.map((f) => (
+              {campusFeatures.map((f) => (
                 <li key={f} className="flex gap-2">
                   <span aria-hidden className="text-[#E9D500]">
                     ✓
@@ -241,11 +268,14 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
                 isSignedInOrgAdmin={isSignedInOrgAdmin}
                 plan="CAMPUS"
                 signupPlan="campus"
+                signupLabel={signupLabel}
+                checkoutLabel={checkoutLabel}
+                redirectingLabel={redirectingLabel}
               />
               <p className="mt-3 text-center text-xs text-white/50">
                 {isSignedInOrgAdmin
-                  ? "Stripe Checkout opens only when you choose to activate billing."
-                  : "Create your account first, then continue to Stripe Checkout."}
+                  ? t("pricing.cardFooter.activateOnly")
+                  : t("pricing.cardFooter.createFirst")}
               </p>
             </div>
           </div>
@@ -253,20 +283,20 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
           {/* District card — featured */}
           <div className="relative flex flex-col rounded-2xl border-2 border-[#E9D500]/70 bg-[#193B4B]/40 p-6 shadow-2xl shadow-[#E9D500]/10">
             <span className="absolute -top-3 left-6 rounded-full bg-[#E9D500] px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#193B4B]">
-              Recommended for districts
+              {t("pricing.cards.district.badge")}
             </span>
-            <h2 className="text-xl font-bold text-[#E9D500]">District</h2>
+            <h2 className="text-xl font-bold text-[#E9D500]">{t("pricing.cards.district.name")}</h2>
             <p className="mt-2 text-sm text-white/70">
-              For districts running more than one school.
+              {t("pricing.cards.district.tagline")}
             </p>
             <div className="mt-6">
-              <p className="text-3xl font-extrabold">Custom pricing</p>
+              <p className="text-3xl font-extrabold">{t("pricing.cards.district.amount")}</p>
               <p className="mt-1 text-xs text-white/60">
-                Up to 10 schools included
+                {t("pricing.cards.district.amountNote")}
               </p>
             </div>
             <ul className="mt-6 flex-1 space-y-2 text-sm text-white/80">
-              {DISTRICT_FEATURES.map((f) => (
+              {districtFeatures.map((f) => (
                 <li key={f} className="flex gap-2">
                   <span aria-hidden className="text-[#E9D500]">
                     ✓
@@ -281,19 +311,18 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
                   href={`mailto:${supportEmail}?subject=District%20pricing`}
                   className="inline-flex w-full items-center justify-center rounded-xl bg-[#E9D500] px-4 py-3 text-sm font-semibold text-[#193B4B] transition hover:bg-[#f5e047]"
                 >
-                  Contact us
+                  {t("pricing.cards.district.contactCta")}
                 </a>
               ) : (
                 <Link
                   to={signupPathForPlan("district", billingCycle)}
                   className="inline-flex w-full items-center justify-center rounded-xl bg-[#E9D500] px-4 py-3 text-sm font-semibold text-[#193B4B] transition hover:bg-[#f5e047]"
                 >
-                  Start Free Trial
+                  {t("pricing.cards.district.startTrialCta")}
                 </Link>
               )}
               <p className="mt-3 text-center text-xs text-white/70">
-                No credit card required. We&apos;ll reach out during your trial
-                to discuss your district&apos;s setup.
+                {t("pricing.cards.district.footer")}
               </p>
             </div>
           </div>
@@ -302,30 +331,29 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
         {/* FAQ */}
         <div className="mx-auto mt-16 max-w-3xl">
           <h2 className="text-center text-2xl font-bold">
-            Questions, answered
+            {t("pricing.faq.heading")}
           </h2>
           <dl className="mt-8 space-y-6">
             <div className="rounded-xl border border-white/10 bg-[#151a1a] p-5">
               <dt className="text-base font-semibold text-white">
-                Do I need a credit card to start?
+                {t("pricing.faq.creditCard.q")}
               </dt>
-              <dd className="mt-2 text-sm text-white/70">No.</dd>
+              <dd className="mt-2 text-sm text-white/70">{t("pricing.faq.creditCard.a")}</dd>
             </div>
             <div className="rounded-xl border border-white/10 bg-[#151a1a] p-5">
               <dt className="text-base font-semibold text-white">
-                What happens after 30 days?
+                {t("pricing.faq.afterTrial.q")}
               </dt>
               <dd className="mt-2 text-sm text-white/70">
-                If you haven&apos;t converted, your site is suspended. No
-                surprise charges.
+                {t("pricing.faq.afterTrial.a")}
               </dd>
             </div>
             <div className="rounded-xl border border-white/10 bg-[#151a1a] p-5">
               <dt className="text-base font-semibold text-white">
-                Can I switch tiers?
+                {t("pricing.faq.switchTiers.q")}
               </dt>
               <dd className="mt-2 text-sm text-white/70">
-                Yes, contact us to upgrade or downgrade anytime.
+                {t("pricing.faq.switchTiers.a")}
               </dd>
             </div>
           </dl>

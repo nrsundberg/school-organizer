@@ -18,6 +18,9 @@ import {
   type AdminUsersAuth,
   type AdminUsersFetcherData,
 } from "~/domain/admin-users/admin-users.server";
+import { detectLocale } from "~/i18n.server";
+import { getFixedT } from "~/lib/t.server";
+import type { TFunction } from "i18next";
 
 export const handle = { i18n: ["admin", "common"] };
 
@@ -25,27 +28,33 @@ export const meta: Route.MetaFunction = ({ data }) => [
   { title: data?.metaTitle ?? "Admin – Users" },
 ];
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const me = await protectToAdminAndGetPermissions(context);
   const prisma = getPrisma(context);
   const tenantPrisma = getTenantPrisma(context);
   const org = getOrgFromContext(context);
-  return loadAdminUsersData({
+  const data = await loadAdminUsersData({
     prisma,
     tenantPrisma,
     org,
     currentUserId: me.id,
   });
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+  return { ...data, metaTitle: t("users.metaTitle") };
 }
 
-function dataWithToast(outcome: AdminUsersActionOutcome) {
+function dataWithToast(outcome: AdminUsersActionOutcome, t: TFunction) {
+  // Server returns translation-ready keys; we resolve at the route boundary
+  // so the toast lands in the user's active locale.
+  const message = t(outcome.message.key, outcome.message.params ?? {});
   if (outcome.kind === "success") {
-    return dataWithSuccess(outcome.data, outcome.message);
+    return dataWithSuccess(outcome.data, message);
   }
   if (outcome.kind === "warning") {
-    return dataWithWarning(outcome.data, outcome.message);
+    return dataWithWarning(outcome.data, message);
   }
-  return dataWithError(outcome.data, outcome.message);
+  return dataWithError(outcome.data, message);
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -54,6 +63,8 @@ export async function action({ request, context }: Route.ActionArgs) {
   const auth: AdminUsersAuth = getAuth(context);
   const formData = await request.formData();
   const org = getOrgFromContext(context);
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, ["admin", "errors"]);
   const outcome = await handleAdminUsersAction({
     formData,
     requestHeaders: request.headers,
@@ -71,7 +82,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         createViewerMagicLink(context, createdByUserId, daysValid),
     },
   });
-  return dataWithToast(outcome);
+  return dataWithToast(outcome, t);
 }
 
 function BanButton({ user, currentUserId }: { user: { id: string; name: string; banned: boolean; banReason: string | null }; currentUserId: string }) {

@@ -1,4 +1,5 @@
 import { Link, useRouteLoaderData } from "react-router";
+import { useTranslation } from "react-i18next";
 import wordmark from "/logo-wordmark.svg?url";
 
 /**
@@ -13,6 +14,7 @@ type RootLoader = {
 };
 
 export function MarketingNav() {
+  const { t } = useTranslation("common");
   const rootData = useRouteLoaderData("root") as RootLoader | undefined;
   const isAuthed = !!rootData?.user;
   const dashboardUrl = rootData?.dashboardUrl ?? null;
@@ -24,40 +26,40 @@ export function MarketingNav() {
         <Link
           to="/"
           className="inline-flex items-center"
-          aria-label="Pickup Roster home"
+          aria-label={t("marketingNav.homeAriaLabel")}
         >
-          <img src={wordmark} alt="Pickup Roster" className="h-8 w-auto" />
+          <img src={wordmark} alt={t("marketingNav.wordmarkAlt")} className="h-8 w-auto" />
         </Link>
         <div className="flex flex-wrap items-center justify-end gap-4 text-sm font-medium text-white/80">
           <Link to="/pricing" className="transition hover:text-white">
-            Pricing
+            {t("marketingNav.pricing")}
           </Link>
           <Link to="/blog" className="transition hover:text-white">
-            Blog
+            {t("marketingNav.blog")}
           </Link>
           <Link to="/guides" className="transition hover:text-white">
-            Guides
+            {t("marketingNav.guides")}
           </Link>
           <Link to="/faqs" className="transition hover:text-white">
-            FAQs
+            {t("marketingNav.faqs")}
           </Link>
           {showDashboard ? (
             <a
               href={dashboardUrl!}
               className="rounded-lg bg-[#E9D500] px-3 py-1.5 text-[#193B4B] transition hover:bg-[#f5e047]"
             >
-              Dashboard
+              {t("marketingNav.dashboard")}
             </a>
           ) : (
             <>
               <Link to="/login" className="transition hover:text-white">
-                Log in
+                {t("marketingNav.login")}
               </Link>
               <Link
                 to="/pricing"
                 className="rounded-lg bg-[#E9D500] px-3 py-1.5 text-[#193B4B] transition hover:bg-[#f5e047]"
               >
-                Sign up
+                {t("marketingNav.signup")}
               </Link>
             </>
           )}

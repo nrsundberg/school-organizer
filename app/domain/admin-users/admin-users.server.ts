@@ -1,6 +1,7 @@
 import type { Org, PrismaClient, User, ViewerAccessAttempt } from "~/db";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
+import type { ServerMessage } from "~/domain/types/server-message";
 
 const TEMP_PASSWORD_CHARS =
   "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
@@ -29,21 +30,30 @@ export type AdminUsersLoaderData = {
   passwordResetEnabled: boolean;
 };
 
+/**
+ * Outcome of an admin-users action handler. Carries a translation-ready
+ * {@link ServerMessage} (instead of an English string) so the route
+ * boundary can render it in the active locale via `t(message.key, ...)`.
+ *
+ * `kind` distinguishes which remix-toast helper the route should call
+ * (`dataWithSuccess` / `dataWithWarning` / `dataWithError`). `data`
+ * carries fetcher payloads (temp passwords, magic links) for the UI.
+ */
 export type AdminUsersActionOutcome =
   | {
       kind: "success";
       data: AdminUsersFetcherData | null;
-      message: string;
+      message: ServerMessage;
     }
   | {
       kind: "error";
       data: null;
-      message: string;
+      message: ServerMessage;
     }
   | {
       kind: "warning";
       data: null;
-      message: string;
+      message: ServerMessage;
     };
 
 export type AdminUsersAuth = {
@@ -246,17 +256,24 @@ export async function handleAdminUsersAction({
       return {
         kind: "success",
         data: { tempPassword },
-        message: `User created! Temp password: ${tempPassword}`,
+        message: {
+          key: "admin:users.toasts.userCreated",
+          params: { password: tempPassword },
+        },
       };
     } catch (error) {
       if (isDuplicateUserError(error)) {
         return {
           kind: "error",
           data: null,
-          message: "An account with that email already exists.",
+          message: { key: "admin:users.errors.emailExists" },
         };
       }
-      return { kind: "error", data: null, message: "Failed to create user." };
+      return {
+        kind: "error",
+        data: null,
+        message: { key: "admin:users.errors.createUserFailed" },
+      };
     }
   }
 
@@ -271,7 +288,7 @@ export async function handleAdminUsersAction({
       return {
         kind: "error",
         data: null,
-        message: "No credential account found.",
+        message: { key: "admin:users.errors.noCredential" },
       };
     }
     await prisma.account.update({
@@ -285,26 +302,40 @@ export async function handleAdminUsersAction({
     return {
       kind: "success",
       data: { tempPassword },
-      message: `Password reset! New temp password: ${tempPassword}`,
+      message: {
+        key: "admin:users.toasts.passwordReset",
+        params: { password: tempPassword },
+      },
     };
   }
 
   if (action === "changeRole") {
     const { userId, role } = changeRoleSchema.parse(formData);
     await prisma.user.update({ where: { id: userId }, data: { role } });
-    return { kind: "success", data: null, message: "Role updated." };
+    return {
+      kind: "success",
+      data: null,
+      message: { key: "admin:users.toasts.roleUpdated" },
+    };
   }
 
   if (action === "revokeUserSessions") {
     const userId = String(formData.get("userId") ?? "");
     if (!userId) {
-      return { kind: "error", data: null, message: "Missing user id." };
+      return {
+        kind: "error",
+        data: null,
+        message: { key: "admin:users.errors.missingId" },
+      };
     }
     const result = await prisma.session.deleteMany({ where: { userId } });
     return {
       kind: "success",
       data: null,
-      message: `Revoked ${result.count} active session(s).`,
+      message: {
+        key: "admin:users.toasts.sessionsRevoked",
+        params: { count: result.count },
+      },
     };
   }
 
@@ -320,15 +351,22 @@ export async function handleAdminUsersAction({
       kind: "success",
       data: { viewerPin: pin },
       message: revokeFlag
-        ? `Viewer PIN updated. Revoked ${revoked} viewer session(s).`
-        : "Viewer PIN updated.",
+        ? {
+            key: "admin:users.toasts.viewerPinRevoked",
+            params: { count: revoked },
+          }
+        : { key: "admin:users.toasts.viewerPinUpdated" },
     };
   }
 
   if (action === "resetViewerLock") {
     const { clientKey } = resetViewerLockSchema.parse(formData);
     await viewerAccess.resetLock(clientKey);
-    return { kind: "success", data: null, message: "Viewer lock reset." };
+    return {
+      kind: "success",
+      data: null,
+      message: { key: "admin:users.toasts.viewerLockReset" },
+    };
   }
 
   if (action === "createViewerMagicLink") {
@@ -337,7 +375,10 @@ export async function handleAdminUsersAction({
     return {
       kind: "success",
       data: { magicLink: buildViewerMagicLink(requestUrl, token) },
-      message: `Magic link created. Valid for ${daysValid} day(s).`,
+      message: {
+        key: "admin:users.toasts.magicLinkCreated",
+        params: { days: daysValid },
+      },
     };
   }
 
@@ -346,7 +387,7 @@ export async function handleAdminUsersAction({
       return {
         kind: "error",
         data: null,
-        message: "Only admins can change this setting.",
+        message: { key: "admin:users.errors.onlyAdmins" },
       };
     }
     const parsed = setPasswordResetEnabledSchema.parse(formData);
@@ -359,15 +400,19 @@ export async function handleAdminUsersAction({
       kind: "success",
       data: null,
       message: enabled
-        ? "Password reset is now enabled for your org."
-        : "Password reset is now disabled. Users must sign in via SSO once configured.",
+        ? { key: "admin:users.toasts.passwordResetEnabled" }
+        : { key: "admin:users.toasts.passwordResetDisabled" },
     };
   }
 
   if (action === "deleteUser") {
     const userId = uncheckedFormText(formData, "userId");
     await prisma.user.delete({ where: { id: userId } });
-    return { kind: "warning", data: null, message: "User deleted." };
+    return {
+      kind: "warning",
+      data: null,
+      message: { key: "admin:users.toasts.userDeleted" },
+    };
   }
 
   if (action === "ban") {
@@ -379,14 +424,26 @@ export async function handleAdminUsersAction({
       body: { userId, banReason },
       headers: requestHeaders,
     });
-    return { kind: "success", data: null, message: "User banned." };
+    return {
+      kind: "success",
+      data: null,
+      message: { key: "admin:users.toasts.userBanned" },
+    };
   }
 
   if (action === "unban") {
     const userId = uncheckedFormText(formData, "userId");
     await auth.api.unbanUser({ body: { userId }, headers: requestHeaders });
-    return { kind: "success", data: null, message: "User unbanned." };
+    return {
+      kind: "success",
+      data: null,
+      message: { key: "admin:users.toasts.userUnbanned" },
+    };
   }
 
-  return { kind: "error", data: null, message: "Unknown action" };
+  return {
+    kind: "error",
+    data: null,
+    message: { key: "admin:users.errors.unknown" },
+  };
 }

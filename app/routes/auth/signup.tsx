@@ -21,12 +21,10 @@ import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.ser
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { ensureOrgForUser } from "~/domain/billing/onboarding.server";
 import {
-  billingCycleLabel,
   billingPlanForSlug,
   normalizePublicPlanSelectionSource,
   normalizePublicBillingCycle,
   normalizePublicPlan,
-  planLabel,
   pricingPathForPlan,
   PUBLIC_BILLING_CYCLES,
   PUBLIC_PLAN_SELECTION_SOURCES,
@@ -51,13 +49,16 @@ import {
 } from "~/domain/utils/rate-limit.server";
 import { createCheckoutSessionForOrg } from "~/domain/billing/checkout.server";
 import { redirectWithError } from "remix-toast";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
+import { localizedErrorMap } from "~/lib/zod-error-map.server";
 
 export const handle = { i18n: ["auth"] };
 
 export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
   return [
-    { title: "Signup — Pickup Roster" },
-    { name: "description", content: "Create your organization and account" }
+    { title: data?.metaTitle ?? "Signup — Pickup Roster" },
+    { name: "description", content: data?.metaDescription ?? "Create your organization and account" }
   ];
 }
 
@@ -81,12 +82,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (!plan && !user) {
     throw redirect("/pricing");
   }
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "auth");
   return {
     plan: plan ?? "car-line",
     billingCycle: normalizePublicBillingCycle(url.searchParams.get("cycle")),
     planSelectionSource: normalizePublicPlanSelectionSource(
       plan ? "explicit" : null
-    )
+    ),
+    metaTitle: t("signup.metaTitle"),
+    metaDescription: t("signup.metaDescription"),
   };
 }
 
@@ -115,9 +120,9 @@ const step1Schema = z.object({
     .string()
     .refine(
       (v) => countDigits(v) >= 10,
-      "Phone number must be at least 10 digits."
+      "auth:signup.errors.phoneTooShort"
     ),
-  password: z.string().min(8, "Password must be at least 8 characters.")
+  password: z.string().min(8, "auth:signup.errors.passwordTooShort")
 });
 
 const step3Schema = zfd.formData({
@@ -137,6 +142,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "auth");
+  const tErrors = await getFixedT(locale, "errors");
 
   // 0. Rate limit by IP
   const clientIp = clientIpFromRequest(request);
@@ -147,7 +153,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (!rlResult.ok) {
     return data(
       {
-        error: "Too many attempts. Please try again in a minute.",
+        error: t("signup.errors.rateLimited"),
         field: undefined
       },
       { status: 429, headers: { "Retry-After": "60" } }
@@ -160,7 +166,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (!session?.user?.id) {
     return data(
       {
-        error: "Your session expired. Please refresh and sign in again.",
+        error: t("signup.errors.sessionExpired"),
         field: undefined
       },
       { status: 401 }
@@ -171,12 +177,14 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   // 2. Parse FormData
   const formData = await request.formData();
-  const parsed = step3Schema.safeParse(formData);
+  const parsed = step3Schema.safeParse(formData, {
+    error: localizedErrorMap(tErrors),
+  });
   if (!parsed.success) {
     const firstError = parsed.error.issues[0];
     return data(
       {
-        error: firstError?.message ?? "Invalid form data.",
+        error: firstError?.message ?? t("signup.errors.invalidForm"),
         field: firstError?.path[0]?.toString()
       },
       { status: 400 }
@@ -206,7 +214,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     orgId = result.orgId;
   } catch (err: unknown) {
     const msg =
-      err instanceof Error ? err.message : "Unable to create organization.";
+      err instanceof Error ? err.message : t("signup.errors.createOrgFailed");
     const isSlugError = msg.toLowerCase().includes("slug");
     return data(
       { error: msg, field: isSlugError ? "slug" : undefined },
@@ -237,7 +245,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       const message =
         error instanceof Error
           ? error.message
-          : "Could not start Stripe Checkout.";
+          : t("signup.errors.couldNotStartCheckout");
       return redirectWithError(pricingPathForPlan(plan, billingCycle), message);
     }
   }
@@ -379,9 +387,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
     }
     const parsedStep1 = step1Schema.safeParse({ name, email, phone, password });
     if (!parsedStep1.success) {
-      setError(
-        parsedStep1.error.issues[0]?.message ?? "Please check your inputs."
-      );
+      setError(translateZodMessage(parsedStep1.error.issues[0]?.message));
       return;
     }
     const normalizedPhone = normalizePhone(phone);
@@ -441,9 +447,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
         setSlugVerifiedFor(payload.slug ?? normalized);
       } else {
         setSlugVerifiedFor(null);
-        setError(
-          "That slug is already taken. Try another or pick a suggestion."
-        );
+        setError(t("signup.errors.slugTaken"));
       }
     } catch {
       setError(t("signup.errors.generic"));
@@ -460,9 +464,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
       return;
     }
     if (!slugIsVerified) {
-      setError(
-        'Check that your slug is available using "Check availability" before continuing.'
-      );
+      setError(t("signup.errors.checkSlug"));
       return;
     }
     setStep(3);
@@ -491,12 +493,38 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
         ? t("signup.step3.planNames.campus")
         : t("signup.step3.planNames.carLine");
 
-  const planDescription =
-    plan === "DISTRICT"
-      ? t("signup.step3.planDescriptions.district")
-      : plan === "CAMPUS"
-        ? t("signup.step3.planDescriptions.campus")
-        : t("signup.step3.planDescriptions.carLine");
+  const cycleLabel = t(
+    selectedBillingCycle === "annual"
+      ? "signup.step3.cycle.annual"
+      : "signup.step3.cycle.monthly"
+  );
+
+  const planDescription = (() => {
+    if (plan === "DISTRICT") {
+      return t("signup.step3.planDescriptions.district");
+    }
+    if (plan === "CAMPUS") {
+      return startsInCheckout
+        ? t("signup.step3.planDescriptions.campusCheckout", { cycle: cycleLabel })
+        : t("signup.step3.planDescriptions.campus", { cycle: cycleLabel });
+    }
+    return startsInCheckout
+      ? t("signup.step3.planDescriptions.carLineCheckout", { cycle: cycleLabel })
+      : t("signup.step3.planDescriptions.carLine", { cycle: cycleLabel });
+  })();
+
+  const step3Title = startsInCheckout
+    ? t("signup.step3.titleCheckout")
+    : t("signup.step3.title");
+  const step3Subtitle = startsInCheckout
+    ? t("signup.step3.subtitleCheckout")
+    : t("signup.step3.subtitle");
+  const step3Submit = startsInCheckout
+    ? t("signup.step3.submitCheckout")
+    : t("signup.step3.submit");
+  const step3Terms = startsInCheckout
+    ? t("signup.step3.termsCheckout")
+    : t("signup.step3.terms");
 
   return (
     <div className="min-h-screen bg-[#0f1414] text-white">
@@ -540,7 +568,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
               </p>
               <form onSubmit={handleStep1} className="mt-6 flex flex-col gap-3">
                 <label className="text-sm text-white/80" htmlFor="signup-name">
-                  Your name
+                  {t("signup.step1.nameLabel")}
                 </label>
                 <Input
                   id="signup-name"
@@ -552,7 +580,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   autoComplete="name"
                 />
                 <label className="text-sm text-white/80" htmlFor="signup-email">
-                  Email
+                  {t("signup.step1.emailLabel")}
                 </label>
                 <Input
                   id="signup-email"
@@ -564,7 +592,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   autoComplete="email"
                 />
                 <label className="text-sm text-white/80" htmlFor="signup-phone">
-                  Phone number
+                  {t("signup.step1.phoneLabel")}
                 </label>
                 <Input
                   id="signup-phone"
@@ -579,7 +607,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   className="text-sm text-white/80"
                   htmlFor="signup-password"
                 >
-                  Password
+                  {t("signup.step1.passwordLabel")}
                 </label>
                 <Input
                   id="signup-password"
@@ -595,7 +623,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   className="text-sm text-white/80"
                   htmlFor="signup-confirm-password"
                 >
-                  Confirm password
+                  {t("signup.step1.confirmLabel")}
                 </label>
                 <Input
                   id="signup-confirm-password"
@@ -616,7 +644,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   variant="primary"
                   className="mt-2 bg-[#E9D500] font-semibold text-[#193B4B]"
                 >
-                  Continue
+                  {t("signup.step1.continue")}
                 </Button>
               </form>
             </>
@@ -626,8 +654,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
             <>
               <h1 className="text-2xl font-bold">{t("signup.step2.title")}</h1>
               <p className="mt-2 text-sm text-white/65">
-                Your slug becomes part of your school&apos;s web address. It
-                must be unique.
+                {t("signup.step2.subtitle")}
               </p>
               <form
                 onSubmit={handleStep2Next}
@@ -637,7 +664,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   className="text-sm text-white/80"
                   htmlFor="signup-org-name"
                 >
-                  School / organization name
+                  {t("signup.step2.orgNameLabel")}
                 </label>
                 <Input
                   id="signup-org-name"
@@ -650,7 +677,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   }}
                 />
                 <label className="text-sm text-white/80" htmlFor="signup-slug">
-                  URL slug
+                  {t("signup.step2.slugLabel")}
                 </label>
                 <Input
                   id="signup-slug"
@@ -660,7 +687,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   onChange={(e) => setSlug(e.target.value)}
                 />
                 <p className="text-xs text-white/50">
-                  Lowercase letters, numbers, and hyphens.
+                  {t("signup.step2.slugHelp")}
                 </p>
                 {suggestions.length > 0 && (
                   <div>
@@ -699,7 +726,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   </Button>
                   {slugIsVerified && (
                     <span className="text-sm text-emerald-400">
-                      Available — you can continue.
+                      {t("signup.step2.available")}
                     </span>
                   )}
                 </div>
@@ -713,7 +740,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                     className="flex-1 border-white/20 text-white"
                     onPress={() => setStep(1)}
                   >
-                    Back
+                    {t("signup.step2.back")}
                   </Button>
                   <Button
                     type="submit"
@@ -730,21 +757,11 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
 
           {step === 3 && (
             <>
-              <h1 className="text-2xl font-bold">
-                {startsInCheckout
-                  ? "Finish setup and continue to checkout"
-                  : "Start your free trial"}
-              </h1>
+              <h1 className="text-2xl font-bold">{step3Title}</h1>
               <p className="mt-2 text-sm text-white/65">
-                {startsInCheckout
-                  ? "We’ll create your school first, then send you to Stripe Checkout to add billing for the plan you selected."
-                  : "Your 30-day trial starts as soon as you finish setup. No credit card required."}
+                {step3Subtitle}
                 {!startsInCheckout && plan === "DISTRICT" && (
-                  <>
-                    {" "}
-                    We&apos;ll reach out during your trial to discuss your
-                    district&apos;s pricing and setup.
-                  </>
+                  <> {t("signup.step3.districtAddon")}</>
                 )}
               </p>
               <div className="mt-6 rounded-2xl border border-[#E9D500]/40 bg-[#193B4B]/30 p-4 text-sm">
@@ -752,18 +769,10 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   {t("signup.step3.selectedPlan")}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-[#E9D500]">
-                  {planLabel(plan)}
+                  {planNameLabel}
                 </p>
                 <p className="mt-1 text-xs text-white/60">
-                  {plan === "DISTRICT"
-                    ? "Custom pricing — confirmed with you during the trial."
-                    : plan === "CAMPUS"
-                      ? startsInCheckout
-                        ? `$500 / month per school. ${billingCycleLabel(selectedBillingCycle)} billing selected for checkout.`
-                        : `$500 / month per school after your 30-day trial. ${billingCycleLabel(selectedBillingCycle)} billing selected for checkout.`
-                      : startsInCheckout
-                        ? `$100 / month per school. ${billingCycleLabel(selectedBillingCycle)} billing selected for checkout.`
-                        : `$100 / month per school after your 30-day trial. ${billingCycleLabel(selectedBillingCycle)} billing selected for checkout.`}
+                  {planDescription}
                 </p>
               </div>
               {/* Step 3 uses a real Form with server action */}
@@ -794,22 +803,18 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                     className="flex-1 border-white/20 text-white"
                     onPress={() => setStep(2)}
                   >
-                    Back
+                    {t("signup.step3.back")}
                   </Button>
                   <Button
                     type="submit"
                     variant="primary"
                     className="flex-1 bg-[#E9D500] font-semibold text-[#193B4B]"
                   >
-                    {startsInCheckout
-                      ? "Continue to secure checkout"
-                      : "Start 30-day trial"}
+                    {step3Submit}
                   </Button>
                 </div>
                 <p className="text-center text-xs text-white/40">
-                  {startsInCheckout
-                    ? "By continuing you agree to our terms. Your account and school are created first, then Stripe Checkout opens to finish billing setup."
-                    : "By continuing you agree to our terms. No card is collected here; when you&apos;re ready to activate billing, you&apos;ll continue to Stripe from pricing or your billing page."}
+                  {step3Terms}
                 </p>
               </Form>
             </>

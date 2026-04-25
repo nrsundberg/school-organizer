@@ -190,10 +190,15 @@ test("handleAdminUsersAction creates a user with a temporary password and then a
     makeTempPassword: () => "TempPass123",
   });
 
+  // Outcome carries a translation-ready ServerMessage rather than a string —
+  // route boundary will resolve via t(key, params).
   assert.deepEqual(outcome, {
     kind: "success",
     data: { tempPassword: "TempPass123" },
-    message: "User created! Temp password: TempPass123",
+    message: {
+      key: "admin:users.toasts.userCreated",
+      params: { password: "TempPass123" },
+    },
   });
   assert.deepEqual(createCalls, [
     {
@@ -241,7 +246,7 @@ test("handleAdminUsersAction returns the duplicate-account toast outcome without
   assert.deepEqual(outcome, {
     kind: "error",
     data: null,
-    message: "An account with that email already exists.",
+    message: { key: "admin:users.errors.emailExists" },
   });
   assert.deepEqual(calls.userUpdates, []);
 });
@@ -263,7 +268,7 @@ test("handleAdminUsersAction gates password-reset toggles to admins and writes t
   assert.deepEqual(denied, {
     kind: "error",
     data: null,
-    message: "Only admins can change this setting.",
+    message: { key: "admin:users.errors.onlyAdmins" },
   });
   assert.deepEqual(nonAdmin.calls.orgUpdates, []);
 
@@ -316,6 +321,9 @@ test("handleAdminUsersAction creates encoded viewer magic links through the view
     data: {
       magicLink: "https://school.example.org/viewer-access?token=raw%20token",
     },
-    message: "Magic link created. Valid for 3 day(s).",
+    message: {
+      key: "admin:users.toasts.magicLinkCreated",
+      params: { days: 3 },
+    },
   });
 });

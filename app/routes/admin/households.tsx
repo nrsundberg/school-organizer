@@ -3,12 +3,14 @@ import { Form } from "react-router";
 import { Button, Input, TextArea } from "@heroui/react";
 import { CalendarClock, Home, Megaphone, TrendingUp, UserMinus, Users } from "lucide-react";
 import { dataWithError, dataWithSuccess, dataWithWarning } from "remix-toast";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { Route } from "./+types/households";
 import {
   defaultHouseholdName,
   parseStudentIds,
   studentDisplayName,
-} from "~/domain/households/households.server";
+} from "~/domain/households/households";
 import {
   DISMISSAL_PLANS,
   WEEKDAYS,
@@ -21,15 +23,50 @@ import { buildRoiDashboardSnapshot } from "~/domain/dismissal/roi.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 import { broadcastProgramCancellation } from "~/lib/broadcast.server";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
+import { detectLocale } from "~/i18n.server";
+import { getFixedT } from "~/lib/t.server";
 
-export const meta: Route.MetaFunction = () => [
-  { title: "Admin – Households" },
+export const handle = { i18n: ["admin", "errors", "common"] };
+
+export const meta: Route.MetaFunction = ({ data }) => [
+  { title: data?.metaTitle ?? "Admin – Households" },
 ];
+
+const WEEKDAY_KEYS = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+] as const;
+
+const DISMISSAL_PLAN_KEYS: Record<string, string> = {
+  "Car line": "carLine",
+  "Walker": "walker",
+  "Bus": "bus",
+  "After-school program": "afterSchoolProgram",
+  "Office pickup": "officePickup",
+  "Other": "other",
+};
+
+function dismissalPlanLabel(t: TFunction, plan: string): string {
+  const key = DISMISSAL_PLAN_KEYS[plan];
+  return key ? t(`households.dismissalPlans.${key}`) : plan;
+}
+
+function weekdayLabel(t: TFunction, index: number): string {
+  const key = WEEKDAY_KEYS[index];
+  return key ? t(`households.weekdays.${key}`) : t("households.exceptions.scheduleWeeklyFallback");
+}
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const roiRange = dateRangeFromSearchParams(new URL(request.url));
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
 
   const [
     households,
@@ -125,6 +162,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   ]);
 
   return {
+    metaTitle: t("households.metaTitle"),
     households,
     unassignedStudents,
     allStudents,
@@ -166,12 +204,14 @@ export async function action({ request, context }: Route.ActionArgs) {
   const org = getOrgFromContext(context);
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
 
   try {
     if (intent === "create") {
       const studentIds = parseStudentIds(formData);
       if (studentIds.length === 0) {
-        return dataWithError(null, "Choose at least one student to group.");
+        return dataWithError(null, t("households.errors.chooseStudent"));
       }
 
       const students = await prisma.student.findMany({
@@ -179,7 +219,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         select: { id: true, firstName: true, lastName: true },
       });
       if (students.length === 0) {
-        return dataWithError(null, "No matching students found.");
+        return dataWithError(null, t("households.errors.noMatchingStudents"));
       }
 
       const requestedName = String(formData.get("name") ?? "").trim();
@@ -200,14 +240,17 @@ export async function action({ request, context }: Route.ActionArgs) {
         data: { householdId: household.id },
       });
 
-      return dataWithSuccess(null, `Created ${household.name}.`);
+      return dataWithSuccess(
+        null,
+        t("households.actions.createdHousehold", { name: household.name }),
+      );
     }
 
     if (intent === "update") {
       const householdId = String(formData.get("householdId") ?? "");
       const name = String(formData.get("name") ?? "").trim();
       if (!householdId || !name) {
-        return dataWithError(null, "Household name is required.");
+        return dataWithError(null, t("households.errors.nameRequired"));
       }
 
       await prisma.household.update({
@@ -221,7 +264,7 @@ export async function action({ request, context }: Route.ActionArgs) {
             String(formData.get("primaryContactPhone") ?? "").trim() || null,
         },
       });
-      return dataWithSuccess(null, "Household pickup context updated.");
+      return dataWithSuccess(null, t("households.actions.pickupContextUpdated"));
     }
 
     if (intent === "assign") {
@@ -230,7 +273,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       if (!householdId || studentIds.length === 0) {
         return dataWithError(
           null,
-          "Choose a household and at least one student.",
+          t("households.errors.chooseHouseholdAndStudent"),
         );
       }
 
@@ -238,26 +281,26 @@ export async function action({ request, context }: Route.ActionArgs) {
         where: { id: { in: studentIds } },
         data: { householdId },
       });
-      return dataWithSuccess(null, "Student assignment updated.");
+      return dataWithSuccess(null, t("households.actions.studentAssignmentUpdated"));
     }
 
     if (intent === "detach") {
       const studentId = Number(formData.get("studentId"));
       if (!Number.isInteger(studentId)) {
-        return dataWithError(null, "Invalid student.");
+        return dataWithError(null, t("households.errors.invalidStudent"));
       }
 
       await prisma.student.update({
         where: { id: studentId },
         data: { householdId: null },
       });
-      return dataWithWarning(null, "Student removed from household.");
+      return dataWithWarning(null, t("households.actions.studentDetached"));
     }
 
     if (intent === "delete") {
       const householdId = String(formData.get("householdId") ?? "");
       if (!householdId) {
-        return dataWithError(null, "Invalid household.");
+        return dataWithError(null, t("households.errors.invalidHousehold"));
       }
 
       await prisma.student.updateMany({
@@ -267,7 +310,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       await prisma.household.delete({ where: { id: householdId } });
       return dataWithWarning(
         null,
-        "Household deleted; students were left on the roster.",
+        t("households.actions.householdDeleted"),
       );
     }
 
@@ -283,7 +326,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       if (!householdId || !dismissalPlan) {
         return dataWithError(
           null,
-          "Choose a household and dismissal plan for the exception.",
+          t("households.errors.chooseHouseholdAndPlan"),
         );
       }
 
@@ -300,7 +343,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       } else {
         dayOfWeek = Number(formData.get("dayOfWeek"));
         if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
-          return dataWithError(null, "Choose a weekday for recurring exceptions.");
+          return dataWithError(null, t("households.errors.chooseWeekday"));
         }
         startsOn = parseOptionalDateOnly(
           String(formData.get("startsOn") ?? ""),
@@ -315,7 +358,7 @@ export async function action({ request, context }: Route.ActionArgs) {
           endsOn &&
           startsOn.getTime() > endsOn.getTime()
         ) {
-          return dataWithError(null, "Recurring exceptions cannot end before they start.");
+          return dataWithError(null, t("households.errors.endsBeforeStart"));
         }
       }
 
@@ -336,20 +379,20 @@ export async function action({ request, context }: Route.ActionArgs) {
         },
       });
 
-      return dataWithSuccess(null, "Recurring dismissal exception saved.");
+      return dataWithSuccess(null, t("households.actions.exceptionSaved"));
     }
 
     if (intent === "deactivateException") {
       const exceptionId = String(formData.get("exceptionId") ?? "").trim();
       if (!exceptionId) {
-        return dataWithError(null, "Invalid exception.");
+        return dataWithError(null, t("households.errors.invalidException"));
       }
 
       await prisma.dismissalException.update({
         where: { id: exceptionId },
         data: { isActive: false },
       });
-      return dataWithWarning(null, "Recurring exception archived.");
+      return dataWithWarning(null, t("households.actions.exceptionArchived"));
     }
 
     if (intent === "createCancellation") {
@@ -365,13 +408,13 @@ export async function action({ request, context }: Route.ActionArgs) {
       if (!programId && !programNameInput) {
         return dataWithError(
           null,
-          "Choose an existing program or enter a new program name.",
+          t("households.errors.chooseProgram"),
         );
       }
       if (!title || !message) {
         return dataWithError(
           null,
-          "Cancellation title and message are both required.",
+          t("households.errors.titleAndMessageRequired"),
         );
       }
 
@@ -402,7 +445,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       }
 
       if (!program) {
-        return dataWithError(null, "Unable to resolve the after-school program.");
+        return dataWithError(null, t("households.errors.unableResolveProgram"));
       }
 
       const cancellation = await prisma.programCancellation.create({
@@ -434,25 +477,25 @@ export async function action({ request, context }: Route.ActionArgs) {
           console.error("program cancellation broadcast failed", error);
           return dataWithWarning(
             null,
-            "Cancellation saved, but the live board broadcast failed.",
+            t("households.actions.cancellationBroadcastFailed"),
           );
         }
       }
 
       return dataWithSuccess(
         null,
-        `Cancellation notice sent for ${program.name}.`,
+        t("households.actions.cancellationSent", { name: program.name }),
       );
     }
   } catch (error) {
     console.error("household action failed", error);
     return dataWithError(
       null,
-      error instanceof Error ? error.message : "Household update failed.",
+      error instanceof Error ? error.message : t("households.errors.updateFailed"),
     );
   }
 
-  return dataWithError(null, "Unknown household action.");
+  return dataWithError(null, t("households.errors.unknown"));
 }
 
 export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
@@ -465,18 +508,17 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
     programs,
     recentCancellations,
   } = loaderData;
+  const { t } = useTranslation("admin");
 
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">
-            Households, exceptions, and pickup ROI
+            {t("households.heading")}
           </h1>
           <p className="max-w-3xl text-sm text-white/60">
-            Group siblings, capture shared pickup context, manage recurring
-            dismissal exceptions, and push after-school cancellation notices
-            onto the live board.
+            {t("households.intro")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-sm">
@@ -484,19 +526,19 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
             href="#roi"
             className="rounded-full border border-white/15 px-3 py-1 text-white/70 hover:border-white/30 hover:text-white"
           >
-            ROI snapshot
+            {t("households.anchors.roi")}
           </a>
           <a
             href="#exceptions"
             className="rounded-full border border-white/15 px-3 py-1 text-white/70 hover:border-white/30 hover:text-white"
           >
-            Recurring exceptions
+            {t("households.anchors.exceptions")}
           </a>
           <a
             href="#cancellations"
             className="rounded-full border border-white/15 px-3 py-1 text-white/70 hover:border-white/30 hover:text-white"
           >
-            Cancellation alerts
+            {t("households.anchors.cancellations")}
           </a>
         </div>
       </div>
@@ -507,53 +549,67 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
         <div className="rounded-xl border border-white/10 bg-white/5 p-5">
           <div className="mb-4 flex items-center gap-2">
             <Users className="h-5 w-5 text-blue-300" />
-            <h2 className="font-semibold text-white">Create a household</h2>
+            <h2 className="font-semibold text-white">
+              {t("households.create.heading")}
+            </h2>
           </div>
           <Form method="post" className="flex flex-col gap-4">
             <input type="hidden" name="intent" value="create" />
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Household name">
-                <Input name="name" placeholder="Garcia household" />
+              <Field label={t("households.create.nameLabel")}>
+                <Input
+                  name="name"
+                  placeholder={t("households.create.namePlaceholder")}
+                />
               </Field>
-              <Field label="Primary pickup contact">
-                <Input name="primaryContactName" placeholder="Optional" />
+              <Field label={t("households.create.primaryContactLabel")}>
+                <Input
+                  name="primaryContactName"
+                  placeholder={t("households.create.primaryContactPlaceholder")}
+                />
               </Field>
-              <Field label="Contact phone">
-                <Input name="primaryContactPhone" placeholder="Optional" />
+              <Field label={t("households.create.contactPhoneLabel")}>
+                <Input
+                  name="primaryContactPhone"
+                  placeholder={t("households.create.contactPhonePlaceholder")}
+                />
               </Field>
             </div>
-            <Field label="Shared pickup context">
+            <Field label={t("households.create.pickupContextLabel")}>
               <TextArea
                 name="pickupNotes"
                 rows={3}
-                placeholder="Example: both siblings leave together on car line unless there is an active exception."
+                placeholder={t("households.create.pickupContextPlaceholder")}
               />
             </Field>
             <StudentCheckboxList
               students={unassignedStudents}
-              emptyText="No unassigned students. Detach a student from another household first."
+              emptyText={t("households.create.unassignedEmpty")}
             />
             <Button type="submit" variant="primary" className="self-start">
-              Create household
+              {t("households.create.submit")}
             </Button>
           </Form>
         </div>
 
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-          <h2 className="font-semibold text-white">Assign existing students</h2>
+          <h2 className="font-semibold text-white">
+            {t("households.assign.heading")}
+          </h2>
           <p className="mt-1 text-sm text-white/50">
-            Use this when a new sibling is added after the household already
-            exists.
+            {t("households.assign.subtitle")}
           </p>
           <Form method="post" className="mt-4 flex flex-col gap-3">
             <input type="hidden" name="intent" value="assign" />
-            <Field label="Household">
+            <Field label={t("households.assign.householdLabel")}>
               <select
                 name="householdId"
                 className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
                 defaultValue=""
               >
-                <option value="">Choose household</option>
+                <option value="">
+                  {t("households.assign.householdPlaceholder")}
+                </option>
                 {households.map((household: HouseholdRecord) => (
                   <option key={household.id} value={household.id}>
                     {household.name}
@@ -563,11 +619,11 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
             </Field>
             <StudentCheckboxList
               students={allStudents}
-              emptyText="No students yet."
+              emptyText={t("households.assign.noStudents")}
               compact
             />
             <Button type="submit" variant="secondary">
-              Assign selected
+              {t("households.assign.submit")}
             </Button>
           </Form>
         </div>
@@ -581,24 +637,24 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
           <div className="mb-4 flex items-center gap-2">
             <CalendarClock className="h-5 w-5 text-cyan-300" />
             <h2 className="font-semibold text-white">
-              Add a recurring dismissal exception
+              {t("households.exceptions.addHeading")}
             </h2>
           </div>
           <p className="mb-4 text-sm text-white/50">
-            These exceptions feed the household count above and the ROI estimate
-            below. Weekly entries can be date-bounded when a temporary routine
-            is in place.
+            {t("households.exceptions.addIntro")}
           </p>
           <Form method="post" className="grid gap-3">
             <input type="hidden" name="intent" value="createException" />
-            <Field label="Household">
+            <Field label={t("households.exceptions.householdLabel")}>
               <select
                 name="householdId"
                 className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
                 defaultValue=""
                 required
               >
-                <option value="">Choose household</option>
+                <option value="">
+                  {t("households.exceptions.householdPlaceholder")}
+                </option>
                 {households.map((household: HouseholdRecord) => (
                   <option key={household.id} value={household.id}>
                     {household.name}
@@ -608,17 +664,21 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
             </Field>
 
             <div className="grid gap-3 md:grid-cols-2">
-              <Field label="Schedule">
+              <Field label={t("households.exceptions.scheduleLabel")}>
                 <select
                   name="scheduleKind"
                   className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
                   defaultValue="DATE"
                 >
-                  <option value="DATE">One specific date</option>
-                  <option value="WEEKLY">Repeats weekly</option>
+                  <option value="DATE">
+                    {t("households.exceptions.scheduleDate")}
+                  </option>
+                  <option value="WEEKLY">
+                    {t("households.exceptions.scheduleWeekly")}
+                  </option>
                 </select>
               </Field>
-              <Field label="Dismissal plan">
+              <Field label={t("households.exceptions.dismissalPlanLabel")}>
                 <select
                   name="dismissalPlan"
                   className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
@@ -626,76 +686,77 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
                 >
                   {DISMISSAL_PLANS.map((plan) => (
                     <option key={plan} value={plan}>
-                      {plan}
+                      {dismissalPlanLabel(t, plan)}
                     </option>
                   ))}
                 </select>
               </Field>
-              <Field label="Specific date">
+              <Field label={t("households.exceptions.specificDateLabel")}>
                 <input
                   type="date"
                   name="exceptionDate"
                   className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
                 />
               </Field>
-              <Field label="Weekly day">
+              <Field label={t("households.exceptions.weeklyDayLabel")}>
                 <select
                   name="dayOfWeek"
                   className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
                   defaultValue="1"
                 >
-                  {WEEKDAYS.map((weekday, index) => (
-                    <option key={weekday} value={index}>
-                      {weekday}
+                  {WEEKDAYS.map((_weekday, index) => (
+                    <option key={index} value={index}>
+                      {weekdayLabel(t, index)}
                     </option>
                   ))}
                 </select>
               </Field>
-              <Field label="Starts on">
+              <Field label={t("households.exceptions.startsOnLabel")}>
                 <input
                   type="date"
                   name="startsOn"
                   className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
                 />
               </Field>
-              <Field label="Ends on">
+              <Field label={t("households.exceptions.endsOnLabel")}>
                 <input
                   type="date"
                   name="endsOn"
                   className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
                 />
               </Field>
-              <Field label="Pickup contact">
+              <Field label={t("households.exceptions.pickupContactLabel")}>
                 <Input
                   name="pickupContactName"
-                  placeholder="Optional override contact"
+                  placeholder={t("households.exceptions.pickupContactPlaceholder")}
                 />
               </Field>
             </div>
 
-            <Field label="Notes">
+            <Field label={t("households.exceptions.notesLabel")}>
               <TextArea
                 name="notes"
                 rows={3}
-                placeholder="Example: every Wednesday grandma picks up both siblings from the side door."
+                placeholder={t("households.exceptions.notesPlaceholder")}
               />
             </Field>
             <Button type="submit" variant="secondary" className="self-start">
-              Save exception
+              {t("households.exceptions.saveException")}
             </Button>
           </Form>
         </div>
 
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-          <h2 className="font-semibold text-white">Active recurring exceptions</h2>
+          <h2 className="font-semibold text-white">
+            {t("households.exceptions.activeHeading")}
+          </h2>
           <p className="mt-1 text-sm text-white/50">
-            Household-level exceptions keep the sibling group aligned even when
-            pickup routines change.
+            {t("households.exceptions.activeSubtitle")}
           </p>
           <div className="mt-4 flex flex-col gap-3">
             {activeExceptions.length === 0 ? (
               <p className="rounded-lg bg-black/20 p-4 text-sm text-white/45">
-                No recurring exceptions yet.
+                {t("households.exceptions.noneActive")}
               </p>
             ) : (
               activeExceptions.map((exception: ExceptionRecord) => (
@@ -706,13 +767,14 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="font-semibold text-white">
-                        {exception.household?.name ?? "Deleted household"}
+                        {exception.household?.name ??
+                          t("households.exceptions.deletedHousehold")}
                       </p>
                       <p className="text-sm text-cyan-200">
-                        {formatExceptionSchedule(exception)}
+                        {formatExceptionSchedule(t, exception)}
                       </p>
                       <p className="mt-1 text-sm text-white/70">
-                        {exception.dismissalPlan}
+                        {dismissalPlanLabel(t, exception.dismissalPlan)}
                         {exception.pickupContactName
                           ? ` · ${exception.pickupContactName}`
                           : ""}
@@ -735,7 +797,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
                         value={exception.id}
                       />
                       <Button type="submit" variant="ghost" size="sm">
-                        Archive
+                        {t("households.exceptions.archive")}
                       </Button>
                     </Form>
                   </div>
@@ -754,22 +816,23 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
           <div className="mb-4 flex items-center gap-2">
             <Megaphone className="h-5 w-5 text-amber-300" />
             <h2 className="font-semibold text-white">
-              Broadcast an after-school cancellation
+              {t("households.cancellations.broadcastHeading")}
             </h2>
           </div>
           <p className="mb-4 text-sm text-white/50">
-            Saving a cancellation here also pushes it to connected boards
-            through the live WebSocket channel.
+            {t("households.cancellations.broadcastIntro")}
           </p>
           <Form method="post" className="grid gap-3">
             <input type="hidden" name="intent" value="createCancellation" />
-            <Field label="Existing program">
+            <Field label={t("households.cancellations.existingProgramLabel")}>
               <select
                 name="programId"
                 className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
                 defaultValue=""
               >
-                <option value="">Create or match by name below</option>
+                <option value="">
+                  {t("households.cancellations.existingProgramPlaceholder")}
+                </option>
                 {programs.map((program) => (
                   <option key={program.id} value={program.id}>
                     {program.name}
@@ -777,14 +840,14 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
                 ))}
               </select>
             </Field>
-            <Field label="Program name">
+            <Field label={t("households.cancellations.programNameLabel")}>
               <Input
                 name="programName"
-                placeholder="Optional if you selected a program above"
+                placeholder={t("households.cancellations.programNamePlaceholder")}
               />
             </Field>
             <div className="grid gap-3 md:grid-cols-2">
-              <Field label="Cancellation date">
+              <Field label={t("households.cancellations.cancellationDateLabel")}>
                 <input
                   type="date"
                   name="cancellationDate"
@@ -792,37 +855,38 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
                   required
                 />
               </Field>
-              <Field label="Alert title">
+              <Field label={t("households.cancellations.alertTitleLabel")}>
                 <Input
                   name="title"
-                  placeholder="Chess Club is canceled today"
+                  placeholder={t("households.cancellations.alertTitlePlaceholder")}
                   required
                 />
               </Field>
             </div>
-            <Field label="Message">
+            <Field label={t("households.cancellations.messageLabel")}>
               <TextArea
                 name="message"
                 rows={3}
-                placeholder="Include the pickup fallback so families know what changes."
+                placeholder={t("households.cancellations.messagePlaceholder")}
               />
             </Field>
             <Button type="submit" variant="secondary" className="self-start">
-              Save and broadcast
+              {t("households.cancellations.submit")}
             </Button>
           </Form>
         </div>
 
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-          <h2 className="font-semibold text-white">Recent cancellation notices</h2>
+          <h2 className="font-semibold text-white">
+            {t("households.cancellations.recentHeading")}
+          </h2>
           <p className="mt-1 text-sm text-white/50">
-            The board shows same-day notices immediately after the broadcast
-            lands.
+            {t("households.cancellations.recentSubtitle")}
           </p>
           <div className="mt-4 flex flex-col gap-3">
             {recentCancellations.length === 0 ? (
               <p className="rounded-lg bg-black/20 p-4 text-sm text-white/45">
-                No cancellation notices yet.
+                {t("households.cancellations.noneRecent")}
               </p>
             ) : (
               recentCancellations.map((notice: CancellationRecord) => (
@@ -845,7 +909,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
       <section className="grid gap-4 xl:grid-cols-2">
         {households.length === 0 ? (
           <div className="rounded-xl border border-white/10 bg-white/5 p-8 text-center text-white/50">
-            No households yet. Create one above to start grouping siblings.
+            {t("households.list.empty")}
           </div>
         ) : (
           households.map((household: HouseholdRecord) => (
@@ -858,6 +922,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
 }
 
 function RoiPanel({ roi }: { roi: LoaderData["roi"] }) {
+  const { t } = useTranslation("admin");
   return (
     <section
       id="roi"
@@ -867,20 +932,23 @@ function RoiPanel({ roi }: { roi: LoaderData["roi"] }) {
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-emerald-200">
             <TrendingUp className="h-4 w-4" />
-            Family ROI snapshot
+            {t("households.roi.eyebrow")}
           </div>
           <h2 className="mt-2 text-xl font-semibold text-white">
-            {roi.avoidedCalls.total} avoided calls and {roi.minutesSaved} minutes
-            saved
+            {t("households.roi.summary", {
+              calls: roi.avoidedCalls.total,
+              minutes: roi.minutesSaved,
+            })}
           </h2>
           <p className="mt-1 max-w-3xl text-sm text-white/70">
-            Based on pickup activity from {roi.range.from} through {roi.range.to},
-            sibling grouping, recurring exceptions, and program cancellations
-            reduced manual coordination across the board.
+            {t("households.roi.rangeNote", {
+              from: roi.range.from,
+              to: roi.range.to,
+            })}
           </p>
         </div>
         <Form method="get" className="grid gap-3 sm:grid-cols-3">
-          <Field label="From">
+          <Field label={t("households.roi.fromLabel")}>
             <input
               type="date"
               name="from"
@@ -888,7 +956,7 @@ function RoiPanel({ roi }: { roi: LoaderData["roi"] }) {
               className="rounded-lg border border-white/20 bg-black/20 px-3 py-2 text-sm text-white"
             />
           </Field>
-          <Field label="To">
+          <Field label={t("households.roi.toLabel")}>
             <input
               type="date"
               name="to"
@@ -897,40 +965,48 @@ function RoiPanel({ roi }: { roi: LoaderData["roi"] }) {
             />
           </Field>
           <Button type="submit" variant="secondary" className="self-end">
-            Refresh ROI
+            {t("households.roi.refresh")}
           </Button>
         </Form>
       </div>
 
       <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <RoiMetric
-          label="Household groups"
+          label={t("households.roi.metrics.householdGroups")}
           value={String(roi.householdGroups)}
-          detail={`${roi.householdSiblingSlots} sibling slots combined`}
+          detail={t("households.roi.metrics.householdGroupsDetail", {
+            count: roi.householdSiblingSlots,
+          })}
         />
         <RoiMetric
-          label="Recurring exceptions"
+          label={t("households.roi.metrics.recurringExceptions")}
           value={String(roi.exceptionOccurrences)}
-          detail={`${roi.avoidedCalls.exceptions} calls avoided`}
+          detail={t("households.roi.metrics.recurringExceptionsDetail", {
+            count: roi.avoidedCalls.exceptions,
+          })}
         />
         <RoiMetric
-          label="Program cancellations"
+          label={t("households.roi.metrics.programCancellations")}
           value={String(roi.programCancellations)}
-          detail={`${roi.avoidedCalls.cancellations} calls avoided`}
+          detail={t("households.roi.metrics.programCancellationsDetail", {
+            count: roi.avoidedCalls.cancellations,
+          })}
         />
         <RoiMetric
-          label="Pickup days with calls"
+          label={t("households.roi.metrics.pickupDaysWithCalls")}
           value={String(roi.pickupDaysWithCalls)}
-          detail={`${roi.baselineCalls} baseline calls in range`}
+          detail={t("households.roi.metrics.pickupDaysWithCallsDetail", {
+            count: roi.baselineCalls,
+          })}
         />
       </div>
 
       <p className="mt-4 text-xs text-white/60">
-        Assumptions: {roi.assumptions.minutesPerAvoidedCall} minutes per avoided
-        family call, {roi.assumptions.callsAvoidedPerExceptionOccurrence} call
-        avoided per exception occurrence, and{" "}
-        {roi.assumptions.callsAvoidedPerProgramCancellation} calls avoided per
-        program cancellation.
+        {t("households.roi.assumptions", {
+          minutes: roi.assumptions.minutesPerAvoidedCall,
+          exceptions: roi.assumptions.callsAvoidedPerExceptionOccurrence,
+          cancellations: roi.assumptions.callsAvoidedPerProgramCancellation,
+        })}
       </p>
     </section>
   );
@@ -978,6 +1054,7 @@ function StudentCheckboxList({
   emptyText: string;
   compact?: boolean;
 }) {
+  const { t } = useTranslation("admin");
   if (students.length === 0) {
     return (
       <p className="rounded-lg bg-black/20 p-3 text-sm text-white/45">
@@ -1001,9 +1078,19 @@ function StudentCheckboxList({
           <span>
             <span className="font-medium">{studentDisplayName(student)}</span>
             <span className="block text-xs text-white/45">
-              {student.homeRoom ? `${student.homeRoom} · ` : ""}
-              {student.spaceNumber ? `Space ${student.spaceNumber}` : "No space"}
-              {student.householdId ? " · currently grouped" : ""}
+              {student.homeRoom
+                ? t("households.studentList.homeroomSeparator", {
+                    homeRoom: student.homeRoom,
+                  })
+                : ""}
+              {student.spaceNumber
+                ? t("households.studentList.spaceLabel", {
+                    number: student.spaceNumber,
+                  })
+                : t("households.studentList.noSpace")}
+              {student.householdId
+                ? t("households.studentList.currentlyGrouped")
+                : ""}
             </span>
           </span>
         </label>
@@ -1013,6 +1100,9 @@ function StudentCheckboxList({
 }
 
 function HouseholdCard({ household }: { household: HouseholdRecord }) {
+  const { t } = useTranslation("admin");
+  const studentCount = household.students.length;
+  const exceptionCount = household.exceptions.length;
   return (
     <article className="rounded-xl border border-white/10 bg-white/5 p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -1022,12 +1112,9 @@ function HouseholdCard({ household }: { household: HouseholdRecord }) {
             <h2 className="text-lg font-semibold text-white">{household.name}</h2>
           </div>
           <p className="mt-1 text-sm text-white/50">
-            {household.students.length}{" "}
-            {household.students.length === 1 ? "student" : "students"}
-            {household.exceptions.length > 0
-              ? ` · ${household.exceptions.length} active exception${
-                  household.exceptions.length === 1 ? "" : "s"
-                }`
+            {t("households.list.students", { count: studentCount })}
+            {exceptionCount > 0
+              ? t("households.list.exceptions", { count: exceptionCount })
               : ""}
           </p>
         </div>
@@ -1035,7 +1122,7 @@ function HouseholdCard({ household }: { household: HouseholdRecord }) {
           <input type="hidden" name="intent" value="delete" />
           <input type="hidden" name="householdId" value={household.id} />
           <Button type="submit" variant="danger" size="sm">
-            Delete
+            {t("households.list.delete")}
           </Button>
         </Form>
       </div>
@@ -1044,23 +1131,23 @@ function HouseholdCard({ household }: { household: HouseholdRecord }) {
         <input type="hidden" name="intent" value="update" />
         <input type="hidden" name="householdId" value={household.id} />
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Household name">
+          <Field label={t("households.card.nameLabel")}>
             <Input name="name" defaultValue={household.name} required />
           </Field>
-          <Field label="Primary contact">
+          <Field label={t("households.card.primaryContactLabel")}>
             <Input
               name="primaryContactName"
               defaultValue={household.primaryContactName ?? ""}
             />
           </Field>
-          <Field label="Contact phone">
+          <Field label={t("households.card.contactPhoneLabel")}>
             <Input
               name="primaryContactPhone"
               defaultValue={household.primaryContactPhone ?? ""}
             />
           </Field>
         </div>
-        <Field label="Pickup notes">
+        <Field label={t("households.card.pickupNotesLabel")}>
           <TextArea
             name="pickupNotes"
             rows={3}
@@ -1073,13 +1160,15 @@ function HouseholdCard({ household }: { household: HouseholdRecord }) {
           size="sm"
           className="justify-self-start"
         >
-          Save pickup context
+          {t("households.list.savePickupContext")}
         </Button>
       </Form>
 
       <div className="overflow-hidden rounded-lg border border-white/10">
         {household.students.length === 0 ? (
-          <p className="p-4 text-sm text-white/45">No students assigned.</p>
+          <p className="p-4 text-sm text-white/45">
+            {t("households.list.noStudentsAssigned")}
+          </p>
         ) : (
           household.students.map((student) => (
             <div
@@ -1091,10 +1180,12 @@ function HouseholdCard({ household }: { household: HouseholdRecord }) {
                   {studentDisplayName(student)}
                 </p>
                 <p className="text-xs text-white/45">
-                  {student.homeRoom ?? "No homeroom"} ·{" "}
+                  {student.homeRoom ?? t("households.list.noHomeroom")} ·{" "}
                   {student.spaceNumber
-                    ? `Space ${student.spaceNumber}`
-                    : "No space"}
+                    ? t("households.list.spaceLabel", {
+                        number: student.spaceNumber,
+                      })
+                    : t("households.list.noSpace")}
                 </p>
               </div>
               <Form method="post">
@@ -1102,7 +1193,7 @@ function HouseholdCard({ household }: { household: HouseholdRecord }) {
                 <input type="hidden" name="studentId" value={student.id} />
                 <Button type="submit" variant="ghost" size="sm">
                   <UserMinus className="h-4 w-4" />
-                  Detach
+                  {t("households.list.detach")}
                 </Button>
               </Form>
             </div>
@@ -1113,18 +1204,27 @@ function HouseholdCard({ household }: { household: HouseholdRecord }) {
   );
 }
 
-function formatExceptionSchedule(exception: ExceptionRecord): string {
+function formatExceptionSchedule(
+  t: TFunction,
+  exception: ExceptionRecord,
+): string {
   if (exception.scheduleKind === "DATE") {
     return exception.exceptionDate
-      ? `One-time on ${exception.exceptionDate}`
-      : "One-time exception";
+      ? t("households.exceptions.scheduleOneTimeOn", {
+          date: exception.exceptionDate,
+        })
+      : t("households.exceptions.scheduleOneTime");
   }
 
   const weekday =
     exception.dayOfWeek != null
-      ? WEEKDAYS[exception.dayOfWeek] ?? "Weekly"
-      : "Weekly";
-  const startsOn = exception.startsOn ? ` starting ${exception.startsOn}` : "";
-  const endsOn = exception.endsOn ? ` through ${exception.endsOn}` : "";
+      ? weekdayLabel(t, exception.dayOfWeek)
+      : t("households.exceptions.scheduleWeeklyFallback");
+  const startsOn = exception.startsOn
+    ? t("households.exceptions.scheduleStartsOn", { date: exception.startsOn })
+    : "";
+  const endsOn = exception.endsOn
+    ? t("households.exceptions.scheduleEndsOn", { date: exception.endsOn })
+    : "";
   return `${weekday}${startsOn}${endsOn}`;
 }

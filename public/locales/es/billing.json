@@ -1,23 +1,118 @@
 {
-  "trial": {
-    "expired": "[ES] Your free trial has ended. Upgrade to continue recording pickups.",
-    "ctaUpgrade": "[ES] Upgrade now"
-  },
-  "suspension": {
-    "pastDue": "[ES] Your subscription is past due. Update your payment method to avoid suspension.",
-    "suspended": "[ES] Your account is suspended. Contact support or update billing to restore access."
+  "checkout": {
+    "couldNotStart": "No se pudo iniciar el pago. Inténtalo de nuevo.",
+    "missingCustomer": "No hay cliente de Stripe para esta organización."
   },
   "planLimits": {
-    "warnApproaching": "[ES] You're approaching your plan's {{name}} limit ({{count}} of {{cap}}).",
-    "overCap": "[ES] You're {{count}} {{name}} over your plan cap.",
-    "graceActive": "[ES] You're over your plan cap, with {{daysLeft}} days left in your grace period.",
-    "graceExpired": "[ES] Your grace period has ended. Reduce usage or upgrade your plan."
-  },
-  "checkout": {
-    "couldNotStart": "[ES] Could not start checkout. Please try again.",
-    "missingCustomer": "[ES] No Stripe customer for this organization."
+    "graceActive": "Estás por encima del límite de tu plan, con {{daysLeft}} días restantes en tu periodo de gracia.",
+    "graceExpired": "Tu periodo de gracia terminó. Reduce el uso o mejora tu plan.",
+    "overCap": "Estás {{count}} {{name}} por encima del límite de tu plan.",
+    "warnApproaching": "Te estás acercando al límite de {{name}} de tu plan ({{count}} de {{cap}})."
   },
   "portal": {
-    "couldNotOpen": "[ES] Could not open the billing portal. Please try again."
+    "couldNotOpen": "No se pudo abrir el portal de facturación. Inténtalo de nuevo."
+  },
+  "pricing": {
+    "amount": {
+      "month": "${{value}}",
+      "year": "${{value}}"
+    },
+    "cardFooter": {
+      "activateOnly": "El Checkout de Stripe se abre solo cuando elijas activar la facturación.",
+      "createFirst": "Crea tu cuenta primero y luego continúa al Checkout de Stripe."
+    },
+    "cards": {
+      "campus": {
+        "name": "Campus",
+        "tagline": "Plan premium para una sola escuela — agrega la app para padres y familias, límites más altos y soporte dedicado."
+      },
+      "carLine": {
+        "badge": "Un buen punto de partida",
+        "name": "Car Line",
+        "tagline": "Maneja la salida con fluidez con un visor solo para personal. Ideal para escuelas pequeñas."
+      },
+      "district": {
+        "amount": "Precio personalizado",
+        "amountNote": "Hasta 10 escuelas incluidas",
+        "badge": "Recomendado para distritos",
+        "contactCta": "Contáctanos",
+        "footer": "Sin tarjeta de crédito. Nos pondremos en contacto durante tu prueba para hablar sobre la configuración de tu distrito.",
+        "name": "Distrito",
+        "startTrialCta": "Comenzar prueba gratuita",
+        "tagline": "Para distritos que manejan más de una escuela."
+      }
+    },
+    "cta": {
+      "continueSignup": "Continuar al registro",
+      "continueStripe": "Continuar a Stripe",
+      "redirecting": "Redirigiendo…"
+    },
+    "cycle": {
+      "annual": "Anual",
+      "monthly": "Mensual"
+    },
+    "faq": {
+      "afterTrial": {
+        "a": "Si no has convertido, tu sitio queda suspendido. Sin cargos sorpresa.",
+        "q": "¿Qué pasa después de los 30 días?"
+      },
+      "creditCard": {
+        "a": "No.",
+        "q": "¿Necesito una tarjeta de crédito para empezar?"
+      },
+      "heading": "Preguntas, respondidas",
+      "switchTiers": {
+        "a": "Sí, contáctanos para mejorar o reducir tu plan en cualquier momento.",
+        "q": "¿Puedo cambiar de plan?"
+      }
+    },
+    "features": {
+      "campus": {
+        "brand": "Branding personalizado completo — carga de logo + dominio personalizado",
+        "caps": "Hasta 300 familias, 900 estudiantes, 80 aulas",
+        "everythingCarLine": "Todo lo de Car Line",
+        "familyApp": "App de visor para padres y familias",
+        "onboarding": "Migración e incorporación con soporte dedicado",
+        "reports": "Reportes e historial de llamadas",
+        "rfid": "Llegada automática con etiquetas RFID disponible como complemento personalizado (precio según el despliegue)",
+        "sso": "SSO con Microsoft Entra (próximamente)",
+        "support": "Soporte prioritario"
+      },
+      "carLine": {
+        "brand": "Elige tus colores de marca (sin carga de logo)",
+        "caps": "Hasta 150 familias, 400 estudiantes, 35 aulas",
+        "live": "Flujo de salida / fila de autos en vivo",
+        "selfServe": "Facturación mensual o anual de autoservicio",
+        "staffViewer": "Visor solo para maestros y personal (sin app para padres ni familias)",
+        "support": "Soporte por correo estándar"
+      },
+      "district": {
+        "addOn": "Escuelas adicionales disponibles como complemento",
+        "dashboard": "Panel para varias escuelas (hasta 10 escuelas incluidas)",
+        "everythingCampus": "Todo lo de Campus",
+        "rfid": "Llegada automática con etiquetas RFID disponible como complemento personalizado (precio según el despliegue)",
+        "unlimited": "Estudiantes, familias y aulas ilimitados"
+      }
+    },
+    "heading": "Precios",
+    "lede": "Elige el plan que se ajuste a tu escuela o distrito y luego continúa al registro. Los planes de autoservicio pueden pasar directo al pago, mientras que las configuraciones distritales se mantienen personalizadas.",
+    "metaDescription": "Precios sencillos para escuelas y distritos. Elige un plan, crea tu cuenta y continúa con el registro o el pago.",
+    "metaTitle": "Precios — Pickup Roster",
+    "note": {
+      "annual": "por escuela, facturado anualmente",
+      "monthly": "por escuela"
+    },
+    "period": {
+      "month": "/ mes",
+      "year": "/ año"
+    }
+  },
+  "suspension": {
+    "pastDue": "Tu suscripción está vencida. Actualiza tu método de pago para evitar la suspensión.",
+    "suspended": "Tu cuenta está suspendida. Contacta a soporte o actualiza la facturación para restaurar el acceso."
+  },
+  "trial": {
+    "ctaUpgrade": "Mejorar plan ahora",
+    "expired": "Tu prueba gratuita terminó. Mejora tu plan para seguir registrando recogidas."
   }
 }
