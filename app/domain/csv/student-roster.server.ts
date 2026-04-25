@@ -60,7 +60,7 @@ export type ParseResult =
  * Returns a 2D array of cells. Does not interpret headers or blank rows —
  * callers decide.
  */
-export function parseCsv(text: string): string[][] {
+export function parseCsv(text: string, delimiter = ","): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";
@@ -93,7 +93,7 @@ export function parseCsv(text: string): string[][] {
       continue;
     }
 
-    if (ch === ",") {
+    if (ch === delimiter) {
       row.push(field);
       field = "";
       i += 1;
