@@ -42,6 +42,7 @@
  */
 import { test as base, expect, type Cookie } from "@playwright/test";
 import { createClient, type Client as LibsqlClient } from "@libsql/client";
+export type { Client as LibsqlClient } from "@libsql/client";
 import {
   generateId,
   hashPassword,
@@ -77,6 +78,33 @@ export type SeededTenant = {
   tenantUrl: (path: string) => string;
   /** Build a `http://localhost:<port>{path}` URL for marketing-host traffic on the same port. */
   marketingUrl: (path: string) => string;
+
+  /**
+   * Direct libsql handle to the same dev.db the Worker is reading. Specs
+   * use this to assert D1 state that isn't visible through the UI (for
+   * example `Space.status` flipping after a `/update/:space` POST, or a
+   * `CallEvent` row being written by `workers/bingo-board.ts`).
+   *
+   * Borrowed from the fixture — don't close it; the fixture's `finally`
+   * block owns the lifecycle.
+   */
+  db: LibsqlClient;
+
+  /**
+   * Clear residual dismissal state for `spaceNumber`:
+   *   - Flip `Space.status` back to 'EMPTY' (clears any prior `/update`).
+   *   - Drop `CallEvent` rows for the spaceNumber, across *all* orgIds.
+   *
+   * The second sweep is deliberate: `workers/bingo-board.ts` inserts
+   * `CallEvent` with the D1 column default (`org_tome`), not with the
+   * requesting tenant's `orgId` — a cross-tenant bug that the dismissal
+   * spec flags in its own summary. Cleaning by `spaceNumber` alone keeps
+   * the next spec on the same wrangler-dev instance from seeing stale
+   * rows when the fixture happens to pick a duplicate high-number space.
+   *
+   * Idempotent — safe to call in teardown even when nothing happened.
+   */
+  resetBoardForSpace: (spaceNumber: number) => Promise<void>;
 };
 
 type Fixtures = {
@@ -302,14 +330,49 @@ export const test = base.extend<Fixtures>({
       viewerPin: state.appSettings.viewerPin,
       homeroomName: state.teacher.homeRoom,
       spaceNumber: state.space.spaceNumber,
-      tenantUrl: (path: string) => `${url.protocol}//${host}:${port}${path.startsWith("/") ? path : `/${path}`}`,
-      marketingUrl: (path: string) => `${url.protocol}//${marketingHost}:${port}${path.startsWith("/") ? path : `/${path}`}`,
+      tenantUrl: (path: string) =>
+        `${url.protocol}//${host}:${port}${path.startsWith("/") ? path : `/${path}`}`,
+      marketingUrl: (path: string) =>
+        `${url.protocol}//${marketingHost}:${port}${path.startsWith("/") ? path : `/${path}`}`,
+      db,
+      resetBoardForSpace: async (spaceNumber: number) => {
+        try {
+          await db.execute({
+            sql: `UPDATE "Space" SET status='EMPTY', timestamp=NULL WHERE spaceNumber=?`,
+            args: [spaceNumber],
+          });
+          await db.execute({
+            sql: `DELETE FROM "CallEvent" WHERE spaceNumber=?`,
+            args: [spaceNumber],
+          });
+        } catch {
+          // Best-effort — see the doc-comment on the field.
+        }
+      },
     };
 
     try {
       await use(tenant);
     } finally {
       if (state) {
+        // Drop dismissal side-effects first — Space.status reset + CallEvent
+        // sweep by spaceNumber (the bingo-board DO writes events without
+        // scoping by orgId, so teardownSeedRows' `WHERE orgId = ?` purge
+        // alone leaves the row behind).
+        try {
+          await db.execute({
+            sql: `UPDATE "Space" SET status='EMPTY', timestamp=NULL WHERE spaceNumber=?`,
+            args: [state.space.spaceNumber],
+          });
+          await db.execute({
+            sql: `DELETE FROM "CallEvent" WHERE spaceNumber=?`,
+            args: [state.space.spaceNumber],
+          });
+        } catch {
+          // Tolerate — teardownSeedRows runs next and the unique per-spec
+          // spaceNumber keeps any leftover rows from colliding on the next
+          // fixture pick.
+        }
         await teardownSeedRows(db, state);
       }
       db.close();
