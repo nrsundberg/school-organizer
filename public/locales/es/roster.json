@@ -1,0 +1,90 @@
+{
+  "index": {
+    "metaTitle": "[ES] {{name}} — Car line made clear",
+    "metaDescription": "[ES] Live car line board, viewer access, and school admin tools.",
+    "tenantMetaTitle": "[ES] {{orgName}} — Car line",
+    "tenantMetaDescription": "[ES] {{orgName}} car line board.",
+    "filterHomeroom": "[ES] Filter Homeroom",
+    "homeroomPlaceholder": "[ES] Homeroom...",
+    "recentQueue": "[ES] Most Recent Queue",
+    "spaceNowActive": "[ES] Space {{spaceNumber}} is now active!",
+    "tabs": {
+      "board": "[ES] Board",
+      "controller": "[ES] Controller"
+    },
+    "popover": {
+      "markEmptyConfirm": "[ES] Mark this spot empty?",
+      "markEmpty": "[ES] Mark Empty"
+    },
+    "drawing": {
+      "clear": "[ES] Clear ({{count}})"
+    },
+    "tile": {
+      "ariaEmpty": "[ES] Space {{spaceNumber}} — empty. Activate to mark active.",
+      "ariaActive": "[ES] Space {{spaceNumber}} — active. Open actions.",
+      "ariaViewerActive": "[ES] Space {{spaceNumber}} — active",
+      "ariaViewerEmpty": "[ES] Space {{spaceNumber}} — empty"
+    }
+  },
+  "caller": {
+    "displayPlaceholder": "[ES] ---",
+    "alreadyActive": "[ES] Space {{spaceNumber}} is already active",
+    "spaceEmpty": "[ES] Space {{spaceNumber}} is empty",
+    "outOfRange": "[ES] Enter 1–{{max}}",
+    "activeHeading": "[ES] Active — tap to clear",
+    "spaceLabel": "[ES] Space {{spaceNumber}}",
+    "markEmptyConfirm": "[ES] Mark this spot empty?",
+    "markEmpty": "[ES] Mark Empty"
+  },
+  "homerooms": {
+    "heading": "[ES] Homerooms",
+    "spaceLabel": "[ES] Space {{number}}"
+  },
+  "drillsLive": {
+    "metaLive": "[ES] LIVE – {{name}}",
+    "metaPaused": "[ES] Paused – {{name}}",
+    "metaFallback": "[ES] Live drill",
+    "bannerPaused": "[ES] PAUSED",
+    "bannerLive": "[ES] LIVE DRILL",
+    "elapsedFrozen": "[ES] frozen at",
+    "elapsedRunning": "[ES] elapsed",
+    "subtitlePaused": "[ES] Drill is paused — checklist is read-only until an admin resumes.",
+    "subtitleLive": "[ES] Tap toggle cells as units check in. Changes sync to everyone signed in.",
+    "adminLink": "[ES] Admin",
+    "notesHeading": "[ES] Notes",
+    "notesPlaceholder": "[ES] Incidents, headcount issues, etc.",
+    "followUpHeading": "[ES] Follow-up items",
+    "addFollowUp": "[ES] Add",
+    "noFollowUp": "[ES] No items yet.",
+    "markDone": "[ES] Mark done",
+    "markNotDone": "[ES] Mark not done",
+    "removeItem": "[ES] Remove item",
+    "followUpPlaceholder": "[ES] Follow-up task…",
+    "adminControls": "[ES] Admin controls",
+    "adminHelper": "[ES] You're an admin — non-admins see the checklist only.",
+    "resume": "[ES] Resume drill",
+    "pause": "[ES] Pause drill",
+    "endConfirm": "[ES] End this drill? Everyone signed in will return to the normal app. The run will be archived as history.",
+    "end": "[ES] End drill",
+    "source": "[ES] Source: {{authority}}",
+    "errors": {
+      "missingRunId": "[ES] Missing run id.",
+      "notAuthenticated": "[ES] Not authenticated",
+      "invalidStateJson": "[ES] Invalid state JSON.",
+      "unknownAction": "[ES] Unknown action.",
+      "unexpected": "[ES] Unexpected error."
+    },
+    "toasts": {
+      "paused": "[ES] Drill paused.",
+      "resumed": "[ES] Drill resumed.",
+      "saved": "[ES] Saved."
+    }
+  },
+  "csvUpload": {
+    "createdRecords": "[ES] Created {{count}} student records from csv{{skipNote}}",
+    "skipNote_one": "[ES]  (skipped {{count}} blank row)",
+    "skipNote_other": "[ES]  (skipped {{count}} blank rows)",
+    "rowError": "[ES] Row {{row}}: {{message}}",
+    "moreErrors": "[ES]  (+{{count}} more)"
+  }
+}

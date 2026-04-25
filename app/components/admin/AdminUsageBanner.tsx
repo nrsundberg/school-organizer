@@ -1,26 +1,35 @@
 import type { UsageSnapshot } from "~/lib/plan-usage-types";
 import { hardCeiling, warnThreshold } from "~/lib/plan-limits";
 import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
 
 type Props = { usage: UsageSnapshot };
 
 export function AdminUsageBanner({ usage }: Props) {
-  const { counts, limits, worstLevel, graceExpiredOverCap, graceActive, shouldWarn, overCap } =
+  const { t } = useTranslation("admin");
+  const { counts, limits, graceExpiredOverCap, graceActive, shouldWarn, overCap } =
     usage;
   if (!limits) return null;
 
   const dims = [
-    { key: "students" as const, label: "Students" },
-    { key: "families" as const, label: "Families" },
-    { key: "classrooms" as const, label: "Classrooms" },
+    { key: "students" as const, labelKey: "usageBanner.students" },
+    { key: "families" as const, labelKey: "usageBanner.families" },
+    { key: "classrooms" as const, labelKey: "usageBanner.classrooms" },
   ];
 
   const lines = dims
-    .map(({ key, label }) => {
+    .map(({ key, labelKey }) => {
       const cap = limits[key];
       const n = counts[key];
       const pct = cap > 0 ? Math.round((n / cap) * 100) : 0;
-      return `${label}: ${n} / ${cap} (${pct}%) — warn ≥${warnThreshold(cap)}, max ${hardCeiling(cap)} during grace`;
+      return t("usageBanner.line", {
+        label: t(labelKey),
+        n,
+        cap,
+        pct,
+        warn: warnThreshold(cap),
+        ceiling: hardCeiling(cap),
+      });
     })
     .join(" · ");
 
@@ -28,17 +37,15 @@ export function AdminUsageBanner({ usage }: Props) {
   let title: string;
   if (graceExpiredOverCap) {
     tone = "red";
-    title =
-      "Plan limit grace period ended — reduce usage (students, families, or classrooms) or upgrade your plan.";
+    title = t("usageBanner.graceExpired");
   } else if (overCap && graceActive) {
     tone = "blue";
-    title =
-      "You’re above your plan limits — 30-day grace active. You can grow up to 110% of each cap, then upgrade or trim data.";
+    title = t("usageBanner.graceActive");
   } else if (overCap) {
     tone = "amber";
-    title = "You’re over a plan limit — a grace period will apply on the next sync.";
+    title = t("usageBanner.overCap");
   } else if (shouldWarn) {
-    title = "You’re approaching a plan limit (80% or more on one dimension).";
+    title = t("usageBanner.warn");
   } else {
     return null;
   }
@@ -56,7 +63,7 @@ export function AdminUsageBanner({ usage }: Props) {
       <p className="mt-1 text-white/75">{lines}</p>
       <p className="mt-2">
         <Link to="/pricing" className="text-[#E9D500] underline underline-offset-2 hover:text-[#f5e047]">
-          View plans
+          {t("usageBanner.viewPlans")}
         </Link>
       </p>
     </div>

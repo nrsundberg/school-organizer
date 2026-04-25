@@ -1,0 +1,62 @@
+{
+  "generic": {
+    "unknown": "[ES] Something went wrong. Please try again.",
+    "badRequest": "[ES] Invalid request.",
+    "unauthorized": "[ES] You must be signed in to do that.",
+    "forbidden": "[ES] You don't have permission to do that.",
+    "notFound": "[ES] Not found.",
+    "internalError": "[ES] Internal server error."
+  },
+  "zod": {
+    "invalidType": "[ES] Expected {{expected}}, received {{received}}.",
+    "invalidTypeRequired": "[ES] This field is required.",
+    "tooSmall": "[ES] Must be at least {{minimum}}.",
+    "tooSmallString": "[ES] Must be at least {{minimum}} character(s).",
+    "tooSmallStringEmpty": "[ES] This field is required.",
+    "tooSmallNumber": "[ES] Must be at least {{minimum}}.",
+    "tooSmallArray": "[ES] Must contain at least {{minimum}} item(s).",
+    "tooBig": "[ES] Must be at most {{maximum}}.",
+    "tooBigString": "[ES] Must be at most {{maximum}} character(s).",
+    "tooBigNumber": "[ES] Must be at most {{maximum}}.",
+    "tooBigArray": "[ES] Must contain at most {{maximum}} item(s).",
+    "invalidString": "[ES] Invalid value.",
+    "invalidStringEmail": "[ES] Enter a valid email address.",
+    "invalidStringUrl": "[ES] Enter a valid URL.",
+    "invalidStringUuid": "[ES] Enter a valid identifier.",
+    "invalidStringRegex": "[ES] Invalid format.",
+    "invalidEnum": "[ES] Must be one of: {{options}}.",
+    "invalidUnion": "[ES] Invalid input.",
+    "invalidLiteral": "[ES] Expected {{expected}}.",
+    "invalidDate": "[ES] Enter a valid date.",
+    "custom": "[ES] Invalid input.",
+    "fallback": "[ES] Invalid input."
+  },
+  "auth": {
+    "invalidEmailOrPassword": "[ES] Invalid email or password.",
+    "userAlreadyExists": "[ES] An account already exists for that email.",
+    "userNotFound": "[ES] No account found for that email.",
+    "emailNotVerified": "[ES] Please verify your email before continuing.",
+    "passwordTooShort": "[ES] Password is too short.",
+    "passwordTooLong": "[ES] Password is too long.",
+    "sessionExpired": "[ES] Your session has expired. Sign in again.",
+    "rateLimited": "[ES] Too many attempts. Please try again in a minute.",
+    "invalidToken": "[ES] This link is invalid or has expired.",
+    "tokenExpired": "[ES] This link has expired. Request a new one.",
+    "accountBanned": "[ES] This account has been suspended.",
+    "unknownError": "[ES] Something went wrong. Please try again."
+  },
+  "form": {
+    "unknownAction": "[ES] Unknown action.",
+    "invalidFormData": "[ES] Invalid form data."
+  },
+  "billing": {
+    "trialExpired": "[ES] Your free trial has ended. Upgrade to continue recording pickups.",
+    "stripeNotConfigured": "[ES] Billing is not configured for this environment.",
+    "noStripeCustomer": "[ES] No Stripe customer for this org.",
+    "stripeCheckoutFailed": "[ES] Could not start checkout. Please try again.",
+    "stripePortalFailed": "[ES] Could not open the billing portal. Please try again.",
+    "orgNotFound": "[ES] Organization not found.",
+    "planLimitExceededHard": "[ES] This change would exceed your plan's maximum ({{name}}: {{hard}} during the grace window, {{cap}} after). Upgrade your plan or remove records.",
+    "planLimitExceededAfterGrace": "[ES] Your plan allows up to {{cap}} {{name}} (30-day grace period ended). Upgrade your plan or reduce usage."
+  }
+}

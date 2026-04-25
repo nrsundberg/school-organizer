@@ -6,6 +6,15 @@
  * ./templates/index.ts, and the queue consumer picks it up automatically.
  */
 
+/**
+ * Recipient locale plumbed end-to-end into every sendable email so the queue
+ * consumer can render copy in the right language. Optional on the wire so
+ * legacy enqueues (and tests) don't have to change at once — templates fall
+ * back to `DEFAULT_LANGUAGE` when omitted. See `docs/i18n-contract.md`
+ * ("Server-side `t` usage").
+ */
+export type EmailLocale = string;
+
 export type WelcomeMessage = {
   kind: "welcome";
   to: string;
@@ -13,6 +22,8 @@ export type WelcomeMessage = {
   orgSlug: string;
   /** Optional greeting name — null is fine, template handles it. */
   userName: string | null;
+  /** Recipient locale (BCP-47 short, e.g. "en", "es"). Optional; defaults to "en". */
+  locale?: EmailLocale;
 };
 
 export type TrialExpiringMessage = {
@@ -26,6 +37,8 @@ export type TrialExpiringMessage = {
   trialEndDate: string;
   /** Optional greeting name. */
   userName: string | null;
+  /** Recipient locale. Optional; defaults to "en". */
+  locale?: EmailLocale;
 };
 
 export type MidTrialCheckinMessage = {
@@ -37,6 +50,8 @@ export type MidTrialCheckinMessage = {
   daysIn: number;
   /** Optional greeting name. */
   userName: string | null;
+  /** Recipient locale. Optional; defaults to "en". */
+  locale?: EmailLocale;
 };
 
 export type PasswordResetMessage = {
@@ -50,6 +65,8 @@ export type PasswordResetMessage = {
   expiryMinutes: number;
   /** IP the request came from, surfaced in the "didn't request this?" footer. */
   requestIp?: string | null;
+  /** Recipient locale. Optional; defaults to "en". */
+  locale?: EmailLocale;
 };
 
 /**

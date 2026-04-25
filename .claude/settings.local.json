@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -f */.git/index.lock)",
+      "Bash(rm -f */.git/refs/stash.lock*)",
+      "Bash(rm -f */.git/refs/*.lock)",
+      "Bash(rm -f */.git/HEAD.lock)",
+      "Bash(rm -f */.git/config.lock)",
+      "Bash(rm -f */.git/packed-refs.lock)",
+      "Bash(mv */.git/refs/stash.lock* /tmp/)",
+      "Bash(mv */.git/refs/*.lock /tmp/)",
+      "Bash(mv */.git/index.lock /tmp/)",
+      "Bash(find * -maxdepth 5 -name index.lock -path */.git/*)",
+      "Bash(find * -maxdepth 5 -name *.lock.stale -path */.git/*)",
+      "Bash(git -C * status)",
+      "Bash(git -C * fetch origin)",
+      "Bash(git -C * pull origin master)",
+      "Bash(git -C * checkout master)",
+      "Bash(git -C * checkout -b nightly-*)",
+      "Bash(git -C * push -u origin HEAD)",
+      "Bash(git -C * push origin HEAD)",
+      "Bash(git -C * add *)",
+      "Bash(git -C * commit -m *)",
+      "Bash(git -C * diff --stat master)",
+      "Bash(git -C * log --oneline *)",
+      "Bash(git -C * branch -a)",
+      "Bash(git -C * stash -u)",
+      "Bash(git -C * stash pop)",
+      "Bash(gh pr create --draft *)",
+      "Bash(gh auth status)",
+      "Bash(npm install)",
+      "Bash(npm run typecheck)",
+      "Bash(npm test)",
+      "Bash(npm run test:e2e)",
+      "Bash(npx playwright install chromium)",
+      "Bash(npx playwright test *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git merge *)"
+    ]
+  }
+}

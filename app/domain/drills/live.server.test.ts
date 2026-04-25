@@ -315,7 +315,10 @@ if (!mod) {
 
   describe("updateLiveRunState", () => {
     const newState: RunState = {
-      toggles: { "row1:col1": true },
+      // Tri-state: explicit "positive" for the checked cell. Legacy `true`
+      // would still parse correctly via parseRunState's migration, but the
+      // canonical in-memory shape uses string values now.
+      toggles: { "row1:col1": "positive" },
       notes: "halfway",
       actionItems: [],
     };

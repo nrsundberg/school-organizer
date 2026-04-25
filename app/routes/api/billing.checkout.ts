@@ -11,6 +11,7 @@ import {
   clientIpFromRequest,
   getRateLimiter,
 } from "~/domain/utils/rate-limit.server";
+import { detectLocale } from "~/i18n.server";
 
 export function loader() {
   return new Response("Method Not Allowed", { status: 405 });
@@ -62,6 +63,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     });
     const email = userRow?.email ?? "";
 
+    // Forward the request locale so Stripe-hosted Checkout localizes its UI.
+    const locale = await detectLocale(request, context);
+
     const { url } = await createCheckoutSessionForOrg({
       context,
       orgId: user.orgId,
@@ -70,6 +74,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       email,
       successUrl,
       cancelUrl,
+      locale,
     });
 
     throw redirect(url);

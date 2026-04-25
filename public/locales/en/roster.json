@@ -1,0 +1,90 @@
+{
+  "index": {
+    "metaTitle": "{{name}} — Car line made clear",
+    "metaDescription": "Live car line board, viewer access, and school admin tools.",
+    "tenantMetaTitle": "{{orgName}} — Car line",
+    "tenantMetaDescription": "{{orgName}} car line board.",
+    "filterHomeroom": "Filter Homeroom",
+    "homeroomPlaceholder": "Homeroom...",
+    "recentQueue": "Most Recent Queue",
+    "spaceNowActive": "Space {{spaceNumber}} is now active!",
+    "tabs": {
+      "board": "Board",
+      "controller": "Controller"
+    },
+    "popover": {
+      "markEmptyConfirm": "Mark this spot empty?",
+      "markEmpty": "Mark Empty"
+    },
+    "drawing": {
+      "clear": "Clear ({{count}})"
+    },
+    "tile": {
+      "ariaEmpty": "Space {{spaceNumber}} — empty. Activate to mark active.",
+      "ariaActive": "Space {{spaceNumber}} — active. Open actions.",
+      "ariaViewerActive": "Space {{spaceNumber}} — active",
+      "ariaViewerEmpty": "Space {{spaceNumber}} — empty"
+    }
+  },
+  "caller": {
+    "displayPlaceholder": "---",
+    "alreadyActive": "Space {{spaceNumber}} is already active",
+    "spaceEmpty": "Space {{spaceNumber}} is empty",
+    "outOfRange": "Enter 1–{{max}}",
+    "activeHeading": "Active — tap to clear",
+    "spaceLabel": "Space {{spaceNumber}}",
+    "markEmptyConfirm": "Mark this spot empty?",
+    "markEmpty": "Mark Empty"
+  },
+  "homerooms": {
+    "heading": "Homerooms",
+    "spaceLabel": "Space {{number}}"
+  },
+  "drillsLive": {
+    "metaLive": "LIVE – {{name}}",
+    "metaPaused": "Paused – {{name}}",
+    "metaFallback": "Live drill",
+    "bannerPaused": "PAUSED",
+    "bannerLive": "LIVE DRILL",
+    "elapsedFrozen": "frozen at",
+    "elapsedRunning": "elapsed",
+    "subtitlePaused": "Drill is paused — checklist is read-only until an admin resumes.",
+    "subtitleLive": "Tap toggle cells as units check in. Changes sync to everyone signed in.",
+    "adminLink": "Admin",
+    "notesHeading": "Notes",
+    "notesPlaceholder": "Incidents, headcount issues, etc.",
+    "followUpHeading": "Follow-up items",
+    "addFollowUp": "Add",
+    "noFollowUp": "No items yet.",
+    "markDone": "Mark done",
+    "markNotDone": "Mark not done",
+    "removeItem": "Remove item",
+    "followUpPlaceholder": "Follow-up task…",
+    "adminControls": "Admin controls",
+    "adminHelper": "You're an admin — non-admins see the checklist only.",
+    "resume": "Resume drill",
+    "pause": "Pause drill",
+    "endConfirm": "End this drill? Everyone signed in will return to the normal app. The run will be archived as history.",
+    "end": "End drill",
+    "source": "Source: {{authority}}",
+    "errors": {
+      "missingRunId": "Missing run id.",
+      "notAuthenticated": "Not authenticated",
+      "invalidStateJson": "Invalid state JSON.",
+      "unknownAction": "Unknown action.",
+      "unexpected": "Unexpected error."
+    },
+    "toasts": {
+      "paused": "Drill paused.",
+      "resumed": "Drill resumed.",
+      "saved": "Saved."
+    }
+  },
+  "csvUpload": {
+    "createdRecords": "Created {{count}} student records from csv{{skipNote}}",
+    "skipNote_one": " (skipped {{count}} blank row)",
+    "skipNote_other": " (skipped {{count}} blank rows)",
+    "rowError": "Row {{row}}: {{message}}",
+    "moreErrors": " (+{{count}} more)"
+  }
+}

@@ -7,6 +7,7 @@ import {
   useRouteLoaderData,
 } from "react-router";
 import { Menu, X, ShieldAlert, LogIn } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/layout";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { buildUsageSnapshot, countOrgUsage } from "~/domain/billing/plan-usage.server";
@@ -20,6 +21,8 @@ import { AdminUsageBanner } from "~/components/admin/AdminUsageBanner";
 import { PastDuePaymentBanner } from "~/components/admin/PastDuePaymentBanner";
 import Header from "~/components/Header";
 import logo from "/logo-icon.svg?url";
+
+export const handle = { i18n: ["admin", "common"] };
 
 export async function loader({ context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
@@ -50,6 +53,7 @@ export async function loader({ context }: Route.LoaderArgs) {
 
 export function ErrorBoundary() {
   const error = useRouteError();
+  const { t } = useTranslation("admin");
 
   const is401 =
     isRouteErrorResponse(error) && error.status === 401;
@@ -61,14 +65,14 @@ export function ErrorBoundary() {
       <div className="min-h-screen bg-[#212525] text-white flex flex-col">
         <div className="h-10 w-full bg-blue-300 flex items-center justify-center flex-shrink-0 relative">
           <a href="/" className="text-black font-bold inline-flex items-center">
-            <img src={logo} alt="school logo" height={40} width={40} />
-            Pickup Roster — Car line
+            <img src={logo} alt={t("layout.errors.headerLogoAlt")} height={40} width={40} />
+            {t("layout.errors.headerBrand")}
           </a>
           <a
             href="/login"
             className="border border-black p-1 rounded-lg absolute right-2 text-black text-sm"
           >
-            Login
+            {t("layout.errors.loginLink")}
           </a>
         </div>
         <div className="flex-1 flex flex-col items-center justify-center px-4 gap-4">
@@ -80,12 +84,12 @@ export function ErrorBoundary() {
             )}
           </div>
           <h1 className="text-2xl font-semibold">
-            {is401 ? "Login Required" : "Access Denied"}
+            {is401 ? t("layout.errors.loginRequired") : t("layout.errors.accessDenied")}
           </h1>
           <p className="text-white/60 text-center max-w-sm">
             {is401
-              ? "You need to be logged in to access the admin panel."
-              : "Your account doesn't have permission to access the admin panel."}
+              ? t("layout.errors.loginRequiredBody")
+              : t("layout.errors.accessDeniedBody")}
           </p>
           <div className="flex gap-3 mt-2">
             {is401 && (
@@ -93,14 +97,14 @@ export function ErrorBoundary() {
                 href="/login"
                 className="bg-blue-300 text-black font-semibold px-4 py-2 rounded-lg hover:bg-blue-400 transition-colors"
               >
-                Log In
+                {t("layout.errors.logIn")}
               </a>
             )}
             <a
               href="/"
               className="border border-white/20 text-white px-4 py-2 rounded-lg hover:bg-white/10 transition-colors"
             >
-              Go Home
+              {t("layout.errors.goHome")}
             </a>
           </div>
         </div>
@@ -115,6 +119,7 @@ export function ErrorBoundary() {
 export default function AdminLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { usage, pastDuePaymentBanner, compedUntil } = useLoaderData<typeof loader>();
+  const { t, i18n } = useTranslation("admin");
   const isComped = !!compedUntil && new Date(compedUntil) > new Date();
   const rootData = useRouteLoaderData("root") as
     | { branding?: { orgName?: string; primaryColor?: string; logoUrl?: string | null } }
@@ -125,13 +130,13 @@ export default function AdminLayout() {
       <Header user={true} branding={rootData?.branding} />
       {isComped && (
         <div className="bg-emerald-500/10 border-b border-emerald-500/30 text-emerald-200 px-4 py-2 text-sm">
-          Your account is comped through{" "}
-          {new Date(compedUntil!).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
+          {t("layout.compedThrough", {
+            date: new Date(compedUntil!).toLocaleDateString(i18n.language, {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            }),
           })}
-          . Thanks for rolling with Pickup Roster 💛
         </div>
       )}
       {pastDuePaymentBanner && (
@@ -150,11 +155,11 @@ export default function AdminLayout() {
           <button
             onClick={() => setDrawerOpen(true)}
             className="text-white/60 hover:text-white mr-2 p-1"
-            aria-label="Open navigation"
+            aria-label={t("layout.openNav")}
           >
             <Menu className="w-5 h-5" />
           </button>
-          <span className="text-sm font-semibold text-white tracking-wide">Admin Panel</span>
+          <span className="text-sm font-semibold text-white tracking-wide">{t("layout.panelTitle")}</span>
         </div>
 
         {/* Mobile drawer overlay */}
@@ -169,11 +174,11 @@ export default function AdminLayout() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-                <span className="text-sm font-semibold">Admin Panel</span>
+                <span className="text-sm font-semibold">{t("layout.panelTitle")}</span>
                 <button
                   onClick={() => setDrawerOpen(false)}
                   className="text-white/60 hover:text-white p-1"
-                  aria-label="Close navigation"
+                  aria-label={t("layout.closeNav")}
                 >
                   <X className="w-4 h-4" />
                 </button>

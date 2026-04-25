@@ -1,7 +1,9 @@
 import { Link, useRouteLoaderData } from "react-router";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/pricing";
 import { MarketingNav } from "~/components/marketing/MarketingNav";
 import { getSupportEmail } from "~/lib/site";
+import { SUPPORTED_LANGUAGES } from "~/lib/i18n-config";
 
 export function meta() {
   return [
@@ -52,6 +54,8 @@ const DISTRICT_FEATURES = [
 ];
 
 export default function Pricing(_: Route.ComponentProps) {
+  const { t } = useTranslation("common");
+  const languageCount = SUPPORTED_LANGUAGES.length;
   const rootData = useRouteLoaderData("root") as RootLoader | undefined;
   const isAuthed = !!rootData?.user;
 
@@ -64,6 +68,10 @@ export default function Pricing(_: Route.ComponentProps) {
           <p className="mx-auto mt-3 max-w-2xl text-lg text-white/70">
             Start a 30-day free trial — no credit card required. Pick the tier
             that matches your school or district today; switch anytime.
+          </p>
+          {/* Multilingual support is available on every plan — not paywalled. */}
+          <p className="mx-auto mt-3 text-sm text-white/55">
+            {t("marketing.languageCount", { count: languageCount })} — included on every plan.
           </p>
         </div>
 

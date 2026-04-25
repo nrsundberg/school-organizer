@@ -1,35 +1,46 @@
 import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/blog._index";
 import { MarketingNav } from "~/components/marketing/MarketingNav";
 import { formatPostDate, type BlogPostMeta } from "~/lib/blog";
 import { listPosts } from "~/lib/blog.server";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 
 export function meta({ data }: Route.MetaArgs) {
   const count = data?.posts.length ?? 0;
+  const desc =
+    count > 0 ? data?.metaDescriptionIndex : data?.metaDescriptionEmpty;
   return [
-    { title: "Blog — PickupRoster" },
+    { title: data?.metaTitle ?? "Blog — PickupRoster" },
     {
       name: "description",
-      content:
-        count > 0
-          ? "Field notes on school dismissal, car-line operations, and district rollouts from the PickupRoster team."
-          : "PickupRoster blog — field notes on dismissal, car lines, and district rollouts.",
+      content: desc ?? "PickupRoster blog — field notes on dismissal, car lines, and district rollouts.",
     },
-    { property: "og:title", content: "PickupRoster Blog" },
+    { property: "og:title", content: data?.ogTitle ?? "PickupRoster Blog" },
     {
       property: "og:description",
-      content:
-        "Field notes on school dismissal, car-line operations, and district rollouts.",
+      content: data?.ogDescription ?? "Field notes on school dismissal, car-line operations, and district rollouts.",
     },
     { property: "og:type", content: "website" },
   ];
 }
 
-export async function loader(_: Route.LoaderArgs) {
-  return { posts: listPosts() };
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "common");
+  return {
+    posts: listPosts(),
+    metaTitle: t("blog.metaTitleIndex"),
+    metaDescriptionIndex: t("blog.metaDescriptionIndex"),
+    metaDescriptionEmpty: t("blog.metaDescriptionEmpty"),
+    ogTitle: t("blog.ogTitle"),
+    ogDescription: t("blog.ogDescription"),
+  };
 }
 
 export default function BlogIndex({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation("common");
   const { posts } = loaderData;
 
   return (
@@ -38,15 +49,13 @@ export default function BlogIndex({ loaderData }: Route.ComponentProps) {
       <div className="mx-auto max-w-3xl px-4 py-14">
         <header className="border-b border-white/10 pb-10">
           <p className="text-sm font-semibold uppercase tracking-wider text-[#E9D500]">
-            The PickupRoster blog
+            {t("blog.kicker")}
           </p>
           <h1 className="mt-3 text-4xl font-extrabold leading-tight sm:text-5xl">
-            Field notes from the car line
+            {t("blog.headline")}
           </h1>
           <p className="mt-4 max-w-2xl text-lg text-white/70">
-            Practical writing for school front offices, principals, and district
-            IT — on dismissal, parent communication, safety, and the messy
-            middle of rolling a system across multiple campuses.
+            {t("blog.lede")}
           </p>
         </header>
 
@@ -67,6 +76,7 @@ export default function BlogIndex({ loaderData }: Route.ComponentProps) {
 }
 
 function PostCard({ post }: { post: BlogPostMeta }) {
+  const { t } = useTranslation("common");
   return (
     <article>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/50">
@@ -98,7 +108,7 @@ function PostCard({ post }: { post: BlogPostMeta }) {
           to={`/blog/${post.slug}`}
           className="ml-auto text-sm font-semibold text-[#E9D500] transition hover:text-[#f5e047]"
         >
-          Read →
+          {t("blog.read")}
         </Link>
       </div>
     </article>
@@ -106,18 +116,18 @@ function PostCard({ post }: { post: BlogPostMeta }) {
 }
 
 function EmptyState() {
+  const { t } = useTranslation("common");
   return (
     <div className="mt-12 rounded-2xl border border-dashed border-white/10 bg-[#151a1a] p-10 text-center">
-      <p className="text-lg font-semibold text-white">Nothing published yet.</p>
+      <p className="text-lg font-semibold text-white">{t("blog.empty.headline")}</p>
       <p className="mt-2 text-sm text-white/60">
-        We're working on the first post. In the meantime, take a look at how
-        PickupRoster works.
+        {t("blog.empty.body")}
       </p>
       <Link
         to="/pricing"
         className="mt-6 inline-flex items-center justify-center rounded-xl bg-[#E9D500] px-4 py-2 text-sm font-semibold text-[#193B4B] transition hover:bg-[#f5e047]"
       >
-        See pricing
+        {t("blog.empty.cta")}
       </Link>
     </div>
   );

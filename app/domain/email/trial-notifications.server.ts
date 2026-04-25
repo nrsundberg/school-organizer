@@ -81,9 +81,10 @@ async function enqueueTrialExpiring(db: any, now: Date, context: any): Promise<n
         name: true,
         slug: true,
         trialEndsAt: true,
+        defaultLocale: true,
         users: {
           where: { role: "ADMIN" },
-          select: { email: true, name: true },
+          select: { email: true, name: true, locale: true },
           take: 5,
         },
       },
@@ -111,6 +112,7 @@ async function enqueueTrialExpiring(db: any, now: Date, context: any): Promise<n
           daysLeft,
           trialEndDate,
           userName: firstName(admin.name),
+          locale: admin.locale ?? org.defaultLocale ?? undefined,
         });
       }
       sentRecords.push({ orgId: org.id, kind: "trial_expiring", bucket });
@@ -148,9 +150,10 @@ async function enqueueMidTrialCheckins(db: any, now: Date, context: any): Promis
       id: true,
       name: true,
       slug: true,
+      defaultLocale: true,
       users: {
         where: { role: "ADMIN" },
-        select: { email: true, name: true },
+        select: { email: true, name: true, locale: true },
         take: 5,
       },
     },
@@ -175,6 +178,7 @@ async function enqueueMidTrialCheckins(db: any, now: Date, context: any): Promis
         orgSlug: org.slug,
         daysIn: 14,
         userName: firstName(admin.name),
+        locale: admin.locale ?? org.defaultLocale ?? undefined,
       });
     }
     sentRecords.push({ orgId: org.id, kind: "mid_trial_checkin", bucket });

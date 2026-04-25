@@ -8,9 +8,58 @@ import { handleEmailQueue } from "../app/domain/email/consumer.server";
 import { pruneExpiredPasswordResetTokens } from "../app/domain/auth/password-reset.server";
 import { runStatusProbes } from "../app/domain/status/runner.server";
 import type { EmailMessage } from "../app/domain/email/types";
-import { isMarketingHost } from "../app/domain/utils/host.server";
+import {
+  isMarketingHost,
+  resolveTenantSlugFromHost,
+} from "../app/domain/utils/host.server";
 import { applySecurityHeaders } from "../app/lib/security-headers.server";
+import { createCspNonce, CSP_NONCE_HEADER } from "../app/lib/csp";
 export { BingoBoardDO } from "./bingo-board";
+
+/**
+ * Resolve the tenant orgId from the request host for the WebSocket upgrade
+ * path, which runs *before* the React Router middleware (no context yet).
+ *
+ * Mirrors `resolveOrgByHost` in app/domain/utils/global-context.server.ts:
+ *   1. Custom-domain match (e.g. tenant.example.com).
+ *   2. Marketing hosts have no tenant → null.
+ *   3. Slug from subdomain (e.g. tome.pickuproster.com → "tome").
+ *
+ * Uses raw D1 prepared statements to avoid the Prisma init cost on every
+ * WebSocket upgrade. The host helpers from `host.server.ts` only read
+ * env, so passing `{ cloudflare: { env } }` as the context shim works.
+ */
+async function resolveOrgIdFromHost(
+  env: Env,
+  request: Request
+): Promise<string | null> {
+  const ctxShim = { cloudflare: { env } };
+  const host = new URL(request.url).host.toLowerCase().split(":")[0];
+
+  // 1. Custom domain (highest priority — explicit per-tenant DNS).
+  const byCustom = await env.D1_DATABASE.prepare(
+    `SELECT id FROM "Org" WHERE customDomain = ? LIMIT 1`
+  )
+    .bind(host)
+    .first<{ id: string }>();
+  if (byCustom?.id) return byCustom.id;
+
+  // 2. Marketing hosts have no tenant board.
+  if (isMarketingHost(request, ctxShim)) return null;
+
+  // 3. Tenant slug from subdomain.
+  const slug = resolveTenantSlugFromHost(request, ctxShim);
+  if (slug) {
+    const bySlug = await env.D1_DATABASE.prepare(
+      `SELECT id FROM "Org" WHERE slug = ? LIMIT 1`
+    )
+      .bind(slug)
+      .first<{ id: string }>();
+    if (bySlug?.id) return bySlug.id;
+  }
+
+  return null;
+}
 
 // @ts-expect-error - build output has no type declarations
 const buildImport = () => import("../build/server/index.js");
@@ -20,22 +69,33 @@ export default withSentry(
     dsn: (env as any).SENTRY_DSN,
     release: (env as any).SENTRY_RELEASE,
     environment: (env as any).ENVIRONMENT ?? "production",
-    tracesSampleRate: 0.1,
+    tracesSampleRate: 0.1
   }),
   {
     async fetch(
       request: Request,
       env: Env,
-      ctx: ExecutionContext,
+      ctx: ExecutionContext
     ): Promise<Response> {
       const url = new URL(request.url);
 
-      // Route WebSocket upgrades directly to the Durable Object
+      // Route WebSocket upgrades directly to the per-tenant Durable Object.
+      // The DO is keyed by orgId so each tenant gets an isolated broadcast
+      // channel and hibernation lifecycle. CF DOs are lazily materialized
+      // on first .fetch(), so no signup-time provisioning is needed.
       if (
         url.pathname === "/ws" &&
         request.headers.get("Upgrade") === "websocket"
       ) {
-        const id = env.BINGO_BOARD.idFromName("main");
+        const orgId = await resolveOrgIdFromHost(env, request);
+        if (!orgId) {
+          // No tenant on this host (marketing, unknown subdomain, etc.) —
+          // there is no live board to subscribe to.
+          return new Response("Tenant not found for board WebSocket", {
+            status: 404
+          });
+        }
+        const id = env.BINGO_BOARD.idFromName(orgId);
         const stub = env.BINGO_BOARD.get(id);
         return stub.fetch(request);
       }
@@ -43,13 +103,23 @@ export default withSentry(
       // Bridge Cloudflare env bindings into process.env
       Object.assign(process.env, env);
 
+      const cspNonce = createCspNonce();
+      const requestWithNonceHeaders = new Headers(request.headers);
+      requestWithNonceHeaders.set(CSP_NONCE_HEADER, cspNonce);
+      const requestWithNonce = new Request(request, {
+        headers: requestWithNonceHeaders
+      });
+
       const context = new RouterContextProvider();
       (context as any).cloudflare = { env, ctx };
 
       try {
         const scope = getCurrentScope();
         scope.setTag("http.host", url.host);
-        scope.setTag("app.surface", isMarketingHost(request, context) ? "marketing" : "tenant");
+        scope.setTag(
+          "app.surface",
+          isMarketingHost(requestWithNonce, context) ? "marketing" : "tenant"
+        );
       } catch {
         // optional Sentry scope
       }
@@ -59,16 +129,24 @@ export default withSentry(
           ? "development"
           : "production";
       const response = await createRequestHandler(buildImport, serverMode)(
-        request,
-        context,
+        requestWithNonce,
+        context
       );
       // NB: the WebSocket upgrade branch above returns before reaching here,
       // so we never try to mutate a 101-switching-protocols response. The
       // `scheduled` and `queue` handlers also never pass through this path.
-      return applySecurityHeaders(response, env as { ENVIRONMENT?: string });
+      return applySecurityHeaders(
+        response,
+        env as { ENVIRONMENT?: string },
+        cspNonce
+      );
     },
 
-    async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    async scheduled(
+      controller: ScheduledController,
+      env: Env,
+      ctx: ExecutionContext
+    ) {
       Object.assign(process.env, env);
       const context = new RouterContextProvider();
       (context as any).cloudflare = { env, ctx };
@@ -97,7 +175,7 @@ export default withSentry(
           const res = await suspendExpiredTrialingOrgs(context);
           if (res.suspended > 0) {
             console.log(
-              `[cron] suspended ${res.suspended} expired trialing org(s) (checked ${res.checked}).`,
+              `[cron] suspended ${res.suspended} expired trialing org(s) (checked ${res.checked}).`
             );
           }
         } catch (e) {
@@ -112,7 +190,9 @@ export default withSentry(
         try {
           const pruned = await pruneExpiredPasswordResetTokens(context);
           if (pruned > 0) {
-            console.log(`[cron] pruned ${pruned} expired password-reset token(s).`);
+            console.log(
+              `[cron] pruned ${pruned} expired password-reset token(s).`
+            );
           }
         } catch (e) {
           console.error("password-reset token prune failed", e);
@@ -129,9 +209,13 @@ export default withSentry(
      * Each message is an EmailMessage — handler renders the template and
      * dispatches to Resend.
      */
-    async queue(batch: MessageBatch<EmailMessage>, env: Env, _ctx: ExecutionContext) {
+    async queue(
+      batch: MessageBatch<EmailMessage>,
+      env: Env,
+      _ctx: ExecutionContext
+    ) {
       Object.assign(process.env, env);
       await handleEmailQueue(batch, env);
-    },
-  } satisfies ExportedHandler<Env, EmailMessage>,
+    }
+  } satisfies ExportedHandler<Env, EmailMessage>
 );

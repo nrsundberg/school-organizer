@@ -23,6 +23,10 @@ model User {
   banExpires                 Int?
   /// "board" | "controller" (keypad); null defaults to board
   controllerViewPreference   String?
+  /// Preferred UI language (BCP-47 short code, e.g. "en", "es"). Defaults to
+  /// "en" so existing rows are valid without a backfill. Updated via the
+  /// `LanguageSwitcher` (which posts to /api/user-prefs).
+  locale                     String    @default("en")
   orgId                      String?
   org                        Org?      @relation(fields: [orgId], references: [id], onDelete: SetNull)
   sessions                   Session[]
@@ -93,6 +97,10 @@ model Org {
   /// Whether this org's users can reset their password via email. Orgs using
   /// SSO should disable this so users are forced through the SSO flow.
   passwordResetEnabled     Boolean                  @default(true)
+  /// Default UI language for this org. Used as a fallback for unauthenticated
+  /// visitors on the tenant board, and as the locale for org-wide print views
+  /// (print.board, print.master). See docs/i18n-contract.md.
+  defaultLocale            String                   @default("en")
   users                  User[]
   appSettings            AppSettings[]
   viewerAccessAttempts   ViewerAccessAttempt[]
@@ -331,6 +339,9 @@ model Teacher {
   orgId    String    @default("org_tome")
   org      Org       @relation(fields: [orgId], references: [id])
   homeRoom String    @unique
+  /// Optional per-teacher locale override for the homeroom print view.
+  /// Null means "use Org.defaultLocale". Most teachers will leave this unset.
+  locale   String?
   students Student[]
 
   @@index([orgId])

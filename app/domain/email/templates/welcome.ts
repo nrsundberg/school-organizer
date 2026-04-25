@@ -1,56 +1,77 @@
 import type { RenderedEmail, WelcomeMessage } from "../types";
-import { interpolate } from "../interpolate";
+import { getFixedT } from "~/lib/t.server";
 
-// Founder-voice welcome email (Variant A — gratitude-led). Replies land in
-// Noah's personal inbox via the Reply-To header set by the send wrapper.
-// Variables: {{ firstName }}, {{ orgName }}.
-const SUBJECT = "thanks for trying PickupRoster, {{ firstName }}";
-const PREVIEW = "a quick note from the founder — and a small ask.";
+/**
+ * Founder-voice welcome email (Variant A — gratitude-led). Replies land in
+ * Noah's personal inbox via the Reply-To header set by the send wrapper.
+ *
+ * i18n: copy lives under the `email.welcome.*` namespace. The recipient's
+ * `locale` flows in from the queue message; default is English.
+ */
+export async function renderWelcome(msg: WelcomeMessage): Promise<RenderedEmail> {
+  const t = await getFixedT(msg.locale ?? "en", "email");
+  const firstName = firstNameOrFallback(msg.userName, t("common.greetingFallback"));
+  const orgName = msg.orgName;
 
-const HTML = `<!doctype html>
+  const subject = t("welcome.subject", { firstName });
+  const preview = t("welcome.preview");
+  const greeting = t("welcome.greeting", { firstName });
+  const para1 = t("welcome.para1", { orgName });
+  const para2 = t("welcome.para2");
+  const para3 = t("welcome.para3");
+  const para4 = t("welcome.para4");
+  const signOff = t("common.signOff");
+  const signOffTitle = t("common.signOffTitle");
+
+  const html = `<!doctype html>
 <html>
   <body style="font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; color: #111; line-height: 1.5;">
-    <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">${PREVIEW}</span>
-    <p>Hi {{ firstName }},</p>
-    <p>Thank you for signing up. Helping schools run a calmer pickup is the whole reason I started PickupRoster, so it genuinely means a lot that {{ orgName }} gave it a shot.</p>
-    <p>I'd love to hear what dismissal actually looks like at your school right now — what's working, what's not, and what you wish someone would fix. Could we grab 15 minutes on the phone in the next week or two?</p>
-    <p>Just hit reply with a couple of times that work for you and I'll send an invite.</p>
-    <p>Either way, I'm glad you're here.</p>
+    <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">${escapeHtml(preview)}</span>
+    <p>${escapeHtml(greeting)}</p>
+    <p>${escapeHtml(para1)}</p>
+    <p>${escapeHtml(para2)}</p>
+    <p>${escapeHtml(para3)}</p>
+    <p>${escapeHtml(para4)}</p>
     <hr />
-    <p>Noah<br />Founder, PickupRoster</p>
+    <p>${escapeHtml(signOff)}<br />${escapeHtml(signOffTitle)}</p>
   </body>
 </html>`;
 
-const TEXT = `Hi {{ firstName }},
+  const text = `${greeting}
 
-Thank you for signing up. Helping schools run a calmer pickup is the whole reason I started PickupRoster, so it genuinely means a lot that {{ orgName }} gave it a shot.
+${para1}
 
-I'd love to hear what dismissal actually looks like at your school right now — what's working, what's not, and what you wish someone would fix. Could we grab 15 minutes on the phone in the next week or two?
+${para2}
 
-Just hit reply with a couple of times that work for you and I'll send an invite.
+${para3}
 
-Either way, I'm glad you're here.
+${para4}
 
 --
-Noah
-Founder, PickupRoster`;
+${signOff}
+${signOffTitle}`;
 
-export function renderWelcome(msg: WelcomeMessage): RenderedEmail {
-  const vars = {
-    orgName: msg.orgName,
-    firstName: firstNameOrFallback(msg.userName),
-  };
   return {
-    subject: interpolate(SUBJECT, vars),
-    html: interpolate(HTML, vars),
-    text: interpolate(TEXT, vars),
+    subject,
+    html,
+    text,
     // Route replies to the founder's personal inbox.
     replyTo: "noahsundberg@gmail.com",
   };
 }
 
-function firstNameOrFallback(name: string | null | undefined): string {
-  if (!name) return "there";
+function firstNameOrFallback(
+  name: string | null | undefined,
+  fallback: string,
+): string {
+  if (!name) return fallback;
   const first = name.trim().split(/\s+/)[0];
-  return first || "there";
+  return first || fallback;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }

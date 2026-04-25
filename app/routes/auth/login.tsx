@@ -1,5 +1,6 @@
 import { Button, Input } from "@heroui/react";
 import { data, Link, redirect } from "react-router";
+import { useTranslation } from "react-i18next";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
 import { isPlatformAdmin } from "~/domain/utils/host.server";
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
@@ -12,11 +13,15 @@ import {
   clientIpFromRequest,
   getRateLimiter,
 } from "~/domain/utils/rate-limit.server";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 
-export function meta() {
+export const handle = { i18n: ["auth"] };
+
+export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
   return [
-    { title: "Login — Pickup Roster" },
-    { name: "description", content: "Sign in to your school car line board" },
+    { title: data?.metaTitle ?? "Login — Pickup Roster" },
+    { name: "description", content: data?.metaDescription ?? "Sign in to your school car line board" },
   ];
 }
 
@@ -27,21 +32,29 @@ function safeInternalNextPath(next: string | null): string | null {
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = getOptionalUserFromContext(context);
-  if (!user) return null;
-  if (!user.orgId) throw redirect("/signup?step=2");
+  if (user) {
+    if (!user.orgId) throw redirect("/signup?step=2");
 
-  const next = safeInternalNextPath(new URL(request.url).searchParams.get("next"));
-  if (next) {
-    throw redirect(next);
+    const next = safeInternalNextPath(new URL(request.url).searchParams.get("next"));
+    if (next) {
+      throw redirect(next);
+    }
+
+    if (isPlatformAdmin(user, context)) {
+      throw redirect("/platform");
+    }
+
+    const boardUrl = await getTenantBoardUrlForRequest(request, context);
+    if (boardUrl) throw redirect(boardUrl);
+    throw redirect("/");
   }
 
-  if (isPlatformAdmin(user, context)) {
-    throw redirect("/platform");
-  }
-
-  const boardUrl = await getTenantBoardUrlForRequest(request, context);
-  if (boardUrl) throw redirect(boardUrl);
-  throw redirect("/");
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "auth");
+  return {
+    metaTitle: t("login.metaTitle"),
+    metaDescription: t("login.metaDescription"),
+  };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -51,8 +64,10 @@ export async function action({ request, context }: Route.ActionArgs) {
     key: "auth:" + clientIp,
   });
   if (!result.ok) {
+    const locale = await detectLocale(request, context);
+    const t = await getFixedT(locale, "auth");
     return data(
-      { error: "Too many attempts. Please try again in a minute." },
+      { error: t("login.errors.rateLimited") },
       { status: 429, headers: { "Retry-After": "60" } },
     );
   }
@@ -63,6 +78,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 type Step = "email" | "password";
 
 export default function Login() {
+  const { t } = useTranslation("auth");
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -83,14 +99,14 @@ export default function Login() {
       const { exists } = (await res.json()) as { exists: boolean };
 
       if (!exists) {
-        setError("No account found for that email.");
+        setError(t("login.errors.noAccount"));
         setLoading(false);
         return;
       }
 
       setStep("password");
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("login.errors.generic"));
     }
 
     setLoading(false);
@@ -104,13 +120,13 @@ export default function Login() {
     try {
       const result = await signIn.email({ email, password });
       if (result.error) {
-        setError("Invalid password.");
+        setError(t("login.errors.invalidPassword"));
         setLoading(false);
       } else {
         window.location.reload();
       }
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("login.errors.generic"));
       setLoading(false);
     }
   };
@@ -121,9 +137,9 @@ export default function Login() {
 
       <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-lg flex-col justify-center px-4 py-10">
         <div className="rounded-2xl border border-white/10 bg-[#151a1a] p-6 shadow-xl">
-          <h1 className="text-2xl font-bold">Log in</h1>
+          <h1 className="text-2xl font-bold">{t("login.title")}</h1>
           <p className="mt-2 text-sm text-white/65">
-            Sign in to manage your school&apos;s car line board.
+            {t("login.subtitle")}
           </p>
 
           {step === "email" ? (
@@ -132,12 +148,12 @@ export default function Login() {
               className="mt-6 flex w-full flex-col gap-3"
             >
               <label className="text-sm text-white/80" htmlFor="email">
-                Email
+                {t("login.emailLabel")}
               </label>
               <Input
                 id="email"
                 type="email"
-                placeholder="you@school.edu"
+                placeholder={t("login.emailPlaceholder")}
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -152,7 +168,7 @@ export default function Login() {
                 variant="primary"
                 className="mt-1 bg-[#E9D500] font-semibold text-[#193B4B]"
               >
-                Next
+                {t("login.next")}
               </Button>
             </form>
           ) : (
@@ -162,12 +178,12 @@ export default function Login() {
             >
               <p className="text-center text-sm text-white/80">{email}</p>
               <label className="text-sm text-white/80" htmlFor="password">
-                Password
+                {t("login.passwordLabel")}
               </label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter your password"
+                placeholder={t("login.passwordPlaceholder")}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -182,7 +198,7 @@ export default function Login() {
                 variant="primary"
                 className="mt-1 bg-[#E9D500] font-semibold text-[#193B4B]"
               >
-                Sign in
+                {t("login.submit")}
               </Button>
               <button
                 type="button"
@@ -193,7 +209,7 @@ export default function Login() {
                 }}
                 className="text-center text-sm text-white/50 transition hover:text-white"
               >
-                Use a different email
+                {t("login.useDifferentEmail")}
               </button>
             </form>
           )}
@@ -210,14 +226,14 @@ export default function Login() {
               to="/forgot-password"
               className="font-medium text-white/70 hover:text-white hover:underline"
             >
-              Forgot password?
+              {t("login.forgot")}
             </Link>
           </p>
 
           <p className="mt-6 text-center text-sm text-white/55">
-            Need an account?{" "}
+            {t("login.needAccount")}{" "}
             <Link to="/signup" className="font-medium text-[#E9D500] hover:underline">
-              Sign up
+              {t("login.signupCta")}
             </Link>
           </p>
         </div>

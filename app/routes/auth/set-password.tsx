@@ -1,26 +1,37 @@
 import { Button, Input } from "@heroui/react";
 import { Link, redirect, useSearchParams } from "react-router";
+import { useTranslation } from "react-i18next";
 import { MarketingNav } from "~/components/marketing/MarketingNav";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
 // @ts-expect-error - route types not yet generated
 import type { Route } from "./+types/set-password";
 import { useState } from "react";
 import { signIn, authClient } from "~/lib/auth-client";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 
-export function meta() {
+export const handle = { i18n: ["auth"] };
+
+export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
   return [
-    { title: "Set password — Pickup Roster" },
-    { name: "description", content: "Set your password for your school car line" },
+    { title: data?.metaTitle ?? "Set password — Pickup Roster" },
+    { name: "description", content: data?.metaDescription ?? "Set your password for your school car line" },
   ];
 }
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const user = getOptionalUserFromContext(context);
   if (user) throw redirect("/");
-  return null;
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "auth");
+  return {
+    metaTitle: t("setPassword.metaTitle"),
+    metaDescription: t("setPassword.metaDescription"),
+  };
 }
 
 export default function SetPassword() {
+  const { t } = useTranslation("auth");
   const [searchParams] = useSearchParams();
   const emailFromParams = searchParams.get("email") ?? "";
 
@@ -35,12 +46,12 @@ export default function SetPassword() {
     setError(null);
 
     if (newPassword !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError(t("setPassword.errors.passwordsDoNotMatch"));
       return;
     }
 
     if (newPassword.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError(t("setPassword.errors.passwordTooShort"));
       return;
     }
 
@@ -54,7 +65,7 @@ export default function SetPassword() {
       });
 
       if (signInResult.error) {
-        setError("Temporary password is incorrect.");
+        setError(t("setPassword.errors.tempIncorrect"));
         setLoading(false);
         return;
       }
@@ -66,14 +77,14 @@ export default function SetPassword() {
       });
 
       if (changeResult.error) {
-        setError("Failed to set new password. Please try again.");
+        setError(t("setPassword.errors.setFailed"));
         setLoading(false);
         return;
       }
 
       window.location.href = "/";
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(t("setPassword.errors.generic"));
       setLoading(false);
     }
   };
@@ -84,38 +95,38 @@ export default function SetPassword() {
 
       <div className="mx-auto flex min-h-[calc(100vh-3.5rem)] max-w-lg flex-col justify-center px-4 py-10">
         <div className="rounded-2xl border border-white/10 bg-[#151a1a] p-6 shadow-xl">
-          <h1 className="text-2xl font-bold">Set your password</h1>
+          <h1 className="text-2xl font-bold">{t("setPassword.title")}</h1>
           <p className="mt-2 text-sm text-white/65">
-            Replace your temporary password with a new one you&apos;ll remember.
+            {t("setPassword.subtitle")}
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-3">
-            <label className="text-sm text-white/80" htmlFor="set-password-current">Temporary password</label>
+            <label className="text-sm text-white/80" htmlFor="set-password-current">{t("setPassword.currentLabel")}</label>
             <Input
               id="set-password-current"
               type="password"
-              placeholder="Enter your temporary password"
+              placeholder={t("setPassword.currentPlaceholder")}
               required
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               autoComplete="current-password"
               autoFocus
             />
-            <label className="text-sm text-white/80" htmlFor="set-password-new">New password</label>
+            <label className="text-sm text-white/80" htmlFor="set-password-new">{t("setPassword.newLabel")}</label>
             <Input
               id="set-password-new"
               type="password"
-              placeholder="At least 8 characters"
+              placeholder={t("setPassword.newPlaceholder")}
               required
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               autoComplete="new-password"
             />
-            <label className="text-sm text-white/80" htmlFor="set-password-confirm">Confirm new password</label>
+            <label className="text-sm text-white/80" htmlFor="set-password-confirm">{t("setPassword.confirmLabel")}</label>
             <Input
               id="set-password-confirm"
               type="password"
-              placeholder="Re-enter your new password"
+              placeholder={t("setPassword.confirmPlaceholder")}
               required
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -130,13 +141,13 @@ export default function SetPassword() {
               variant="primary"
               className="mt-1 bg-[#E9D500] font-semibold text-[#193B4B]"
             >
-              Set password
+              {t("setPassword.submit")}
             </Button>
           </form>
 
           <p className="mt-6 text-center text-sm text-white/55">
             <Link to="/login" className="font-medium text-[#E9D500] hover:underline">
-              Back to log in
+              {t("setPassword.backToLogin")}
             </Link>
           </p>
         </div>

@@ -1,22 +1,26 @@
 import { useLoaderData } from "react-router";
+import { useTranslation } from "react-i18next";
 import type { LoaderFunctionArgs } from "react-router";
 import { MarketingNav } from "~/components/marketing/MarketingNav";
 import { getStatusPageData } from "~/domain/status/service.server";
 import { StatusPill } from "~/components/status/StatusPill";
 import { UptimeGrid } from "~/components/status/UptimeGrid";
 import { IncidentList } from "~/components/status/IncidentList";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 import type {
   ComponentStatus,
   SectionId,
   StatusPageComponent,
 } from "~/domain/status/types";
 
-export function meta() {
+export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
   return [
-    { title: "Status — Pickup Roster" },
+    { title: data?.metaTitle ?? "Status — Pickup Roster" },
     {
       name: "description",
       content:
+        data?.metaDescription ??
         "Live status of the Pickup Roster platform, including board infrastructure and third-party dependencies.",
     },
   ];
@@ -30,17 +34,18 @@ export function headers() {
   };
 }
 
-export async function loader({ context }: LoaderFunctionArgs) {
-  return await getStatusPageData(context);
+export async function loader({ request, context }: LoaderFunctionArgs) {
+  const data = await getStatusPageData(context);
+  // Localize meta tags at the edge — the meta() helper runs before the
+  // component mounts so we can't use useTranslation there.
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "common");
+  return {
+    ...data,
+    metaTitle: t("status.metaTitle"),
+    metaDescription: t("status.metaDescription"),
+  };
 }
-
-const SECTION_TITLES: Record<SectionId, string> = {
-  application: "Application",
-  data: "Data",
-  email: "Email",
-  payments: "Payments",
-  tenants: "Tenants",
-};
 
 const SECTION_ORDER: SectionId[] = [
   "application",
@@ -51,12 +56,21 @@ const SECTION_ORDER: SectionId[] = [
 ];
 
 export default function StatusPage() {
+  const { t } = useTranslation("common");
   const loaderData = useLoaderData<typeof loader>();
   const { components, activeIncidents, overall, renderedAt } = loaderData;
 
+  const sectionTitles: Record<SectionId, string> = {
+    application: t("status.sections.application"),
+    data: t("status.sections.data"),
+    email: t("status.sections.email"),
+    payments: t("status.sections.payments"),
+    tenants: t("status.sections.tenants"),
+  };
+
   const grouped = SECTION_ORDER.map((section) => ({
     section,
-    title: SECTION_TITLES[section],
+    title: sectionTitles[section],
     items: components.filter((c) => c.section === section),
   })).filter((g) => g.items.length > 0);
 
@@ -67,10 +81,10 @@ export default function StatusPage() {
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-extrabold sm:text-4xl">
-              Pickup Roster Status
+              {t("status.title")}
             </h1>
             <p className="mt-2 text-sm text-white/60">
-              Live health of the platform and its third-party dependencies.
+              {t("status.description")}
             </p>
           </div>
           <div className="shrink-0">
@@ -103,7 +117,7 @@ export default function StatusPage() {
         </div>
 
         <footer className="mt-10 text-xs text-white/40">
-          Rendered {formatRenderedAt(renderedAt)}. Updated every 2 minutes.
+          {t("status.renderedAt", { when: formatRenderedAt(renderedAt) })}
         </footer>
       </div>
     </div>
@@ -111,6 +125,7 @@ export default function StatusPage() {
 }
 
 function ComponentRow({ component }: { component: StatusPageComponent }) {
+  const { t } = useTranslation("common");
   return (
     <li className="flex flex-col gap-3 px-5 py-4 sm:gap-4">
       <div className="flex items-start justify-between gap-3">
@@ -131,15 +146,16 @@ function ComponentRow({ component }: { component: StatusPageComponent }) {
       </div>
       <UptimeGrid days={component.uptime90d} />
       <div className="flex items-center justify-between text-[11px] uppercase tracking-wide text-white/35">
-        <span>90 days ago</span>
-        <span>Today</span>
+        <span>{t("status.ninetyDaysAgo")}</span>
+        <span>{t("status.today")}</span>
       </div>
     </li>
   );
 }
 
 function OverallBanner({ status }: { status: ComponentStatus }) {
-  const { label, bgClass } = overallStyle(status);
+  const { t } = useTranslation("common");
+  const { label, bgClass } = overallStyle(status, t);
   return (
     <div
       className={`flex items-center gap-3 rounded-xl px-4 py-3 ${bgClass}`}
@@ -150,30 +166,35 @@ function OverallBanner({ status }: { status: ComponentStatus }) {
   );
 }
 
-function overallStyle(status: ComponentStatus): {
+type TFn = (key: string, opts?: Record<string, unknown>) => string;
+
+function overallStyle(
+  status: ComponentStatus,
+  t: TFn,
+): {
   label: string;
   bgClass: string;
 } {
   switch (status) {
     case "operational":
       return {
-        label: "All systems operational",
+        label: t("status.overall.operational"),
         bgClass: "bg-emerald-500/10 ring-1 ring-inset ring-emerald-400/25",
       };
     case "degraded":
       return {
-        label: "Degraded performance",
+        label: t("status.overall.degraded"),
         bgClass: "bg-amber-500/10 ring-1 ring-inset ring-amber-400/25",
       };
     case "outage":
       return {
-        label: "Major outage",
+        label: t("status.overall.outage"),
         bgClass: "bg-red-500/10 ring-1 ring-inset ring-red-400/25",
       };
     case "unknown":
     default:
       return {
-        label: "Status collecting",
+        label: t("status.overall.unknown"),
         bgClass: "bg-white/5 ring-1 ring-inset ring-white/15",
       };
   }

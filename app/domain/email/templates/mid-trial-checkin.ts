@@ -1,52 +1,68 @@
 import type { MidTrialCheckinMessage, RenderedEmail } from "../types";
-import { interpolate } from "../interpolate";
+import { getFixedT } from "~/lib/t.server";
 
-// Day ~14 check-in, founder voice. Variables: {{ firstName }}, {{ appLink }}.
-const SUBJECT = "how's pickup going, {{ firstName }}?";
-const PREVIEW = "checking in — no agenda, just want to make sure it's useful.";
+/**
+ * Day ~14 check-in, founder voice.
+ *
+ * i18n: copy lives under `email.midTrialCheckin.*`.
+ */
+export async function renderMidTrialCheckin(
+  msg: MidTrialCheckinMessage,
+): Promise<RenderedEmail> {
+  const t = await getFixedT(msg.locale ?? "en", "email");
+  const firstName = firstNameOrFallback(msg.userName, t("common.greetingFallback"));
+  const appLink = `https://${msg.orgSlug}.pickuproster.com`;
 
-const HTML = `<!doctype html>
+  const subject = t("midTrialCheckin.subject", { firstName });
+  const preview = t("midTrialCheckin.preview");
+  const greeting = t("midTrialCheckin.greeting", { firstName });
+  const para1 = t("midTrialCheckin.para1");
+  const para2 = t("midTrialCheckin.para2");
+  const para3Text = t("midTrialCheckin.para3", { appLink });
+  const para3Html = t("midTrialCheckin.para3Html", { appLink });
+  const signOff = t("common.signOff");
+  const signOffTitle = t("common.signOffTitle");
+
+  const html = `<!doctype html>
 <html>
   <body style="font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; color: #111; line-height: 1.5;">
-    <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">${PREVIEW}</span>
-    <p>Hi {{ firstName }},</p>
-    <p>You're about halfway through your trial. I wanted to check in — not to sell you anything, just to see how it's going.</p>
-    <p>If something's confusing, clunky, or missing, hit reply and tell me. I read every email and I'd rather hear it now than not at all.</p>
-    <p>If you want to poke around some more, you can jump back in here: <a href="{{ appLink }}">{{ appLink }}</a></p>
+    <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">${escapeHtml(preview)}</span>
+    <p>${escapeHtml(greeting)}</p>
+    <p>${escapeHtml(para1)}</p>
+    <p>${escapeHtml(para2)}</p>
+    <p>${para3Html}</p>
     <hr />
-    <p>Noah<br />Founder, PickupRoster</p>
+    <p>${escapeHtml(signOff)}<br />${escapeHtml(signOffTitle)}</p>
   </body>
 </html>`;
 
-const TEXT = `Hi {{ firstName }},
+  const text = `${greeting}
 
-You're about halfway through your trial. I wanted to check in — not to sell you anything, just to see how it's going.
+${para1}
 
-If something's confusing, clunky, or missing, hit reply and tell me. I read every email and I'd rather hear it now than not at all.
+${para2}
 
-If you want to poke around some more, you can jump back in here: {{ appLink }}
+${para3Text}
 
 --
-Noah
-Founder, PickupRoster`;
+${signOff}
+${signOffTitle}`;
 
-export function renderMidTrialCheckin(msg: MidTrialCheckinMessage): RenderedEmail {
-  const vars = {
-    orgName: msg.orgName,
-    orgSlug: msg.orgSlug,
-    daysIn: msg.daysIn,
-    firstName: firstNameOrFallback(msg.userName),
-    appLink: `https://${msg.orgSlug}.pickuproster.com`,
-  };
-  return {
-    subject: interpolate(SUBJECT, vars),
-    html: interpolate(HTML, vars),
-    text: interpolate(TEXT, vars),
-  };
+  return { subject, html, text };
 }
 
-function firstNameOrFallback(name: string | null | undefined): string {
-  if (!name) return "there";
+function firstNameOrFallback(
+  name: string | null | undefined,
+  fallback: string,
+): string {
+  if (!name) return fallback;
   const first = name.trim().split(/\s+/)[0];
-  return first || "there";
+  return first || fallback;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }

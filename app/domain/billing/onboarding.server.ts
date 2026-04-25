@@ -27,6 +27,9 @@ export async function ensureOrgForUser(params: {
   if (existingUser.orgId) {
     return { orgId: existingUser.orgId, plan, created: false };
   }
+  // Recipient locale for the welcome email — falls through to "en" via the
+  // template default if the column hasn't been backfilled yet.
+  const recipientLocale = (existingUser as { locale?: string }).locale;
 
   const slug = slugifyOrgName(requestedSlug);
   if (!slug) {
@@ -80,6 +83,7 @@ export async function ensureOrgForUser(params: {
       orgName: orgName.trim(),
       orgSlug: slug,
       userName: existingUser.name || null,
+      locale: recipientLocale,
     });
   } catch (err) {
     console.error("enqueueEmail(welcome) failed", err);

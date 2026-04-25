@@ -1,14 +1,20 @@
 import { Form, Link, redirect, useFetcher, useRevalidator } from "react-router";
+import { useTranslation } from "react-i18next";
 import { AlertTriangle, ArrowLeft, Check, Pause, Play, Plus, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { dataWithError, dataWithSuccess } from "remix-toast";
 import type { Route } from "./+types/drills.live";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
+
+export const handle = { i18n: ["roster"] };
 import {
   getOptionalUserFromContext,
   getOrgFromContext,
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
 import {
+  cycleToggle,
   parseRunState,
   parseTemplateDefinition,
   toggleKey,
@@ -27,9 +33,7 @@ import type { Prisma } from "~/db";
 
 export const meta: Route.MetaFunction = ({ data }) => [
   {
-    title: data?.run
-      ? `${data.paused ? "Paused" : "LIVE"} – ${data.template.name}`
-      : "Live drill",
+    title: data?.metaTitle ?? "Live drill",
   },
 ];
 
@@ -42,15 +46,31 @@ const btnDanger =
 const btnGhost =
   "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const user = getOptionalUserFromContext(context);
   if (!user) {
     throw new Response("Not authenticated", { status: 401 });
   }
   const org = getOrgFromContext(context);
   const prisma = getTenantPrisma(context);
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "roster");
 
-  const run = await getActiveDrillRun(prisma, org.id);
+  // Wrap the DB fetch so a thrown error surfaces with context rather than
+  // an opaque 500. The prior implementation let any throw bubble straight
+  // to the worker boundary, which replies with empty-body 500 — leaving
+  // "live drill clicks just crash" with no actionable log. Now the real
+  // stack shows up in wrangler tail.
+  let run;
+  try {
+    run = await getActiveDrillRun(prisma, org.id);
+  } catch (err) {
+    console.error(
+      `[drills.live] loader getActiveDrillRun threw (org=${org.id}, user=${user.id})`,
+      err,
+    );
+    throw err;
+  }
   if (!run) {
     // Nothing to take over — bounce back to the home board.
     throw redirect("/");
@@ -58,6 +78,9 @@ export async function loader({ context }: Route.LoaderArgs) {
 
   const isAdmin = userIsAdmin(user);
   const paused = run.status === "PAUSED";
+  const metaTitle = paused
+    ? t("drillsLive.metaPaused", { name: run.template.name })
+    : t("drillsLive.metaLive", { name: run.template.name });
 
   return {
     run: {
@@ -79,6 +102,7 @@ export async function loader({ context }: Route.LoaderArgs) {
     isAdmin,
     paused,
     userName: user.name || user.email,
+    metaTitle,
   };
 }
 
@@ -91,12 +115,15 @@ export async function action({ request, context }: Route.ActionArgs) {
   const prisma = getTenantPrisma(context);
   const isAdmin = userIsAdmin(user);
 
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "roster");
+
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
   const runId = String(formData.get("runId") ?? "");
 
   if (!runId) {
-    return dataWithError(null, "Missing run id.");
+    return dataWithError(null, t("drillsLive.errors.missingRunId"));
   }
 
   const requireAdmin = () => {
@@ -105,39 +132,52 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
   };
 
-  if (intent === "pause") {
-    requireAdmin();
-    await pauseDrillRun(prisma, org.id, runId);
-    return dataWithSuccess(null, "Drill paused.");
-  }
-
-  if (intent === "resume") {
-    requireAdmin();
-    await resumeDrillRun(prisma, org.id, runId);
-    return dataWithSuccess(null, "Drill resumed.");
-  }
-
-  if (intent === "end") {
-    requireAdmin();
-    await endDrillRun(prisma, org.id, runId);
-    // After ending, the user no longer needs the takeover. Send them home.
-    throw redirect("/");
-  }
-
-  if (intent === "update-state") {
-    const raw = String(formData.get("state") ?? "");
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return dataWithError(null, "Invalid state JSON.");
+  // Single try/catch so any unexpected throw (unique constraint, D1 hiccup,
+  // bad JSON) surfaces to logs with actor + intent context. Response throws
+  // (404/409/redirect) still propagate for React Router to handle.
+  try {
+    if (intent === "pause") {
+      requireAdmin();
+      await pauseDrillRun(prisma, org.id, runId);
+      return dataWithSuccess(null, t("drillsLive.toasts.paused"));
     }
-    const next = parseRunState(parsed as Prisma.JsonValue);
-    await updateLiveRunState(prisma, org.id, runId, next);
-    return dataWithSuccess(null, "Saved.");
-  }
 
-  return dataWithError(null, "Unknown action.");
+    if (intent === "resume") {
+      requireAdmin();
+      await resumeDrillRun(prisma, org.id, runId);
+      return dataWithSuccess(null, t("drillsLive.toasts.resumed"));
+    }
+
+    if (intent === "end") {
+      requireAdmin();
+      await endDrillRun(prisma, org.id, runId);
+      // After ending, the user no longer needs the takeover. Send them home.
+      throw redirect("/");
+    }
+
+    if (intent === "update-state") {
+      const raw = String(formData.get("state") ?? "");
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        return dataWithError(null, t("drillsLive.errors.invalidStateJson"));
+      }
+      const next = parseRunState(parsed as Prisma.JsonValue);
+      await updateLiveRunState(prisma, org.id, runId, next);
+      return dataWithSuccess(null, t("drillsLive.toasts.saved"));
+    }
+
+    return dataWithError(null, t("drillsLive.errors.unknownAction"));
+  } catch (err) {
+    if (err instanceof Response) throw err;
+    console.error(
+      `[drills.live] action intent=${intent} runId=${runId} user=${user.id} threw`,
+      err,
+    );
+    const msg = err instanceof Error ? err.message : t("drillsLive.errors.unexpected");
+    return dataWithError(null, msg, { status: 500 });
+  }
 }
 
 function newId(): string {
@@ -159,6 +199,7 @@ function formatElapsed(startIso: string | null): string {
 }
 
 export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation("roster");
   const { run, template, isAdmin, paused } = loaderData;
   const def = useMemo(() => parseTemplateDefinition(template.definition), [template.definition]);
   const [state, setState] = useState<RunState>(() => parseRunState(run.state));
@@ -209,10 +250,14 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
       if (readOnly) return;
       const key = toggleKey(rowId, colId);
       setState((s) => {
-        const next: RunState = {
-          ...s,
-          toggles: { ...s.toggles, [key]: !s.toggles[key] },
-        };
+        const nextVal = cycleToggle(s.toggles[key]);
+        const toggles = { ...s.toggles };
+        if (nextVal === null) {
+          delete toggles[key];
+        } else {
+          toggles[key] = nextVal;
+        }
+        const next: RunState = { ...s, toggles };
         persist(next);
         return next;
       });
@@ -302,7 +347,7 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
         <AlertTriangle className="w-5 h-5 flex-shrink-0" />
         <div className="flex-1 min-w-[12rem]">
           <div className="text-sm font-bold uppercase tracking-wide">
-            {paused ? "PAUSED" : "LIVE DRILL"}
+            {paused ? t("drillsLive.bannerPaused") : t("drillsLive.bannerLive")}
             {" — "}
             <span className="font-semibold normal-case">{template.name}</span>
           </div>
@@ -311,7 +356,7 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
           )}
         </div>
         <div className="text-sm font-mono tabular-nums">
-          {paused ? "frozen at " : "elapsed "} {elapsed}
+          {paused ? t("drillsLive.elapsedFrozen") : t("drillsLive.elapsedRunning")} {elapsed}
         </div>
       </div>
 
@@ -322,14 +367,14 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
               <h1 className="text-2xl font-bold text-white">{template.name}</h1>
               <p className="text-white/50 text-sm mt-1">
                 {paused
-                  ? "Drill is paused — checklist is read-only until an admin resumes."
-                  : "Tap toggle cells as units check in. Changes sync to everyone signed in."}
+                  ? t("drillsLive.subtitlePaused")
+                  : t("drillsLive.subtitleLive")}
               </p>
             </div>
             {isAdmin && (
               <Link to="/admin/drills" className={btnGhost}>
                 <ArrowLeft className="w-4 h-4 mr-1" />
-                Admin
+                {t("drillsLive.adminLink")}
               </Link>
             )}
           </div>
@@ -342,7 +387,7 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
           />
 
           <section className="rounded-xl border border-white/10 bg-white/5 p-4">
-            <h2 className="text-sm font-semibold text-white mb-2">Notes</h2>
+            <h2 className="text-sm font-semibold text-white mb-2">{t("drillsLive.notesHeading")}</h2>
             <textarea
               value={state.notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -350,23 +395,23 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
               rows={4}
               disabled={readOnly}
               className="w-full rounded-lg border border-white/20 bg-[#1a1f1f] px-3 py-2 text-white text-sm placeholder:text-white/30 disabled:opacity-60 disabled:cursor-not-allowed"
-              placeholder="Incidents, headcount issues, etc."
+              placeholder={t("drillsLive.notesPlaceholder")}
             />
           </section>
 
           <section className="rounded-xl border border-white/10 bg-white/5 p-4">
             <div className="flex items-center justify-between gap-2 mb-3">
-              <h2 className="text-sm font-semibold text-white">Follow-up items</h2>
+              <h2 className="text-sm font-semibold text-white">{t("drillsLive.followUpHeading")}</h2>
               {!readOnly && (
                 <button type="button" className={btnSecondary} onClick={addActionItem}>
                   <Plus className="w-4 h-4 mr-1 inline" />
-                  Add
+                  {t("drillsLive.addFollowUp")}
                 </button>
               )}
             </div>
             <ul className="flex flex-col gap-2">
               {state.actionItems.length === 0 ? (
-                <li className="text-white/40 text-sm">No items yet.</li>
+                <li className="text-white/40 text-sm">{t("drillsLive.noFollowUp")}</li>
               ) : (
                 state.actionItems.map((item) => (
                   <li key={item.id} className="flex flex-wrap items-center gap-2">
@@ -380,7 +425,7 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
                           : "border-white/20 bg-white/5 text-white/40"
                       } disabled:opacity-60 disabled:cursor-not-allowed`}
                       aria-pressed={item.done}
-                      aria-label={item.done ? "Mark not done" : "Mark done"}
+                      aria-label={item.done ? t("drillsLive.markNotDone") : t("drillsLive.markDone")}
                     >
                       {item.done && <Check className="w-4 h-4" />}
                     </button>
@@ -390,14 +435,14 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
                       onBlur={flushNotes}
                       disabled={readOnly}
                       className="flex-1 min-w-[12rem] rounded border border-white/15 bg-[#1a1f1f] px-2 py-1.5 text-sm text-white disabled:opacity-60 disabled:cursor-not-allowed"
-                      placeholder="Follow-up task…"
+                      placeholder={t("drillsLive.followUpPlaceholder")}
                     />
                     {!readOnly && (
                       <button
                         type="button"
                         onClick={() => removeActionItem(item.id)}
                         className="p-2 text-rose-300 hover:bg-rose-500/10 rounded"
-                        aria-label="Remove item"
+                        aria-label={t("drillsLive.removeItem")}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -413,10 +458,10 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
           <aside className="xl:w-72 xl:flex-shrink-0">
             <div className="sticky top-6 rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col gap-3">
               <div className="text-xs uppercase tracking-wide text-white/50 font-semibold">
-                Admin controls
+                {t("drillsLive.adminControls")}
               </div>
               <p className="text-xs text-white/50">
-                You're an admin — non-admins see the checklist only.
+                {t("drillsLive.adminHelper")}
               </p>
 
               {paused ? (
@@ -429,7 +474,7 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
                     disabled={fetcher.state !== "idle"}
                   >
                     <Play className="w-4 h-4 mr-1" />
-                    Resume drill
+                    {t("drillsLive.resume")}
                   </button>
                 </fetcher.Form>
               ) : (
@@ -442,7 +487,7 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
                     disabled={fetcher.state !== "idle"}
                   >
                     <Pause className="w-4 h-4 mr-1" />
-                    Pause drill
+                    {t("drillsLive.pause")}
                   </button>
                 </fetcher.Form>
               )}
@@ -450,11 +495,7 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
               <Form
                 method="post"
                 onSubmit={(e) => {
-                  if (
-                    !confirm(
-                      "End this drill? Everyone signed in will return to the normal app. The run will be archived as history.",
-                    )
-                  ) {
+                  if (!confirm(t("drillsLive.endConfirm"))) {
                     e.preventDefault();
                   }
                 }}
@@ -463,13 +504,13 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
                 <input type="hidden" name="runId" value={run.id} />
                 <button type="submit" className={`${btnDanger} w-full`}>
                   <Square className="w-4 h-4 mr-1" />
-                  End drill
+                  {t("drillsLive.end")}
                 </button>
               </Form>
 
               {template.authority && (
                 <p className="text-[11px] text-white/40 mt-2">
-                  Source: {template.authority}
+                  {t("drillsLive.source", { authority: template.authority })}
                 </p>
               )}
             </div>

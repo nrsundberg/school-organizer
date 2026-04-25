@@ -79,6 +79,8 @@ export default [
   route("faqs", "routes/faqs.tsx"),
   route("blog", "routes/blog._index.tsx"),
   route("blog/:slug", "routes/blog.$slug.tsx"),
+  route("guides", "routes/guides._index.tsx"),
+  route("guides/:slug", "routes/guides.$slug.tsx"),
   route("status", "routes/status.tsx"),
 
   route("platform", "routes/platform/layout.tsx", [

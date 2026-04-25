@@ -6,10 +6,16 @@ import { renderPasswordReset } from "./password-reset";
 
 /**
  * Map an EmailMessage to a {subject, html, text} payload.
+ *
+ * Async because templates resolve their copy via `getFixedT` (which spins up a
+ * per-call i18next instance — see `app/lib/t.server.ts`). The recipient
+ * locale is read off `msg.locale` by each renderer; when omitted, templates
+ * fall back to English.
+ *
  * Exhaustive switch — TypeScript will error on the `never` if a new `kind`
  * is added to EmailMessage without a matching renderer here.
  */
-export function renderEmail(msg: EmailMessage): RenderedEmail {
+export async function renderEmail(msg: EmailMessage): Promise<RenderedEmail> {
   switch (msg.kind) {
     case "welcome":
       return renderWelcome(msg);

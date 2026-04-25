@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import { getFormProps, getInputProps } from "@conform-to/react";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills.$templateId";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
@@ -14,16 +15,25 @@ import { startDrillRun } from "~/domain/drills/live.server";
 import { parseIntent } from "~/lib/forms.server";
 import { formClasses, getFieldError, useAppForm } from "~/lib/forms";
 import { dataWithError, dataWithSuccess } from "remix-toast";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
+
+export const handle = { i18n: ["admin", "common"] };
 
 export const meta: Route.MetaFunction = ({ data }) => [
-  { title: data?.template ? `Edit – ${data.template.name}` : "Edit checklist" },
+  { title: data?.metaTitle ?? (data?.template ? `Edit – ${data.template.name}` : "Edit checklist") },
 ];
 
 // -----------------------------------------------------------------------------
 // Shared zod schemas — drive both client-side (useAppForm) and server-side
 // (parseIntent) validation. Phase 2 agents mirror this pattern in their routes.
+// TODO: wire localized errorMap once Agent C ships `makeZodErrorMap`. Until
+// then we keep messages keyed via `t()` resolved at use-site / build-site.
 // -----------------------------------------------------------------------------
 
+// English messages used as the static schema source. The action wraps these
+// with translated dataWithError(...) toasts where it surfaces validation
+// failures to the user.
 const renameSchema = z.object({
   intent: z.literal("rename"),
   name: z.string().trim().min(1, "Name is required.").max(120, "Name is too long."),
@@ -60,7 +70,7 @@ const saveDefinitionSchema = zfd.formData({
   ),
 });
 
-export async function loader({ context, params }: Route.LoaderArgs) {
+export async function loader({ context, params, request }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const id = params.templateId;
@@ -74,15 +84,19 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   if (!template) {
     throw new Response("Not found", { status: 404 });
   }
-  return { template };
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+  return { template, metaTitle: t("drills.metaEdit", { name: template.name }) };
 }
 
 export async function action({ request, context, params }: Route.ActionArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const id = params.templateId;
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
   if (!id) {
-    return dataWithError(null, "Missing template.");
+    return dataWithError(null, t("drills.edit.errors.missingTemplate"));
   }
 
   const result = await parseIntent(request, {
@@ -98,7 +112,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         where: { id },
         data: { name: result.data.name },
       });
-      return dataWithSuccess(null, "Name saved.");
+      return dataWithSuccess(null, t("drills.edit.toasts.nameSaved"));
     }
 
     if (result.intent === "start-live") {
@@ -109,7 +123,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         // startDrillRun throws a Response (409) when another drill is already
         // active. Surface it as a toast instead of crashing the route.
         if (err instanceof Response && err.status === 409) {
-          return dataWithError(null, "Another drill is already live. End it first.");
+          return dataWithError(null, t("drills.edit.errors.anotherLive"));
         }
         throw err;
       }
@@ -124,19 +138,25 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         where: { id },
         data: { definition: result.data.definition as unknown as Prisma.InputJsonValue },
       });
-      return dataWithSuccess(null, "Layout saved.");
+      return dataWithSuccess(null, t("drills.edit.toasts.layoutSaved"));
     }
   } catch (err) {
     // A redirect from start-live must propagate — React Router surfaces
     // Response throws itself. Everything else we turn into a toast so the
-    // user sees WHAT failed rather than an opaque crash (this was the
-    // "unexpected server error" on Save layout).
+    // user sees WHAT failed rather than an opaque crash.
     if (err instanceof Response) throw err;
-    const msg = err instanceof Error ? err.message : "Unexpected error saving.";
+    // Always log the real error so wrangler tail shows the stack. Without
+    // this we saw "save layout 500" with no clue — the catch swallowed
+    // everything into a generic toast.
+    console.error(
+      `[drills.$templateId] action intent=${result.intent} template=${id} threw`,
+      err,
+    );
+    const msg = err instanceof Error ? err.message : t("drills.edit.errors.unexpectedSave");
     return dataWithError(null, msg, { status: 500 });
   }
 
-  return dataWithError(null, "Unknown action.");
+  return dataWithError(null, t("drills.edit.errors.unknown"));
 }
 
 function newId(): string {
@@ -152,6 +172,7 @@ function cloneDefinition(def: TemplateDefinition): TemplateDefinition {
 
 export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) {
   const { template } = loaderData;
+  const { t } = useTranslation("admin");
   const [definition, setDefinition] = useState<TemplateDefinition>(() =>
     cloneDefinition(parseTemplateDefinition(template.definition)),
   );
@@ -294,7 +315,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
           className="inline-flex items-center gap-1 text-sm text-white/50 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          All checklists
+          {t("drills.edit.back")}
         </Link>
       </div>
 
@@ -306,7 +327,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
         >
           <input type="hidden" name="intent" value="rename" />
           <label className={`${formClasses.labelStack} flex-1 max-w-md`}>
-            Template name
+            {t("drills.edit.templateName")}
             <input
               {...getInputProps(renameFields.name, { type: "text" })}
               key={template.updatedAt.toISOString()}
@@ -322,17 +343,17 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
             ) : null}
           </label>
           <button type="submit" className={formClasses.btnSecondary}>
-            Save name
+            {t("drills.edit.saveName")}
           </button>
         </Form>
         <div className="flex flex-wrap gap-2">
           <button type="button" className={formClasses.btnSecondary} onClick={() => addColumn("text")}>
             <Plus className="w-4 h-4 mr-1 inline" />
-            Text column
+            {t("drills.edit.addText")}
           </button>
           <button type="button" className={formClasses.btnSecondary} onClick={() => addColumn("toggle")}>
             <Plus className="w-4 h-4 mr-1 inline" />
-            Toggle column
+            {t("drills.edit.addToggle")}
           </button>
           <button
             type="button"
@@ -340,13 +361,13 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
             onClick={saveDefinition}
             disabled={saveFetcher.state !== "idle"}
           >
-            {saveFetcher.state !== "idle" ? "Saving…" : "Save layout"}
+            {saveFetcher.state !== "idle" ? t("drills.edit.saving") : t("drills.edit.saveLayout")}
           </button>
         </div>
       </div>
 
       <p className="text-xs text-white/40">
-        Toggle columns show a check on the run screen. Text columns store labels (grade, teacher name, etc.).
+        {t("drills.edit.intro")}
       </p>
 
       <div className="overflow-x-auto rounded-xl border border-white/10">
@@ -361,7 +382,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                       value={col.label}
                       onChange={(e) => updateColumn(ci, { label: e.target.value })}
                       className="rounded border border-white/20 bg-white/5 px-2 py-1 text-white text-xs font-semibold"
-                      aria-label={`Column ${ci + 1} label`}
+                      aria-label={t("drills.edit.columnLabel", { n: ci + 1 })}
                     />
                     <select
                       value={col.kind}
@@ -370,15 +391,15 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                       }
                       className="rounded border border-white/20 bg-[#1a1f1f] px-2 py-1 text-white text-xs"
                     >
-                      <option value="text">Text</option>
-                      <option value="toggle">Toggle</option>
+                      <option value="text">{t("drills.edit.kindText")}</option>
+                      <option value="toggle">{t("drills.edit.kindToggle")}</option>
                     </select>
                     <div className="flex gap-1">
                       <button
                         type="button"
                         className="p-1 rounded border border-white/10 text-white/60 hover:bg-white/10"
                         onClick={() => moveColumn(ci, -1)}
-                        aria-label="Move column left"
+                        aria-label={t("drills.edit.moveLeft")}
                       >
                         <ArrowUp className="w-3 h-3 -rotate-90" />
                       </button>
@@ -386,7 +407,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                         type="button"
                         className="p-1 rounded border border-white/10 text-white/60 hover:bg-white/10"
                         onClick={() => moveColumn(ci, 1)}
-                        aria-label="Move column right"
+                        aria-label={t("drills.edit.moveRight")}
                       >
                         <ArrowDown className="w-3 h-3 -rotate-90" />
                       </button>
@@ -394,7 +415,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                         type="button"
                         className="p-1 rounded border border-rose-500/30 text-rose-300 hover:bg-rose-500/10 ml-auto"
                         onClick={() => removeColumn(ci)}
-                        aria-label="Remove column"
+                        aria-label={t("drills.edit.removeColumn")}
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
@@ -418,7 +439,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                         className="w-full min-w-[6rem] rounded border border-white/15 bg-white/5 px-2 py-1.5 text-white"
                       />
                     ) : (
-                      <span className="text-white/30 text-xs">check on run</span>
+                      <span className="text-white/30 text-xs">{t("drills.edit.checkOnRun")}</span>
                     )}
                   </td>
                 ))}
@@ -428,7 +449,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                       type="button"
                       className="p-1 rounded border border-white/10 text-white/60 hover:bg-white/10"
                       onClick={() => moveRow(ri, -1)}
-                      aria-label="Move row up"
+                      aria-label={t("drills.edit.moveUp")}
                     >
                       <ArrowUp className="w-3 h-3" />
                     </button>
@@ -436,7 +457,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                       type="button"
                       className="p-1 rounded border border-white/10 text-white/60 hover:bg-white/10"
                       onClick={() => moveRow(ri, 1)}
-                      aria-label="Move row down"
+                      aria-label={t("drills.edit.moveDown")}
                     >
                       <ArrowDown className="w-3 h-3" />
                     </button>
@@ -444,7 +465,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                       type="button"
                       className="p-1 rounded border border-rose-500/30 text-rose-300 hover:bg-rose-500/10"
                       onClick={() => removeRow(ri)}
-                      aria-label="Remove row"
+                      aria-label={t("drills.edit.removeRow")}
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -458,7 +479,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
 
       <button type="button" className={`${formClasses.btnSecondary} self-start`} onClick={addRow}>
         <Plus className="w-4 h-4 mr-1 inline" />
-        Add row
+        {t("drills.edit.addRow")}
       </button>
 
       <div className="flex flex-wrap gap-3">
@@ -470,14 +491,14 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
             disabled={liveFetcher.state !== "idle"}
           >
             <Radio className="w-4 h-4" />
-            Start live drill
+            {t("drills.edit.startLive")}
           </button>
         </liveFetcher.Form>
         <Link
           to={`/admin/drills/${template.id}/run`}
           className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
         >
-          Open run screen
+          {t("drills.edit.openRun")}
         </Link>
         <Link
           to={`/admin/print/drills/${template.id}`}
@@ -485,7 +506,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
           target="_blank"
           rel="noreferrer"
         >
-          Print preview
+          {t("drills.edit.printPreview")}
         </Link>
       </div>
       </div>
@@ -494,11 +515,11 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
         <div className="sticky top-6 flex flex-col gap-3">
           <div className="flex items-center gap-2 text-sm text-white/60">
             <Eye className="w-4 h-4" />
-            <span className="font-medium">Live preview</span>
+            <span className="font-medium">{t("drills.edit.livePreview")}</span>
           </div>
           <ChecklistPreview definition={definition} />
           <p className="text-xs text-white/40">
-            What teachers see on the run screen. Updates as you edit — save to persist.
+            {t("drills.edit.previewHelp")}
           </p>
         </div>
       </aside>

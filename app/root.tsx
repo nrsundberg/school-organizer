@@ -16,11 +16,24 @@ import { toast as notify, ToastContainer } from "react-toastify";
 import toastStyles from "react-toastify/ReactToastify.css?url";
 import styles from "./app.css?url";
 import type { Route } from "./+types/root";
+import { useChangeLanguage } from "remix-i18next/react";
+import { detectLocale } from "~/i18n.server";
+import { DEFAULT_LANGUAGE } from "~/lib/i18n-config";
+// Initial common-namespace bundle shipped with the SSR response. The full
+// JSON for other namespaces is fetched lazily by the http backend (see
+// app/i18n.ts) once a route declares them via `handle = { i18n: [...] }`.
+import enCommon from "../public/locales/en/common.json";
+import esCommon from "../public/locales/es/common.json";
+
+const COMMON_BUNDLES: Record<string, unknown> = {
+  en: enCommon,
+  es: esCommon,
+};
 import {
   globalStorageMiddleware,
   userContext,
   getOptionalOrgFromContext,
-  getTenantPrisma,
+  getTenantPrisma
 } from "~/domain/utils/global-context.server";
 import { isMarketingHost } from "~/domain/utils/host.server";
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
@@ -30,12 +43,17 @@ import { Footer } from "~/components/Footer";
 import logo from "/logo-icon.svg?url";
 import { getBrandingFromOrg } from "~/domain/org/branding.server";
 import { HEX_COLOR_RE } from "~/domain/org/branding-constants";
-import { DEFAULT_SITE_NAME, DEFAULT_SUPPORT_EMAIL, getSupportEmail } from "~/lib/site";
+import {
+  DEFAULT_SITE_NAME,
+  DEFAULT_SUPPORT_EMAIL,
+  getSupportEmail
+} from "~/lib/site";
 import { getActiveDrillRun } from "~/domain/drills/live.server";
 import {
   liveDrillRedirectTarget,
-  userIsAdmin,
+  userIsAdmin
 } from "~/domain/drills/live-redirect.server";
+import { getCspNonceFromRequest } from "~/lib/csp";
 
 export const middleware: MiddlewareFunction<Response>[] = [
   globalStorageMiddleware
@@ -71,22 +89,28 @@ export const meta: Route.MetaFunction = ({ data }) => {
   if (!data) {
     return [
       { title: DEFAULT_SITE_NAME },
-      { name: "description", content: "Live car line board, viewer access, and school admin tools." },
-      { name: "theme-color", content: "#3D6B9A" },
+      {
+        name: "description",
+        content: "Live car line board, viewer access, and school admin tools."
+      },
+      { name: "theme-color", content: "#3D6B9A" }
     ];
   }
   if (data.marketing) {
     return [
       { title: `${DEFAULT_SITE_NAME} — Car line made clear` },
-      { name: "description", content: "Live car line board, viewer access, and school admin tools." },
-      { name: "theme-color", content: "#3D6B9A" },
+      {
+        name: "description",
+        content: "Live car line board, viewer access, and school admin tools."
+      },
+      { name: "theme-color", content: "#3D6B9A" }
     ];
   }
   const name = data.branding?.orgName ?? DEFAULT_SITE_NAME;
   return [
     { title: `${name} — Car line` },
     { name: "description", content: `${name} car line board.` },
-    { name: "theme-color", content: "#3D6B9A" },
+    { name: "theme-color", content: "#3D6B9A" }
   ];
 };
 
@@ -98,7 +122,7 @@ export const links: Route.LinksFunction = () => [
   { rel: "icon", href: "/logo-32.png", type: "image/png", sizes: "32x32" },
   { rel: "icon", href: "/logo-192.png", type: "image/png", sizes: "192x192" },
   { rel: "apple-touch-icon", href: "/logo-180.png" },
-  { rel: "manifest", href: "/site.webmanifest" },
+  { rel: "manifest", href: "/site.webmanifest" }
 ];
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -122,7 +146,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
           user,
           pathname: url.pathname,
           hasActiveDrill: true,
-          isAdmin: false,
+          isAdmin: false
         });
         if (target) {
           throw redirect(target);
@@ -158,6 +182,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }
   }
 
+  // Run the i18n detector chain once per request so every loader downstream
+  // can read the locale from the matched root route. We also ship the
+  // initial `common` namespace bundle inline so the very first render has
+  // strings available without an extra fetch round-trip.
+  const locale = await detectLocale(request, context);
+  const i18nResources = {
+    common: COMMON_BUNDLES[locale] ?? COMMON_BUNDLES[DEFAULT_LANGUAGE],
+  };
+
   return data(
     {
       toast,
@@ -168,10 +201,17 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       dashboardUrl,
       supportEmail: getSupportEmail(context),
       sentryDsn: (context as any).cloudflare?.env?.SENTRY_DSN ?? null,
+      cspNonce: getCspNonceFromRequest(request),
+      locale,
+      i18nResources
     },
-    { headers },
+    { headers }
   );
 }
+
+// Surfaces the i18n namespaces the root render needs. Phase 2 routes
+// declare additional namespaces with their own `handle = { i18n: [...] }`.
+export const handle = { i18n: ["common"] };
 
 export function ErrorBoundary() {
   const error = useRouteError();
@@ -222,7 +262,9 @@ export function ErrorBoundary() {
         </div>
         <div className="flex-1 flex flex-col items-center justify-center px-4">
           {statusCode && (
-            <p className="text-blue-300 text-6xl font-bold mb-2">{statusCode}</p>
+            <p className="text-blue-300 text-6xl font-bold mb-2">
+              {statusCode}
+            </p>
           )}
           <h1 className="text-2xl font-semibold mb-3">{title}</h1>
           <p className="text-white/60 mb-6 text-center max-w-sm">{message}</p>
@@ -237,17 +279,28 @@ export function ErrorBoundary() {
           siteName={DEFAULT_SITE_NAME}
           supportEmail={DEFAULT_SUPPORT_EMAIL}
         />
-        {/* window.__sentryDsn is not injected here because ErrorBoundary renders
-            without loader data (the loader may have thrown). Client errors that
-            fire after hydration already have Sentry initialized via entry.client.tsx. */}
-        <Scripts />
       </body>
     </html>
   );
 }
 
 export default function App({ loaderData }: Route.ComponentProps) {
-  const { toast, user, impersonatedBy, branding, supportEmail, sentryDsn, marketing } = loaderData;
+  const {
+    toast,
+    user,
+    impersonatedBy,
+    branding,
+    supportEmail,
+    sentryDsn,
+    marketing,
+    cspNonce,
+    locale
+  } = loaderData;
+
+  // Keep i18next in lock-step with the loader-resolved locale. Triggers
+  // `i18n.changeLanguage(locale)`, which the http backend then uses to
+  // load any missing namespace JSON for that language.
+  useChangeLanguage(locale);
 
   useEffect(() => {
     if (toast) {
@@ -261,19 +314,23 @@ export default function App({ loaderData }: Route.ComponentProps) {
   const paletteOverrideCss = buildPaletteOverrideCss({
     marketing,
     primary: branding?.primaryColorOverride ?? null,
-    secondary: branding?.secondaryColorOverride ?? null,
+    secondary: branding?.secondaryColorOverride ?? null
   });
 
   return (
-    <html lang="en" className="dark bg-[#212525]">
+    <html lang={locale} className="dark bg-[#212525]">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Loading...</title>
         <Meta />
         <Links />
+        {sentryDsn && (
+          <meta name="pickup-roster-sentry-dsn" content={sentryDsn} />
+        )}
         {paletteOverrideCss && (
           <style
+            nonce={cspNonce ?? undefined}
             // eslint-disable-next-line react/no-danger -- values are pre-validated
             // against HEX_COLOR_RE; anything that doesn't match is stripped before
             // reaching this template (see buildPaletteOverrideCss).
@@ -283,12 +340,10 @@ export default function App({ loaderData }: Route.ComponentProps) {
       </head>
       <body
         className="min-h-screen flex flex-col"
-        style={
-          {
-            ["--brand-primary" as string]: branding.primaryColor,
-            ["--brand-accent" as string]: branding.accentColor,
-          }
-        }
+        style={{
+          ["--brand-primary" as string]: branding.primaryColor,
+          ["--brand-accent" as string]: branding.accentColor
+        }}
       >
         {/* Skip link for keyboard users — visible only when focused. WCAG 2.4.1 */}
         <a
@@ -309,15 +364,8 @@ export default function App({ loaderData }: Route.ComponentProps) {
           supportEmail={supportEmail}
           orgName={branding?.orgName ?? null}
         />
-        <ScrollRestoration />
-        {sentryDsn && (
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `window.__sentryDsn=${JSON.stringify(sentryDsn)};`,
-            }}
-          />
-        )}
-        <Scripts />
+        <ScrollRestoration nonce={cspNonce ?? undefined} />
+        <Scripts nonce={cspNonce ?? undefined} />
       </body>
     </html>
   );

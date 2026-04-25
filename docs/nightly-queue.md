@@ -354,3 +354,38 @@ From `docs/research/2026-04-24-schools.md` (admin onboarding / first-week-of-sch
 - Admin-side: family adoption report (who's logged in / verified / missing email) with CSV export for phone-call follow-up.
 - Build size: M.
 
+---
+
+## [research: 2026-04-25]
+
+From `docs/research/2026-04-25-schools.md` (parent-comms during dismissal angle). Three high-leverage hypotheses sized S–M worth queueing:
+
+### R6. `[ ]` late-pickup-escalation-tree — Automate the first 30 minutes of "nobody picked up Junior"
+
+**Why:** EdWeek (May 2025): three-quarters of principals just have a staffer wait with the kid; nearly 1-in-5 schools call the police; 12% call CPS. Today this whole call-tree runs on a sticky note: secretary calls mom → calls dad → calls grandma → calls the emergency contact, in that order, while the kid sits in the office. No competitor automates the first 30 minutes. The audit log we'd produce ("we tried these contacts in this order with these timestamps") is exactly the artifact a school needs when it does have to escalate to police/CPS. Source: docs/research/2026-04-25-schools.md, TL;DR bullet 3 + hypothesis #3.
+
+**Scope (research first — write spec):**
+- `docs/nightly-specs/late-pickup-escalation-tree.md`: per-org default escalation policy + per-child override. Steps are (offset minutes, channel, target). Channels: push, SMS, voice. Targets: any guardian/authorized-pickup contact. After the policy fires its last step, kid surfaces on a "office-needs-this-resolved" admin badge with one-tap call buttons.
+- Every escalation event writes to `OrgAuditLog` (already in repo) so the daily PDF export is essentially free.
+- Reuses existing guardian + authorized-pickup model; adds a `pickupEscalationPolicy` table + a per-child override pointer.
+- Build size: M.
+
+### R7. `[ ]` early-dismissal-blast — One-tap "school is closing in 60 minutes" fan-out
+
+**Why:** Francis Howell SD (Dec 2025) released high schoolers at 12:20pm and held MS/elementary mid-day when the snow timing missed; one student spent an hour at a light outside school. Industry best-practice ("send notifications several hours ahead") doesn't survive contact with weather reality. The product ask is one button that fans the new dismissal time out across push + SMS + voice fallback, then shows acknowledged/not-acknowledged in real time. Source: docs/research/2026-04-25-schools.md, TL;DR bullet 5 + hypothesis #5.
+
+**Scope (research first — write spec):**
+- `docs/nightly-specs/early-dismissal-blast.md`: admin selects new dismissal time + reason (Weather / Power / Event / Other). System fans a localized push to every linked guardian; for guardians without a recent app open event, fall through to SMS via existing send pipeline (or via Twilio/MessageBird — research first). Per-guardian "what does this mean for my kid" page derives transportation mode + tag from existing roster.
+- Acknowledged/unacknowledged dashboard reuses the rate-limiting + audit-log infra already in repo.
+- Build size: M. Biggest open question is the SMS fan-out provider — pick one and keep the abstraction thin.
+
+### R8. `[ ]` hands-free-arrival-geofence — Reliable arrival announce without opening the app
+
+**Why:** PikMyKid's own help docs concede the default Announce flow is manual ("a parent MUST open the app and hit the announce button"). Their hands-free announce is opt-in, admin-tuned, and frequently fires too early. A reliable hands-free arrival signal — geofence + dwell time + foreground-app-not-required — is a credible parent-side wedge that compounds with our existing tag/space data model. Source: docs/research/2026-04-25-schools.md, TL;DR bullet 1 + hypothesis #1.
+
+**Scope (research first — write spec):**
+- `docs/nightly-specs/hands-free-arrival-geofence.md`: campus polygon (admin-drawn or radius-from-pin), dwell threshold (default 20s), dismissal-window guard, idempotency cap (one announce per child per window). iOS region monitoring + Android Geofencing API; document battery + privacy posture explicitly.
+- Manual announce remains the fallback (default for parents who decline location).
+- Should ship paired with the dispatcher chime (cheap, named-complaint fix) — note in spec, but keep it as a separate ticket so the chime isn't gated on geofence work.
+- Build size: M (S for the chime alone if we split).
+

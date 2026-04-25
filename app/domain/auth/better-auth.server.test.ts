@@ -16,6 +16,9 @@ import {
   verifyPassword,
   parseStoredHash,
   verifyPasswordBool,
+  pbkdf2KeyBytes,
+  PBKDF2_ITERATIONS,
+  PBKDF2_MAX_ITERATIONS_PER_CALL,
 } from "./password-hash";
 
 // Force the module's bookkeeping not to reach into db.server by only
@@ -129,29 +132,13 @@ test("verifyPassword accepts a legacy saltHex:keyHex hash and flags needsRehash"
 
 test("verifyPassword flags needsRehash when iterations below current target", async () => {
   // Construct a synthetic v2 hash at 300k iters — below PBKDF2_ITERATIONS
-  // (600k). It should verify but flag needsRehash.
+  // (600k). It should verify but flag needsRehash. Must use the same
+  // chunked primitive the verifier uses so the bytes match: a single
+  // deriveBits(300_000) call produces different output than 3 chunked
+  // calls of 100k each.
   const password = "mid-iter-password";
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password.normalize("NFKC")),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const bits = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      hash: "SHA-256",
-      salt: salt.buffer.slice(
-        salt.byteOffset,
-        salt.byteOffset + salt.byteLength,
-      ) as ArrayBuffer,
-      iterations: 300_000,
-    },
-    key,
-    32 * 8,
-  );
+  const bits = await pbkdf2KeyBytes(password, salt, 300_000, "sha256", 32);
 
   const toHex = (u: Uint8Array) =>
     Array.from(u)
@@ -162,6 +149,99 @@ test("verifyPassword flags needsRehash when iterations below current target", as
   const result = await verifyPassword(stored, password);
   assert.equal(result.ok, true);
   assert.equal(result.needsRehash, true, "sub-target iter count flags rehash");
+});
+
+test("pbkdf2KeyBytes stays within the workerd 100k-per-call cap", async () => {
+  // Regression test for cloudflare/workerd#1346. We can't observe the
+  // individual deriveBits calls from outside, but we can assert the
+  // contract that the chunk size is <= the runtime cap, and that
+  // chunking does not break determinism (same inputs produce same
+  // bytes).
+  assert.equal(PBKDF2_MAX_ITERATIONS_PER_CALL, 100_000);
+
+  const password = "cap-test";
+  const salt = new Uint8Array(16); // deterministic zeros
+  const a = await pbkdf2KeyBytes(password, salt, 600_000, "sha256", 32);
+  const b = await pbkdf2KeyBytes(password, salt, 600_000, "sha256", 32);
+  assert.deepEqual(
+    new Uint8Array(a),
+    new Uint8Array(b),
+    "chunked derivation must be deterministic",
+  );
+});
+
+test("pbkdf2KeyBytes chunk boundaries: 100k round-trips, 200k differs from single-shot", async () => {
+  // At exactly the cap, the loop runs once — chunked and single-shot
+  // produce identical bytes. Above the cap, salt chaining diverges
+  // from single-shot. Covers both sides of the chunk boundary.
+  const password = "boundary-test";
+  const salt = new Uint8Array(16);
+
+  const singleShot100k = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      hash: "SHA-256",
+      salt: salt.buffer.slice(0, 16) as ArrayBuffer,
+      iterations: 100_000,
+    },
+    await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(password.normalize("NFKC")),
+      "PBKDF2",
+      false,
+      ["deriveBits"],
+    ),
+    32 * 8,
+  );
+  const chunked100k = await pbkdf2KeyBytes(password, salt, 100_000, "sha256", 32);
+  assert.deepEqual(
+    new Uint8Array(singleShot100k),
+    new Uint8Array(chunked100k),
+    "at the cap, chunked matches single-shot exactly (one chunk)",
+  );
+
+  const singleShot200k = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      hash: "SHA-256",
+      salt: salt.buffer.slice(0, 16) as ArrayBuffer,
+      iterations: 200_000,
+    },
+    await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(password.normalize("NFKC")),
+      "PBKDF2",
+      false,
+      ["deriveBits"],
+    ),
+    32 * 8,
+  );
+  const chunked200k = await pbkdf2KeyBytes(password, salt, 200_000, "sha256", 32);
+  assert.notDeepEqual(
+    new Uint8Array(singleShot200k),
+    new Uint8Array(chunked200k),
+    "above the cap, salt-chained output intentionally diverges",
+  );
+});
+
+test("pbkdf2KeyBytes rejects non-positive iterations", async () => {
+  await assert.rejects(() => pbkdf2KeyBytes("x", new Uint8Array(16), 0, "sha256", 32));
+  await assert.rejects(() => pbkdf2KeyBytes("x", new Uint8Array(16), -1, "sha256", 32));
+  await assert.rejects(() => pbkdf2KeyBytes("x", new Uint8Array(16), 1.5, "sha256", 32));
+});
+
+test("hashPassword at PBKDF2_ITERATIONS (600k) round-trips end-to-end", async () => {
+  // Full-fat path: the exact configuration production runs. Guards
+  // against a regression where PBKDF2_ITERATIONS gets bumped above
+  // what the chunker can handle, or where the hash/verify paths drift
+  // apart. Expensive (~1s) but worth it.
+  assert.equal(PBKDF2_ITERATIONS, 600_000);
+  const stored = await hashPassword("prod-config-sanity");
+  const parts = stored.split("$");
+  assert.equal(parts[2], String(PBKDF2_ITERATIONS));
+  const result = await verifyPassword(stored, "prod-config-sanity");
+  assert.equal(result.ok, true);
+  assert.equal(result.needsRehash, false);
 });
 
 test("timing-safe compare: XOR-diff loop returns the same diff=0 result for correct match", async () => {

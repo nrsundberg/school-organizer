@@ -1,7 +1,8 @@
 import { Button, Input } from "@heroui/react";
 import { useFetcher, useLoaderData } from "react-router";
 import { useState } from "react";
-import { SchoolIcon, UserIcon, XIcon } from "lucide-react";
+import { SchoolIcon, XIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import type { Route } from "./+types/create.homeroom";
 import {
@@ -16,8 +17,12 @@ import {
 } from "~/domain/billing/plan-usage.server";
 import { Page } from "~/components/Page";
 import { redirectWithSuccess } from "remix-toast";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 
-export async function loader({ request, context }: Route.LoaderArgs) {
+export const handle = { i18n: ["admin", "common"] };
+
+export async function loader({ context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
 
@@ -31,7 +36,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   return {
     students: unassignedStudents,
-    existingHomerooms: existingHomerooms.map((t) => t.homeRoom)
+    existingHomerooms: existingHomerooms.map((teacher) => teacher.homeRoom)
   };
 }
 
@@ -41,12 +46,15 @@ export async function action({ request, context }: Route.ActionArgs) {
   const org = getOrgFromContext(context);
   const formData = await request.formData();
 
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+
   const homeRoom = formData.get("homeRoom") as string;
   const selectedStudentsJson = formData.get("selectedStudents") as string;
 
   try {
     if (!homeRoom?.trim()) {
-      return { error: "Homeroom name/number is required" };
+      return { error: t("create.homeroom.errors.nameRequired") };
     }
 
     const existingTeacher = await prisma.teacher.findUnique({
@@ -54,7 +62,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     });
 
     if (existingTeacher) {
-      return { error: `Homeroom "${homeRoom}" already exists` };
+      return { error: t("create.homeroom.duplicateError", { name: homeRoom }) };
     }
 
     const counts = await countOrgUsage(prisma, org.id);
@@ -85,8 +93,8 @@ export async function action({ request, context }: Route.ActionArgs) {
 
     const message =
       studentCount > 0
-        ? `Homeroom "${homeRoom}" created with ${studentCount} student${studentCount !== 1 ? "s" : ""}`
-        : `Homeroom "${homeRoom}" created successfully`;
+        ? t("create.homeroom.createWith", { name: homeRoom, count: studentCount })
+        : t("create.homeroom.created", { name: homeRoom });
 
     const freshOrg = await prisma.org.findUnique({ where: { id: org.id } });
     if (freshOrg) {
@@ -101,7 +109,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return { error: error.message };
     }
     return {
-      error: error instanceof Error ? error.message : "Failed to create homeroom"
+      error: error instanceof Error ? error.message : t("create.homeroom.errors.createFailed")
     };
   }
 }
@@ -109,6 +117,8 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function CreateHomeroom() {
   const fetcher = useFetcher();
   const { students, existingHomerooms } = useLoaderData<typeof loader>();
+  const { t } = useTranslation("admin");
+  const { t: tCommon } = useTranslation("common");
 
   const [homeRoom, setHomeRoom] = useState("");
   const [selectedStudents, setSelectedStudents] = useState<
@@ -144,7 +154,7 @@ export default function CreateHomeroom() {
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
             <SchoolIcon size={24} className="text-primary" />
-            <h1 className="text-2xl font-bold">Create New Homeroom</h1>
+            <h1 className="text-2xl font-bold">{t("create.homeroom.heading")}</h1>
           </div>
         </div>
 
@@ -156,35 +166,38 @@ export default function CreateHomeroom() {
           />
 
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold">Homeroom Information</h2>
-            <label className="text-sm text-gray-400">Homeroom Name/Number</label>
+            <h2 className="text-lg font-semibold">{t("create.homeroom.infoHeading")}</h2>
+            <label className="text-sm text-gray-400">{t("create.homeroom.nameLabel")}</label>
             <Input
               name="homeRoom"
-              placeholder="e.g., 101, Ms. Smith"
+              placeholder={t("create.homeroom.namePlaceholder")}
               value={homeRoom}
               onChange={(e) => setHomeRoom(e.target.value)}
               required
               disabled={isSubmitting}
             />
-            {isHomeroomDuplicate && <p className="text-red-400 text-sm">This homeroom already exists</p>}
+            {isHomeroomDuplicate && <p className="text-red-400 text-sm">{t("create.homeroom.duplicateWarning")}</p>}
           </div>
 
           <div className="space-y-4">
             <h2 className="text-lg font-semibold">
-              Assign Students ({selectedStudents.length} selected)
+              {t("create.homeroom.assignHeading", { n: selectedStudents.length })}
             </h2>
             {availableStudents.length > 0 && (
               <div className="flex flex-col gap-1">
-                <label className="text-sm text-gray-400">Add Student to Homeroom</label>
+                <label className="text-sm text-gray-400">{t("create.homeroom.addStudentLabel")}</label>
                 <select
                   onChange={(e) => { if (e.target.value) { handleStudentSelect(e.target.value); e.target.value = ""; } }}
                   disabled={isSubmitting}
                   className="rounded-lg border border-gray-500 bg-gray-900 px-3 py-2 text-gray-100 focus:border-primary focus:outline-none disabled:opacity-60"
                 >
-                  <option value="">Search and select a student</option>
+                  <option value="">{t("create.homeroom.selectStudent")}</option>
                   {availableStudents.map((student) => (
                     <option key={student.id} value={student.id.toString()} className="bg-gray-900 text-gray-100">
-                      {student.firstName} {student.lastName}{student.spaceNumber ? ` (Space: ${student.spaceNumber})` : ""}
+                      {student.firstName} {student.lastName}
+                      {student.spaceNumber
+                        ? ` ${t("create.homeroom.studentSpace", { number: student.spaceNumber })}`
+                        : ""}
                     </option>
                   ))}
                 </select>
@@ -198,7 +211,11 @@ export default function CreateHomeroom() {
                 <div key={student.id} className="flex items-center justify-between p-2 bg-white/10 rounded border border-white/20">
                   <span className="font-medium">
                     {student.firstName} {student.lastName}
-                    {student.spaceNumber && <span className="text-sm text-gray-400 ml-2">(Space: {student.spaceNumber})</span>}
+                    {student.spaceNumber && (
+                      <span className="text-sm text-gray-400 ml-2">
+                        {t("create.homeroom.studentSpace", { number: student.spaceNumber })}
+                      </span>
+                    )}
                   </span>
                   <Button size="sm" variant="ghost" isIconOnly onPress={() => removeSelectedStudent(student.id)} isDisabled={isSubmitting}>
                     <XIcon size={14} />
@@ -216,10 +233,11 @@ export default function CreateHomeroom() {
 
           <div className="flex justify-between items-center pt-6 border-t">
             <a href="/admin"><Button variant="ghost" isDisabled={isSubmitting}>
-              Cancel
+              {tCommon("buttons.cancel")}
             </Button></a>
             <Button type="submit" variant="primary" isPending={isSubmitting} isDisabled={!homeRoom.trim() || isHomeroomDuplicate}>
-              {!isSubmitting && <SchoolIcon size={16} />} {isSubmitting ? "Creating..." : "Create Homeroom"}
+              {!isSubmitting && <SchoolIcon size={16} />}{" "}
+              {isSubmitting ? t("create.homeroom.submitting") : t("create.homeroom.submit")}
             </Button>
           </div>
         </fetcher.Form>

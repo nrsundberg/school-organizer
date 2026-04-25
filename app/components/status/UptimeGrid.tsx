@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { UptimeDay } from "~/domain/status/types";
 
 /**
@@ -6,17 +7,21 @@ import type { UptimeDay } from "~/domain/status/types";
  * latency numbers are exposed on hover per product spec.
  */
 export function UptimeGrid({ days }: { days: UptimeDay[] }) {
+  const { t } = useTranslation("common");
   return (
     <div
       className="flex w-full items-end gap-[2px]"
       role="img"
-      aria-label={`90-day uptime history. ${summarize(days)}.`}
+      aria-label={t("status.uptime.ariaLabel", { summary: summarize(days, t) })}
     >
       {days.map((day) => (
         <span
           key={day.date}
           className={`h-6 flex-1 min-w-[2px] rounded-[2px] ${cellClass(day.status)}`}
-          title={`${day.date} — ${label(day.status)}`}
+          title={t("status.uptime.cellTitle", {
+            date: day.date,
+            label: label(day.status, t),
+          })}
         />
       ))}
     </div>
@@ -37,27 +42,30 @@ function cellClass(status: UptimeDay["status"]): string {
   }
 }
 
-function label(status: UptimeDay["status"]): string {
+type TFn = (key: string, opts?: Record<string, unknown>) => string;
+
+function label(status: UptimeDay["status"], t: TFn): string {
   switch (status) {
     case "operational":
-      return "operational";
+      return t("status.uptime.operational");
     case "degraded":
-      return "degraded";
+      return t("status.uptime.degraded");
     case "outage":
-      return "outage";
+      return t("status.uptime.outage");
     case "unknown":
     default:
-      return "no data";
+      return t("status.uptime.noDataLabel");
   }
 }
 
-function summarize(days: UptimeDay[]): string {
+function summarize(days: UptimeDay[], t: TFn): string {
   const total = days.length;
   const withData = days.filter((d) => d.status !== "unknown").length;
   const bad = days.filter(
     (d) => d.status === "outage" || d.status === "degraded",
   ).length;
-  if (withData === 0) return "No data yet";
-  if (bad === 0) return `${withData} of ${total} days with data — all operational`;
-  return `${bad} of ${withData} days with incidents over the last ${total} days`;
+  if (withData === 0) return t("status.uptime.noData");
+  if (bad === 0)
+    return t("status.uptime.allOperational", { withData, total });
+  return t("status.uptime.withIncidents", { bad, withData, total });
 }

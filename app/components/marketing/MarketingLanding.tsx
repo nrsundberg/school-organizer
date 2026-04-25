@@ -1,5 +1,7 @@
 import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
 import { MarketingNav } from "~/components/marketing/MarketingNav";
+import { SUPPORTED_LANGUAGES } from "~/lib/i18n-config";
 
 const VIDEO_EMBEDS = [
   {
@@ -20,6 +22,8 @@ const VIDEO_EMBEDS = [
 ] as const;
 
 export function MarketingLanding() {
+  const { t } = useTranslation("common");
+  const languageCount = SUPPORTED_LANGUAGES.length;
   return (
     <div className="min-h-screen bg-[#0f1414] text-white">
       <MarketingNav />
@@ -66,6 +70,10 @@ export function MarketingLanding() {
               <li className="flex gap-2">
                 <span className="text-[#E9D500]">✓</span>
                 Trial that respects real usage: calendar time and qualifying pickup days.
+              </li>
+              <li className="flex gap-2">
+                <span className="text-[#E9D500]">✓</span>
+                {t("marketing.languageCount", { count: languageCount })}
               </li>
             </ul>
           </div>

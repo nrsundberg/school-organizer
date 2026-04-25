@@ -2,6 +2,7 @@ import { Button, Input } from "@heroui/react";
 import { useFetcher } from "react-router";
 import { useState } from "react";
 import { ArrowLeftIcon, UserPlusIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/create.student";
 import {
   getOrgFromContext,
@@ -16,24 +17,37 @@ import {
 } from "~/domain/billing/plan-usage.server";
 import { Page } from "~/components/Page";
 import { redirectWithSuccess } from "remix-toast";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 
-export const meta: Route.MetaFunction = () => {
-  return [{ title: "Create Student" }];
+export const handle = { i18n: ["admin", "common"] };
+
+export const meta: Route.MetaFunction = ({ data }) => {
+  return [{ title: data?.metaTitle ?? "Create Student" }];
 };
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const prisma = getTenantPrisma(context);
   const homerooms = await prisma.teacher.findMany({
     select: { homeRoom: true },
     orderBy: { homeRoom: "asc" }
   });
-  return { success: true, homerooms: homerooms.map((teacher) => teacher.homeRoom) };
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+  return {
+    success: true,
+    homerooms: homerooms.map((teacher) => teacher.homeRoom),
+    metaTitle: t("create.student.metaTitle"),
+  };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
   const prisma = getTenantPrisma(context);
   const org = getOrgFromContext(context);
   const formData = await request.formData();
+
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
 
   const spaceNum = formData.get("spaceNum") as string;
   const homeRoom = formData.get("homeRoom") as string;
@@ -42,7 +56,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   try {
     if (!firstName?.trim() || !lastName?.trim()) {
-      return { error: "First name and last name are required" };
+      return { error: t("create.student.errors.namesRequired") };
     }
 
     const spaceNumber =
@@ -62,7 +76,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         where: { homeRoom: trimmedHomeRoom }
       });
       if (!existingHomeroom) {
-        return { error: "Please choose an existing homeroom from suggestions" };
+        return { error: t("create.student.errors.homeroomMustExist") };
       }
     }
 
@@ -92,7 +106,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
 
     return redirectWithSuccess("/admin", {
-      message: `Student ${student.firstName} ${student.lastName} created successfully`
+      message: t("create.student.created", {
+        name: `${student.firstName} ${student.lastName}`,
+      }),
     });
   } catch (error) {
     console.error("Error creating student:", error);
@@ -100,7 +116,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return { error: error.message };
     }
     return {
-      error: error instanceof Error ? error.message : "Failed to create student"
+      error: error instanceof Error ? error.message : t("create.student.errors.createFailed")
     };
   }
 }
@@ -108,6 +124,8 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function CreateStudent({ loaderData }: Route.ComponentProps) {
   const fetcher = useFetcher();
   const { homerooms } = loaderData;
+  const { t } = useTranslation("admin");
+  const { t: tCommon } = useTranslation("common");
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -122,39 +140,39 @@ export default function CreateStudent({ loaderData }: Route.ComponentProps) {
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
             <UserPlusIcon size={24} className="text-primary" />
-            <h1 className="text-2xl font-bold">Create New Student</h1>
+            <h1 className="text-2xl font-bold">{t("create.student.heading")}</h1>
           </div>
         </div>
 
         <fetcher.Form method="post" className="space-y-6">
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold">Basic Information</h2>
+            <h2 className="text-lg font-semibold">{t("create.student.basicInfo")}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1">
-                <label className="text-sm text-gray-400">First Name</label>
-                <Input name="firstName" placeholder="Enter first name" value={firstName} onChange={(e) => setFirstName(e.target.value)} required disabled={isSubmitting} />
+                <label className="text-sm text-gray-400">{t("create.student.firstName")}</label>
+                <Input name="firstName" placeholder={t("create.student.firstNamePlaceholder")} value={firstName} onChange={(e) => setFirstName(e.target.value)} required disabled={isSubmitting} />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-sm text-gray-400">Last Name</label>
-                <Input name="lastName" placeholder="Enter last name" value={lastName} onChange={(e) => setLastName(e.target.value)} required disabled={isSubmitting} />
+                <label className="text-sm text-gray-400">{t("create.student.lastName")}</label>
+                <Input name="lastName" placeholder={t("create.student.lastNamePlaceholder")} value={lastName} onChange={(e) => setLastName(e.target.value)} required disabled={isSubmitting} />
               </div>
             </div>
           </div>
 
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold">Assignments (Optional)</h2>
+            <h2 className="text-lg font-semibold">{t("create.student.assignmentsOptional")}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1">
-                <label className="text-sm text-gray-400">Parking Space Number</label>
-                <Input type="number" name="spaceNum" placeholder="Enter space number" value={spaceNumber} onChange={(e) => setSpaceNumber(e.target.value)} disabled={isSubmitting} />
-                <p className="text-xs text-gray-400">Leave empty if not assigned</p>
+                <label className="text-sm text-gray-400">{t("create.student.spaceLabel")}</label>
+                <Input type="number" name="spaceNum" placeholder={t("create.student.spacePlaceholder")} value={spaceNumber} onChange={(e) => setSpaceNumber(e.target.value)} disabled={isSubmitting} />
+                <p className="text-xs text-gray-400">{t("create.student.leaveEmpty")}</p>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-sm text-gray-400">Homeroom</label>
+                <label className="text-sm text-gray-400">{t("create.student.homeroomLabel")}</label>
                 <input
                   name="homeRoom"
                   list="homeroom-options"
-                  placeholder="Select existing homeroom"
+                  placeholder={t("create.student.homeroomPlaceholder")}
                   value={homeRoom}
                   onChange={(e) => setHomeRoom(e.target.value)}
                   disabled={isSubmitting}
@@ -165,7 +183,7 @@ export default function CreateStudent({ loaderData }: Route.ComponentProps) {
                     <option key={room} value={room} />
                   ))}
                 </datalist>
-                <p className="text-xs text-gray-400">Leave empty if not assigned</p>
+                <p className="text-xs text-gray-400">{t("create.student.leaveEmpty")}</p>
               </div>
             </div>
           </div>
@@ -178,12 +196,13 @@ export default function CreateStudent({ loaderData }: Route.ComponentProps) {
 
           <div className="flex justify-between items-center pt-6 border-t">
             <Button variant="ghost" onPress={() => { setFirstName(""); setLastName(""); setSpaceNumber(""); setHomeRoom(""); }} isDisabled={isSubmitting}>
-              <ArrowLeftIcon size={16} /> Reset Form
+              <ArrowLeftIcon size={16} /> {tCommon("buttons.back")}
             </Button>
             <div className="flex gap-3">
-              <a href="/admin"><Button variant="ghost" isDisabled={isSubmitting}>Cancel</Button></a>
+              <a href="/admin"><Button variant="ghost" isDisabled={isSubmitting}>{tCommon("buttons.cancel")}</Button></a>
               <Button type="submit" variant="primary" isPending={isSubmitting} isDisabled={!firstName.trim() || !lastName.trim()}>
-                {!isSubmitting && <UserPlusIcon size={16} />} {isSubmitting ? "Creating..." : "Create Student"}
+                {!isSubmitting && <UserPlusIcon size={16} />}{" "}
+                {isSubmitting ? t("create.student.submitting") : t("create.student.submit")}
               </Button>
             </div>
           </div>

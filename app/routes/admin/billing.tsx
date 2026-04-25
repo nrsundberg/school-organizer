@@ -1,11 +1,18 @@
 import { Form, Link, useNavigation } from "react-router";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/billing";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getOptionalOrgFromContext } from "~/domain/utils/global-context.server";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Billing — Admin" }];
+export const handle = { i18n: ["admin"] };
 
-export async function loader({ context }: Route.LoaderArgs) {
+export const meta: Route.MetaFunction = ({ data }) => [
+  { title: data?.metaTitle ?? "Billing — Admin" },
+];
+
+export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const org = getOptionalOrgFromContext(context);
 
@@ -18,7 +25,11 @@ export async function loader({ context }: Route.LoaderArgs) {
   const isComped =
     !!org?.compedUntil && new Date(org.compedUntil) > now;
 
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+
   return {
+    metaTitle: t("billing.metaTitle"),
     org: org
       ? {
           id: org.id,
@@ -38,6 +49,7 @@ export async function loader({ context }: Route.LoaderArgs) {
 
 export default function AdminBilling({ loaderData }: Route.ComponentProps) {
   const { org, trialDaysRemaining, isComped } = loaderData;
+  const { t, i18n } = useTranslation("admin");
   const navigation = useNavigation();
   const isPortalPending =
     navigation.state !== "idle" &&
@@ -48,21 +60,21 @@ export default function AdminBilling({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="flex flex-col gap-8 p-6 max-w-2xl">
-      <h1 className="text-2xl font-bold text-white">Billing</h1>
+      <h1 className="text-2xl font-bold text-white">{t("billing.heading")}</h1>
 
       {isComped && org?.compedUntil && (
         <div className="rounded-xl border border-[#E9D500]/40 bg-[#E9D500]/10 p-4">
           <p className="text-sm font-semibold text-[#E9D500]">
-            Comped account
+            {t("billing.compedTitle")}
           </p>
           <p className="mt-1 text-sm text-white/70">
-            Your account is comped through{" "}
-            {new Date(org.compedUntil).toLocaleDateString(undefined, {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
+            {t("billing.compedBody", {
+              date: new Date(org.compedUntil).toLocaleDateString(i18n.language, {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              }),
             })}
-            .
           </p>
         </div>
       )}
@@ -70,15 +82,15 @@ export default function AdminBilling({ loaderData }: Route.ComponentProps) {
       {/* Plan & Status panel */}
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-[#E9D500]">
-          Current plan
+          {t("billing.currentPlan")}
         </h2>
         <dl className="space-y-3 text-sm">
           <div className="flex items-center justify-between">
-            <dt className="text-white/50">Plan</dt>
-            <dd className="font-semibold text-white">{org?.billingPlan ?? "—"}</dd>
+            <dt className="text-white/50">{t("billing.plan")}</dt>
+            <dd className="font-semibold text-white">{org?.billingPlan ?? t("billing.dash")}</dd>
           </div>
           <div className="flex items-center justify-between">
-            <dt className="text-white/50">Org status</dt>
+            <dt className="text-white/50">{t("billing.orgStatus")}</dt>
             <dd>
               <span
                 className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -91,21 +103,21 @@ export default function AdminBilling({ loaderData }: Route.ComponentProps) {
                         : "bg-red-500/20 text-red-300"
                 }`}
               >
-                {org?.status ?? "—"}
+                {org?.status ?? t("billing.dash")}
               </span>
             </dd>
           </div>
           {org?.subscriptionStatus && (
             <div className="flex items-center justify-between">
-              <dt className="text-white/50">Subscription status</dt>
+              <dt className="text-white/50">{t("billing.subscriptionStatus")}</dt>
               <dd className="text-white">{org.subscriptionStatus}</dd>
             </div>
           )}
           {trialDaysRemaining !== null && (
             <div className="flex items-center justify-between">
-              <dt className="text-white/50">Trial days remaining</dt>
+              <dt className="text-white/50">{t("billing.trialDaysRemaining")}</dt>
               <dd className="text-white">
-                {trialDaysRemaining} day{trialDaysRemaining !== 1 ? "s" : ""}
+                {t("billing.trialDays", { count: trialDaysRemaining })}
               </dd>
             </div>
           )}
@@ -121,7 +133,7 @@ export default function AdminBilling({ loaderData }: Route.ComponentProps) {
               disabled={isPortalPending}
               className="rounded-xl bg-[#E9D500] px-5 py-2.5 text-sm font-semibold text-[#193B4B] hover:bg-[#f5e047] disabled:opacity-50"
             >
-              {isPortalPending ? "Redirecting…" : "Manage billing"}
+              {isPortalPending ? t("billing.redirecting") : t("billing.manageBilling")}
             </button>
           </Form>
         ) : (
@@ -129,7 +141,7 @@ export default function AdminBilling({ loaderData }: Route.ComponentProps) {
             to="/pricing"
             className="inline-flex rounded-xl bg-[#E9D500] px-5 py-2.5 text-sm font-semibold text-[#193B4B] hover:bg-[#f5e047]"
           >
-            Upgrade plan
+            {t("billing.upgradePlan")}
           </Link>
         )}
         {canManageBilling && (
@@ -137,14 +149,13 @@ export default function AdminBilling({ loaderData }: Route.ComponentProps) {
             to="/pricing"
             className="inline-flex rounded-xl border border-white/20 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/10"
           >
-            View plans
+            {t("billing.viewPlans")}
           </Link>
         )}
       </div>
 
       <p className="text-xs text-white/65">
-        Billing is managed through Stripe. Changes to your plan take effect immediately and are
-        reflected on your next invoice.
+        {t("billing.footer")}
       </p>
     </div>
   );

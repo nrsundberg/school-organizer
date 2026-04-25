@@ -1,11 +1,16 @@
 import { MarketingLanding } from "~/components/marketing/MarketingLanding";
 import { Page } from "~/components/Page";
 import { useFetcher, useSearchParams, redirect } from "react-router";
+import { useTranslation } from "react-i18next";
 import { type Space, Status } from "~/db/browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { Send } from "lucide-react";
 import type { Route } from "./+types/_index";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
+
+export const handle = { i18n: ["roster"] };
 import { isMarketingHost } from "~/domain/utils/host.server";
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
 import {
@@ -28,17 +33,20 @@ import confetti from "canvas-confetti";
 export const meta: Route.MetaFunction = ({ data }) => {
   if (!data || data.mode === "marketing") {
     return [
-      { title: `${DEFAULT_SITE_NAME} — Car line made clear` },
-      { name: "description", content: "Live car line board, viewer access, and school admin tools." },
+      { title: data?.metaTitle ?? `${DEFAULT_SITE_NAME} — Car line made clear` },
+      { name: "description", content: data?.metaDescription ?? "Live car line board, viewer access, and school admin tools." },
     ];
   }
   return [
-    { title: `${data.orgName} — Car line` },
-    { name: "description", content: `${data.orgName} car line board.` },
+    { title: data.metaTitle },
+    { name: "description", content: data.metaDescription },
   ];
 };
 
 export async function loader({ request, context }: Route.LoaderArgs) {
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "roster");
+
   if (isMarketingHost(request, context)) {
     // If a logged-in user with an org visits the marketing home, send them
     // straight to their tenant board. Edge cases (no org) fall through to
@@ -49,7 +57,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       const url = await getTenantBoardUrlForRequest(request, context);
       if (url) throw redirect(url);
     }
-    return { mode: "marketing" as const };
+    return {
+      mode: "marketing" as const,
+      metaTitle: t("index.metaTitle", { name: DEFAULT_SITE_NAME }),
+      metaDescription: t("index.metaDescription"),
+    };
   }
 
   const org = getOptionalOrgFromContext(context);
@@ -94,6 +106,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     controllerViewPreference: user?.controllerViewPreference ?? null,
     viewerDrawingEnabled,
     maxSpaceNumber,
+    metaTitle: t("index.tenantMetaTitle", { orgName: org.name }),
+    metaDescription: t("index.tenantMetaDescription", { orgName: org.name }),
   };
 }
 
@@ -106,6 +120,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 }
 
 function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.ComponentProps["loaderData"], { mode: "marketing" }> }) {
+  const { t } = useTranslation("roster");
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     homeRooms,
@@ -153,7 +168,7 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
             rect.top >= 0 &&
             rect.bottom <= (window.innerHeight || document.documentElement.clientHeight);
           if (!visible) {
-            toast(`Space ${spaceNumber} is now active!`, { type: "info", theme: "dark" });
+            toast(t("index.spaceNowActive", { spaceNumber }), { type: "info", theme: "dark" });
           }
         }
       }
@@ -270,7 +285,7 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
         htmlFor="homepage-homeroom"
         className="mb-1 block text-sm text-gray-300"
       >
-        Filter Homeroom
+        {t("index.filterHomeroom")}
       </label>
       <input
         id="homepage-homeroom"
@@ -281,7 +296,7 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
           setHomeroomFilter(value);
           updateRoomFilter(value);
         }}
-        placeholder="Homeroom..."
+        placeholder={t("index.homeroomPlaceholder")}
         className="w-full rounded-lg border border-gray-500 bg-gray-900 px-3 py-2 text-gray-100 [color-scheme:dark] focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D500]"
       />
       <datalist id="homepage-homeroom-options">
@@ -298,7 +313,7 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
 
   const recentQueueContent = (
     <div className="py-3">
-      Most Recent Queue
+      {t("index.recentQueue")}
       <Separator className={"my-3"} />
       <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm md:grid-cols-1 md:text-base">
         {recentCars.map(
@@ -371,7 +386,7 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
                     onClick={clearDrawing}
                     className="absolute bottom-2 right-2 z-20 text-xs bg-black/60 text-white px-2 py-1 rounded hover:bg-black/80"
                   >
-                    Clear ({drawPoints.length})
+                    {t("index.drawing.clear", { count: drawPoints.length })}
                   </button>
                 )}
               </>
@@ -411,7 +426,7 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
                     onClick={clearDrawing}
                     className="absolute bottom-2 right-2 z-20 text-xs bg-black/60 text-white px-2 py-1 rounded hover:bg-black/80"
                   >
-                    Clear ({drawPoints.length})
+                    {t("index.drawing.clear", { count: drawPoints.length })}
                   </button>
                 )}
               </>
@@ -440,6 +455,7 @@ function ControllerTabView({
   initialPreference: string | null;
   maxSpaceNumber: number;
 }) {
+  const { t } = useTranslation("roster");
   const fetcher = useFetcher();
   const defaultTab = initialPreference === "controller" ? "controller" : "board";
   const [tab, setTab] = useState<"controller" | "board">(defaultTab);
@@ -468,7 +484,7 @@ function ControllerTabView({
               : "text-white/50 hover:text-white"
           }`}
         >
-          Board
+          {t("index.tabs.board")}
         </button>
         <button
           type="button"
@@ -479,7 +495,7 @@ function ControllerTabView({
               : "text-white/50 hover:text-white"
           }`}
         >
-          Controller
+          {t("index.tabs.controller")}
         </button>
       </div>
 
@@ -577,6 +593,7 @@ function ParkingTile({
   compact?: boolean;
   onDrawingSpace?: (spaceNumber: number) => void;
 }) {
+  const { t } = useTranslation("roster");
   const { timestamp, status, spaceNumber } = space;
   const [, forceTick] = useState(0);
   useEffect(() => {
@@ -607,7 +624,7 @@ function ParkingTile({
       <button
         type="button"
         data-space={spaceNumber}
-        aria-label={`Space ${spaceNumber} — empty. Activate to mark active.`}
+        aria-label={t("index.tile.ariaEmpty", { spaceNumber })}
         className={`${color} ${commonClasses} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D500] focus-visible:z-10`}
         onClick={() => updateToActive(spaceNumber)}
       >
@@ -620,7 +637,7 @@ function ParkingTile({
             <button
               type="button"
               data-space={spaceNumber}
-              aria-label={`Space ${spaceNumber} — active. Open actions.`}
+              aria-label={t("index.tile.ariaActive", { spaceNumber })}
               className={`${color} ${commonClasses} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D500] focus-visible:z-10`}
             >
               <Send aria-hidden="true" />
@@ -629,9 +646,9 @@ function ParkingTile({
           </PopoverTrigger>
           <PopoverContent>
             <div className="px-1 py-2">
-              <div className="text-small font-bold">Mark this spot empty?</div>
+              <div className="text-small font-bold">{t("index.popover.markEmptyConfirm")}</div>
               <Button className="max-w-xs" variant="secondary" onPress={() => updateToEmpty(spaceNumber)}>
-                Mark Empty
+                {t("index.popover.markEmpty")}
               </Button>
             </div>
           </PopoverContent>
@@ -642,7 +659,7 @@ function ParkingTile({
     <button
       type="button"
       data-space={spaceNumber}
-      aria-label={`Space ${spaceNumber} — ${status === Status.ACTIVE ? "active" : "empty"}`}
+      aria-label={status === Status.ACTIVE ? t("index.tile.ariaViewerActive", { spaceNumber }) : t("index.tile.ariaViewerEmpty", { spaceNumber })}
       className={`${color} ${commonClasses} w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D500] focus-visible:z-10 ${onDrawingSpace ? "cursor-crosshair opacity-95" : ""}`}
       onClick={() => onDrawingSpace?.(spaceNumber)}
     >

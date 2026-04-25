@@ -1,129 +1,184 @@
 import type { RenderedEmail, TrialExpiringMessage } from "../types";
-import { interpolate } from "../interpolate";
+import { getFixedT } from "~/lib/t.server";
+import type { TFunction } from "i18next";
 
-// Trial-expiring copy has three variants keyed off `daysLeft` (7 / 3 / 1).
-// Variables: {{ firstName }}, {{ orgName }}, {{ daysLeft }}, {{ trialEndDate }},
-// {{ appLink }}.
+/**
+ * Trial-expiring copy has three variants keyed off `daysLeft` (7 / 3 / 1).
+ *
+ * i18n: copy lives under `email.trialExpiring.{seven,three,one}.*`.
+ */
 
-type Variant = {
-  subject: string;
-  preview: string;
-  html: string;
-  text: string;
-};
+type VariantKey = "seven" | "three" | "one";
 
-// ---- 7 days out ----
-const SEVEN: Variant = {
-  subject: "a week left on your PickupRoster trial",
-  preview: "{{ daysLeft }} days to keep your setup — here's how.",
-  html: `<!doctype html>
-<html>
-  <body style="font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; color: #111; line-height: 1.5;">
-    <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">{{ daysLeft }} days to keep your setup — here's how.</span>
-    <p>Hi {{ firstName }},</p>
-    <p>Quick heads up: your trial ends on {{ trialEndDate }}, about a week from now.</p>
-    <p>If pickup has felt a little less chaotic at {{ orgName }} lately, that's the thing worth keeping. Upgrading now means no interruption, your roster stays put, and tomorrow's dismissal runs exactly like today's.</p>
-    <p>You can upgrade in a couple of clicks here: <a href="{{ appLink }}">{{ appLink }}</a></p>
-    <p>Questions? Just reply — I'll answer.</p>
-    <hr />
-    <p>Noah<br />Founder, PickupRoster</p>
-  </body>
-</html>`,
-  text: `Hi {{ firstName }},
-
-Quick heads up: your trial ends on {{ trialEndDate }}, about a week from now.
-
-If pickup has felt a little less chaotic at {{ orgName }} lately, that's the thing worth keeping. Upgrading now means no interruption, your roster stays put, and tomorrow's dismissal runs exactly like today's.
-
-You can upgrade in a couple of clicks here: {{ appLink }}
-
-Questions? Just reply — I'll answer.
-
---
-Noah
-Founder, PickupRoster`,
-};
-
-// ---- 3 days out ----
-const THREE: Variant = {
-  subject: "3 days left, {{ firstName }}",
-  preview: "don't want you to lose your setup at {{ orgName }}.",
-  html: `<!doctype html>
-<html>
-  <body style="font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; color: #111; line-height: 1.5;">
-    <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">don't want you to lose your setup at {{ orgName }}.</span>
-    <p>Hi {{ firstName }},</p>
-    <p>Your trial wraps on {{ trialEndDate }} — just 3 days out.</p>
-    <p>I don't want you to lose the setup you've built for {{ orgName }}, or wake up next week to a dismissal line that's back to the old way. Upgrading takes about a minute and everything keeps running.</p>
-    <p>Upgrade here: <a href="{{ appLink }}">{{ appLink }}</a></p>
-    <p>If there's a reason you're holding off, tell me. I want to know.</p>
-    <hr />
-    <p>Noah<br />Founder, PickupRoster</p>
-  </body>
-</html>`,
-  text: `Hi {{ firstName }},
-
-Your trial wraps on {{ trialEndDate }} — just 3 days out.
-
-I don't want you to lose the setup you've built for {{ orgName }}, or wake up next week to a dismissal line that's back to the old way. Upgrading takes about a minute and everything keeps running.
-
-Upgrade here: {{ appLink }}
-
-If there's a reason you're holding off, tell me. I want to know.
-
---
-Noah
-Founder, PickupRoster`,
-};
-
-// ---- Tomorrow (1 day out) ----
-const ONE: Variant = {
-  subject: "your trial ends tomorrow",
-  preview: "one click to keep PickupRoster running at {{ orgName }}.",
-  html: `<!doctype html>
-<html>
-  <body style="font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; color: #111; line-height: 1.5;">
-    <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">one click to keep PickupRoster running at {{ orgName }}.</span>
-    <p>Hi {{ firstName }},</p>
-    <p>Your trial ends tomorrow. To keep PickupRoster running at {{ orgName }} without a gap, upgrade here: <a href="{{ appLink }}">{{ appLink }}</a></p>
-    <hr />
-    <p>Noah<br />Founder, PickupRoster</p>
-  </body>
-</html>`,
-  text: `Hi {{ firstName }},
-
-Your trial ends tomorrow. To keep PickupRoster running at {{ orgName }} without a gap, upgrade here: {{ appLink }}
-
---
-Noah
-Founder, PickupRoster`,
-};
-
-function pickVariant(daysLeft: number): Variant {
-  if (daysLeft <= 1) return ONE;
-  if (daysLeft <= 3) return THREE;
-  return SEVEN;
+function pickVariantKey(daysLeft: number): VariantKey {
+  if (daysLeft <= 1) return "one";
+  if (daysLeft <= 3) return "three";
+  return "seven";
 }
 
-export function renderTrialExpiring(msg: TrialExpiringMessage): RenderedEmail {
-  const variant = pickVariant(msg.daysLeft);
-  const vars = {
+export async function renderTrialExpiring(
+  msg: TrialExpiringMessage,
+): Promise<RenderedEmail> {
+  const t = await getFixedT(msg.locale ?? "en", "email");
+  const variantKey = pickVariantKey(msg.daysLeft);
+  const firstName = firstNameOrFallback(msg.userName, t("common.greetingFallback"));
+  const appLink = `https://${msg.orgSlug}.pickuproster.com/admin/billing`;
+  const interp = {
+    firstName,
     orgName: msg.orgName,
-    orgSlug: msg.orgSlug,
     daysLeft: msg.daysLeft,
     trialEndDate: msg.trialEndDate,
-    firstName: firstNameOrFallback(msg.userName),
-    appLink: `https://${msg.orgSlug}.pickuproster.com/admin/billing`,
+    appLink,
   };
-  return {
-    subject: interpolate(variant.subject, vars),
-    html: interpolate(variant.html, vars),
-    text: interpolate(variant.text, vars),
-  };
+
+  switch (variantKey) {
+    case "one":
+      return renderOne(t, interp);
+    case "three":
+      return renderThree(t, interp);
+    case "seven":
+    default:
+      return renderSeven(t, interp);
+  }
 }
 
-function firstNameOrFallback(name: string | null | undefined): string {
-  if (!name) return "there";
+type Vars = {
+  firstName: string;
+  orgName: string;
+  daysLeft: number;
+  trialEndDate: string;
+  appLink: string;
+};
+
+function renderSeven(t: TFunction, vars: Vars): RenderedEmail {
+  const subject = t("trialExpiring.seven.subject");
+  const preview = t("trialExpiring.seven.preview", vars);
+  const greeting = t("trialExpiring.seven.greeting", vars);
+  const para1 = t("trialExpiring.seven.para1", vars);
+  const para2 = t("trialExpiring.seven.para2", vars);
+  const para3Text = t("trialExpiring.seven.para3", vars);
+  const para3Html = t("trialExpiring.seven.para3Html", vars);
+  const para4 = t("trialExpiring.seven.para4");
+  const signOff = t("common.signOff");
+  const signOffTitle = t("common.signOffTitle");
+
+  const html = `<!doctype html>
+<html>
+  <body style="font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; color: #111; line-height: 1.5;">
+    <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">${escapeHtml(preview)}</span>
+    <p>${escapeHtml(greeting)}</p>
+    <p>${escapeHtml(para1)}</p>
+    <p>${escapeHtml(para2)}</p>
+    <p>${para3Html}</p>
+    <p>${escapeHtml(para4)}</p>
+    <hr />
+    <p>${escapeHtml(signOff)}<br />${escapeHtml(signOffTitle)}</p>
+  </body>
+</html>`;
+
+  const text = `${greeting}
+
+${para1}
+
+${para2}
+
+${para3Text}
+
+${para4}
+
+--
+${signOff}
+${signOffTitle}`;
+
+  return { subject, html, text };
+}
+
+function renderThree(t: TFunction, vars: Vars): RenderedEmail {
+  const subject = t("trialExpiring.three.subject", vars);
+  const preview = t("trialExpiring.three.preview", vars);
+  const greeting = t("trialExpiring.three.greeting", vars);
+  const para1 = t("trialExpiring.three.para1", vars);
+  const para2 = t("trialExpiring.three.para2", vars);
+  const para3Text = t("trialExpiring.three.para3", vars);
+  const para3Html = t("trialExpiring.three.para3Html", vars);
+  const para4 = t("trialExpiring.three.para4");
+  const signOff = t("common.signOff");
+  const signOffTitle = t("common.signOffTitle");
+
+  const html = `<!doctype html>
+<html>
+  <body style="font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; color: #111; line-height: 1.5;">
+    <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">${escapeHtml(preview)}</span>
+    <p>${escapeHtml(greeting)}</p>
+    <p>${escapeHtml(para1)}</p>
+    <p>${escapeHtml(para2)}</p>
+    <p>${para3Html}</p>
+    <p>${escapeHtml(para4)}</p>
+    <hr />
+    <p>${escapeHtml(signOff)}<br />${escapeHtml(signOffTitle)}</p>
+  </body>
+</html>`;
+
+  const text = `${greeting}
+
+${para1}
+
+${para2}
+
+${para3Text}
+
+${para4}
+
+--
+${signOff}
+${signOffTitle}`;
+
+  return { subject, html, text };
+}
+
+function renderOne(t: TFunction, vars: Vars): RenderedEmail {
+  const subject = t("trialExpiring.one.subject");
+  const preview = t("trialExpiring.one.preview", vars);
+  const greeting = t("trialExpiring.one.greeting", vars);
+  const para1Text = t("trialExpiring.one.para1", vars);
+  const para1Html = t("trialExpiring.one.para1Html", vars);
+  const signOff = t("common.signOff");
+  const signOffTitle = t("common.signOffTitle");
+
+  const html = `<!doctype html>
+<html>
+  <body style="font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; color: #111; line-height: 1.5;">
+    <span style="display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;">${escapeHtml(preview)}</span>
+    <p>${escapeHtml(greeting)}</p>
+    <p>${para1Html}</p>
+    <hr />
+    <p>${escapeHtml(signOff)}<br />${escapeHtml(signOffTitle)}</p>
+  </body>
+</html>`;
+
+  const text = `${greeting}
+
+${para1Text}
+
+--
+${signOff}
+${signOffTitle}`;
+
+  return { subject, html, text };
+}
+
+function firstNameOrFallback(
+  name: string | null | undefined,
+  fallback: string,
+): string {
+  if (!name) return fallback;
   const first = name.trim().split(/\s+/)[0];
-  return first || "there";
+  return first || fallback;
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }

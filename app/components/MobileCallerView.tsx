@@ -1,9 +1,11 @@
 import { useFetcher } from "react-router";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button, Popover, PopoverTrigger, PopoverContent } from "@heroui/react";
 import { Send } from "lucide-react";
 import { XCircleIcon } from "lucide-react";
 import { type Space, Status } from "~/db/browser";
+import LanguageSwitcher from "~/components/LanguageSwitcher";
 
 const TIMEOUT_MS = 30000;
 
@@ -21,6 +23,7 @@ export default function MobileCallerView({
   onSpaceChange: (spaceNumber: number, status: string) => void;
   maxSpaceNumber: number;
 }) {
+  const { t } = useTranslation("roster");
   const maxSpaceNumber =
     maxSpaceProp > 0
       ? maxSpaceProp
@@ -79,18 +82,26 @@ export default function MobileCallerView({
 
   return (
     <div className="flex flex-col items-center gap-4 px-4 py-6 w-full max-w-sm mx-auto">
+      {/* Language switcher — useful for callers who don't have a header
+          chrome above this view (e.g. embedded keypad mode). Phase 2 may
+          relocate this if/when the surrounding layout changes. */}
+      <div className="w-full flex justify-end">
+        <LanguageSwitcher placement="compact" />
+      </div>
       {/* Display */}
       <div className="w-full bg-[#193B4B] rounded-xl p-4 text-center h-[100px] flex flex-col items-center justify-center">
         <div className="text-5xl font-extrabold text-white tracking-widest">
-          {input || <span className="text-white/30">---</span>}
+          {input || <span className="text-white/30">{t("caller.displayPlaceholder")}</span>}
         </div>
         {isValid && targetSpace && (
           <div className={`text-sm mt-1 font-semibold ${isActive ? "text-yellow-400" : "text-green-400"}`}>
-            Space {parsedNumber} is {isActive ? "already active" : "empty"}
+            {isActive
+              ? t("caller.alreadyActive", { spaceNumber: parsedNumber })
+              : t("caller.spaceEmpty", { spaceNumber: parsedNumber })}
           </div>
         )}
         {input && !isValid && (
-          <div className="text-sm mt-1 text-red-400">Enter 1–{maxSpaceNumber}</div>
+          <div className="text-sm mt-1 text-red-400">{t("caller.outOfRange", { max: maxSpaceNumber })}</div>
         )}
       </div>
 
@@ -127,7 +138,7 @@ export default function MobileCallerView({
       {activeSpaces.length > 0 && (
         <div className="w-full">
           <p className="text-sm text-gray-400 mb-2 font-semibold uppercase tracking-wide">
-            Active — tap to clear
+            {t("caller.activeHeading")}
           </p>
           <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
             {activeSpaces.map((space) => (
@@ -151,6 +162,7 @@ function ActiveSpaceItem({
   space: Space;
   onClear: (spaceNumber: number) => void;
 }) {
+  const { t } = useTranslation("roster");
   const [, forceTick] = useState(0);
   useEffect(() => {
     if (!space.timestamp) return;
@@ -175,7 +187,7 @@ function ActiveSpaceItem({
           <div className="flex items-center gap-3">
             <Send className={icon} />
             <span className={`font-bold ${text} text-lg`}>
-              Space {space.spaceNumber}
+              {t("caller.spaceLabel", { spaceNumber: space.spaceNumber })}
             </span>
           </div>
           <XCircleIcon size={20} className={xIcon} />
@@ -183,9 +195,9 @@ function ActiveSpaceItem({
       </PopoverTrigger>
       <PopoverContent>
         <div className="px-1 py-2">
-          <div className="text-small font-bold">Mark this spot empty?</div>
+          <div className="text-small font-bold">{t("caller.markEmptyConfirm")}</div>
           <Button className="max-w-xs" variant="secondary" onPress={() => onClear(space.spaceNumber)}>
-            Mark Empty
+            {t("caller.markEmpty")}
           </Button>
         </div>
       </PopoverContent>

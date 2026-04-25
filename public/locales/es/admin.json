@@ -1,0 +1,571 @@
+{
+  "layout": {
+    "panelTitle": "[ES] Admin Panel",
+    "openNav": "[ES] Open navigation",
+    "closeNav": "[ES] Close navigation",
+    "compedThrough": "[ES] Your account is comped through {{date}}. Thanks for rolling with Pickup Roster 💛",
+    "errors": {
+      "loginRequired": "[ES] Login Required",
+      "accessDenied": "[ES] Access Denied",
+      "loginRequiredBody": "[ES] You need to be logged in to access the admin panel.",
+      "accessDeniedBody": "[ES] Your account doesn't have permission to access the admin panel.",
+      "logIn": "[ES] Log In",
+      "goHome": "[ES] Go Home",
+      "headerBrand": "[ES] Pickup Roster — Car line",
+      "headerLogoAlt": "[ES] school logo",
+      "loginLink": "[ES] Login"
+    }
+  },
+  "sidebar": {
+    "panelTitle": "[ES] Admin Panel",
+    "dashboard": "[ES] Dashboard",
+    "users": "[ES] Users",
+    "children": "[ES] Children & Classes",
+    "drills": "[ES] Drills",
+    "history": "[ES] History",
+    "branding": "[ES] Branding",
+    "billing": "[ES] Billing"
+  },
+  "usageBanner": {
+    "students": "[ES] Students",
+    "families": "[ES] Families",
+    "classrooms": "[ES] Classrooms",
+    "line": "[ES] {{label}}: {{n}} / {{cap}} ({{pct}}%) — warn ≥{{warn}}, max {{ceiling}} during grace",
+    "graceExpired": "[ES] Plan limit grace period ended — reduce usage (students, families, or classrooms) or upgrade your plan.",
+    "graceActive": "[ES] You're above your plan limits — 30-day grace active. You can grow up to 110% of each cap, then upgrade or trim data.",
+    "overCap": "[ES] You're over a plan limit — a grace period will apply on the next sync.",
+    "warn": "[ES] You're approaching a plan limit (80% or more on one dimension).",
+    "viewPlans": "[ES] View plans"
+  },
+  "pastDueBanner": {
+    "headline": "[ES] Payment failed — your subscription is past due.",
+    "body": "[ES] If payment is not received, this account will be suspended on ",
+    "suffix": "[ES]  (14 days from the first past-due notice).",
+    "updateBilling": "[ES] Update billing"
+  },
+  "dashboard": {
+    "metaTitle": "[ES] Admin Dashboard",
+    "heading": "[ES] Dashboard",
+    "stats": {
+      "students": "[ES] Students",
+      "gridSpaces": "[ES] Grid Spaces"
+    },
+    "planUsage": {
+      "heading": "[ES] Plan usage",
+      "planLine": "[ES] Plan: ",
+      "manageBilling": "[ES] Manage billing",
+      "atOrNearLimit": "[ES] You're at or near your plan limit.",
+      "viewBilling": "[ES] View billing",
+      "students": "[ES] Students",
+      "families": "[ES] Families",
+      "classrooms": "[ES] Classrooms",
+      "enterpriseNote": "[ES] Enterprise plan — no usage limits apply."
+    },
+    "grid": {
+      "heading": "[ES] Grid Controls",
+      "maxLabel": "[ES] Max space number: {{max}} ({{count}} spaces)",
+      "newGridLabel": "[ES] Spaces for new grid (1–5000)",
+      "createGrid": "[ES] Create Grid",
+      "clearGrid": "[ES] Clear Grid",
+      "disabledHint": "[ES] Create Grid is disabled because a grid already exists. Use Extend or Reduce.",
+      "newHint": "[ES] Create Grid builds spaces 1..N for initial setup.",
+      "extendLabel": "[ES] Extend to space #",
+      "extendPlaceholder": "[ES] e.g. {{number}}",
+      "addSpaces": "[ES] Add Spaces",
+      "reduceLabel": "[ES] Reduce to space #",
+      "reducePlaceholder": "[ES] e.g. {{number}}",
+      "reduceGrid": "[ES] Reduce Grid",
+      "reduceHint": "[ES] Students assigned above the new max are kept and automatically detached from their space number."
+    },
+    "viewerDrawing": {
+      "heading": "[ES] Viewer board drawing",
+      "enabled": "[ES] Enabled",
+      "disabled": "[ES] Disabled",
+      "body": "[ES] When enabled, viewers can draw light lines on the public board (stored on their device only).",
+      "subtle": "[ES] This affects the board seen by viewer accounts and logged-out visitors on the home page.",
+      "enable": "[ES] Enable drawing",
+      "disable": "[ES] Disable drawing",
+      "nonAdmin": "[ES] Only admins can change this setting. Ask an admin to enable or disable viewer drawing."
+    },
+    "print": {
+      "heading": "[ES] Print backups (PDF)",
+      "subtitle": "[ES] Opens in the browser for preview and printing.",
+      "fullBoard": "[ES] Full board grid",
+      "fitPage": "[ES] Fit to one page",
+      "naturalSize": "[ES] Natural size (may span pages)",
+      "masterList": "[ES] Master list — all students by car space + homeroom",
+      "perHomeroom": "[ES] Per homeroom",
+      "azSort": "[ES] A–Z",
+      "spaceSort": "[ES] By space #"
+    },
+    "import": {
+      "heading": "[ES] Import Students",
+      "createRecords": "[ES] Create Records"
+    },
+    "danger": {
+      "heading": "[ES] Danger Zone",
+      "deleteAll": "[ES] Delete All Student Records"
+    },
+    "actions": {
+      "createdGrid": "[ES] Created grid ({{n}} spaces)",
+      "addedSpaces": "[ES] Added spaces {{from}}–{{to}}",
+      "reducedGrid": "[ES] Reduced grid to spaces 1–{{to}}",
+      "viewerDrawingEnabled": "[ES] Viewer drawing enabled",
+      "viewerDrawingDisabled": "[ES] Viewer drawing disabled",
+      "resetGrid": "[ES] Reset grid!",
+      "deletedAll": "[ES] Deleted all student records",
+      "extendError": "[ES] Target must be greater than current max space number.",
+      "reduceError": "[ES] Reduce target must be lower than current max space number.",
+      "unknown": "[ES] Unknown action"
+    }
+  },
+  "billing": {
+    "metaTitle": "[ES] Billing — Admin",
+    "heading": "[ES] Billing",
+    "compedTitle": "[ES] Comped account",
+    "compedBody": "[ES] Your account is comped through {{date}}.",
+    "currentPlan": "[ES] Current plan",
+    "plan": "[ES] Plan",
+    "orgStatus": "[ES] Org status",
+    "subscriptionStatus": "[ES] Subscription status",
+    "trialDaysRemaining": "[ES] Trial days remaining",
+    "trialDays_one": "[ES] {{count}} day",
+    "trialDays_other": "[ES] {{count}} days",
+    "manageBilling": "[ES] Manage billing",
+    "redirecting": "[ES] Redirecting…",
+    "upgradePlan": "[ES] Upgrade plan",
+    "viewPlans": "[ES] View plans",
+    "footer": "[ES] Billing is managed through Stripe. Changes to your plan take effect immediately and are reflected on your next invoice.",
+    "dash": "—"
+  },
+  "branding": {
+    "metaTitle": "[ES] Branding Settings",
+    "heading": "[ES] Branding",
+    "tenant": "[ES] Tenant: ",
+    "primaryColor": "[ES] Primary color",
+    "accentColor": "[ES] Accent color",
+    "sitePalette": "[ES] Site palette",
+    "sitePaletteHelp": "[ES] Override the default site palette for your tenant. Leave unset to use the defaults ({{primary}} / {{secondary}}).",
+    "primaryFieldLabel": "[ES] Primary color",
+    "secondaryFieldLabel": "[ES] Secondary color",
+    "logoLabel": "[ES] Logo (PNG, JPEG, WEBP up to 2MB)",
+    "logoPreviewAlt": "[ES] Logo preview",
+    "logoPreviewNote": "[ES] Preview (not yet saved)",
+    "currentLogoAlt": "[ES] Current tenant logo",
+    "removeLogo": "[ES] Remove current logo",
+    "customDomain": "[ES] Custom domain",
+    "customDomainPlaceholder": "[ES] e.g. pickup.myschool.org",
+    "domainHelp": "[ES] DNS must point to pickuproster.com with a proxied record. Leave blank to use the default subdomain.",
+    "currentDomainPrefix": "[ES] Current: ",
+    "advancedTitle": "[ES] Logo upload & custom domain",
+    "advancedBody": "[ES] Upload your school logo and point a custom domain like ",
+    "advancedBodyExample": "[ES] pickup.myschool.org",
+    "advancedBodySuffix": "[ES]  at your board. Available on the Campus and District plans.",
+    "upgradeCampus": "[ES] Upgrade to Campus",
+    "save": "[ES] Save branding",
+    "overridingDefault": "[ES] Overriding default",
+    "usingDefault": "[ES] Using default {{value}}",
+    "resetToDefault": "[ES] Reset to default",
+    "errors": {
+      "advancedRequired": "[ES] Custom domain and logo upload require the Campus or District plan.",
+      "brandColorsHex": "[ES] Brand colors must use full hex format like #1A2B3C.",
+      "primaryHex": "[ES] Primary color must use full hex format like #1A2B3C.",
+      "secondaryHex": "[ES] Secondary color must use full hex format like #1A2B3C.",
+      "domainInvalid": "[ES] Invalid domain format. Use lowercase letters, numbers, and hyphens (e.g. myschool.example.com).",
+      "logoStorageMissing": "[ES] Logo storage is not configured.",
+      "domainInUse": "[ES] That domain is in use by another org."
+    },
+    "saved": "[ES] Branding updated."
+  },
+  "children": {
+    "metaTitle": "[ES] Admin – Children & Classes",
+    "heading": "[ES] Children & Classes",
+    "addClass": "[ES] Add Class",
+    "addChild": "[ES] Add Child",
+    "empty": "[ES] No classes yet. Add a class to get started.",
+    "noChildren": "[ES] No children in this class.",
+    "child_one": "[ES] child",
+    "child_other": "[ES] children",
+    "table": {
+      "name": "[ES] Name",
+      "space": "[ES] Space #"
+    },
+    "edit": "[ES] Edit"
+  },
+  "drills": {
+    "metaList": "[ES] Admin – Drill checklists",
+    "metaLibrary": "[ES] Admin – Drill template library",
+    "metaEditFallback": "[ES] Edit checklist",
+    "metaEdit": "[ES] Edit – {{name}}",
+    "metaRunFallback": "[ES] Run checklist",
+    "metaRun": "[ES] Run – {{name}}",
+    "list": {
+      "heading": "[ES] Drill checklists",
+      "subtitle": "[ES] Templates for fire, lockdown, shelter-in-place, reunification, and more. Build your own or start from the global library.",
+      "newHeading": "[ES] New checklist template",
+      "startFromLibrary": "[ES] Start from library",
+      "nameLabel": "[ES] Name",
+      "namePlaceholder": "[ES] e.g. Lockdown, Fire evacuation, Reunification",
+      "createBlank": "[ES] Create blank",
+      "yourTemplates": "[ES] Your templates",
+      "empty": "[ES] No templates yet. Create one above.",
+      "updated": "[ES] Updated {{when}}",
+      "startLive": "[ES] Start live drill",
+      "editLayout": "[ES] Edit layout",
+      "delete": "[ES] Delete",
+      "confirmStartLive": "[ES] Start a live drill for \"{{name}}\"? Everyone in this school will be redirected to the live checklist.",
+      "confirmDelete": "[ES] Delete this template?",
+      "errors": {
+        "nameRequired": "[ES] Name is required.",
+        "missingId": "[ES] Missing template id.",
+        "deleted": "[ES] Checklist deleted.",
+        "anotherLive": "[ES] Another drill is already live. End it first.",
+        "unknown": "[ES] Unknown action."
+      }
+    },
+    "edit": {
+      "back": "[ES] All checklists",
+      "templateName": "[ES] Template name",
+      "saveName": "[ES] Save name",
+      "addText": "[ES] Text column",
+      "addToggle": "[ES] Toggle column",
+      "saveLayout": "[ES] Save layout",
+      "saving": "[ES] Saving…",
+      "intro": "[ES] Toggle columns show a check on the run screen. Text columns store labels (grade, teacher name, etc.).",
+      "columnLabel": "[ES] Column {{n}} label",
+      "moveLeft": "[ES] Move column left",
+      "moveRight": "[ES] Move column right",
+      "removeColumn": "[ES] Remove column",
+      "kindText": "[ES] Text",
+      "kindToggle": "[ES] Toggle",
+      "checkOnRun": "[ES] check on run",
+      "moveUp": "[ES] Move row up",
+      "moveDown": "[ES] Move row down",
+      "removeRow": "[ES] Remove row",
+      "addRow": "[ES] Add row",
+      "startLive": "[ES] Start live drill",
+      "openRun": "[ES] Open run screen",
+      "printPreview": "[ES] Print preview",
+      "livePreview": "[ES] Live preview",
+      "previewHelp": "[ES] What teachers see on the run screen. Updates as you edit — save to persist.",
+      "errors": {
+        "missingTemplate": "[ES] Missing template.",
+        "nameRequired": "[ES] Name is required.",
+        "nameTooLong": "[ES] Name is too long.",
+        "definitionEmpty": "[ES] Definition is empty.",
+        "addToggle": "[ES] Add at least one toggle column (e.g. Check).",
+        "invalidJson": "[ES] Invalid JSON.",
+        "anotherLive": "[ES] Another drill is already live. End it first.",
+        "unexpectedSave": "[ES] Unexpected error saving.",
+        "unknown": "[ES] Unknown action."
+      },
+      "toasts": {
+        "nameSaved": "[ES] Name saved.",
+        "layoutSaved": "[ES] Layout saved."
+      }
+    },
+    "run": {
+      "back": "[ES] Edit layout",
+      "save": "[ES] Save",
+      "saving": "[ES] Saving…",
+      "clearAll": "[ES] Clear all",
+      "print": "[ES] Print",
+      "tap": "[ES] Tap toggle cells during the drill. Green means checked.",
+      "concurrencyReload": "[ES] Reload now",
+      "notesHeading": "[ES] Notes",
+      "notesPlaceholder": "[ES] Incidents, headcount issues, etc.",
+      "followUpHeading": "[ES] Follow-up items",
+      "addItem": "[ES] Add",
+      "noItems": "[ES] No items yet. Add reminders (e.g. check who has Johnny).",
+      "markDone": "[ES] Mark done",
+      "markNotDone": "[ES] Mark not done",
+      "removeItem": "[ES] Remove item",
+      "itemPlaceholder": "[ES] Follow-up task…",
+      "saveChecklist": "[ES] Save checklist",
+      "confirmReset": "[ES] Clear all checks, notes, and follow-up items for this template?",
+      "errors": {
+        "missingTemplate": "[ES] Missing template.",
+        "invalidStateJson": "[ES] Invalid state JSON.",
+        "concurrency": "[ES] Someone else updated this drill. Reload to see the latest state.",
+        "unknown": "[ES] Unknown action."
+      },
+      "toasts": {
+        "saved": "[ES] Saved.",
+        "cleared": "[ES] Checklist cleared."
+      }
+    },
+    "library": {
+      "heading": "[ES] Drill template library",
+      "subtitle": "[ES] Pre-built templates aligned to NFPA, SRP v4.2, FEMA, NWS, and other safety standards. Clone one to make it editable in your org.",
+      "back": "[ES] Back to checklists",
+      "step_one": "[ES] {{count}} step",
+      "step_other": "[ES] {{count}} steps",
+      "section_one": "[ES]  · {{count}} section",
+      "section_other": "[ES]  · {{count}} sections",
+      "alreadyCloned": "[ES] Already cloned",
+      "openCopy": "[ES] Open your copy",
+      "clone": "[ES] Clone to my templates",
+      "errors": {
+        "missingKey": "[ES] Missing template key.",
+        "alreadyCloned": "[ES] Already cloned — it's in your templates list.",
+        "notFound": "[ES] Template not found in library.",
+        "unknown": "[ES] Unknown action."
+      }
+    },
+    "print": {
+      "title": "[ES] Print – {{name}}",
+      "back": "[ES] Back to run screen",
+      "yes": "[ES] Yes",
+      "no": "[ES] No",
+      "notesHeading": "[ES] Notes",
+      "followUpHeading": "[ES] Follow-up items",
+      "none": "[ES] None"
+    }
+  },
+  "history": {
+    "metaTitle": "[ES] Admin – History & Reports",
+    "heading": "[ES] History & Reports",
+    "tenant": "[ES] Tenant: ",
+    "upgrade": {
+      "title": "[ES] Full call history & CSV reports",
+      "body": "[ES] See every car-line call with filters by date, homeroom, and student, plus summary stats and CSV export for record-keeping. Available on the Campus and District plans.",
+      "cta": "[ES] Upgrade to Campus",
+      "csvForbidden": "[ES] CSV export requires the Campus plan."
+    },
+    "filters": {
+      "from": "[ES] From",
+      "to": "[ES] To",
+      "homeroom": "[ES] Homeroom",
+      "allHomerooms": "[ES] All homerooms",
+      "studentName": "[ES] Student name",
+      "searchPlaceholder": "[ES] Search name...",
+      "apply": "[ES] Apply",
+      "exportCsv": "[ES] Export CSV"
+    },
+    "stats": {
+      "totalCalls": "[ES] Total calls",
+      "uniqueStudents": "[ES] Unique students",
+      "busiestDay": "[ES] Busiest day",
+      "topHomeroom": "[ES] Top homeroom",
+      "dash": "—"
+    },
+    "table": {
+      "ariaLabel": "[ES] Call history",
+      "time": "[ES] Time",
+      "student": "[ES] Student",
+      "homeroom": "[ES] Homeroom",
+      "space": "[ES] Space",
+      "noCalls": "[ES] No calls in this range.",
+      "truncated": "[ES] Showing the most recent {{cap}} calls. Narrow the filters or use Export CSV to get the full set."
+    }
+  },
+  "users": {
+    "metaTitle": "[ES] Admin – Users",
+    "heading": "[ES] Users",
+    "passwordReset": {
+      "heading": "[ES] Password reset",
+      "label": "[ES] Allow users to reset their password via email.",
+      "ssoHint": "[ES] Users will need to sign in via your SSO provider when that's configured."
+    },
+    "viewer": {
+      "heading": "[ES] Viewer Privacy Access",
+      "resetPin": "[ES] Reset Global 4-Digit PIN",
+      "pinPlaceholder": "[ES] New access code...",
+      "revokeSessions": "[ES] Revoke all current viewer sessions after resetting PIN",
+      "savePin": "[ES] Save PIN",
+      "newPin": "[ES] New PIN: {{pin}}",
+      "createMagicLink": "[ES] Create Viewer Magic Link",
+      "daysValidPlaceholder": "[ES] Days valid (default 7)",
+      "linkValid": "[ES] This link will be valid for {{days}} day(s).",
+      "generateLink": "[ES] Generate Link",
+      "lockedClients": "[ES] Locked Viewer Clients",
+      "noLockouts": "[ES] No active lockouts.",
+      "unknownNetwork": "[ES] Unknown network",
+      "adminResetRequired": "[ES] Admin reset required",
+      "lockedUntil": "[ES] Locked until {{when}}",
+      "lockedUntilUnknown": "[ES] unknown",
+      "resetLock": "[ES] Reset Lock"
+    },
+    "create": {
+      "heading": "[ES] Create User",
+      "fullName": "[ES] Full Name",
+      "email": "[ES] Email",
+      "role": "[ES] Role",
+      "controller": "[ES] Controller",
+      "admin": "[ES] Admin",
+      "viewer": "[ES] Viewer",
+      "submit": "[ES] Create User"
+    },
+    "table": {
+      "ariaLabel": "[ES] Users",
+      "name": "[ES] Name",
+      "email": "[ES] Email",
+      "role": "[ES] Role",
+      "status": "[ES] Status",
+      "actions": "[ES] Actions",
+      "banned": "[ES] Banned",
+      "active": "[ES] Active",
+      "resetPw": "[ES] Reset PW",
+      "ban": "[ES] Ban",
+      "unban": "[ES] Unban",
+      "revokeSessions": "[ES] Revoke Sessions",
+      "impersonate": "[ES] Impersonate",
+      "impersonating": "...",
+      "delete": "[ES] Delete"
+    },
+    "ban": {
+      "heading": "[ES] Ban {{name}}?",
+      "body": "[ES] This will revoke their active sessions immediately.",
+      "reasonLabel": "[ES] Reason",
+      "reasonPlaceholder": "[ES] Enter ban reason...",
+      "submit": "[ES] Ban User"
+    },
+    "errors": {
+      "missingId": "[ES] Missing user id.",
+      "userNotFound": "[ES] User not found in this org.",
+      "createUserFailed": "[ES] Failed to create user.",
+      "emailExists": "[ES] An account with that email already exists.",
+      "noCredential": "[ES] No credential account found.",
+      "onlyAdmins": "[ES] Only admins can change this setting.",
+      "unknown": "[ES] Unknown action"
+    },
+    "toasts": {
+      "userCreated": "[ES] User created! Temp password: {{password}}",
+      "passwordReset": "[ES] Password reset! New temp password: {{password}}",
+      "roleUpdated": "[ES] Role updated.",
+      "sessionsRevoked": "[ES] Revoked {{count}} active session(s).",
+      "viewerPinUpdated": "[ES] Viewer PIN updated.",
+      "viewerPinRevoked": "[ES] Viewer PIN updated. Revoked {{count}} viewer session(s).",
+      "viewerLockReset": "[ES] Viewer lock reset.",
+      "magicLinkCreated": "[ES] Magic link created. Valid for {{days}} day(s).",
+      "passwordResetEnabled": "[ES] Password reset is now enabled for your org.",
+      "passwordResetDisabled": "[ES] Password reset is now disabled. Users must sign in via SSO once configured.",
+      "userDeleted": "[ES] User deleted.",
+      "userBanned": "[ES] User banned.",
+      "userUnbanned": "[ES] User unbanned."
+    }
+  },
+  "create": {
+    "homeroom": {
+      "heading": "[ES] Create New Homeroom",
+      "infoHeading": "[ES] Homeroom Information",
+      "nameLabel": "[ES] Homeroom Name/Number",
+      "namePlaceholder": "[ES] e.g., 101, Ms. Smith",
+      "duplicateWarning": "[ES] This homeroom already exists",
+      "duplicateError": "[ES] Homeroom \"{{name}}\" already exists",
+      "assignHeading": "[ES] Assign Students ({{n}} selected)",
+      "addStudentLabel": "[ES] Add Student to Homeroom",
+      "selectStudent": "[ES] Search and select a student",
+      "studentSpace": "[ES] (Space: {{number}})",
+      "createWith_one": "[ES] Homeroom \"{{name}}\" created with {{count}} student",
+      "createWith_other": "[ES] Homeroom \"{{name}}\" created with {{count}} students",
+      "created": "[ES] Homeroom \"{{name}}\" created successfully",
+      "submit": "[ES] Create Homeroom",
+      "submitting": "[ES] Creating...",
+      "errors": {
+        "nameRequired": "[ES] Homeroom name/number is required",
+        "createFailed": "[ES] Failed to create homeroom"
+      }
+    },
+    "student": {
+      "metaTitle": "[ES] Create Student",
+      "heading": "[ES] Create New Student",
+      "basicInfo": "[ES] Basic Information",
+      "firstName": "[ES] First Name",
+      "firstNamePlaceholder": "[ES] Enter first name",
+      "lastName": "[ES] Last Name",
+      "lastNamePlaceholder": "[ES] Enter last name",
+      "assignmentsOptional": "[ES] Assignments (Optional)",
+      "spaceLabel": "[ES] Parking Space Number",
+      "spacePlaceholder": "[ES] Enter space number",
+      "leaveEmpty": "[ES] Leave empty if not assigned",
+      "homeroomLabel": "[ES] Homeroom",
+      "homeroomPlaceholder": "[ES] Select existing homeroom",
+      "submit": "[ES] Create Student",
+      "submitting": "[ES] Creating...",
+      "created": "[ES] Student {{name}} created successfully",
+      "errors": {
+        "namesRequired": "[ES] First name and last name are required",
+        "homeroomMustExist": "[ES] Please choose an existing homeroom from suggestions",
+        "createFailed": "[ES] Failed to create student"
+      }
+    }
+  },
+  "edit": {
+    "homeroom": {
+      "heading": "[ES] Edit Teacher & Homeroom",
+      "teacherInfo": "[ES] Teacher Information",
+      "homeroomLabel": "[ES] Homeroom",
+      "currentStudents": "[ES] Current Students ({{n}})",
+      "noStudents": "[ES] No students assigned to this homeroom",
+      "addStudents": "[ES] Add Students",
+      "selectLabel": "[ES] Select student to add",
+      "selectStudent": "[ES] Search and select a student",
+      "currentlyIn": "[ES] (Currently: {{room}})",
+      "noAvailable": "[ES] No available students to add",
+      "pendingHeading": "[ES] Pending Updates ({{n}})",
+      "noHomeroom": "[ES] No homeroom",
+      "saveChanges": "[ES] Save Changes",
+      "saveAndReturn": "[ES] Save & Return to Admin",
+      "toasts": {
+        "removed": "[ES] Student removed",
+        "updated": "[ES] Homeroom updated",
+        "updatedSuccess": "[ES] Homeroom updated successfully"
+      },
+      "errors": {
+        "updateFailed": "[ES] Failed to update homeroom"
+      }
+    },
+    "student": {
+      "heading": "[ES] Edit Student",
+      "basicInfo": "[ES] Basic Information",
+      "firstName": "[ES] First Name",
+      "lastName": "[ES] Last Name",
+      "assignments": "[ES] Assignments",
+      "spaceLabel": "[ES] Parking Space Number",
+      "leaveEmpty": "[ES] Leave empty if not assigned",
+      "homeroomLabel": "[ES] Homeroom",
+      "homeroomPlaceholder": "[ES] Select existing homeroom",
+      "submit": "[ES] Update Student",
+      "submitting": "[ES] Updating...",
+      "delete": "[ES] Delete Student",
+      "deleting": "[ES] Deleting...",
+      "deleted": "[ES] Student deleted successfully",
+      "updated": "[ES] Student updated successfully",
+      "errors": {
+        "namesRequired": "[ES] First name and last name are required",
+        "homeroomMustExist": "[ES] Please choose an existing homeroom from suggestions",
+        "updateFailed": "[ES] Failed to update student",
+        "invalidId": "[ES] Invalid student ID",
+        "notFound": "[ES] Student not found"
+      }
+    }
+  },
+  "print": {
+    "board": {
+      "title": "[ES] Car line bingo board (backup)",
+      "fitPage": "[ES] Fit to one page",
+      "naturalSize": "[ES] Natural size (multi-page)"
+    },
+    "master": {
+      "title": "[ES] Master list — by car space",
+      "heading": "[ES] Master list — by car space number",
+      "space": "[ES] Space",
+      "student": "[ES] Student",
+      "homeroom": "[ES] Homeroom",
+      "dash": "—"
+    },
+    "homeroom": {
+      "title": "[ES] Homeroom: {{name}}",
+      "heading": "[ES] Homeroom: {{name}}",
+      "sortedByCarSpace": "[ES] Sorted by car space",
+      "sortedByName": "[ES] Sorted by name",
+      "student": "[ES] Student",
+      "carSpace": "[ES] Car space",
+      "errors": {
+        "invalid": "[ES] Invalid homeroom",
+        "notFound": "[ES] Homeroom not found"
+      }
+    }
+  }
+}

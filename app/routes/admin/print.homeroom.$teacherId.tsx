@@ -1,7 +1,21 @@
+// Print route — DO NOT use the user's UI locale for translations.
+// The homeroom printout is targeted at one teacher; honor `Teacher.locale`
+// when set, otherwise fall back to `org.defaultLocale`. The server-side
+// helper `getTeacherPrintLocale` resolves this for us. Component-side,
+// `usePrintLocale("homeroom", teacherId)` reads the resolved value from
+// loader data; we pass `lng` to `useTranslation` so the printout matches
+// the teacher's preferred language even when the admin clicking Print
+// uses something different.
+
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/print.homeroom.$teacherId";
 import { getTenantPrisma } from "~/domain/utils/global-context.server";
 import { requireRole } from "~/sessions.server";
+import { getTeacherPrintLocale } from "~/i18n.server";
+import { usePrintLocale } from "~/hooks/usePrintLocale";
+
+export const handle = { i18n: ["admin"] };
 
 export async function loader({ request, context, params }: Route.LoaderArgs) {
   await requireRole(context, "ADMIN");
@@ -30,31 +44,44 @@ export async function loader({ request, context, params }: Route.LoaderArgs) {
     },
   });
 
-  return { homeRoom: teacher.homeRoom, students, sort };
+  // Print locale rule: teacher.locale wins, else org.defaultLocale.
+  const printLocale = await getTeacherPrintLocale(context, teacherId);
+
+  return {
+    homeRoom: teacher.homeRoom,
+    teacher: { id: teacher.id },
+    students,
+    sort,
+    printLocale,
+  };
 }
 
 export default function PrintHomeroom({ loaderData }: Route.ComponentProps) {
-  const { homeRoom, students, sort } = loaderData;
+  const { homeRoom, students, sort, teacher } = loaderData;
+  const printLocale = usePrintLocale("homeroom", teacher.id);
+  const { t } = useTranslation("admin", { lng: printLocale });
 
   useEffect(() => {
-    const t = setTimeout(() => window.print(), 300);
-    return () => clearTimeout(t);
+    const tm = setTimeout(() => window.print(), 300);
+    return () => clearTimeout(tm);
   }, []);
 
   return (
     <>
-      <title>{`Homeroom: ${homeRoom}`}</title>
+      <title>{t("print.homeroom.title", { name: homeRoom })}</title>
       <style>{`@page { size: letter; margin: 0.5in; }`}</style>
-      <div className="p-6 text-black bg-white font-sans">
-        <h1 className="text-xl font-semibold mb-1">Homeroom: {homeRoom}</h1>
+      <div lang={printLocale} className="p-6 text-black bg-white font-sans">
+        <h1 className="text-xl font-semibold mb-1">{t("print.homeroom.heading", { name: homeRoom })}</h1>
         <p className="text-xs text-black/60 mb-3">
-          Sorted by {sort === "space" ? "car space" : "name"}
+          {sort === "space"
+            ? t("print.homeroom.sortedByCarSpace")
+            : t("print.homeroom.sortedByName")}
         </p>
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="border-b border-black">
-              <th className="text-left py-1">Student</th>
-              <th className="text-left py-1 w-32">Car space</th>
+              <th className="text-left py-1">{t("print.homeroom.student")}</th>
+              <th className="text-left py-1 w-32">{t("print.homeroom.carSpace")}</th>
             </tr>
           </thead>
           <tbody>

@@ -46,23 +46,40 @@
 			"*/2 * * * *"
 		]
 	},
+	// PRODUCTION D1 binding — used when deploying with `npm run deploy`
+	// (no `--env` flag, so wrangler resolves the top-level config).
+	//
+	// IMPORTANT: this previously pointed at the staging database, which
+	// meant every request to pickuproster.com was reading/writing the
+	// staging D1 (likely the cause of the cross-tenant test rows that
+	// showed up on the balt-hs admin page). Both the database_name AND
+	// database_id must match the production DB on Cloudflare. Get them
+	// with `wrangler d1 list`. The db is named `school-organizer` per
+	// docs/ops-runbook.md and the `d1:migrate` npm script.
 	"d1_databases": [
 		{
 			"binding": "D1_DATABASE",
-			"database_name": "school-organizer-staging",
-			"database_id": "88aac5de-1ee7-42e5-b784-3ecd3a4e331f",
+			"database_name": "school-organizer",
+			// __PASTE_PROD_D1_UUID__ — run `wrangler d1 list`, copy the id
+			// for the row whose name is `school-organizer`. The string below
+			// is intentionally invalid so a deploy without filling this in
+			// fails loudly instead of silently routing prod to staging.
+			"database_id": "399295fb-9f0d-42a9-a271-8619366caa1d",
 			"migrations_dir": "migrations"
 		}
 	],
-	// R2 bucket for per-org branding assets (logos). Referenced as env.ORG_BRANDING_BUCKET
-	// by app/routes/admin/branding.tsx and app/routes/api/branding.logo.$slug.ts.
-	// The bucket must already exist in Cloudflare — run:
-	// `wrangler r2 bucket create pickup-roster-org-branding`
+	// PRODUCTION R2 bucket for per-org branding assets (logos). Referenced
+	// as env.ORG_BRANDING_BUCKET by app/routes/admin/branding.tsx and
+	// app/routes/api/branding.logo.$slug.ts. The bucket must already exist
+	// in Cloudflare — run:
+	//   wrangler r2 bucket create pickup-roster-org-branding
+	// (Same staging→prod confusion fixed here: the prod worker should not
+	// share a bucket with staging or tenant logos cross-contaminate.)
 	"r2_buckets": [
 		{
 			"binding": "ORG_BRANDING_BUCKET",
-			"bucket_name": "pickup-roster-org-branding-staging",
-			"preview_bucket_name": "pickup-roster-org-branding-staging"
+			"bucket_name": "pickup-roster-org-branding",
+			"preview_bucket_name": "pickup-roster-org-branding"
 		}
 	],
 	"durable_objects": {

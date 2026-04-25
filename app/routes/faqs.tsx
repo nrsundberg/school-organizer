@@ -1,47 +1,51 @@
 import { Link } from "react-router";
+import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/faqs";
 import { MarketingNav } from "~/components/marketing/MarketingNav";
+import { SUPPORTED_LANGUAGES } from "~/lib/i18n-config";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 
-export function meta() {
+export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
   return [
-    { title: "FAQs — Pickup Roster" },
-    { name: "description", content: "Common questions about car line boards, trials, and security." },
+    { title: data?.metaTitle ?? "FAQs — Pickup Roster" },
+    { name: "description", content: data?.metaDescription ?? "Common questions about car line boards, trials, and security." },
   ];
 }
 
-export async function loader() {
-  return null;
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "common");
+  return {
+    metaTitle: t("faqs.metaTitle"),
+    metaDescription: t("faqs.metaDescription"),
+  };
 }
 
-const FAQS = [
-  {
-    q: "Where does my school live?",
-    a: "Each organization gets its own subdomain like yourslug.pickuproster.com. The main domain shows this marketing site; the board never mixes tenants. On Campus and District plans you can instead use a custom domain or a subdomain on your school's own domain (for example, pickup.yourschool.edu).",
-  },
-  {
-    q: "How does the trial work?",
-    a: "Your trial ends on the later of 30 calendar days from signup or 25 qualifying pickup days. A qualifying day is a day with more than 10 distinct students marked as called.",
-  },
-  {
-    q: "How do families view the board?",
-    a: "Share the viewer PIN or a magic link. Viewer sessions are scoped to your organization and respect lockouts after failed attempts.",
-  },
-  {
-    q: "Can we use our own domain?",
-    a: "Yes — custom domains (or a subdomain on your school's own domain) are available on Campus and District plans. Point DNS to the same Worker as your other hosts. Car Line uses a yourslug.pickuproster.com subdomain.",
-  },
-];
-
 export default function Faqs() {
+  const { t } = useTranslation("common");
+  const names = SUPPORTED_LANGUAGES.map((l) => l.nativeName).join(", ");
+
+  const items = [
+    { q: t("faqs.items.where.q"), a: t("faqs.items.where.a") },
+    { q: t("faqs.items.trial.q"), a: t("faqs.items.trial.a") },
+    { q: t("faqs.items.viewer.q"), a: t("faqs.items.viewer.a") },
+    { q: t("faqs.items.domain.q"), a: t("faqs.items.domain.a") },
+    {
+      q: t("marketing.faqLanguageQuestion"),
+      a: `${t("marketing.languageList", { names })} ${t("marketing.faqLanguageAnswerSuffix")}`,
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-[#0f1414] text-white">
       <MarketingNav />
       <div className="mx-auto max-w-3xl px-4 py-14">
-        <h1 className="text-4xl font-extrabold">FAQs</h1>
-        <p className="mt-3 text-lg text-white/70">Straight answers for admins and IT.</p>
+        <h1 className="text-4xl font-extrabold">{t("faqs.heading")}</h1>
+        <p className="mt-3 text-lg text-white/70">{t("faqs.lede")}</p>
 
         <div className="mt-10 space-y-8">
-          {FAQS.map((item) => (
+          {items.map((item) => (
             <div key={item.q} className="rounded-2xl border border-white/10 bg-[#151a1a] p-5">
               <h2 className="text-lg font-semibold text-[#E9D500]">{item.q}</h2>
               <p className="mt-2 text-sm leading-relaxed text-white/75">{item.a}</p>
@@ -50,9 +54,9 @@ export default function Faqs() {
         </div>
 
         <p className="mt-10 text-center text-sm text-white/50">
-          Ready to try it?{" "}
+          {t("faqs.readyToTry")}{" "}
           <Link to="/signup" className="text-[#E9D500] underline hover:text-[#f5e047]">
-            Create an account
+            {t("faqs.createAccount")}
           </Link>
         </p>
       </div>
