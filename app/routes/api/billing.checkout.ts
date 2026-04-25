@@ -6,6 +6,7 @@ import type { Route } from "./+types/billing.checkout";
 import { getPrisma } from "~/db.server";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
 import { createCheckoutSessionForOrg } from "~/domain/billing/checkout.server";
+import { pricingPathForPlan } from "~/domain/billing/public-plans";
 import {
   checkRateLimit,
   clientIpFromRequest,
@@ -79,6 +80,6 @@ export async function action({ request, context }: Route.ActionArgs) {
       error instanceof Error
         ? error.message
         : "Could not start Stripe Checkout.";
-    return redirectWithError("/pricing", message);
+    return redirectWithError(pricingPathForPlan(plan, billingCycle ?? "monthly"), message);
   }
 }

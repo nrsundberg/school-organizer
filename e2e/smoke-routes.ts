@@ -55,21 +55,18 @@ export const publicMarketingRoutes: RouteSpec[] = [
   {
     path: "/",
     expect: "self",
-    // The marketing nav renders an anchor to "/" with aria-label="PickupRoster home"
-    // and an <img alt="PickupRoster">. The accessible name has no space, so
-    // /PickupRoster/ (no space) is the correct matcher. Covers the current
-    // wordmark+logo header.
-    landmark: { role: "link", name: /PickupRoster/i },
+    // Covers the current wordmark+logo header.
+    landmark: { role: "link", name: /Pickup Roster/i }
   },
   {
     path: "/pricing",
     expect: "self",
-    landmark: { role: "heading", name: /Car Line/i },
+    landmark: { role: "heading", name: /Car Line/i }
   },
   {
     path: "/faqs",
     expect: "self",
-    landmark: { role: "heading" },
+    landmark: { role: "heading" }
   },
   {
     // Blog index is linked from the marketing nav + footer on every page, so
@@ -79,7 +76,7 @@ export const publicMarketingRoutes: RouteSpec[] = [
     // catch the regression before staging smoke does.
     path: "/blog",
     expect: "self",
-    landmark: { role: "heading", name: /Field notes/i },
+    landmark: { role: "heading", name: /Field notes/i }
   },
   {
     // Sample post path — exercises the `/blog/$slug` loader on marketing host
@@ -87,23 +84,17 @@ export const publicMarketingRoutes: RouteSpec[] = [
     // content/blog/. If this post is ever removed, swap for another.
     path: "/blog/parent-communication-confirming-pickup-changes-without-chaos",
     expect: "self",
-    landmark: { role: "heading" },
+    landmark: { role: "heading" }
   },
   {
-    // BUG: /status redirects to /login?next=/status on marketing host +
-    // no session. The middleware in
-    // app/domain/utils/global-context.server.ts does not list /status in
-    // `publicMarketingPath`, so unauthenticated visitors get kicked to
-    // login. Status pages must be publicly visible.
     path: "/status",
     expect: "self",
-    landmark: { role: "heading" },
-    fixme: "BUG: /status is not in middleware publicMarketingPath; it 302s to /login",
+    landmark: { role: "heading" }
   },
   {
     path: "/login",
     expect: "self",
-    landmark: { text: /Email/i },
+    landmark: { text: /Email/i }
   },
   {
     // Signup requires ?plan=car-line|campus|district. Without a plan, the
@@ -111,20 +102,20 @@ export const publicMarketingRoutes: RouteSpec[] = [
     // actual signup form.
     path: "/signup?plan=car-line",
     expect: "self",
-    landmark: { text: /Your name/i },
+    landmark: { text: /Your name/i }
   },
   {
     path: "/forgot-password",
     expect: "self",
-    landmark: { role: "heading" },
+    landmark: { role: "heading" }
   },
   {
     path: "/reset-password",
     // Reset-password without a valid token typically renders an error state
     // or redirects. Either is fine as long as it's not a 500.
     expect: "either",
-    landmark: { role: "heading" },
-  },
+    landmark: { role: "heading" }
+  }
 ];
 
 /* ------------------------------------------------------------------ */
@@ -150,7 +141,11 @@ export const tenantAuthedRoutes: RouteSpec[] = [
   // turn this on. Skipping here so the sweep doesn't fail on a route that
   // doesn't exist yet.
   // { path: "/admin/history", expect: "either", landmark: { role: "heading" } },
-  { path: "/admin/fire-drill", expect: "either", landmark: { role: "heading" } },
+  {
+    path: "/admin/fire-drill",
+    expect: "either",
+    landmark: { role: "heading" }
+  },
 
   // `/create/*` — these loaders typically require admin + org.
   { path: "/create/homeroom", expect: "either", landmark: { role: "heading" } },
@@ -169,7 +164,7 @@ export const tenantAuthedRoutes: RouteSpec[] = [
   { path: "/billing-required", expect: "either" },
 
   // Set-password — redirects to /login if no user.
-  { path: "/set-password", expect: "either" },
+  { path: "/set-password", expect: "either" }
 ];
 
 /* ------------------------------------------------------------------ */
@@ -178,7 +173,7 @@ export const tenantAuthedRoutes: RouteSpec[] = [
 /* ------------------------------------------------------------------ */
 export const printRoutes: RouteSpec[] = [
   { path: "/admin/print/board", expect: "either" },
-  { path: "/admin/print/master", expect: "either" },
+  { path: "/admin/print/master", expect: "either" }
 ];
 
 /* ------------------------------------------------------------------ */
@@ -190,7 +185,7 @@ export const platformRoutes: RouteSpec[] = [
   { path: "/platform/signups", expect: "either" },
   { path: "/platform/sessions", expect: "either" },
   { path: "/platform/webhooks", expect: "either" },
-  { path: "/platform/audit", expect: "either" },
+  { path: "/platform/audit", expect: "either" }
 ];
 
 /* ------------------------------------------------------------------ */
@@ -203,7 +198,7 @@ export const platformRoutes: RouteSpec[] = [
  */
 export async function visitAndCapture(
   page: Page,
-  path: string,
+  path: string
 ): Promise<{
   response: Response | null;
   pageErrors: string[];
@@ -228,7 +223,7 @@ export async function visitAndCapture(
   try {
     response = await page.goto(path, {
       waitUntil: "domcontentloaded",
-      timeout: 30000,
+      timeout: 30000
     });
   } finally {
     page.off("pageerror", onPageError);
@@ -243,7 +238,7 @@ export function assertNotServerError(path: string, response: Response | null) {
   const status = response!.status();
   expect(
     status,
-    `Route ${path} returned ${status}. Expected 2xx or redirect chain ending in 2xx.`,
+    `Route ${path} returned ${status}. Expected 2xx or redirect chain ending in 2xx.`
   ).toBeLessThan(500);
   // 4xx is also a smell — most of our routes should either render (2xx) or
   // have been redirected (3xx resolved to 2xx by Playwright's goto). The
@@ -252,7 +247,7 @@ export function assertNotServerError(path: string, response: Response | null) {
   // see a rendered ErrorBoundary (2xx).
   if (status >= 400 && status < 500) {
     throw new Error(
-      `Route ${path} returned ${status}. Smoke sweep expects a rendered page or redirect; a raw 4xx means the ErrorBoundary didn't render.`,
+      `Route ${path} returned ${status}. Smoke sweep expects a rendered page or redirect; a raw 4xx means the ErrorBoundary didn't render.`
     );
   }
 }
@@ -261,10 +256,13 @@ export async function assertLandmark(page: Page, spec: RouteSpec) {
   if (!spec.landmark) {
     // Fallback: assert <body> rendered something, not just whitespace.
     const bodyText =
-      (await page.locator("body").innerText().catch(() => "")) ?? "";
+      (await page
+        .locator("body")
+        .innerText()
+        .catch(() => "")) ?? "";
     expect(
       bodyText.trim().length,
-      `Route ${spec.path} rendered an empty body`,
+      `Route ${spec.path} rendered an empty body`
     ).toBeGreaterThan(0);
     return;
   }
@@ -275,16 +273,16 @@ export async function assertLandmark(page: Page, spec: RouteSpec) {
       : page.getByRole(role).first();
     await expect(
       locator,
-      `Landmark ${role} not visible on ${spec.path}`,
+      `Landmark ${role} not visible on ${spec.path}`
     ).toBeVisible({
-      timeout: 10000,
+      timeout: 10000
     });
     return;
   }
   if (text) {
     await expect(
       page.getByText(text).first(),
-      `Landmark text ${String(text)} not visible on ${spec.path}`,
+      `Landmark text ${String(text)} not visible on ${spec.path}`
     ).toBeVisible({ timeout: 10000 });
   }
 }
@@ -298,7 +296,7 @@ export function assertAllowedFinalPath(spec: RouteSpec, finalUrl: string) {
     const expectedPath = spec.path.split("?")[0];
     expect(
       landedPath,
-      `Expected ${spec.path} to render itself but landed on ${landedPath}`,
+      `Expected ${spec.path} to render itself but landed on ${landedPath}`
     ).toBe(expectedPath);
   }
   if (spec.expect === "redirect") {
@@ -307,7 +305,7 @@ export function assertAllowedFinalPath(spec: RouteSpec, finalUrl: string) {
     const ok = spec.allowedFinalPaths.some((re) => re.test(u.pathname));
     expect(
       ok,
-      `Route ${spec.path} landed on ${u.pathname}, not in allowed list`,
+      `Route ${spec.path} landed on ${u.pathname}, not in allowed list`
     ).toBe(true);
   }
   // "either" — no assertion on final URL.
@@ -328,7 +326,7 @@ export async function smokeOne(page: Page, spec: RouteSpec) {
     // Filter out known-harmless browser noise if we observe any in practice.
     // For now surface everything — we want to see what's real.
     throw new Error(
-      `Route ${spec.path} raised ${pageErrors.length} pageerror(s):\n  - ${pageErrors.join("\n  - ")}`,
+      `Route ${spec.path} raised ${pageErrors.length} pageerror(s):\n  - ${pageErrors.join("\n  - ")}`
     );
   }
 }

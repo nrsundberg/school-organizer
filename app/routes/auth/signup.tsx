@@ -6,16 +6,33 @@ import {
   useActionData,
   useRevalidator,
   useRouteLoaderData,
-  useSearchParams,
+  useSearchParams
 } from "react-router";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import type { Route } from "./+types/signup";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
-import { isMarketingHost, marketingOriginFromRequest } from "~/domain/utils/host.server";
+import {
+  isMarketingHost,
+  marketingOriginFromRequest
+} from "~/domain/utils/host.server";
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { ensureOrgForUser } from "~/domain/billing/onboarding.server";
+import {
+  billingCycleLabel,
+  billingPlanForSlug,
+  normalizePublicPlanSelectionSource,
+  normalizePublicBillingCycle,
+  normalizePublicPlan,
+  planLabel,
+  pricingPathForPlan,
+  PUBLIC_BILLING_CYCLES,
+  PUBLIC_PLAN_SELECTION_SOURCES,
+  shouldStartCheckoutAfterSignup,
+  type PublicBillingCycle,
+  type PublicPlanSelectionSource
+} from "~/domain/billing/public-plans";
 import { getPrisma } from "~/db.server";
 import { signUp } from "~/lib/auth-client";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
@@ -24,39 +41,21 @@ import {
   schoolBoardHostname,
   slugifyOrgName,
   suggestOrgSlugsFromName,
-  tenantBoardUrlFromRequest,
+  tenantBoardUrlFromRequest
 } from "~/lib/org-slug";
 import {
   checkRateLimit,
   clientIpFromRequest,
-  getRateLimiter,
+  getRateLimiter
 } from "~/domain/utils/rate-limit.server";
+import { createCheckoutSessionForOrg } from "~/domain/billing/checkout.server";
+import { redirectWithError } from "remix-toast";
 
 export function meta() {
   return [
     { title: "Signup — Pickup Roster" },
-    { name: "description", content: "Create your organization and account" },
+    { name: "description", content: "Create your organization and account" }
   ];
-}
-
-/** Public plans accepted as `?plan=` query params on the signup route. */
-const PUBLIC_PLAN_SLUGS = ["car-line", "campus", "district"] as const;
-type PublicPlanSlug = (typeof PUBLIC_PLAN_SLUGS)[number];
-
-function normalizePublicPlan(raw: string | null): PublicPlanSlug | null {
-  if (!raw) return null;
-  const v = raw.trim().toLowerCase();
-  if (v === "car-line" || v === "car_line" || v === "carline") return "car-line";
-  if (v === "campus") return "campus";
-  if (v === "district") return "district";
-  return null;
-}
-
-/** Map a public plan slug to its BillingPlan enum value. */
-function billingPlanForSlug(slug: PublicPlanSlug): "CAR_LINE" | "CAMPUS" | "DISTRICT" {
-  if (slug === "district") return "DISTRICT";
-  if (slug === "campus") return "CAMPUS";
-  return "CAR_LINE";
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -73,12 +72,19 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // picks a tier — there is no public free tier. Exception: users who've
   // already completed step 1 (authed, no org yet) fall back to car-line so a
   // lost `?plan=` param mid-flow doesn't strand them.
-  const planParam = new URL(request.url).searchParams.get("plan");
+  const url = new URL(request.url);
+  const planParam = url.searchParams.get("plan");
   const plan = normalizePublicPlan(planParam);
   if (!plan && !user) {
     throw redirect("/pricing");
   }
-  return { plan: plan ?? "car-line" };
+  return {
+    plan: plan ?? "car-line",
+    billingCycle: normalizePublicBillingCycle(url.searchParams.get("cycle")),
+    planSelectionSource: normalizePublicPlanSelectionSource(
+      plan ? "explicit" : null
+    )
+  };
 }
 
 const VALID_PLANS = ["CAR_LINE", "CAMPUS", "DISTRICT"] as const;
@@ -104,14 +110,21 @@ const step1Schema = z.object({
   email: z.string().email(),
   phone: z
     .string()
-    .refine((v) => countDigits(v) >= 10, "Phone number must be at least 10 digits."),
-  password: z.string().min(8, "Password must be at least 8 characters."),
+    .refine(
+      (v) => countDigits(v) >= 10,
+      "Phone number must be at least 10 digits."
+    ),
+  password: z.string().min(8, "Password must be at least 8 characters.")
 });
 
 const step3Schema = zfd.formData({
   orgName: zfd.text(z.string().min(2)),
   slug: zfd.text(z.string().min(1)),
   plan: zfd.text(z.enum(VALID_PLANS)),
+  billingCycle: zfd.text(z.enum(PUBLIC_BILLING_CYCLES).optional()),
+  planSelectionSource: zfd.text(
+    z.enum(PUBLIC_PLAN_SELECTION_SOURCES).optional()
+  )
 });
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -123,12 +136,15 @@ export async function action({ request, context }: Route.ActionArgs) {
   const clientIp = clientIpFromRequest(request);
   const rlResult = await checkRateLimit({
     limiter: getRateLimiter(context, "RL_AUTH"),
-    key: "auth:" + clientIp,
+    key: "auth:" + clientIp
   });
   if (!rlResult.ok) {
     return data(
-      { error: "Too many attempts. Please try again in a minute.", field: undefined },
-      { status: 429, headers: { "Retry-After": "60" } },
+      {
+        error: "Too many attempts. Please try again in a minute.",
+        field: undefined
+      },
+      { status: 429, headers: { "Retry-After": "60" } }
     );
   }
 
@@ -136,7 +152,13 @@ export async function action({ request, context }: Route.ActionArgs) {
   const auth = getAuth(context);
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session?.user?.id) {
-    return data({ error: "Your session expired. Please refresh and sign in again.", field: undefined }, { status: 401 });
+    return data(
+      {
+        error: "Your session expired. Please refresh and sign in again.",
+        field: undefined
+      },
+      { status: 401 }
+    );
   }
   const userId = session.user.id;
   const email = session.user.email;
@@ -147,14 +169,24 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (!parsed.success) {
     const firstError = parsed.error.issues[0];
     return data(
-      { error: firstError?.message ?? "Invalid form data.", field: firstError?.path[0]?.toString() },
-      { status: 400 },
+      {
+        error: firstError?.message ?? "Invalid form data.",
+        field: firstError?.path[0]?.toString()
+      },
+      { status: 400 }
     );
   }
   const { orgName, slug, plan } = parsed.data;
+  const billingCycle = parsed.data.billingCycle ?? "monthly";
+  const planSelectionSource = parsed.data.planSelectionSource ?? "default";
+  const startsInCheckout = shouldStartCheckoutAfterSignup(
+    plan,
+    planSelectionSource
+  );
 
-  // 3. Call ensureOrgForUser. Every new org starts as TRIALING with a 30-day
-  //    trial window regardless of tier — we do NOT collect a card at signup.
+  // 3. Create the org first so signup can either continue into checkout for
+  //    an explicitly-selected self-serve paid plan, or keep the existing
+  //    board redirect for district/default flows.
   let orgId: string;
   try {
     const result = await ensureOrgForUser({
@@ -163,20 +195,56 @@ export async function action({ request, context }: Route.ActionArgs) {
       orgName,
       requestedSlug: slug,
       plan,
-      email,
+      email
     });
     orgId = result.orgId;
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Unable to create organization.";
+    const msg =
+      err instanceof Error ? err.message : "Unable to create organization.";
     const isSlugError = msg.toLowerCase().includes("slug");
-    return data({ error: msg, field: isSlugError ? "slug" : undefined }, { status: 400 });
+    return data(
+      { error: msg, field: isSlugError ? "slug" : undefined },
+      { status: 400 }
+    );
   }
 
-  // 4. Redirect to the tenant board. The user is in-trial; Stripe customer /
-  //    checkout flows are deferred until they convert from the billing page.
+  if (startsInCheckout) {
+    try {
+      const origin = new URL(request.url).origin;
+      const successUrl = `${origin}/billing/success?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = new URL(
+        pricingPathForPlan(plan, billingCycle),
+        origin
+      ).toString();
+      const { url } = await createCheckoutSessionForOrg({
+        context,
+        orgId,
+        plan,
+        billingCycle,
+        email,
+        successUrl,
+        cancelUrl
+      });
+      throw redirect(url);
+    } catch (error) {
+      if (error instanceof Response) throw error;
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Could not start Stripe Checkout.";
+      return redirectWithError(pricingPathForPlan(plan, billingCycle), message);
+    }
+  }
+
+  // 4. District and default/fallback flows keep the current no-card trial path.
   const db = getPrisma(context);
-  const org = await db.org.findUnique({ where: { id: orgId }, select: { slug: true } });
-  const boardUrl = org?.slug ? tenantBoardUrlFromRequest(request, org.slug) : "/";
+  const org = await db.org.findUnique({
+    where: { id: orgId },
+    select: { slug: true }
+  });
+  const boardUrl = org?.slug
+    ? tenantBoardUrlFromRequest(request, org.slug)
+    : "/";
   throw redirect(boardUrl);
 }
 
@@ -206,6 +274,13 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
   // BillingPlan enum value the server action expects.
   const selectedPlanSlug = loaderData.plan;
   const initialPlan: Plan = billingPlanForSlug(selectedPlanSlug);
+  const selectedBillingCycle = loaderData.billingCycle as PublicBillingCycle;
+  const planSelectionSource =
+    loaderData.planSelectionSource as PublicPlanSelectionSource;
+  const startsInCheckout = shouldStartCheckoutAfterSignup(
+    initialPlan,
+    planSelectionSource
+  );
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -235,10 +310,10 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
           next.set("step", String(n));
           return next;
         },
-        { replace: opts?.replace ?? n === 1 },
+        { replace: opts?.replace ?? n === 1 }
       );
     },
-    [setSearchParams],
+    [setSearchParams]
   );
 
   useEffect(() => {
@@ -257,12 +332,11 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
     (n: number) => {
       updateStepParam(n);
     },
-    [updateStepParam],
+    [updateStepParam]
   );
 
   const slugNormalized = slugifyOrgName(slug);
-  const slugIsVerified =
-    !!slugNormalized && slugVerifiedFor === slugNormalized;
+  const slugIsVerified = !!slugNormalized && slugVerifiedFor === slugNormalized;
 
   useEffect(() => {
     if (slugVerifiedFor && slugifyOrgName(slug) !== slugVerifiedFor) {
@@ -272,7 +346,12 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
 
   const [previewHost, setPreviewHost] = useState<string | null>(null);
   useEffect(() => {
-    setPreviewHost(schoolBoardHostname(window.location.hostname, slugNormalized || "your-school"));
+    setPreviewHost(
+      schoolBoardHostname(
+        window.location.hostname,
+        slugNormalized || "your-school"
+      )
+    );
   }, [slugNormalized]);
 
   const handleStep1 = async (e: FormEvent) => {
@@ -284,7 +363,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
     }
     const parsedStep1 = step1Schema.safeParse({ name, email, phone, password });
     if (!parsedStep1.success) {
-      setError(parsedStep1.error.issues[0]?.message ?? "Please check your inputs.");
+      setError(
+        parsedStep1.error.issues[0]?.message ?? "Please check your inputs."
+      );
       return;
     }
     const normalizedPhone = normalizePhone(phone);
@@ -294,7 +375,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
         email,
         password,
         name,
-        phone: normalizedPhone,
+        phone: normalizedPhone
       });
       if (result.error) {
         setError(result.error.message ?? "Unable to create account.");
@@ -325,7 +406,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
       const res = await fetch("/api/check-org-slug", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug }),
+        body: JSON.stringify({ slug })
       });
       const payload = (await res.json()) as {
         available?: boolean;
@@ -344,7 +425,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
         setSlugVerifiedFor(payload.slug ?? normalized);
       } else {
         setSlugVerifiedFor(null);
-        setError("That slug is already taken. Try another or pick a suggestion.");
+        setError(
+          "That slug is already taken. Try another or pick a suggestion."
+        );
       }
     } catch {
       setError("Something went wrong. Please try again.");
@@ -361,7 +444,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
       return;
     }
     if (!slugIsVerified) {
-      setError('Check that your slug is available using "Check availability" before continuing.');
+      setError(
+        'Check that your slug is available using "Check availability" before continuing.'
+      );
       return;
     }
     setStep(3);
@@ -418,7 +503,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 Use your work email. You&apos;ll set up your school next.
               </p>
               <form onSubmit={handleStep1} className="mt-6 flex flex-col gap-3">
-                <label className="text-sm text-white/80" htmlFor="signup-name">Your name</label>
+                <label className="text-sm text-white/80" htmlFor="signup-name">
+                  Your name
+                </label>
                 <Input
                   id="signup-name"
                   type="text"
@@ -428,7 +515,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   onChange={(e) => setName(e.target.value)}
                   autoComplete="name"
                 />
-                <label className="text-sm text-white/80" htmlFor="signup-email">Email</label>
+                <label className="text-sm text-white/80" htmlFor="signup-email">
+                  Email
+                </label>
                 <Input
                   id="signup-email"
                   type="email"
@@ -438,7 +527,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
                 />
-                <label className="text-sm text-white/80" htmlFor="signup-phone">Phone number</label>
+                <label className="text-sm text-white/80" htmlFor="signup-phone">
+                  Phone number
+                </label>
                 <Input
                   id="signup-phone"
                   type="tel"
@@ -448,7 +539,12 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   onChange={(e) => setPhone(e.target.value)}
                   autoComplete="tel"
                 />
-                <label className="text-sm text-white/80" htmlFor="signup-password">Password</label>
+                <label
+                  className="text-sm text-white/80"
+                  htmlFor="signup-password"
+                >
+                  Password
+                </label>
                 <Input
                   id="signup-password"
                   type="password"
@@ -459,7 +555,12 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="new-password"
                 />
-                <label className="text-sm text-white/80" htmlFor="signup-confirm-password">Confirm password</label>
+                <label
+                  className="text-sm text-white/80"
+                  htmlFor="signup-confirm-password"
+                >
+                  Confirm password
+                </label>
                 <Input
                   id="signup-confirm-password"
                   type="password"
@@ -470,8 +571,15 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   autoComplete="new-password"
                 />
-                {error && <p className="text-center text-sm text-red-400">{error}</p>}
-                <Button type="submit" isPending={loading} variant="primary" className="mt-2 bg-[#E9D500] font-semibold text-[#193B4B]">
+                {error && (
+                  <p className="text-center text-sm text-red-400">{error}</p>
+                )}
+                <Button
+                  type="submit"
+                  isPending={loading}
+                  variant="primary"
+                  className="mt-2 bg-[#E9D500] font-semibold text-[#193B4B]"
+                >
                   Continue
                 </Button>
               </form>
@@ -482,10 +590,19 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
             <>
               <h1 className="text-2xl font-bold">Your school</h1>
               <p className="mt-2 text-sm text-white/65">
-                Your slug becomes part of your school&apos;s web address. It must be unique.
+                Your slug becomes part of your school&apos;s web address. It
+                must be unique.
               </p>
-              <form onSubmit={handleStep2Next} className="mt-6 flex flex-col gap-3">
-                <label className="text-sm text-white/80" htmlFor="signup-org-name">School / organization name</label>
+              <form
+                onSubmit={handleStep2Next}
+                className="mt-6 flex flex-col gap-3"
+              >
+                <label
+                  className="text-sm text-white/80"
+                  htmlFor="signup-org-name"
+                >
+                  School / organization name
+                </label>
                 <Input
                   id="signup-org-name"
                   type="text"
@@ -496,7 +613,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                     setOrgName(e.target.value);
                   }}
                 />
-                <label className="text-sm text-white/80" htmlFor="signup-slug">URL slug</label>
+                <label className="text-sm text-white/80" htmlFor="signup-slug">
+                  URL slug
+                </label>
                 <Input
                   id="signup-slug"
                   type="text"
@@ -504,7 +623,9 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
                 />
-                <p className="text-xs text-white/50">Lowercase letters, numbers, and hyphens.</p>
+                <p className="text-xs text-white/50">
+                  Lowercase letters, numbers, and hyphens.
+                </p>
                 {suggestions.length > 0 && (
                   <div>
                     <p className="mb-2 text-xs text-white/50">Suggestions</p>
@@ -541,12 +662,21 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                     Check availability
                   </Button>
                   {slugIsVerified && (
-                    <span className="text-sm text-emerald-400">Available — you can continue.</span>
+                    <span className="text-sm text-emerald-400">
+                      Available — you can continue.
+                    </span>
                   )}
                 </div>
-                {error && <p className="text-center text-sm text-red-400">{error}</p>}
+                {error && (
+                  <p className="text-center text-sm text-red-400">{error}</p>
+                )}
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" className="flex-1 border-white/20 text-white" onPress={() => setStep(1)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 border-white/20 text-white"
+                    onPress={() => setStep(1)}
+                  >
                     Back
                   </Button>
                   <Button
@@ -564,13 +694,19 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
 
           {step === 3 && (
             <>
-              <h1 className="text-2xl font-bold">Start your free trial</h1>
+              <h1 className="text-2xl font-bold">
+                {startsInCheckout
+                  ? "Finish setup and continue to checkout"
+                  : "Start your free trial"}
+              </h1>
               <p className="mt-2 text-sm text-white/65">
-                Your 30-day trial starts as soon as you finish setup. No credit
-                card required.
-                {plan === "DISTRICT" && (
+                {startsInCheckout
+                  ? "We’ll create your school first, then send you to Stripe Checkout to add billing for the plan you selected."
+                  : "Your 30-day trial starts as soon as you finish setup. No credit card required."}
+                {!startsInCheckout && plan === "DISTRICT" && (
                   <>
-                    {" "}We&apos;ll reach out during your trial to discuss your
+                    {" "}
+                    We&apos;ll reach out during your trial to discuss your
                     district&apos;s pricing and setup.
                   </>
                 )}
@@ -580,18 +716,18 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   Selected plan
                 </p>
                 <p className="mt-1 text-lg font-semibold text-[#E9D500]">
-                  {plan === "DISTRICT"
-                    ? "District"
-                    : plan === "CAMPUS"
-                      ? "Campus"
-                      : "Car Line"}
+                  {planLabel(plan)}
                 </p>
                 <p className="mt-1 text-xs text-white/60">
                   {plan === "DISTRICT"
                     ? "Custom pricing — confirmed with you during the trial."
                     : plan === "CAMPUS"
-                      ? "$500 / month per school after your 30-day trial."
-                      : "$100 / month per school after your 30-day trial."}
+                      ? startsInCheckout
+                        ? `$500 / month per school. ${billingCycleLabel(selectedBillingCycle)} billing selected for checkout.`
+                        : `$500 / month per school after your 30-day trial. ${billingCycleLabel(selectedBillingCycle)} billing selected for checkout.`
+                      : startsInCheckout
+                        ? `$100 / month per school. ${billingCycleLabel(selectedBillingCycle)} billing selected for checkout.`
+                        : `$100 / month per school after your 30-day trial. ${billingCycleLabel(selectedBillingCycle)} billing selected for checkout.`}
                 </p>
               </div>
               {/* Step 3 uses a real Form with server action */}
@@ -600,20 +736,44 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 <input type="hidden" name="orgName" value={orgName} />
                 <input type="hidden" name="slug" value={slugNormalized} />
                 <input type="hidden" name="plan" value={plan} />
+                <input
+                  type="hidden"
+                  name="billingCycle"
+                  value={selectedBillingCycle}
+                />
+                <input
+                  type="hidden"
+                  name="planSelectionSource"
+                  value={planSelectionSource}
+                />
                 {actionData?.error && (
-                  <p className="text-center text-sm text-red-400">{actionData.error}</p>
+                  <p className="text-center text-sm text-red-400">
+                    {actionData.error}
+                  </p>
                 )}
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" className="flex-1 border-white/20 text-white" onPress={() => setStep(2)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 border-white/20 text-white"
+                    onPress={() => setStep(2)}
+                  >
                     Back
                   </Button>
-                  <Button type="submit" variant="primary" className="flex-1 bg-[#E9D500] font-semibold text-[#193B4B]">
-                    Start free trial
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    className="flex-1 bg-[#E9D500] font-semibold text-[#193B4B]"
+                  >
+                    {startsInCheckout
+                      ? "Continue to secure checkout"
+                      : "Start 30-day trial"}
                   </Button>
                 </div>
                 <p className="text-center text-xs text-white/40">
-                  By continuing you agree to our terms. You can change tiers
-                  later by contacting support.
+                  {startsInCheckout
+                    ? "By continuing you agree to our terms. Your account and school are created first, then Stripe Checkout opens to finish billing setup."
+                    : "By continuing you agree to our terms. No card is collected here; when you&apos;re ready to activate billing, you&apos;ll continue to Stripe from pricing or your billing page."}
                 </p>
               </Form>
             </>

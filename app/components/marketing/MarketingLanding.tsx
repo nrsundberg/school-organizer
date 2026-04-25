@@ -4,19 +4,21 @@ import { MarketingNav } from "~/components/marketing/MarketingNav";
 const VIDEO_EMBEDS = [
   {
     title: "Getting started",
-    description: "Create your school, invite staff, and go live with the board in minutes.",
-    youtubeId: "M7lc1UVf-VE",
+    description:
+      "Create your school, invite staff, and go live with the board in minutes.",
+    youtubeId: "M7lc1UVf-VE"
   },
   {
     title: "Car line pickups",
-    description: "How controllers move the line and how families see status in real time.",
-    youtubeId: "M7lc1UVf-VE",
+    description:
+      "How controllers move the line and how families see status in real time.",
+    youtubeId: "M7lc1UVf-VE"
   },
   {
     title: "Fire drills and safety",
     description: "Use the same visibility tools when every second counts.",
-    youtubeId: "M7lc1UVf-VE",
-  },
+    youtubeId: "M7lc1UVf-VE"
+  }
 ] as const;
 
 export function MarketingLanding() {
@@ -31,15 +33,17 @@ export function MarketingLanding() {
               School car line, simplified
             </p>
             <h1 className="text-4xl font-extrabold leading-tight md:text-5xl">
-              One board for pickups, drills, and daily chaos—without the walkie chatter.
+              One board for pickups, drills, and daily chaos—without the walkie
+              chatter.
             </h1>
             <p className="text-lg text-white/70">
-              Pickup Roster gives each school its own live board, viewer access families trust, and admin tools
-              your front office already understands.
+              Pickup Roster gives each school its own live board, viewer access
+              families trust, and admin tools your front office already
+              understands.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link
-                to="/signup"
+                to="/signup?plan=car-line"
                 className="inline-flex items-center justify-center rounded-xl bg-[#E9D500] px-6 py-3 text-base font-semibold text-[#193B4B] shadow-lg shadow-[#E9D500]/20 transition hover:bg-[#f5e047]"
               >
                 Start free trial
@@ -57,15 +61,19 @@ export function MarketingLanding() {
             <ul className="mt-4 space-y-3 text-sm text-white/70">
               <li className="flex gap-2">
                 <span className="text-[#E9D500]">✓</span>
-                Subdomain per school (yourslug.pickuproster.com); Campus and District plans can bring a custom domain or a subdomain on your school's own domain.
+                Subdomain per school (yourslug.pickuproster.com); Campus and
+                District plans can bring a custom domain or a subdomain on your
+                school's own domain.
               </li>
               <li className="flex gap-2">
                 <span className="text-[#E9D500]">✓</span>
-                Live board with WebSocket updates and viewer PINs or magic links.
+                Live board with WebSocket updates and viewer PINs or magic
+                links.
               </li>
               <li className="flex gap-2">
                 <span className="text-[#E9D500]">✓</span>
-                Trial that respects real usage: calendar time and qualifying pickup days.
+                Trial that respects real usage: calendar time and qualifying
+                pickup days.
               </li>
             </ul>
           </div>
@@ -75,7 +83,9 @@ export function MarketingLanding() {
       <section className="mx-auto max-w-5xl px-4 py-16">
         <div className="mb-10 text-center">
           <h2 className="text-3xl font-bold">See it in action</h2>
-          <p className="mt-2 text-white/60">Short walkthroughs you can share with staff and families.</p>
+          <p className="mt-2 text-white/60">
+            Short walkthroughs you can share with staff and families.
+          </p>
         </div>
         <div className="grid gap-10 md:grid-cols-1">
           {VIDEO_EMBEDS.map((block) => (
@@ -94,7 +104,9 @@ export function MarketingLanding() {
                 />
               </div>
               <div className="space-y-2 px-5 py-4">
-                <h3 className="text-xl font-semibold text-white">{block.title}</h3>
+                <h3 className="text-xl font-semibold text-white">
+                  {block.title}
+                </h3>
                 <p className="text-sm text-white/65">{block.description}</p>
               </div>
             </article>
@@ -107,12 +119,12 @@ export function MarketingLanding() {
           <div>
             <h2 className="text-2xl font-bold">Ready when your school is</h2>
             <p className="mt-2 max-w-xl text-white/65">
-              Start a trial from the marketing site. Your live board lives on your school subdomain—never mixed with
-              other tenants.
+              Start a trial from the marketing site. Your live board lives on
+              your school subdomain—never mixed with other tenants.
             </p>
           </div>
           <Link
-            to="/signup"
+            to="/signup?plan=car-line"
             className="inline-flex shrink-0 items-center justify-center rounded-xl bg-[#E9D500] px-6 py-3 text-base font-semibold text-[#193B4B] shadow-lg shadow-[#E9D500]/15 transition hover:bg-[#f5e047]"
           >
             Create your account

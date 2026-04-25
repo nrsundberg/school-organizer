@@ -11,13 +11,15 @@ test.describe("auth pages", () => {
     await expect(page.getByRole("button", { name: "Next" })).toBeVisible();
   });
 
-  test("/signup renders an org name / school name field", async ({ page }) => {
-    await page.goto("/signup");
+  test("/signup with a selected plan renders the account step", async ({
+    page
+  }) => {
+    await page.goto("/signup?plan=car-line");
 
     // Step 1 of signup: "Your name" and "Email" fields are shown.
     // The org name field ("School / organization name") is on step 2, which requires auth.
     // Step 1 shows the account creation form with a "Your name" label.
-    await expect(page.getByText("Your name")).toBeVisible();
+    await expect(page.getByLabel("Your name")).toBeVisible();
     await expect(page.getByRole("button", { name: "Continue" })).toBeVisible();
   });
 
@@ -31,7 +33,10 @@ test.describe("auth pages", () => {
 
     const onLoginPage =
       page.url().includes("/login") ||
-      (await page.getByLabel("Email").isVisible().catch(() => false));
+      (await page
+        .getByLabel("Email")
+        .isVisible()
+        .catch(() => false));
 
     expect(onLoginPage).toBe(true);
   });

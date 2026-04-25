@@ -10,13 +10,13 @@ import { MarketingNav } from "~/components/marketing/MarketingNav";
 import {
   checkRateLimit,
   clientIpFromRequest,
-  getRateLimiter,
+  getRateLimiter
 } from "~/domain/utils/rate-limit.server";
 
 export function meta() {
   return [
     { title: "Login — Pickup Roster" },
-    { name: "description", content: "Sign in to your school car line board" },
+    { name: "description", content: "Sign in to your school car line board" }
   ];
 }
 
@@ -30,7 +30,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (!user) return null;
   if (!user.orgId) throw redirect("/signup?step=2");
 
-  const next = safeInternalNextPath(new URL(request.url).searchParams.get("next"));
+  const next = safeInternalNextPath(
+    new URL(request.url).searchParams.get("next")
+  );
   if (next) {
     throw redirect(next);
   }
@@ -48,12 +50,12 @@ export async function action({ request, context }: Route.ActionArgs) {
   const clientIp = clientIpFromRequest(request);
   const result = await checkRateLimit({
     limiter: getRateLimiter(context, "RL_AUTH"),
-    key: "auth:" + clientIp,
+    key: "auth:" + clientIp
   });
   if (!result.ok) {
     return data(
       { error: "Too many attempts. Please try again in a minute." },
-      { status: 429, headers: { "Retry-After": "60" } },
+      { status: 429, headers: { "Retry-After": "60" } }
     );
   }
   // login is handled client-side via better-auth; this action is a rate-limit gate
@@ -216,7 +218,10 @@ export default function Login() {
 
           <p className="mt-6 text-center text-sm text-white/55">
             Need an account?{" "}
-            <Link to="/signup" className="font-medium text-[#E9D500] hover:underline">
+            <Link
+              to="/pricing"
+              className="font-medium text-[#E9D500] hover:underline"
+            >
               Sign up
             </Link>
           </p>

@@ -5,6 +5,13 @@ import {
   type StripeConfig,
 } from "~/domain/billing/stripe.server";
 
+type BillingDb = {
+  org: {
+    findUnique(args: any): Promise<any>;
+    update(args: any): Promise<any>;
+  };
+};
+
 /**
  * Resolve the Stripe Price ID for a plan + billing cycle.
  * Falls back to the monthly price if an annual price isn't configured.
@@ -30,9 +37,11 @@ export async function ensureStripeCustomerForOrg(params: {
   context: any;
   orgId: string;
   email: string;
+  db?: BillingDb;
+  stripeConfig?: StripeConfig;
 }): Promise<string> {
   const { context, orgId, email } = params;
-  const db = getPrisma(context);
+  const db = params.db ?? getPrisma(context);
   const org = await db.org.findUnique({ where: { id: orgId } });
   if (!org) {
     throw new Response("Org not found.", { status: 404 });
@@ -41,7 +50,7 @@ export async function ensureStripeCustomerForOrg(params: {
     return org.stripeCustomerId;
   }
 
-  const stripe = requireStripeConfig(context);
+  const stripe = params.stripeConfig ?? requireStripeConfig(context);
   const customer = await stripe.client.customers.create({
     email,
     name: org.name,
@@ -62,6 +71,8 @@ export async function createCheckoutSessionForOrg(params: {
   email: string;
   successUrl: string;
   cancelUrl: string;
+  db?: BillingDb;
+  stripeConfig?: StripeConfig;
 }): Promise<{ url: string }> {
   const {
     context,
@@ -72,11 +83,13 @@ export async function createCheckoutSessionForOrg(params: {
     successUrl,
     cancelUrl,
   } = params;
-  const stripe = requireStripeConfig(context);
+  const stripe = params.stripeConfig ?? requireStripeConfig(context);
   const customer = await ensureStripeCustomerForOrg({
     context,
     orgId,
     email,
+    db: params.db,
+    stripeConfig: stripe,
   });
 
   const session = await stripe.client.checkout.sessions.create({

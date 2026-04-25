@@ -12,6 +12,10 @@ const TENANT_MODELS = new Set<string>([
   "ViewerMagicLink",
   "DrillTemplate",
   "DrillRun",
+  "Household",
+  "DismissalException",
+  "AfterSchoolProgram",
+  "ProgramCancellation",
 ]);
 
 const READ_OPS = new Set([

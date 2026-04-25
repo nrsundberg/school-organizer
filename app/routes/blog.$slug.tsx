@@ -8,7 +8,7 @@ export function meta({ data }: Route.MetaArgs) {
   if (!data?.post) {
     return [
       { title: "Post not found — PickupRoster" },
-      { name: "robots", content: "noindex" },
+      { name: "robots", content: "noindex" }
     ];
   }
   const { post, canonical } = data;
@@ -20,7 +20,7 @@ export function meta({ data }: Route.MetaArgs) {
     { property: "og:type", content: "article" },
     { property: "article:published_time", content: post.date },
     { property: "article:author", content: post.author },
-    ...(canonical ? [{ rel: "canonical", href: canonical } as const] : []),
+    ...(canonical ? [{ rel: "canonical", href: canonical } as const] : [])
   ];
 }
 
@@ -113,7 +113,7 @@ function TrialCta() {
           See pricing
         </Link>
         <Link
-          to="/signup"
+          to="/signup?plan=car-line"
           className="inline-flex items-center justify-center rounded-xl border border-white/15 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/5"
         >
           Start free trial
@@ -202,7 +202,9 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
           {isNotFound ? "404" : "Something broke"}
         </p>
         <h1 className="mt-3 text-3xl font-extrabold">
-          {isNotFound ? "We can't find that post." : "We hit a snag loading this post."}
+          {isNotFound
+            ? "We can't find that post."
+            : "We hit a snag loading this post."}
         </h1>
         <p className="mt-3 text-white/70">
           {isNotFound
