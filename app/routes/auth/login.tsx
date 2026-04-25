@@ -34,8 +34,6 @@ function safeInternalNextPath(next: string | null): string | null {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = getOptionalUserFromContext(context);
   if (user) {
-    if (!user.orgId) throw redirect("/signup?step=2");
-
     const next = safeInternalNextPath(new URL(request.url).searchParams.get("next"));
     if (next) {
       throw redirect(next);
@@ -44,6 +42,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     if (isPlatformAdmin(user, context)) {
       throw redirect("/platform");
     }
+
+    // District admins land in the district portal. Has to come before the
+    // !user.orgId check below since district-scoped users have no orgId.
+    if ((user as { districtId?: string | null }).districtId) {
+      throw redirect("/district");
+    }
+
+    if (!user.orgId) throw redirect("/signup?step=2");
 
     const boardUrl = await getTenantBoardUrlForRequest(request, context);
     if (boardUrl) throw redirect(boardUrl);
