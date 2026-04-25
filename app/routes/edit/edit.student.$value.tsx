@@ -67,16 +67,15 @@ export async function action({ request, context }: Route.ActionArgs) {
     const spaceNumber = spaceNumberStr ? parseInt(spaceNumberStr) : null;
 
     if (spaceNumber) {
-      await prisma.space.upsert({
-        where: { spaceNumber },
-        update: {},
-        create: { spaceNumber }
-      });
+      const existingSpace = await prisma.space.findFirst({ where: { spaceNumber } });
+      if (!existingSpace) {
+        await prisma.space.create({ data: { spaceNumber } });
+      }
     }
 
     const trimmedHomeRoom = homeRoom?.trim();
     if (trimmedHomeRoom) {
-      const existingHomeroom = await prisma.teacher.findUnique({
+      const existingHomeroom = await prisma.teacher.findFirst({
         where: { homeRoom: trimmedHomeRoom }
       });
       if (!existingHomeroom) {

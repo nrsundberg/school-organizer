@@ -26,7 +26,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   const studentReturn: Student[] = [];
 
   for (let student of students) {
-    let spaceStatus = await prisma.space.findUnique({
+    let spaceStatus = await prisma.space.findFirst({
       where: { spaceNumber: student.spaceNumber ?? 0 },
       select: { status: true }
     });

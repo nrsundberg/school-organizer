@@ -26,7 +26,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const [studentCount, spaceCount, appSettings, maxSpace, teachers, counts] = await Promise.all([
     prisma.student.count(),
     prisma.space.count(),
-    prisma.appSettings.findUnique({ where: { id: "default" } }),
+    prisma.appSettings.findFirst(),
     prisma.space.aggregate({ _max: { spaceNumber: true } }),
     prisma.teacher.findMany({ orderBy: { homeRoom: "asc" } }),
     countOrgUsage(prisma, org.id),
@@ -122,8 +122,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     await requireRole(context, "ADMIN");
     const enabled = formData.get("enabled") === "true";
     await prisma.appSettings.upsert({
-      where: { id: "default" },
-      create: { id: "default", viewerDrawingEnabled: enabled },
+      where: { orgId: org.id },
+      create: { viewerDrawingEnabled: enabled },
       update: { viewerDrawingEnabled: enabled },
     });
     return dataWithSuccess(

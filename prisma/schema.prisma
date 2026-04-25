@@ -242,21 +242,21 @@ model StatusIncident {
   @@index([startedAt(sort: Desc)], map: "StatusIncident_startedAt_idx")
 }
 
-/// Singleton row: use id "default"
+/// One row per org. orgId is the primary key — there is exactly one
+/// AppSettings row per tenant. The `@default("org_tome")` is a type-system
+/// convenience so callers don't need to pass orgId explicitly; the tenant
+/// extension always overwrites it with the real orgId at runtime.
 model AppSettings {
-  id                     String  @id
-  orgId                  String  @default("org_tome")
+  orgId                  String  @id @default("org_tome")
   org                    Org     @relation(fields: [orgId], references: [id])
   viewerDrawingEnabled   Boolean @default(false)
   viewerPinHash          String?
-
-  @@index([orgId])
 }
 
 model ViewerAccessAttempt {
-  clientKey           String   @id
   orgId               String   @default("org_tome")
   org                 Org      @relation(fields: [orgId], references: [id])
+  clientKey           String
   ipHint              String?
   failedCount         Int      @default(0)
   stage               Int      @default(0)
@@ -266,6 +266,7 @@ model ViewerAccessAttempt {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
+  @@id([orgId, clientKey])
   @@index([orgId])
 }
 
@@ -273,13 +274,14 @@ model ViewerAccessSession {
   id           String   @id @default(cuid())
   orgId        String   @default("org_tome")
   org          Org      @relation(fields: [orgId], references: [id])
-  tokenHash    String   @unique
+  tokenHash    String
   source       String
   expiresAt    DateTime
   revokedAt    DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  @@unique([orgId, tokenHash])
   @@index([orgId])
 }
 
@@ -287,7 +289,7 @@ model ViewerMagicLink {
   id               String   @id @default(cuid())
   orgId            String   @default("org_tome")
   org              Org      @relation(fields: [orgId], references: [id])
-  tokenHash        String   @unique
+  tokenHash        String
   expiresAt        DateTime
   usedAt           DateTime?
   revokedAt        DateTime?
@@ -295,6 +297,7 @@ model ViewerMagicLink {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  @@unique([orgId, tokenHash])
   @@index([orgId])
 }
 
@@ -342,14 +345,14 @@ model Teacher {
   id       Int       @id @default(autoincrement())
   orgId    String    @default("org_tome")
   org      Org       @relation(fields: [orgId], references: [id])
-  homeRoom String    @unique
+  homeRoom String
   /// Optional per-teacher locale override for the homeroom print view.
   /// Null means "use Org.defaultLocale". Most teachers will leave this unset.
   locale   String?
   students Student[]
 
+  @@unique([orgId, homeRoom])
   @@index([orgId])
-  @@index([orgId, homeRoom])
 }
 
 model Student {
@@ -361,9 +364,9 @@ model Student {
   /// Siblings share one household; each distinct household (or unassigned student) counts toward family cap.
   householdId String?
   household   Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
-  space       Space?   @relation(fields: [spaceNumber], references: [spaceNumber])
+  space       Space?   @relation(fields: [orgId, spaceNumber], references: [orgId, spaceNumber])
   spaceNumber Int?
-  teacher     Teacher? @relation(fields: [homeRoom], references: [homeRoom])
+  teacher     Teacher? @relation(fields: [orgId, homeRoom], references: [orgId, homeRoom])
   homeRoom    String?
   callEvents  CallEvent[]
   dismissalExceptions DismissalException[]
@@ -461,22 +464,22 @@ model Space {
   id          Int       @id @default(autoincrement())
   orgId       String    @default("org_tome")
   org         Org       @relation(fields: [orgId], references: [id])
-  spaceNumber Int       @unique
+  spaceNumber Int
   students    Student[]
   status      Status    @default(EMPTY)
   timestamp   String?
   callEvents  CallEvent[]
 
+  @@unique([orgId, spaceNumber])
   @@index([orgId])
   @@index([spaceNumber])
-  @@index([orgId, spaceNumber])
 }
 
 model CallEvent {
   id               Int      @id @default(autoincrement())
   orgId            String   @default("org_tome")
   org              Org      @relation(fields: [orgId], references: [id])
-  space            Space    @relation(fields: [spaceNumber], references: [spaceNumber])
+  space            Space    @relation(fields: [orgId, spaceNumber], references: [orgId, spaceNumber])
   spaceNumber      Int
   student          Student? @relation(fields: [studentId], references: [id])
   studentId        Int?
