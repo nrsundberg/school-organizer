@@ -13,6 +13,7 @@ export default [
     index("routes/admin/dashboard.tsx"),
     route("users", "routes/admin/users.tsx"),
     route("children", "routes/admin/children.tsx"),
+    route("roster-import", "routes/admin/roster-import.tsx"),
     route("billing", "routes/admin/billing.tsx"),
     route("branding", "routes/admin/branding.tsx"),
     route("history", "routes/admin/history.tsx"),
@@ -29,6 +30,7 @@ export default [
   route("drills/live", "routes/drills.live.tsx"),
 
   // Print routes — standalone (no admin chrome) so browser Cmd+P output is clean
+  route("admin/roster-template.csv", "routes/admin/roster-template.csv.ts"),
   route("admin/print/board", "routes/admin/print.board.tsx"),
   route("admin/print/master", "routes/admin/print.master.tsx"),
   route("admin/print/homeroom/:teacherId", "routes/admin/print.homeroom.$teacherId.tsx"),
