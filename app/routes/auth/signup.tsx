@@ -16,6 +16,15 @@ import { isMarketingHost, marketingOriginFromRequest } from "~/domain/utils/host
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { ensureOrgForUser } from "~/domain/billing/onboarding.server";
+import {
+  billingCycleLabel,
+  billingPlanForSlug,
+  normalizePublicBillingCycle,
+  normalizePublicPlan,
+  planLabel,
+  PUBLIC_BILLING_CYCLES,
+  type PublicBillingCycle,
+} from "~/domain/billing/public-plans";
 import { getPrisma } from "~/db.server";
 import { signUp } from "~/lib/auth-client";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
@@ -39,26 +48,6 @@ export function meta() {
   ];
 }
 
-/** Public plans accepted as `?plan=` query params on the signup route. */
-const PUBLIC_PLAN_SLUGS = ["car-line", "campus", "district"] as const;
-type PublicPlanSlug = (typeof PUBLIC_PLAN_SLUGS)[number];
-
-function normalizePublicPlan(raw: string | null): PublicPlanSlug | null {
-  if (!raw) return null;
-  const v = raw.trim().toLowerCase();
-  if (v === "car-line" || v === "car_line" || v === "carline") return "car-line";
-  if (v === "campus") return "campus";
-  if (v === "district") return "district";
-  return null;
-}
-
-/** Map a public plan slug to its BillingPlan enum value. */
-function billingPlanForSlug(slug: PublicPlanSlug): "CAR_LINE" | "CAMPUS" | "DISTRICT" {
-  if (slug === "district") return "DISTRICT";
-  if (slug === "campus") return "CAMPUS";
-  return "CAR_LINE";
-}
-
 export async function loader({ request, context }: Route.LoaderArgs) {
   if (!isMarketingHost(request, context)) {
     throw redirect(`${marketingOriginFromRequest(request, context)}/`);
@@ -73,12 +62,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // picks a tier — there is no public free tier. Exception: users who've
   // already completed step 1 (authed, no org yet) fall back to car-line so a
   // lost `?plan=` param mid-flow doesn't strand them.
-  const planParam = new URL(request.url).searchParams.get("plan");
+  const url = new URL(request.url);
+  const planParam = url.searchParams.get("plan");
   const plan = normalizePublicPlan(planParam);
   if (!plan && !user) {
     throw redirect("/pricing");
   }
-  return { plan: plan ?? "car-line" };
+  return {
+    plan: plan ?? "car-line",
+    billingCycle: normalizePublicBillingCycle(url.searchParams.get("cycle")),
+  };
 }
 
 const VALID_PLANS = ["CAR_LINE", "CAMPUS", "DISTRICT"] as const;
@@ -112,6 +105,7 @@ const step3Schema = zfd.formData({
   orgName: zfd.text(z.string().min(2)),
   slug: zfd.text(z.string().min(1)),
   plan: zfd.text(z.enum(VALID_PLANS)),
+  billingCycle: zfd.text(z.enum(PUBLIC_BILLING_CYCLES).optional()),
 });
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -152,6 +146,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     );
   }
   const { orgName, slug, plan } = parsed.data;
+  const billingCycle = parsed.data.billingCycle ?? "monthly";
 
   // 3. Call ensureOrgForUser. Every new org starts as TRIALING with a 30-day
   //    trial window regardless of tier — we do NOT collect a card at signup.
@@ -173,10 +168,12 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   // 4. Redirect to the tenant board. The user is in-trial; Stripe customer /
-  //    checkout flows are deferred until they convert from the billing page.
+  //    checkout flows are deferred until they explicitly convert from pricing
+  //    or the billing page so the no-card trial promise stays true.
   const db = getPrisma(context);
   const org = await db.org.findUnique({ where: { id: orgId }, select: { slug: true } });
   const boardUrl = org?.slug ? tenantBoardUrlFromRequest(request, org.slug) : "/";
+  void billingCycle;
   throw redirect(boardUrl);
 }
 
@@ -206,6 +203,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
   // BillingPlan enum value the server action expects.
   const selectedPlanSlug = loaderData.plan;
   const initialPlan: Plan = billingPlanForSlug(selectedPlanSlug);
+  const selectedBillingCycle = loaderData.billingCycle as PublicBillingCycle;
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -580,18 +578,14 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                   Selected plan
                 </p>
                 <p className="mt-1 text-lg font-semibold text-[#E9D500]">
-                  {plan === "DISTRICT"
-                    ? "District"
-                    : plan === "CAMPUS"
-                      ? "Campus"
-                      : "Car Line"}
+                  {planLabel(plan)}
                 </p>
                 <p className="mt-1 text-xs text-white/60">
                   {plan === "DISTRICT"
                     ? "Custom pricing — confirmed with you during the trial."
                     : plan === "CAMPUS"
-                      ? "$500 / month per school after your 30-day trial."
-                      : "$100 / month per school after your 30-day trial."}
+                      ? `$500 / month per school after your 30-day trial. ${billingCycleLabel(selectedBillingCycle)} billing selected for checkout.`
+                      : `$100 / month per school after your 30-day trial. ${billingCycleLabel(selectedBillingCycle)} billing selected for checkout.`}
                 </p>
               </div>
               {/* Step 3 uses a real Form with server action */}
@@ -600,6 +594,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 <input type="hidden" name="orgName" value={orgName} />
                 <input type="hidden" name="slug" value={slugNormalized} />
                 <input type="hidden" name="plan" value={plan} />
+                <input type="hidden" name="billingCycle" value={selectedBillingCycle} />
                 {actionData?.error && (
                   <p className="text-center text-sm text-red-400">{actionData.error}</p>
                 )}
@@ -608,12 +603,13 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                     Back
                   </Button>
                   <Button type="submit" variant="primary" className="flex-1 bg-[#E9D500] font-semibold text-[#193B4B]">
-                    Start free trial
+                    Start 30-day trial
                   </Button>
                 </div>
                 <p className="text-center text-xs text-white/40">
-                  By continuing you agree to our terms. You can change tiers
-                  later by contacting support.
+                  By continuing you agree to our terms. No card is collected
+                  here; when you&apos;re ready to activate billing, you&apos;ll
+                  continue to Stripe from pricing or your billing page.
                 </p>
               </Form>
             </>

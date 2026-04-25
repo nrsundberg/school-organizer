@@ -5,217 +5,68 @@ import { useState } from "react";
 import type { Route } from "./+types/users";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getPrisma } from "~/db.server";
-import { getAuth } from "~/domain/auth/better-auth.server";
-import { hashPassword } from "~/domain/auth/better-auth.server";
+import { getAuth, hashPassword } from "~/domain/auth/better-auth.server";
 import { authClient } from "~/lib/auth-client";
 import { dataWithError, dataWithSuccess, dataWithWarning } from "remix-toast";
-import { z } from "zod";
-import { zfd } from "zod-form-data";
 import { createViewerMagicLink, resetViewerLock, revokeAllViewerSessions, setViewerPin } from "~/domain/auth/viewer-access.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
+import {
+  handleAdminUsersAction,
+  loadAdminUsersData,
+  type AdminUsersActionOutcome,
+  type AdminUsersAuth,
+  type AdminUsersFetcherData,
+} from "~/domain/admin-users/admin-users.server";
 
 export const meta: Route.MetaFunction = () => [{ title: "Admin – Users" }];
-
-function generateTempPassword() {
-  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-  let result = "";
-  const array = new Uint8Array(12);
-  crypto.getRandomValues(array);
-  for (const byte of array) result += chars[byte % chars.length];
-  return result;
-}
-
-const createUserSchema = zfd.formData({
-  action: zfd.text(),
-  name: zfd.text(),
-  email: zfd.text(z.string().email()),
-  role: zfd.text(),
-});
-
-const resetPasswordSchema = zfd.formData({
-  action: zfd.text(),
-  userId: zfd.text(),
-});
-
-const changeRoleSchema = zfd.formData({
-  action: zfd.text(),
-  userId: zfd.text(),
-  role: zfd.text(),
-});
-
-const setViewerPinSchema = zfd.formData({
-  action: zfd.text(),
-  pin: zfd.text(z.string().trim().min(4).max(32)),
-  revokeViewerSessions: zfd.checkbox().optional(),
-});
-
-const resetViewerLockSchema = zfd.formData({
-  action: zfd.text(),
-  clientKey: zfd.text(),
-});
-
-const createMagicLinkSchema = zfd.formData({
-  action: zfd.text(),
-  daysValid: zfd.numeric(z.number().int().min(1).max(30)),
-});
-
-const setPasswordResetEnabledSchema = zfd.formData({
-  action: zfd.text(),
-  enabled: zfd.checkbox().optional(),
-});
 
 export async function loader({ context }: Route.LoaderArgs) {
   const me = await protectToAdminAndGetPermissions(context);
   const prisma = getPrisma(context);
   const tenantPrisma = getTenantPrisma(context);
   const org = getOrgFromContext(context);
-  const [users, locks] = await Promise.all([
-    prisma.user.findMany({ orderBy: { name: "asc" } }),
-    tenantPrisma.viewerAccessAttempt.findMany({
-      where: {
-        OR: [
-          { requiresAdminReset: true },
-          { lockedUntil: { gt: new Date() } },
-        ],
-      },
-      orderBy: [{ requiresAdminReset: "desc" }, { updatedAt: "desc" }],
-    }),
-  ]);
-  // `passwordResetEnabled` is missing from the generated Prisma type until
-  // `prisma generate` re-runs. Cast at the boundary rather than weakening
-  // the rest of the loader. Default to true if the column is null/missing.
-  const orgAny = org as any;
-  return {
-    users,
-    locks,
+  return loadAdminUsersData({
+    prisma,
+    tenantPrisma,
+    org,
     currentUserId: me.id,
-    passwordResetEnabled: orgAny.passwordResetEnabled !== false,
-  };
+  });
+}
+
+function dataWithToast(outcome: AdminUsersActionOutcome) {
+  if (outcome.kind === "success") {
+    return dataWithSuccess(outcome.data, outcome.message);
+  }
+  if (outcome.kind === "warning") {
+    return dataWithWarning(outcome.data, outcome.message);
+  }
+  return dataWithError(outcome.data, outcome.message);
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
   const me = await protectToAdminAndGetPermissions(context);
   const prisma = getPrisma(context);
-  const auth = getAuth(context);
+  const auth: AdminUsersAuth = getAuth(context);
   const formData = await request.formData();
-  const action = formData.get("action") as string;
-
-  if (action === "createUser") {
-    const { name, email, role } = createUserSchema.parse(formData);
-    const tempPassword = generateTempPassword();
-    try {
-      const result = await auth.api.createUser({
-        body: { name, email, password: tempPassword, data: { mustChangePassword: true } },
-        headers: request.headers,
-      });
-      if (!result?.user) throw new Error("Failed to create user");
-      await prisma.user.update({ where: { id: result.user.id }, data: { role } });
-      return dataWithSuccess({ tempPassword }, `User created! Temp password: ${tempPassword}`);
-    } catch (e: any) {
-      if (e?.message?.includes("already exists") || e?.status === 422) {
-        return dataWithError(null, "An account with that email already exists.");
-      }
-      return dataWithError(null, "Failed to create user.");
-    }
-  }
-
-  if (action === "resetPassword") {
-    const { userId } = resetPasswordSchema.parse(formData);
-    const tempPassword = generateTempPassword();
-    const hashed = await hashPassword(tempPassword);
-    const account = await prisma.account.findFirst({ where: { userId, providerId: "credential" } });
-    if (!account) return dataWithError(null, "No credential account found.");
-    await prisma.account.update({ where: { id: account.id }, data: { password: hashed } });
-    await prisma.user.update({ where: { id: userId }, data: { mustChangePassword: true } });
-    return dataWithSuccess({ tempPassword }, `Password reset! New temp password: ${tempPassword}`);
-  }
-
-  if (action === "changeRole") {
-    const { userId, role } = changeRoleSchema.parse(formData);
-    await prisma.user.update({ where: { id: userId }, data: { role } });
-    return dataWithSuccess(null, "Role updated.");
-  }
-
-  if (action === "revokeUserSessions") {
-    const userId = String(formData.get("userId") ?? "");
-    if (!userId) return dataWithError(null, "Missing user id.");
-    const result = await prisma.session.deleteMany({ where: { userId } });
-    return dataWithSuccess(null, `Revoked ${result.count} active session(s).`);
-  }
-
-  if (action === "setViewerPin") {
-    const { pin, revokeViewerSessions: revokeFlag } = setViewerPinSchema.parse(formData);
-    await setViewerPin(context, pin);
-    let revoked = 0;
-    if (revokeFlag) {
-      revoked = await revokeAllViewerSessions(context);
-    }
-    return dataWithSuccess(
-      { viewerPin: pin },
-      revokeFlag
-        ? `Viewer PIN updated. Revoked ${revoked} viewer session(s).`
-        : "Viewer PIN updated."
-    );
-  }
-
-  if (action === "resetViewerLock") {
-    const { clientKey } = resetViewerLockSchema.parse(formData);
-    await resetViewerLock(context, clientKey);
-    return dataWithSuccess(null, "Viewer lock reset.");
-  }
-
-  if (action === "createViewerMagicLink") {
-    const { daysValid } = createMagicLinkSchema.parse(formData);
-    const token = await createViewerMagicLink(context, me.id, daysValid);
-    const origin = new URL(request.url).origin;
-    const link = `${origin}/viewer-access?token=${encodeURIComponent(token)}`;
-    return dataWithSuccess(
-      { magicLink: link },
-      `Magic link created. Valid for ${daysValid} day(s).`,
-    );
-  }
-
-  if (action === "setPasswordResetEnabled") {
-    if (me.role !== "ADMIN") {
-      return dataWithError(null, "Only admins can change this setting.");
-    }
-    const parsed = setPasswordResetEnabledSchema.parse(formData);
-    const enabled = parsed.enabled === true;
-    const org = getOrgFromContext(context);
-    // Cast the update input: the generated Prisma type doesn't know about
-    // `passwordResetEnabled` yet (see comment in loader).
-    await (prisma.org as any).update({
-      where: { id: org.id },
-      data: { passwordResetEnabled: enabled },
-    });
-    return dataWithSuccess(
-      null,
-      enabled
-        ? "Password reset is now enabled for your org."
-        : "Password reset is now disabled. Users must sign in via SSO once configured.",
-    );
-  }
-
-  if (action === "deleteUser") {
-    const userId = formData.get("userId") as string;
-    await prisma.user.delete({ where: { id: userId } });
-    return dataWithWarning(null, "User deleted.");
-  }
-
-  if (action === "ban") {
-    const userId = formData.get("userId") as string;
-    const banReason = (formData.get("banReason") as string) || "Banned by admin";
-    await auth.api.banUser({ body: { userId, banReason }, headers: request.headers });
-    return dataWithSuccess(null, "User banned.");
-  }
-
-  if (action === "unban") {
-    const userId = formData.get("userId") as string;
-    await auth.api.unbanUser({ body: { userId }, headers: request.headers });
-    return dataWithSuccess(null, "User unbanned.");
-  }
-
-  return dataWithError(null, "Unknown action");
+  const org = getOrgFromContext(context);
+  const outcome = await handleAdminUsersAction({
+    formData,
+    requestHeaders: request.headers,
+    requestUrl: request.url,
+    actor: me,
+    org,
+    prisma,
+    auth,
+    hashPassword,
+    viewerAccess: {
+      setPin: (pin) => setViewerPin(context, pin),
+      revokeAllSessions: () => revokeAllViewerSessions(context),
+      resetLock: (clientKey) => resetViewerLock(context, clientKey),
+      createMagicLink: (createdByUserId, daysValid) =>
+        createViewerMagicLink(context, createdByUserId, daysValid),
+    },
+  });
+  return dataWithToast(outcome);
 }
 
 function BanButton({ user, currentUserId }: { user: { id: string; name: string; banned: boolean; banReason: string | null }; currentUserId: string }) {
@@ -309,9 +160,8 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
   const [viewerPin, setViewerPinState] = useState("");
   const [daysValid, setDaysValid] = useState("7");
 
-  const anyFetcherData = userFetcher.data as
-    | { tempPassword?: string; viewerPin?: string; magicLink?: string }
-    | undefined;
+  const fetcherData = userFetcher.data as AdminUsersFetcherData | undefined;
+  type AdminUserTableRow = (typeof users)[number];
 
   return (
     <div className="flex flex-col gap-8 p-6">
@@ -370,8 +220,8 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                 Save PIN
               </Button>
             </userFetcher.Form>
-            {anyFetcherData?.viewerPin ? (
-              <p className="text-xs text-yellow-300">New PIN: {anyFetcherData.viewerPin}</p>
+            {fetcherData?.viewerPin ? (
+              <p className="text-xs text-yellow-300">New PIN: {fetcherData.viewerPin}</p>
             ) : null}
           </div>
 
@@ -396,8 +246,8 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                 Generate Link
               </Button>
             </userFetcher.Form>
-            {anyFetcherData?.magicLink ? (
-              <p className="text-xs text-green-300 break-all">{anyFetcherData.magicLink}</p>
+            {fetcherData?.magicLink ? (
+              <p className="text-xs text-green-300 break-all">{fetcherData.magicLink}</p>
             ) : null}
           </div>
         </div>
@@ -471,8 +321,8 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
               <TableColumn>Status</TableColumn>
               <TableColumn>Actions</TableColumn>
             </TableHeader>
-            <TableBody items={users as any[]}>
-              {(user: any) => (
+            <TableBody<AdminUserTableRow> items={users}>
+              {(user) => (
                 <TableRow id={user.id} key={user.id}>
                   <TableCell>{user.name}</TableCell>
                   <TableCell>{user.email}</TableCell>
@@ -513,7 +363,7 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                           Reset PW
                         </Button>
                       </userFetcher.Form>
-                      <BanButton user={{ ...user, banned: user.banned ?? false }} currentUserId={currentUserId} />
+                      <BanButton user={user} currentUserId={currentUserId} />
                       <userFetcher.Form method="post">
                         <input type="hidden" name="action" value="revokeUserSessions" />
                         <input type="hidden" name="userId" value={user.id} />
