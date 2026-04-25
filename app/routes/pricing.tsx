@@ -7,7 +7,7 @@ import {
   normalizePublicBillingCycle,
   signupPathForPlan,
   type PublicBillingCycle,
-  type SelfServeBillingPlan,
+  type SelfServeBillingPlan
 } from "~/domain/billing/public-plans";
 
 export function meta() {
@@ -16,8 +16,8 @@ export function meta() {
     {
       name: "description",
       content:
-        "Simple pricing for schools and districts. Start a 30-day free trial — no credit card required.",
-    },
+        "Simple pricing for schools and districts. Pick a plan, create your account, and continue through signup or checkout."
+    }
   ];
 }
 
@@ -25,7 +25,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   return {
     supportEmail: getSupportEmail(context),
-    billingCycle: normalizePublicBillingCycle(url.searchParams.get("cycle")),
+    billingCycle: normalizePublicBillingCycle(url.searchParams.get("cycle"))
   };
 }
 
@@ -39,7 +39,7 @@ const CAR_LINE_FEATURES = [
   "Live dismissal / car-line flow",
   "Pick your brand colors (no logo upload)",
   "Standard email support",
-  "30-day free trial — no credit card required",
+  "Self-serve monthly or annual billing"
 ];
 
 const CAMPUS_FEATURES = [
@@ -51,7 +51,7 @@ const CAMPUS_FEATURES = [
   "Dedicated migration & onboarding support",
   "Microsoft Entra SSO (coming soon)",
   "Priority support",
-  "RFID vehicle-tag auto-arrival available as a custom add-on (pricing scoped per deployment)",
+  "RFID vehicle-tag auto-arrival available as a custom add-on (pricing scoped per deployment)"
 ];
 
 const DISTRICT_FEATURES = [
@@ -59,7 +59,7 @@ const DISTRICT_FEATURES = [
   "Multi-school dashboard (up to 10 schools included)",
   "Unlimited students, families, and classrooms",
   "Additional schools available as an add-on",
-  "RFID vehicle-tag auto-arrival available as a custom add-on (pricing scoped per deployment)",
+  "RFID vehicle-tag auto-arrival available as a custom add-on (pricing scoped per deployment)"
 ];
 
 function priceForCycle(monthlyPrice: number, billingCycle: PublicBillingCycle) {
@@ -67,14 +67,14 @@ function priceForCycle(monthlyPrice: number, billingCycle: PublicBillingCycle) {
     return {
       amount: `$${(monthlyPrice * 12).toLocaleString()}`,
       period: "/ year",
-      note: "per school, billed annually",
+      note: "per school, billed annually"
     };
   }
 
   return {
     amount: `$${monthlyPrice.toLocaleString()}`,
     period: "/ month",
-    note: "per school",
+    note: "per school"
   };
 }
 
@@ -84,7 +84,7 @@ function CheckoutOrSignupCta({
   isCheckoutPending,
   isSignedInOrgAdmin,
   plan,
-  signupPlan,
+  signupPlan
 }: {
   billingCycle: PublicBillingCycle;
   buttonClassName: string;
@@ -99,7 +99,7 @@ function CheckoutOrSignupCta({
         to={signupPathForPlan(signupPlan, billingCycle)}
         className={buttonClassName}
       >
-        Start Free Trial
+        Continue to Signup
       </Link>
     );
   }
@@ -139,8 +139,9 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
         <div className="text-center">
           <h1 className="text-4xl font-extrabold">Pricing</h1>
           <p className="mx-auto mt-3 max-w-2xl text-lg text-white/70">
-            Start a 30-day free trial — no credit card required. Pick the tier
-            that matches your school or district today; switch anytime.
+            Pick the tier that matches your school or district, then continue
+            through signup. Self-serve plans can move straight into checkout,
+            and district setups stay custom.
           </p>
           <div className="mt-6 inline-flex rounded-full border border-white/15 bg-white/5 p-1 text-sm">
             {(["monthly", "annual"] as const).map((cycle) => (
@@ -201,7 +202,7 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
               <p className="mt-3 text-center text-xs text-white/50">
                 {isSignedInOrgAdmin
                   ? "Stripe Checkout opens only when you choose to activate billing."
-                  : "30-day free trial. No credit card required."}
+                  : "Create your account first, then continue to Stripe Checkout."}
               </p>
             </div>
           </div>
@@ -244,7 +245,7 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
               <p className="mt-3 text-center text-xs text-white/50">
                 {isSignedInOrgAdmin
                   ? "Stripe Checkout opens only when you choose to activate billing."
-                  : "30-day free trial. No credit card required."}
+                  : "Create your account first, then continue to Stripe Checkout."}
               </p>
             </div>
           </div>
