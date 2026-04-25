@@ -3,6 +3,7 @@ import { Button, Input, Table, TableBody, TableCell, TableColumn, TableContent, 
 import { Ban, KeyRound, Link as LinkIcon, LogIn, RotateCcw, ShieldX, Trash2, UserCheck } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { toast as notify } from "react-toastify";
 import type { Route } from "./+types/users";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getPrisma } from "~/db.server";
@@ -159,6 +160,13 @@ function ImpersonateButton({ user, currentUserId }: { user: { id: string; name: 
         const { error } = await authClient.admin.impersonateUser({ userId: user.id });
         if (error) {
           setIsLoading(false);
+          const code =
+            (error as { code?: string } | null | undefined)?.code ?? null;
+          const msg =
+            code === "IMPERSONATION_NESTED"
+              ? t("users.table.impersonateNestedError")
+              : t("users.table.impersonateGenericError");
+          notify.error(msg);
         } else {
           window.location.href = "/";
         }

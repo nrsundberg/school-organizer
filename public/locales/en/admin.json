@@ -778,6 +778,8 @@
       "delete": "Delete",
       "email": "Email",
       "impersonate": "Impersonate",
+      "impersonateGenericError": "Could not impersonate this user.",
+      "impersonateNestedError": "Stop the current impersonation before starting a new one.",
       "impersonating": "...",
       "name": "Name",
       "resetPw": "Reset PW",

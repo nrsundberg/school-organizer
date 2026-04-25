@@ -778,6 +778,8 @@
       "delete": "Eliminar",
       "email": "Correo",
       "impersonate": "Suplantar",
+      "impersonateGenericError": "No se pudo suplantar a este usuario.",
+      "impersonateNestedError": "Detén la suplantación actual antes de iniciar otra.",
       "impersonating": "...",
       "name": "Nombre",
       "resetPw": "Restablecer contraseña",
