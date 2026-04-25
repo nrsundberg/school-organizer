@@ -166,7 +166,7 @@ export const DEMO_TENANTS: readonly DemoTenantSpec[] = [
  * Keep this list short — admins add their own in the demo to show the
  * library picker, so the seeded list should not look "complete".
  */
-export const DEMO_DRILL_GLOBAL_KEYS: readonly string[] = [
+export const DEMO_DRILL_GLOBAL_KEYS = [
   "fire-evacuation",
   "lockdown-srp",
   "secure-srp",
