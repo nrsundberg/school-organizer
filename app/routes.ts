@@ -12,6 +12,7 @@ export default [
   route("admin", "routes/admin/layout.tsx", [
     index("routes/admin/dashboard.tsx"),
     route("users", "routes/admin/users.tsx"),
+    route("households", "routes/admin/households.tsx"),
     route("children", "routes/admin/children.tsx"),
     route("billing", "routes/admin/billing.tsx"),
     route("branding", "routes/admin/branding.tsx"),

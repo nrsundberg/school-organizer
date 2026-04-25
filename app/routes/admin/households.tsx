@@ -1,23 +1,45 @@
-import { Form, Link } from "react-router";
-import { Button, Input, Textarea } from "@heroui/react";
-import { Home, UserMinus, Users } from "lucide-react";
+import type { ReactNode } from "react";
+import { Form } from "react-router";
+import { Button, Input, TextArea } from "@heroui/react";
+import { CalendarClock, Home, Megaphone, TrendingUp, UserMinus, Users } from "lucide-react";
 import { dataWithError, dataWithSuccess, dataWithWarning } from "remix-toast";
 import type { Route } from "./+types/households";
-import { protectToAdminAndGetPermissions } from "~/sessions.server";
-import { getTenantPrisma } from "~/domain/utils/global-context.server";
 import {
   defaultHouseholdName,
   parseStudentIds,
   studentDisplayName,
 } from "~/domain/households/households.server";
+import {
+  DISMISSAL_PLANS,
+  WEEKDAYS,
+  dateRangeFromSearchParams,
+  parseDateOnly,
+  parseOptionalDateOnly,
+  toDateInputValue,
+} from "~/domain/dismissal/schedule";
+import { buildRoiDashboardSnapshot } from "~/domain/dismissal/roi.server";
+import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
+import { broadcastProgramCancellation } from "~/lib/broadcast.server";
+import { protectToAdminAndGetPermissions } from "~/sessions.server";
 
-export const meta: Route.MetaFunction = () => [{ title: "Admin – Households" }];
+export const meta: Route.MetaFunction = () => [
+  { title: "Admin – Households" },
+];
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
+  const roiRange = dateRangeFromSearchParams(new URL(request.url));
 
-  const [households, unassignedStudents, allStudents] = await Promise.all([
+  const [
+    households,
+    unassignedStudents,
+    allStudents,
+    roi,
+    activeExceptions,
+    programs,
+    recentCancellations,
+  ] = await Promise.all([
     prisma.household.findMany({
       orderBy: { name: "asc" },
       include: {
@@ -33,7 +55,16 @@ export async function loader({ context }: Route.LoaderArgs) {
         },
         exceptions: {
           where: { isActive: true },
-          select: { id: true, dismissalPlan: true, scheduleKind: true },
+          orderBy: [
+            { scheduleKind: "asc" },
+            { exceptionDate: "asc" },
+            { createdAt: "desc" },
+          ],
+          select: {
+            id: true,
+            dismissalPlan: true,
+            scheduleKind: true,
+          },
         },
       },
     }),
@@ -57,14 +88,82 @@ export async function loader({ context }: Route.LoaderArgs) {
         householdId: true,
       },
     }),
+    buildRoiDashboardSnapshot(prisma, roiRange),
+    prisma.dismissalException.findMany({
+      where: { isActive: true },
+      orderBy: [{ updatedAt: "desc" }],
+      select: {
+        id: true,
+        scheduleKind: true,
+        exceptionDate: true,
+        dayOfWeek: true,
+        startsOn: true,
+        endsOn: true,
+        dismissalPlan: true,
+        pickupContactName: true,
+        notes: true,
+        household: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    }),
+    prisma.afterSchoolProgram.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.programCancellation.findMany({
+      orderBy: [{ cancellationDate: "desc" }, { createdAt: "desc" }],
+      take: 8,
+      include: {
+        program: { select: { name: true } },
+      },
+    }),
   ]);
 
-  return { households, unassignedStudents, allStudents };
+  return {
+    households,
+    unassignedStudents,
+    allStudents,
+    roi,
+    activeExceptions: activeExceptions.map((exception) => ({
+      ...exception,
+      exceptionDate: toDateInputValue(exception.exceptionDate),
+      startsOn: toDateInputValue(exception.startsOn),
+      endsOn: toDateInputValue(exception.endsOn),
+    })),
+    programs,
+    recentCancellations: recentCancellations.map((cancellation) => ({
+      id: cancellation.id,
+      programId: cancellation.programId,
+      programName: cancellation.program.name,
+      cancellationDate: toDateInputValue(cancellation.cancellationDate),
+      title: cancellation.title,
+      message: cancellation.message,
+    })),
+  };
 }
+
+type LoaderData = Route.ComponentProps["loaderData"];
+type HouseholdRecord = LoaderData["households"][number];
+type ExceptionRecord = LoaderData["activeExceptions"][number];
+type CancellationRecord = LoaderData["recentCancellations"][number];
+type StudentListRecord = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  homeRoom?: string | null;
+  spaceNumber?: number | null;
+  householdId?: string | null;
+};
 
 export async function action({ request, context }: Route.ActionArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
+  const org = getOrgFromContext(context);
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
 
@@ -86,10 +185,13 @@ export async function action({ request, context }: Route.ActionArgs) {
       const requestedName = String(formData.get("name") ?? "").trim();
       const household = await prisma.household.create({
         data: {
+          orgId: org.id,
           name: requestedName || defaultHouseholdName(students),
           pickupNotes: String(formData.get("pickupNotes") ?? "").trim() || null,
-          primaryContactName: String(formData.get("primaryContactName") ?? "").trim() || null,
-          primaryContactPhone: String(formData.get("primaryContactPhone") ?? "").trim() || null,
+          primaryContactName:
+            String(formData.get("primaryContactName") ?? "").trim() || null,
+          primaryContactPhone:
+            String(formData.get("primaryContactPhone") ?? "").trim() || null,
         },
       });
 
@@ -113,8 +215,10 @@ export async function action({ request, context }: Route.ActionArgs) {
         data: {
           name,
           pickupNotes: String(formData.get("pickupNotes") ?? "").trim() || null,
-          primaryContactName: String(formData.get("primaryContactName") ?? "").trim() || null,
-          primaryContactPhone: String(formData.get("primaryContactPhone") ?? "").trim() || null,
+          primaryContactName:
+            String(formData.get("primaryContactName") ?? "").trim() || null,
+          primaryContactPhone:
+            String(formData.get("primaryContactPhone") ?? "").trim() || null,
         },
       });
       return dataWithSuccess(null, "Household pickup context updated.");
@@ -124,7 +228,10 @@ export async function action({ request, context }: Route.ActionArgs) {
       const householdId = String(formData.get("householdId") ?? "");
       const studentIds = parseStudentIds(formData);
       if (!householdId || studentIds.length === 0) {
-        return dataWithError(null, "Choose a household and at least one student.");
+        return dataWithError(
+          null,
+          "Choose a household and at least one student.",
+        );
       }
 
       await prisma.student.updateMany({
@@ -139,6 +246,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       if (!Number.isInteger(studentId)) {
         return dataWithError(null, "Invalid student.");
       }
+
       await prisma.student.update({
         where: { id: studentId },
         data: { householdId: null },
@@ -151,37 +259,249 @@ export async function action({ request, context }: Route.ActionArgs) {
       if (!householdId) {
         return dataWithError(null, "Invalid household.");
       }
+
       await prisma.student.updateMany({
         where: { householdId },
         data: { householdId: null },
       });
       await prisma.household.delete({ where: { id: householdId } });
-      return dataWithWarning(null, "Household deleted; students were left on the roster.");
+      return dataWithWarning(
+        null,
+        "Household deleted; students were left on the roster.",
+      );
+    }
+
+    if (intent === "createException") {
+      const householdId = String(formData.get("householdId") ?? "").trim();
+      const scheduleKind =
+        String(formData.get("scheduleKind") ?? "DATE").toUpperCase() ===
+        "WEEKLY"
+          ? "WEEKLY"
+          : "DATE";
+      const dismissalPlan = String(formData.get("dismissalPlan") ?? "").trim();
+
+      if (!householdId || !dismissalPlan) {
+        return dataWithError(
+          null,
+          "Choose a household and dismissal plan for the exception.",
+        );
+      }
+
+      let exceptionDate: Date | null = null;
+      let dayOfWeek: number | null = null;
+      let startsOn: Date | null = null;
+      let endsOn: Date | null = null;
+
+      if (scheduleKind === "DATE") {
+        exceptionDate = parseDateOnly(
+          String(formData.get("exceptionDate") ?? ""),
+          "Exception date",
+        );
+      } else {
+        dayOfWeek = Number(formData.get("dayOfWeek"));
+        if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+          return dataWithError(null, "Choose a weekday for recurring exceptions.");
+        }
+        startsOn = parseOptionalDateOnly(
+          String(formData.get("startsOn") ?? ""),
+          "Starts on",
+        );
+        endsOn = parseOptionalDateOnly(
+          String(formData.get("endsOn") ?? ""),
+          "Ends on",
+        );
+        if (
+          startsOn &&
+          endsOn &&
+          startsOn.getTime() > endsOn.getTime()
+        ) {
+          return dataWithError(null, "Recurring exceptions cannot end before they start.");
+        }
+      }
+
+      await prisma.dismissalException.create({
+        data: {
+          orgId: org.id,
+          householdId,
+          scheduleKind,
+          exceptionDate,
+          dayOfWeek,
+          startsOn,
+          endsOn,
+          dismissalPlan,
+          pickupContactName:
+            String(formData.get("pickupContactName") ?? "").trim() || null,
+          notes: String(formData.get("notes") ?? "").trim() || null,
+          isActive: true,
+        },
+      });
+
+      return dataWithSuccess(null, "Recurring dismissal exception saved.");
+    }
+
+    if (intent === "deactivateException") {
+      const exceptionId = String(formData.get("exceptionId") ?? "").trim();
+      if (!exceptionId) {
+        return dataWithError(null, "Invalid exception.");
+      }
+
+      await prisma.dismissalException.update({
+        where: { id: exceptionId },
+        data: { isActive: false },
+      });
+      return dataWithWarning(null, "Recurring exception archived.");
+    }
+
+    if (intent === "createCancellation") {
+      const programId = String(formData.get("programId") ?? "").trim();
+      const programNameInput = String(formData.get("programName") ?? "").trim();
+      const cancellationDate = parseDateOnly(
+        String(formData.get("cancellationDate") ?? ""),
+        "Cancellation date",
+      );
+      const title = String(formData.get("title") ?? "").trim();
+      const message = String(formData.get("message") ?? "").trim();
+
+      if (!programId && !programNameInput) {
+        return dataWithError(
+          null,
+          "Choose an existing program or enter a new program name.",
+        );
+      }
+      if (!title || !message) {
+        return dataWithError(
+          null,
+          "Cancellation title and message are both required.",
+        );
+      }
+
+      let program =
+        programId.length > 0
+          ? await prisma.afterSchoolProgram.findUnique({
+              where: { id: programId },
+              select: { id: true, name: true },
+            })
+          : null;
+
+      if (!program && programNameInput) {
+        program = await prisma.afterSchoolProgram.findFirst({
+          where: { name: programNameInput },
+          select: { id: true, name: true },
+        });
+      }
+
+      if (!program && programNameInput) {
+        program = await prisma.afterSchoolProgram.create({
+          data: {
+            orgId: org.id,
+            name: programNameInput,
+            isActive: true,
+          },
+          select: { id: true, name: true },
+        });
+      }
+
+      if (!program) {
+        return dataWithError(null, "Unable to resolve the after-school program.");
+      }
+
+      const cancellation = await prisma.programCancellation.create({
+        data: {
+          orgId: org.id,
+          programId: program.id,
+          cancellationDate,
+          title,
+          message,
+          deliveryMode: "IN_APP",
+        },
+        select: {
+          id: true,
+          cancellationDate: true,
+        },
+      });
+
+      const env = (context as { cloudflare?: { env?: Env } }).cloudflare?.env;
+      if (env) {
+        try {
+          await broadcastProgramCancellation(env, {
+            id: cancellation.id,
+            programName: program.name,
+            cancellationDate: toDateInputValue(cancellation.cancellationDate),
+            title,
+            message,
+          });
+        } catch (error) {
+          console.error("program cancellation broadcast failed", error);
+          return dataWithWarning(
+            null,
+            "Cancellation saved, but the live board broadcast failed.",
+          );
+        }
+      }
+
+      return dataWithSuccess(
+        null,
+        `Cancellation notice sent for ${program.name}.`,
+      );
     }
   } catch (error) {
     console.error("household action failed", error);
-    return dataWithError(null, error instanceof Error ? error.message : "Household update failed.");
+    return dataWithError(
+      null,
+      error instanceof Error ? error.message : "Household update failed.",
+    );
   }
 
   return dataWithError(null, "Unknown household action.");
 }
 
 export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
-  const { households, unassignedStudents, allStudents } = loaderData;
+  const {
+    households,
+    unassignedStudents,
+    allStudents,
+    roi,
+    activeExceptions,
+    programs,
+    recentCancellations,
+  } = loaderData;
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Households</h1>
-          <p className="text-sm text-white/60">
-            Group siblings and capture shared pickup notes that admins can see at a glance.
+          <h1 className="text-2xl font-bold text-white">
+            Households, exceptions, and pickup ROI
+          </h1>
+          <p className="max-w-3xl text-sm text-white/60">
+            Group siblings, capture shared pickup context, manage recurring
+            dismissal exceptions, and push after-school cancellation notices
+            onto the live board.
           </p>
         </div>
-        <Link to="/admin/exceptions" className="text-sm text-blue-300 hover:text-blue-200">
-          Manage recurring exceptions
-        </Link>
+        <div className="flex flex-wrap gap-2 text-sm">
+          <a
+            href="#roi"
+            className="rounded-full border border-white/15 px-3 py-1 text-white/70 hover:border-white/30 hover:text-white"
+          >
+            ROI snapshot
+          </a>
+          <a
+            href="#exceptions"
+            className="rounded-full border border-white/15 px-3 py-1 text-white/70 hover:border-white/30 hover:text-white"
+          >
+            Recurring exceptions
+          </a>
+          <a
+            href="#cancellations"
+            className="rounded-full border border-white/15 px-3 py-1 text-white/70 hover:border-white/30 hover:text-white"
+          >
+            Cancellation alerts
+          </a>
+        </div>
       </div>
+
+      <RoiPanel roi={roi} />
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
         <div className="rounded-xl border border-white/10 bg-white/5 p-5">
@@ -192,16 +512,27 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
           <Form method="post" className="flex flex-col gap-4">
             <input type="hidden" name="intent" value="create" />
             <div className="grid gap-3 sm:grid-cols-2">
-              <Input name="name" label="Household name" placeholder="Garcia household" />
-              <Input name="primaryContactName" label="Primary pickup contact" placeholder="Optional" />
-              <Input name="primaryContactPhone" label="Contact phone" placeholder="Optional" />
+              <Field label="Household name">
+                <Input name="name" placeholder="Garcia household" />
+              </Field>
+              <Field label="Primary pickup contact">
+                <Input name="primaryContactName" placeholder="Optional" />
+              </Field>
+              <Field label="Contact phone">
+                <Input name="primaryContactPhone" placeholder="Optional" />
+              </Field>
             </div>
-            <Textarea
-              name="pickupNotes"
-              label="Shared pickup context"
-              placeholder="Example: both siblings leave together on car line unless there is an active exception."
+            <Field label="Shared pickup context">
+              <TextArea
+                name="pickupNotes"
+                rows={3}
+                placeholder="Example: both siblings leave together on car line unless there is an active exception."
+              />
+            </Field>
+            <StudentCheckboxList
+              students={unassignedStudents}
+              emptyText="No unassigned students. Detach a student from another household first."
             />
-            <StudentCheckboxList students={unassignedStudents} emptyText="No unassigned students. Detach a student from another household first." />
             <Button type="submit" variant="primary" className="self-start">
               Create household
             </Button>
@@ -211,29 +542,303 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
           <h2 className="font-semibold text-white">Assign existing students</h2>
           <p className="mt-1 text-sm text-white/50">
-            Use this when a new sibling is added after the household already exists.
+            Use this when a new sibling is added after the household already
+            exists.
           </p>
           <Form method="post" className="mt-4 flex flex-col gap-3">
             <input type="hidden" name="intent" value="assign" />
-            <label className="flex flex-col gap-1 text-xs text-white/60">
-              Household
+            <Field label="Household">
               <select
                 name="householdId"
                 className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                defaultValue=""
               >
                 <option value="">Choose household</option>
-                {households.map((household) => (
+                {households.map((household: HouseholdRecord) => (
                   <option key={household.id} value={household.id}>
                     {household.name}
                   </option>
                 ))}
               </select>
-            </label>
-            <StudentCheckboxList students={allStudents} emptyText="No students yet." compact />
+            </Field>
+            <StudentCheckboxList
+              students={allStudents}
+              emptyText="No students yet."
+              compact
+            />
             <Button type="submit" variant="secondary">
               Assign selected
             </Button>
           </Form>
+        </div>
+      </section>
+
+      <section
+        id="exceptions"
+        className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]"
+      >
+        <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <CalendarClock className="h-5 w-5 text-cyan-300" />
+            <h2 className="font-semibold text-white">
+              Add a recurring dismissal exception
+            </h2>
+          </div>
+          <p className="mb-4 text-sm text-white/50">
+            These exceptions feed the household count above and the ROI estimate
+            below. Weekly entries can be date-bounded when a temporary routine
+            is in place.
+          </p>
+          <Form method="post" className="grid gap-3">
+            <input type="hidden" name="intent" value="createException" />
+            <Field label="Household">
+              <select
+                name="householdId"
+                className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                defaultValue=""
+                required
+              >
+                <option value="">Choose household</option>
+                {households.map((household: HouseholdRecord) => (
+                  <option key={household.id} value={household.id}>
+                    {household.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="Schedule">
+                <select
+                  name="scheduleKind"
+                  className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                  defaultValue="DATE"
+                >
+                  <option value="DATE">One specific date</option>
+                  <option value="WEEKLY">Repeats weekly</option>
+                </select>
+              </Field>
+              <Field label="Dismissal plan">
+                <select
+                  name="dismissalPlan"
+                  className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                  defaultValue={DISMISSAL_PLANS[0]}
+                >
+                  {DISMISSAL_PLANS.map((plan) => (
+                    <option key={plan} value={plan}>
+                      {plan}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Specific date">
+                <input
+                  type="date"
+                  name="exceptionDate"
+                  className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                />
+              </Field>
+              <Field label="Weekly day">
+                <select
+                  name="dayOfWeek"
+                  className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                  defaultValue="1"
+                >
+                  {WEEKDAYS.map((weekday, index) => (
+                    <option key={weekday} value={index}>
+                      {weekday}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Starts on">
+                <input
+                  type="date"
+                  name="startsOn"
+                  className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                />
+              </Field>
+              <Field label="Ends on">
+                <input
+                  type="date"
+                  name="endsOn"
+                  className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                />
+              </Field>
+              <Field label="Pickup contact">
+                <Input
+                  name="pickupContactName"
+                  placeholder="Optional override contact"
+                />
+              </Field>
+            </div>
+
+            <Field label="Notes">
+              <TextArea
+                name="notes"
+                rows={3}
+                placeholder="Example: every Wednesday grandma picks up both siblings from the side door."
+              />
+            </Field>
+            <Button type="submit" variant="secondary" className="self-start">
+              Save exception
+            </Button>
+          </Form>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+          <h2 className="font-semibold text-white">Active recurring exceptions</h2>
+          <p className="mt-1 text-sm text-white/50">
+            Household-level exceptions keep the sibling group aligned even when
+            pickup routines change.
+          </p>
+          <div className="mt-4 flex flex-col gap-3">
+            {activeExceptions.length === 0 ? (
+              <p className="rounded-lg bg-black/20 p-4 text-sm text-white/45">
+                No recurring exceptions yet.
+              </p>
+            ) : (
+              activeExceptions.map((exception: ExceptionRecord) => (
+                <div
+                  key={exception.id}
+                  className="rounded-xl border border-white/10 bg-black/20 p-4"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-semibold text-white">
+                        {exception.household?.name ?? "Deleted household"}
+                      </p>
+                      <p className="text-sm text-cyan-200">
+                        {formatExceptionSchedule(exception)}
+                      </p>
+                      <p className="mt-1 text-sm text-white/70">
+                        {exception.dismissalPlan}
+                        {exception.pickupContactName
+                          ? ` · ${exception.pickupContactName}`
+                          : ""}
+                      </p>
+                      {exception.notes ? (
+                        <p className="mt-1 text-sm text-white/55">
+                          {exception.notes}
+                        </p>
+                      ) : null}
+                    </div>
+                    <Form method="post">
+                      <input
+                        type="hidden"
+                        name="intent"
+                        value="deactivateException"
+                      />
+                      <input
+                        type="hidden"
+                        name="exceptionId"
+                        value={exception.id}
+                      />
+                      <Button type="submit" variant="ghost" size="sm">
+                        Archive
+                      </Button>
+                    </Form>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="cancellations"
+        className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]"
+      >
+        <div className="rounded-xl border border-white/10 bg-white/5 p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <Megaphone className="h-5 w-5 text-amber-300" />
+            <h2 className="font-semibold text-white">
+              Broadcast an after-school cancellation
+            </h2>
+          </div>
+          <p className="mb-4 text-sm text-white/50">
+            Saving a cancellation here also pushes it to connected boards
+            through the live WebSocket channel.
+          </p>
+          <Form method="post" className="grid gap-3">
+            <input type="hidden" name="intent" value="createCancellation" />
+            <Field label="Existing program">
+              <select
+                name="programId"
+                className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                defaultValue=""
+              >
+                <option value="">Create or match by name below</option>
+                {programs.map((program) => (
+                  <option key={program.id} value={program.id}>
+                    {program.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Program name">
+              <Input
+                name="programName"
+                placeholder="Optional if you selected a program above"
+              />
+            </Field>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="Cancellation date">
+                <input
+                  type="date"
+                  name="cancellationDate"
+                  className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                  required
+                />
+              </Field>
+              <Field label="Alert title">
+                <Input
+                  name="title"
+                  placeholder="Chess Club is canceled today"
+                  required
+                />
+              </Field>
+            </div>
+            <Field label="Message">
+              <TextArea
+                name="message"
+                rows={3}
+                placeholder="Include the pickup fallback so families know what changes."
+              />
+            </Field>
+            <Button type="submit" variant="secondary" className="self-start">
+              Save and broadcast
+            </Button>
+          </Form>
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
+          <h2 className="font-semibold text-white">Recent cancellation notices</h2>
+          <p className="mt-1 text-sm text-white/50">
+            The board shows same-day notices immediately after the broadcast
+            lands.
+          </p>
+          <div className="mt-4 flex flex-col gap-3">
+            {recentCancellations.length === 0 ? (
+              <p className="rounded-lg bg-black/20 p-4 text-sm text-white/45">
+                No cancellation notices yet.
+              </p>
+            ) : (
+              recentCancellations.map((notice: CancellationRecord) => (
+                <div
+                  key={notice.id}
+                  className="rounded-xl border border-white/10 bg-black/20 p-4"
+                >
+                  <p className="font-semibold text-white">{notice.title}</p>
+                  <p className="text-sm text-amber-200">
+                    {notice.programName} · {notice.cancellationDate}
+                  </p>
+                  <p className="mt-1 text-sm text-white/70">{notice.message}</p>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </section>
 
@@ -243,7 +848,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
             No households yet. Create one above to start grouping siblings.
           </div>
         ) : (
-          households.map((household) => (
+          households.map((household: HouseholdRecord) => (
             <HouseholdCard key={household.id} household={household} />
           ))
         )}
@@ -252,28 +857,141 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
   );
 }
 
+function RoiPanel({ roi }: { roi: LoaderData["roi"] }) {
+  return (
+    <section
+      id="roi"
+      className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-5"
+    >
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-emerald-200">
+            <TrendingUp className="h-4 w-4" />
+            Family ROI snapshot
+          </div>
+          <h2 className="mt-2 text-xl font-semibold text-white">
+            {roi.avoidedCalls.total} avoided calls and {roi.minutesSaved} minutes
+            saved
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm text-white/70">
+            Based on pickup activity from {roi.range.from} through {roi.range.to},
+            sibling grouping, recurring exceptions, and program cancellations
+            reduced manual coordination across the board.
+          </p>
+        </div>
+        <Form method="get" className="grid gap-3 sm:grid-cols-3">
+          <Field label="From">
+            <input
+              type="date"
+              name="from"
+              defaultValue={roi.range.from}
+              className="rounded-lg border border-white/20 bg-black/20 px-3 py-2 text-sm text-white"
+            />
+          </Field>
+          <Field label="To">
+            <input
+              type="date"
+              name="to"
+              defaultValue={roi.range.to}
+              className="rounded-lg border border-white/20 bg-black/20 px-3 py-2 text-sm text-white"
+            />
+          </Field>
+          <Button type="submit" variant="secondary" className="self-end">
+            Refresh ROI
+          </Button>
+        </Form>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <RoiMetric
+          label="Household groups"
+          value={String(roi.householdGroups)}
+          detail={`${roi.householdSiblingSlots} sibling slots combined`}
+        />
+        <RoiMetric
+          label="Recurring exceptions"
+          value={String(roi.exceptionOccurrences)}
+          detail={`${roi.avoidedCalls.exceptions} calls avoided`}
+        />
+        <RoiMetric
+          label="Program cancellations"
+          value={String(roi.programCancellations)}
+          detail={`${roi.avoidedCalls.cancellations} calls avoided`}
+        />
+        <RoiMetric
+          label="Pickup days with calls"
+          value={String(roi.pickupDaysWithCalls)}
+          detail={`${roi.baselineCalls} baseline calls in range`}
+        />
+      </div>
+
+      <p className="mt-4 text-xs text-white/60">
+        Assumptions: {roi.assumptions.minutesPerAvoidedCall} minutes per avoided
+        family call, {roi.assumptions.callsAvoidedPerExceptionOccurrence} call
+        avoided per exception occurrence, and{" "}
+        {roi.assumptions.callsAvoidedPerProgramCancellation} calls avoided per
+        program cancellation.
+      </p>
+    </section>
+  );
+}
+
+function RoiMetric({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+      <p className="text-xs uppercase tracking-wide text-white/50">{label}</p>
+      <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
+      <p className="mt-1 text-sm text-white/60">{detail}</p>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-xs text-white/60">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+
 function StudentCheckboxList({
   students,
   emptyText,
   compact = false,
 }: {
-  students: {
-    id: number;
-    firstName: string;
-    lastName: string;
-    homeRoom?: string | null;
-    spaceNumber?: number | null;
-    householdId?: string | null;
-  }[];
+  students: StudentListRecord[];
   emptyText: string;
   compact?: boolean;
 }) {
   if (students.length === 0) {
-    return <p className="rounded-lg bg-black/20 p-3 text-sm text-white/45">{emptyText}</p>;
+    return (
+      <p className="rounded-lg bg-black/20 p-3 text-sm text-white/45">
+        {emptyText}
+      </p>
+    );
   }
 
   return (
-    <div className={`grid gap-2 ${compact ? "max-h-56 overflow-y-auto" : "sm:grid-cols-2"}`}>
+    <div
+      className={`grid gap-2 ${
+        compact ? "max-h-56 overflow-y-auto" : "sm:grid-cols-2"
+      }`}
+    >
       {students.map((student) => (
         <label
           key={student.id}
@@ -294,25 +1012,7 @@ function StudentCheckboxList({
   );
 }
 
-function HouseholdCard({
-  household,
-}: {
-  household: {
-    id: string;
-    name: string;
-    pickupNotes: string | null;
-    primaryContactName: string | null;
-    primaryContactPhone: string | null;
-    students: {
-      id: number;
-      firstName: string;
-      lastName: string;
-      homeRoom: string | null;
-      spaceNumber: number | null;
-    }[];
-    exceptions: { id: string; dismissalPlan: string; scheduleKind: string }[];
-  };
-}) {
+function HouseholdCard({ household }: { household: HouseholdRecord }) {
   return (
     <article className="rounded-xl border border-white/10 bg-white/5 p-5">
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -322,8 +1022,13 @@ function HouseholdCard({
             <h2 className="text-lg font-semibold text-white">{household.name}</h2>
           </div>
           <p className="mt-1 text-sm text-white/50">
-            {household.students.length} {household.students.length === 1 ? "student" : "students"}
-            {household.exceptions.length > 0 ? ` · ${household.exceptions.length} active exception${household.exceptions.length === 1 ? "" : "s"}` : ""}
+            {household.students.length}{" "}
+            {household.students.length === 1 ? "student" : "students"}
+            {household.exceptions.length > 0
+              ? ` · ${household.exceptions.length} active exception${
+                  household.exceptions.length === 1 ? "" : "s"
+                }`
+              : ""}
           </p>
         </div>
         <Form method="post">
@@ -339,12 +1044,35 @@ function HouseholdCard({
         <input type="hidden" name="intent" value="update" />
         <input type="hidden" name="householdId" value={household.id} />
         <div className="grid gap-3 sm:grid-cols-2">
-          <Input name="name" label="Household name" defaultValue={household.name} required />
-          <Input name="primaryContactName" label="Primary contact" defaultValue={household.primaryContactName ?? ""} />
-          <Input name="primaryContactPhone" label="Contact phone" defaultValue={household.primaryContactPhone ?? ""} />
+          <Field label="Household name">
+            <Input name="name" defaultValue={household.name} required />
+          </Field>
+          <Field label="Primary contact">
+            <Input
+              name="primaryContactName"
+              defaultValue={household.primaryContactName ?? ""}
+            />
+          </Field>
+          <Field label="Contact phone">
+            <Input
+              name="primaryContactPhone"
+              defaultValue={household.primaryContactPhone ?? ""}
+            />
+          </Field>
         </div>
-        <Textarea name="pickupNotes" label="Pickup notes" defaultValue={household.pickupNotes ?? ""} />
-        <Button type="submit" variant="secondary" size="sm" className="justify-self-start">
+        <Field label="Pickup notes">
+          <TextArea
+            name="pickupNotes"
+            rows={3}
+            defaultValue={household.pickupNotes ?? ""}
+          />
+        </Field>
+        <Button
+          type="submit"
+          variant="secondary"
+          size="sm"
+          className="justify-self-start"
+        >
           Save pickup context
         </Button>
       </Form>
@@ -359,9 +1087,14 @@ function HouseholdCard({
               className="flex items-center justify-between gap-3 border-t border-white/5 px-4 py-3 first:border-t-0"
             >
               <div>
-                <p className="font-medium text-white">{studentDisplayName(student)}</p>
+                <p className="font-medium text-white">
+                  {studentDisplayName(student)}
+                </p>
                 <p className="text-xs text-white/45">
-                  {student.homeRoom ?? "No homeroom"} · {student.spaceNumber ? `Space ${student.spaceNumber}` : "No space"}
+                  {student.homeRoom ?? "No homeroom"} ·{" "}
+                  {student.spaceNumber
+                    ? `Space ${student.spaceNumber}`
+                    : "No space"}
                 </p>
               </div>
               <Form method="post">
@@ -378,4 +1111,20 @@ function HouseholdCard({
       </div>
     </article>
   );
+}
+
+function formatExceptionSchedule(exception: ExceptionRecord): string {
+  if (exception.scheduleKind === "DATE") {
+    return exception.exceptionDate
+      ? `One-time on ${exception.exceptionDate}`
+      : "One-time exception";
+  }
+
+  const weekday =
+    exception.dayOfWeek != null
+      ? WEEKDAYS[exception.dayOfWeek] ?? "Weekly"
+      : "Weekly";
+  const startsOn = exception.startsOn ? ` starting ${exception.startsOn}` : "";
+  const endsOn = exception.endsOn ? ` through ${exception.endsOn}` : "";
+  return `${weekday}${startsOn}${endsOn}`;
 }
