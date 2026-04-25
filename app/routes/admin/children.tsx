@@ -101,6 +101,9 @@ export default function AdminChildren({ loaderData }: Route.ComponentProps) {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Children & Classes</h1>
         <div className="flex gap-2">
+          <Link to="/admin/roster-import">
+            <Button variant="secondary" size="sm">Import Roster</Button>
+          </Link>
           <Link to="/create/homeroom">
             <Button variant="secondary" size="sm">Add Class</Button>
           </Link>
