@@ -366,6 +366,11 @@ model Session {
   userId         String
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   impersonatedBy String?
+  /// Set when a district admin impersonates a school. The per-request
+  /// middleware honors this over `User.orgId` so the existing
+  /// tenant-extension scopes the request to the impersonated school.
+  /// Cleared when impersonation ends.
+  impersonatedOrgId String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }

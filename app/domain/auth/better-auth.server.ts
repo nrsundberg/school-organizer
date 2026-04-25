@@ -189,6 +189,14 @@ export function getAuth(context: any) {
         enabled: true,
         maxAge: 60 * 5, // 5-min in-memory cache to reduce DB hits
       },
+      additionalFields: {
+        impersonatedOrgId: {
+          type: "string",
+          required: false,
+          defaultValue: null,
+          input: false,
+        },
+      },
     },
     user: {
       additionalFields: {
