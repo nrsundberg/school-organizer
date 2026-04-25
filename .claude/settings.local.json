@@ -36,7 +36,8 @@
       "Bash(npx playwright test *)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git merge *)"
+      "Bash(git merge *)",
+      "Bash(gh run *)"
     ]
   }
 }
