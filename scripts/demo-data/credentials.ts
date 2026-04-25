@@ -52,13 +52,19 @@ export function resolveCredentials(
 
   return specs.map((spec) => {
     const perOrg = env[`DEMO_PASSWORD_${envKey(spec)}`];
-    const password =
-      perOrg && perOrg.length >= 8
-        ? perOrg
-        : fallback && fallback.length >= 8
-          ? fallback
-          : deriveFromSeed(seed, spec.slug);
-    const generated = !perOrg && !fallback;
+    const perOrgUsable = !!perOrg && perOrg.length >= 8;
+    const fallbackUsable = !!fallback && fallback.length >= 8;
+    const password = perOrgUsable
+      ? perOrg!
+      : fallbackUsable
+        ? fallback!
+        : deriveFromSeed(seed, spec.slug);
+    // True iff the password actually came from the seed-derive branch
+    // — i.e. neither env var was set AND long enough to be used. Without
+    // this, an operator who sets a too-short env var would see no
+    // "[generated]" tag in the summary even though their value was
+    // ignored and the seed-derived password was used instead.
+    const generated = !perOrgUsable && !fallbackUsable;
     return {
       slug: spec.slug,
       adminEmail: `admin@${spec.slug}.demo`,
