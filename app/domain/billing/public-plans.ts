@@ -3,6 +3,9 @@ export type PublicPlanSlug = (typeof PUBLIC_PLAN_SLUGS)[number];
 
 export const PUBLIC_BILLING_CYCLES = ["monthly", "annual"] as const;
 export type PublicBillingCycle = (typeof PUBLIC_BILLING_CYCLES)[number];
+export const PUBLIC_PLAN_SELECTION_SOURCES = ["default", "explicit"] as const;
+export type PublicPlanSelectionSource =
+  (typeof PUBLIC_PLAN_SELECTION_SOURCES)[number];
 
 export type SelfServeBillingPlan = "CAR_LINE" | "CAMPUS";
 export type PublicBillingPlan = SelfServeBillingPlan | "DISTRICT";
@@ -19,9 +22,15 @@ export function normalizePublicPlan(raw: string | null): PublicPlanSlug | null {
 }
 
 export function normalizePublicBillingCycle(
-  raw: string | null,
+  raw: string | null
 ): PublicBillingCycle {
   return raw?.trim().toLowerCase() === "annual" ? "annual" : "monthly";
+}
+
+export function normalizePublicPlanSelectionSource(
+  raw: string | null
+): PublicPlanSelectionSource {
+  return raw?.trim().toLowerCase() === "explicit" ? "explicit" : "default";
 }
 
 export function billingPlanForSlug(slug: PublicPlanSlug): PublicBillingPlan {
@@ -37,9 +46,16 @@ export function slugForBillingPlan(plan: PublicBillingPlan): PublicPlanSlug {
 }
 
 export function isSelfServeBillingPlan(
-  plan: PublicBillingPlan,
+  plan: PublicBillingPlan
 ): plan is SelfServeBillingPlan {
   return plan === "CAR_LINE" || plan === "CAMPUS";
+}
+
+export function shouldStartCheckoutAfterSignup(
+  plan: PublicBillingPlan,
+  selectionSource: PublicPlanSelectionSource
+): plan is SelfServeBillingPlan {
+  return selectionSource === "explicit" && isSelfServeBillingPlan(plan);
 }
 
 export function planLabel(plan: PublicBillingPlan): string {
@@ -54,22 +70,22 @@ export function billingCycleLabel(cycle: PublicBillingCycle): string {
 
 export function signupPathForPlan(
   plan: PublicPlanSlug,
-  billingCycle: PublicBillingCycle,
+  billingCycle: PublicBillingCycle
 ): string {
   const params = new URLSearchParams({
     plan,
-    cycle: billingCycle,
+    cycle: billingCycle
   });
   return `/signup?${params.toString()}`;
 }
 
 export function pricingPathForPlan(
   plan: PublicBillingPlan,
-  billingCycle: PublicBillingCycle,
+  billingCycle: PublicBillingCycle
 ): string {
   const params = new URLSearchParams({
     plan: slugForBillingPlan(plan),
-    cycle: billingCycle,
+    cycle: billingCycle
   });
   return `/pricing?${params.toString()}`;
 }
