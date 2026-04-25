@@ -15,9 +15,19 @@ import {
 
 export const userContext = createContext<User | null>(null);
 export const orgContext = createContext<Org | null>(null);
+export const impersonationContext = createContext<{
+  active: boolean;
+  orgId: string | null;
+} | null>(null);
 
 export const getOptionalUserFromContext = (context: any): User | null => {
   return context.get(userContext) ?? null;
+};
+
+export const getImpersonationFromContext = (
+  context: any,
+): { active: boolean; orgId: string | null } => {
+  return context.get(impersonationContext) ?? { active: false, orgId: null };
 };
 
 export const getUserFromContext = (context: any): User => {
@@ -84,6 +94,7 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
     // Host-to-org resolution is best-effort during rollout.
   }
 
+  let impersonatedOrgId: string | null = null;
   try {
     const auth = getAuth(context);
     const session = await auth.api.getSession({
@@ -97,6 +108,9 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
           data: { role: "CONTROLLER" }
         });
       }
+      impersonatedOrgId =
+        (session.session as { impersonatedOrgId?: string | null } | null)
+          ?.impersonatedOrgId ?? null;
     }
   } catch {
     // No session — that's fine, board is public
@@ -105,13 +119,24 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   context.set(userContext, user);
 
   const onMarketingHost = isMarketingHost(request, context);
-  if (!onMarketingHost && !org && user?.orgId) {
+  // Impersonation takes precedence over both host-resolved and user.orgId.
+  // When a district admin (or platform admin) has an active impersonation,
+  // the request operates as that org and the existing tenant-extension
+  // scopes accordingly — no per-route changes required.
+  if (!onMarketingHost && impersonatedOrgId) {
+    const impOrg = await db.org.findUnique({ where: { id: impersonatedOrgId } });
+    if (impOrg) org = impOrg;
+  } else if (!onMarketingHost && !org && user?.orgId) {
     org = await db.org.findUnique({ where: { id: user.orgId } });
   }
   if (onMarketingHost) {
     org = null;
   }
   context.set(orgContext, org);
+  context.set(impersonationContext, {
+    active: impersonatedOrgId != null && org?.id === impersonatedOrgId,
+    orgId: impersonatedOrgId,
+  });
 
   const url = new URL(request.url);
   const pathname = url.pathname;
@@ -152,12 +177,18 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   }
 
   const skipTenantOrgBinding = isStatic || isAuthApi || isStripeWebhook;
+  // District admins are allowed onto a tenant org's pages while impersonating.
+  // Without this carve-out, the sameOrg check below would bounce them since
+  // `User.orgId` is null for district-scoped users.
+  const isImpersonatingThisOrg =
+    impersonatedOrgId != null && impersonatedOrgId === org?.id;
   if (
     !onMarketingHost &&
     user &&
     org &&
     !skipTenantOrgBinding &&
-    !isPlatformAdmin(user, context)
+    !isPlatformAdmin(user, context) &&
+    !isImpersonatingThisOrg
   ) {
     const sameOrg = !!user.orgId && user.orgId === org.id;
     if (!sameOrg) {
