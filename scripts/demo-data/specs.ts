@@ -11,6 +11,24 @@
 // Stable IDs ("org_demo_<key>") let the seed be idempotent: re-running
 // deletes by orgId then re-inserts.
 
+// `DEMO_DRILL_GLOBAL_KEYS` strings must each match a `globalKey` in
+// `app/domain/drills/library.ts` (the GLOBAL_TEMPLATES array). The
+// generator (Task 5) validates by calling `getGlobalTemplate(key)` and
+// throws if any are missing — but a typo here will only surface at
+// generate-time, not type-check time. Keep this list short and review
+// it when the library is updated.
+
+// We define this union locally rather than importing the canonical
+// `BillingPlan` from `app/db` (Prisma) or `~/lib/plan-limits` because:
+//   1. This module is consumed by a Node-only CLI script and we want
+//      to keep its dependency footprint to zero (no prisma client, no
+//      app/* imports — the script must run in any cwd, including from
+//      a tarball without `prisma generate` having been run).
+//   2. We intentionally omit FREE / STARTER / ENTERPRISE — demos only
+//      showcase the public paid tiers. If the canonical enum changes,
+//      the per-org INSERT in Task 5 will surface a runtime error
+//      against D1's CHECK constraint, which is a deliberate failure
+//      mode (loud > silent drift).
 export type DemoBillingPlan = "CAR_LINE" | "CAMPUS" | "DISTRICT";
 
 export interface DemoTenantSpec {
@@ -28,7 +46,13 @@ export interface DemoTenantSpec {
   /** Roster sizing. Stay well under the plan cap so admins can demo a row add. */
   studentCount: number;
   classroomCount: number;
-  /** Approx household count — siblings will be grouped to hit this number. */
+  /**
+   * Approximate household count. The generator creates exactly this many
+   * Household rows; ~30% of households will then be assigned 2 students
+   * (siblings) and the rest 1, so the actual student-to-household ratio
+   * lands between 1.0 and ~1.3. If `studentCount` exceeds what those
+   * households can absorb the extras share an existing household.
+   */
   householdCount: number;
   /** Number of past CallEvents to replay across the trailing 21 days. */
   pastCallEvents: number;
@@ -36,9 +60,19 @@ export interface DemoTenantSpec {
   programCount: number;
   /** Optional district group key — sibling orgs share this string. */
   districtKey?: string;
-  /** Pool of teacher last names that classroom homeRooms are built from. */
-  teacherLastNamesSeed: number;
-  /** Stable seed for deterministic name selection. */
+  /**
+   * Offset into the shared `TEACHER_LAST_NAMES` pool (defined in
+   * `name-pools.ts`) where this org's classroom homerooms start. Each org
+   * uses a different offset so the demo trio doesn't all start with
+   * "Atwood, Bishop, ...". Modulo'd against the pool length when read.
+   */
+  teacherNameOffset: number;
+  /**
+   * Seed for the per-org PRNG used by the generator: student first/last
+   * names, household assignment, and CallEvent timestamp jitter. Does not
+   * affect teacher-homeroom names (those use `teacherNameOffset`) so
+   * tweaking roster sizes here will not also shuffle classroom names.
+   */
   randomSeed: number;
 }
 
@@ -55,7 +89,7 @@ export const DEMO_TENANTS: readonly DemoTenantSpec[] = [
     householdCount: 80,
     pastCallEvents: 220,
     programCount: 3,
-    teacherLastNamesSeed: 1,
+    teacherNameOffset: 1,
     randomSeed: 1001,
   },
   {
@@ -70,10 +104,13 @@ export const DEMO_TENANTS: readonly DemoTenantSpec[] = [
     householdCount: 220,
     pastCallEvents: 540,
     programCount: 6,
-    teacherLastNamesSeed: 2,
+    teacherNameOffset: 2,
     randomSeed: 2002,
   },
   // District trio — same brand palette so they read as one district visually.
+  // Per-school CallEvent counts are intentionally lower than Lincoln per
+  // student — older grades historically have less car-line volume than
+  // elementary, and we want the district demo to reflect that.
   {
     orgId: "org_demo_westside_elem",
     slug: "westside-elem-example",
@@ -87,7 +124,7 @@ export const DEMO_TENANTS: readonly DemoTenantSpec[] = [
     pastCallEvents: 150,
     programCount: 2,
     districtKey: "westside",
-    teacherLastNamesSeed: 3,
+    teacherNameOffset: 3,
     randomSeed: 3003,
   },
   {
@@ -103,7 +140,7 @@ export const DEMO_TENANTS: readonly DemoTenantSpec[] = [
     pastCallEvents: 180,
     programCount: 2,
     districtKey: "westside",
-    teacherLastNamesSeed: 4,
+    teacherNameOffset: 4,
     randomSeed: 3004,
   },
   {
@@ -119,7 +156,7 @@ export const DEMO_TENANTS: readonly DemoTenantSpec[] = [
     pastCallEvents: 200,
     programCount: 3,
     districtKey: "westside",
-    teacherLastNamesSeed: 5,
+    teacherNameOffset: 5,
     randomSeed: 3005,
   },
 ] as const;
@@ -142,7 +179,7 @@ export const DEMO_DRILL_GLOBAL_KEYS: readonly string[] = [
  * one lockdown. Toggles are filled in to ~80% so the run looks realistic
  * when replayed for a demo.
  */
-export const HISTORICAL_RUN_KEYS: readonly string[] = [
+export const HISTORICAL_RUN_KEYS = [
   "fire-evacuation",
   "lockdown-srp",
-] as const;
+] as const satisfies readonly (typeof DEMO_DRILL_GLOBAL_KEYS)[number][];
