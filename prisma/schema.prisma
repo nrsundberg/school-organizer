@@ -104,6 +104,10 @@ model Org {
   callEvents             CallEvent[]
   drillTemplates         DrillTemplate[]
   drillRuns              DrillRun[]
+  households             Household[]
+  dismissalExceptions    DismissalException[]
+  afterSchoolPrograms    AfterSchoolProgram[]
+  programCancellations   ProgramCancellation[]
   auditLogs              OrgAuditLog[]
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
@@ -345,18 +349,101 @@ model Student {
   lastName    String
   /// Siblings share one household; each distinct household (or unassigned student) counts toward family cap.
   householdId String?
+  household   Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
   space       Space?   @relation(fields: [spaceNumber], references: [spaceNumber])
   spaceNumber Int?
   teacher     Teacher? @relation(fields: [homeRoom], references: [homeRoom])
   homeRoom    String?
   callEvents  CallEvent[]
+  dismissalExceptions DismissalException[]
 
   @@index([orgId])
   @@index([householdId])
+  @@index([orgId, householdId])
   @@index([spaceNumber])
   @@index([homeRoom])
   @@index([orgId, spaceNumber])
   @@index([orgId, homeRoom])
+}
+
+model Household {
+  id                  String               @id @default(cuid())
+  orgId               String
+  org                 Org                  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name                String
+  pickupNotes         String?
+  primaryContactName  String?
+  primaryContactPhone String?
+  students            Student[]
+  exceptions          DismissalException[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([orgId])
+  @@index([orgId, name])
+}
+
+model DismissalException {
+  id                String     @id @default(cuid())
+  orgId             String
+  org               Org        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  studentId         Int?
+  student           Student?   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  householdId       String?
+  household         Household? @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  /// DATE or WEEKLY; kept as TEXT for D1 compatibility.
+  scheduleKind      String     @default("DATE")
+  exceptionDate     DateTime?
+  dayOfWeek         Int?
+  startsOn          DateTime?
+  endsOn            DateTime?
+  dismissalPlan     String
+  pickupContactName String?
+  notes             String?
+  isActive          Boolean    @default(true)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  @@index([orgId])
+  @@index([orgId, exceptionDate])
+  @@index([orgId, dayOfWeek])
+  @@index([studentId])
+  @@index([householdId])
+}
+
+model AfterSchoolProgram {
+  id            String                @id @default(cuid())
+  orgId         String
+  org           Org                   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  isActive      Boolean               @default(true)
+  cancellations ProgramCancellation[]
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([orgId])
+  @@index([orgId, name])
+}
+
+model ProgramCancellation {
+  id               String             @id @default(cuid())
+  orgId            String
+  org              Org                @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  programId        String
+  program          AfterSchoolProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  cancellationDate DateTime
+  title            String
+  message          String
+  /// IN_APP for now; EMAIL and SMS are the intended extension seam.
+  deliveryMode     String             @default("IN_APP")
+  createdByUserId  String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@index([orgId])
+  @@index([orgId, cancellationDate])
+  @@index([programId])
 }
 
 model Space {

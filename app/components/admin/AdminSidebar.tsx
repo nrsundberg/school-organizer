@@ -4,6 +4,7 @@ import {
   FileSpreadsheet,
   GraduationCap,
   History,
+  Home,
   LayoutDashboard,
   Palette,
   Users,
@@ -13,6 +14,7 @@ import { NavLink } from "react-router";
 const navItems = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/users", label: "Users", icon: Users },
+  { to: "/admin/households", label: "Households", icon: Home },
   { to: "/admin/children", label: "Children & Classes", icon: GraduationCap },
   { to: "/admin/roster-import", label: "Roster Import", icon: FileSpreadsheet },
   { to: "/admin/drills", label: "Drills", icon: ClipboardList },

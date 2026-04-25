@@ -4,7 +4,7 @@ import { useFetcher, useSearchParams, redirect } from "react-router";
 import { type Space, Status } from "~/db/browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "react-toastify";
-import { Send } from "lucide-react";
+import { Megaphone, Send } from "lucide-react";
 import type { Route } from "./+types/_index";
 import { isMarketingHost } from "~/domain/utils/host.server";
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
@@ -24,6 +24,7 @@ import {
 import { useBingoWebSocket } from "~/hooks/useBingoWebSocket";
 import MobileCallerView from "~/components/MobileCallerView";
 import confetti from "canvas-confetti";
+import { endOfUtcDay, toDateInputValue } from "~/domain/dismissal/schedule";
 
 export const meta: Route.MetaFunction = ({ data }) => {
   if (!data || data.mode === "marketing") {
@@ -62,7 +63,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const user = getOptionalUserFromContext(context);
   const filterRooms = new URL(request.url).searchParams.get("room");
 
-  const [spaces, homeRooms, recentCars, appSettings] = await Promise.all([
+  const today = new Date();
+  const todayStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+
+  const [spaces, homeRooms, recentCars, appSettings, programCancellations] = await Promise.all([
     prisma.space.findMany({ orderBy: { spaceNumber: "asc" } }),
     prisma.teacher.findMany({ orderBy: { homeRoom: "asc" } }),
     prisma.callEvent.findMany({
@@ -74,6 +78,18 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       take: 20
     }),
     prisma.appSettings.findUnique({ where: { id: "default" } }),
+    prisma.programCancellation.findMany({
+      where: {
+        cancellationDate: {
+          gte: todayStart,
+          lte: endOfUtcDay(todayStart),
+        },
+      },
+      include: {
+        program: { select: { name: true } },
+      },
+      orderBy: [{ cancellationDate: "asc" }, { createdAt: "desc" }],
+    }),
   ]);
 
   const role = user?.role ?? null;
@@ -91,6 +107,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     spaces,
     homeRooms,
     recentCars,
+    programCancellations: programCancellations.map((notice) => ({
+      id: notice.id,
+      programName: notice.program.name,
+      cancellationDate: toDateInputValue(notice.cancellationDate),
+      title: notice.title,
+      message: notice.message,
+    })),
     controllerViewPreference: user?.controllerViewPreference ?? null,
     viewerDrawingEnabled,
     maxSpaceNumber,
@@ -110,6 +133,7 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
   const {
     homeRooms,
     recentCars: initialRecentCars,
+    programCancellations: initialProgramCancellations,
     permitted,
     role,
     user,
@@ -121,6 +145,7 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
   // Local spaces state — initialized from loader, updated by WebSocket
   const [spaces, setSpaces] = useState(loaderData.spaces);
   const [recentCars, setRecentCars] = useState(initialRecentCars);
+  const [programCancellations, setProgramCancellations] = useState(initialProgramCancellations);
   const [homeroomFilter, setHomeroomFilter] = useState(searchParams.get("room") ?? "");
 
   // Keep spaces in sync if loader data changes (e.g. after revalidation on WS reconnect)
@@ -131,6 +156,10 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
   useEffect(() => {
     setRecentCars(initialRecentCars);
   }, [initialRecentCars]);
+
+  useEffect(() => {
+    setProgramCancellations(initialProgramCancellations);
+  }, [initialProgramCancellations]);
 
   useEffect(() => {
     setHomeroomFilter(searchParams.get("room") ?? "");
@@ -177,6 +206,13 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
         }))
       );
       setRecentCars([]);
+    },
+    onProgramCancellation: ({ cancellation }) => {
+      toast(cancellation.title, { type: "warning", theme: "dark" });
+      setProgramCancellations((prev) => {
+        if (prev.some((notice) => notice.id === cancellation.id)) return prev;
+        return [cancellation, ...prev];
+      });
     },
   });
 
@@ -317,10 +353,13 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
     </div>
   );
 
+  const noticePanel = <ProgramCancellationBanner notices={programCancellations} />;
+
   // Controllers see a tabbed view: keypad or board (default board; preference persisted)
   if (role === "CONTROLLER") {
     return (
       <Page user={user}>
+        {noticePanel}
         <ControllerTabView
           spaces={spaces}
           onSpaceChange={handleSpaceChange}
@@ -335,6 +374,7 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
   // Viewers (and logged-out users) see just the board
   return (
     <Page user={user}>
+      {noticePanel}
       {permitted ? (
         <div className="flex justify-center">
           {/* Admin mobile caller view */}
@@ -426,6 +466,38 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
         </div>
       )}
     </Page>
+  );
+}
+
+function ProgramCancellationBanner({
+  notices,
+}: {
+  notices: {
+    id: string;
+    programName: string;
+    cancellationDate: string;
+    title: string;
+    message: string;
+  }[];
+}) {
+  if (notices.length === 0) return null;
+
+  return (
+    <div className="mx-auto my-3 flex w-[min(96vw,980px)] flex-col gap-2 rounded-xl border border-amber-300/40 bg-amber-300/15 p-4 text-amber-50 shadow-lg">
+      <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-amber-200">
+        <Megaphone className="h-4 w-4" />
+        Program cancellation notice
+      </div>
+      {notices.map((notice) => (
+        <div key={notice.id} className="rounded-lg bg-black/20 p-3">
+          <p className="font-semibold text-white">{notice.title}</p>
+          <p className="text-sm text-amber-100/90">
+            {notice.programName} · {notice.cancellationDate}
+          </p>
+          <p className="mt-1 text-sm text-white/80">{notice.message}</p>
+        </div>
+      ))}
+    </div>
   );
 }
 
