@@ -29,6 +29,10 @@ model User {
   locale                     String    @default("en")
   orgId                      String?
   org                        Org?      @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  /// Set for district admins. Mutually exclusive with orgId and isPlatformAdmin
+  /// at the application layer (validated in better-auth hooks).
+  districtId   String?
+  district     District? @relation(fields: [districtId], references: [id], onDelete: SetNull)
   sessions                   Session[]
   accounts                   Account[]
   passwordResetTokens        PasswordResetToken[]
@@ -36,6 +40,7 @@ model User {
   updatedAt                  DateTime  @updatedAt
 
   @@index([orgId])
+  @@index([districtId])
 }
 
 /// Password-reset tokens for the "forgot password" flow. We store only the
@@ -101,6 +106,11 @@ model Org {
   /// visitors on the tenant board, and as the locale for org-wide print views
   /// (print.board, print.master). See docs/i18n-contract.md.
   defaultLocale            String                   @default("en")
+  /// Optional FK to District. When set, the org's own Stripe and trial
+  /// fields are unused — billing flows through the district. Plan caps
+  /// still apply per-school (each school inherits CAMPUS-tier limits).
+  districtId             String?
+  district               District?                @relation(fields: [districtId], references: [id], onDelete: SetNull)
   users                  User[]
   appSettings            AppSettings[]
   viewerAccessAttempts   ViewerAccessAttempt[]
@@ -119,6 +129,8 @@ model Org {
   auditLogs              OrgAuditLog[]
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
+
+  @@index([districtId])
 }
 
 model OrgAuditLog {
@@ -132,6 +144,53 @@ model OrgAuditLog {
 
   @@index([orgId])
   @@index([orgId, createdAt])
+}
+
+model District {
+  id                       String                    @id @default(cuid())
+  name                     String
+  slug                     String                    @unique
+  logoUrl                  String?
+  logoObjectKey            String?
+  status                   OrgStatus                 @default(TRIALING)
+  /// Soft cap. Districts that exceed are flagged in the staff panel; school
+  /// creation is allowed but the district sees a banner and an audit-log
+  /// entry is written.
+  schoolCap                Int                       @default(3)
+  stripeCustomerId         String?                   @unique
+  stripeSubscriptionId     String?                   @unique
+  subscriptionStatus       StripeSubscriptionStatus?
+  billingPlan              BillingPlan               @default(DISTRICT)
+  trialStartedAt           DateTime?
+  /// Sales-set. No automatic enforcement at the district level — staff sets
+  /// this manually from the platform admin panel.
+  trialEndsAt              DateTime?
+  pastDueSinceAt           DateTime?
+  compedUntil              DateTime?
+  isComped                 Boolean                   @default(false)
+  billingNote              String?
+  passwordResetEnabled     Boolean                   @default(true)
+  defaultLocale            String                    @default("en")
+  orgs                     Org[]
+  users                    User[]
+  auditLogs                DistrictAuditLog[]
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+}
+
+model DistrictAuditLog {
+  id           String   @id @default(cuid())
+  districtId   String
+  district     District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  actorUserId  String?
+  actorEmail   String?
+  action       String
+  targetType   String?
+  targetId     String?
+  details      String?  // JSON-encoded
+  createdAt    DateTime @default(now())
+
+  @@index([districtId, createdAt])
 }
 
 /// Org-configurable safety drill template (fire, lockdown, secure, shelter, etc.).
