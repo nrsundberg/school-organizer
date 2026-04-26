@@ -187,12 +187,8 @@ async function insertSeedRows(
   const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
   const expiresAtIso = expiresAt.toISOString();
 
-  // Most writes here are INSERT-only. The single UPSERT is AppSettings:
-  // the schema has an `id TEXT PRIMARY KEY` with a seeded 'default' row,
-  // and `viewerPinHash` is a column not a per-id row — but we need one
-  // AppSettings row per org thanks to the migration 0005z orgId column,
-  // so we insert a fresh row keyed by a random id.
-  const appSettingsId = generateId();
+  // AppSettings is keyed by `orgId` directly (model AppSettings { orgId String @id }),
+  // so each tenant gets exactly one row — no separate id column.
 
   await db.batch(
     [
@@ -217,9 +213,9 @@ async function insertSeedRows(
         args: [sessionId, sessionToken, expiresAtIso, userId, nowIso, nowIso],
       },
       {
-        sql: `INSERT INTO "AppSettings" (id, viewerDrawingEnabled, viewerPinHash, orgId)
-              VALUES (?, 0, ?, ?)`,
-        args: [appSettingsId, pinHash, orgId],
+        sql: `INSERT INTO "AppSettings" (orgId, viewerDrawingEnabled, viewerPinHash)
+              VALUES (?, 0, ?)`,
+        args: [orgId, pinHash],
       },
       {
         sql: `INSERT INTO "Teacher" (homeRoom, orgId) VALUES (?, ?)`,
