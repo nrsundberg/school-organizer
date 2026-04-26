@@ -112,22 +112,43 @@ export async function getDistrictRollup(
   districtId: string,
 ): Promise<DistrictRollup> {
   const db = getDistrictDb(context);
-  const filter = buildSchoolFilter(districtId);
   const now = Date.now();
   const SEVEN = new Date(now - 7 * 24 * 60 * 60 * 1000);
   const THIRTY = new Date(now - 30 * 24 * 60 * 60 * 1000);
 
+  // Resolve the district's orgs first so every aggregate filters by an
+  // explicit IN-clause on orgId. This avoids depending on Prisma relation-
+  // filter behavior in groupBy.where (which is fine on SQLite/D1 today,
+  // but the IN-clause is one less moving part for cross-district safety).
+  const orgs = await db.org.findMany({
+    where: { districtId },
+    select: { id: true },
+  });
+  const orgIds = orgs.map((o) => o.id);
+  if (orgIds.length === 0) {
+    return {
+      totalStudents: 0,
+      totalFamilies: 0,
+      totalClassrooms: 0,
+      callsLast7d: 0,
+      callsLast30d: 0,
+      activeSchools: 0,
+    };
+  }
+
+  const orgScope = { orgId: { in: orgIds } };
+
   const [students, families, classrooms, calls7d, calls30d, activeSchools] =
     await Promise.all([
-      db.student.count({ where: filter }),
-      db.household.count({ where: filter }),
-      db.space.count({ where: filter }),
-      db.callEvent.count({ where: { ...filter, createdAt: { gte: SEVEN } } }),
-      db.callEvent.count({ where: { ...filter, createdAt: { gte: THIRTY } } }),
+      db.student.count({ where: orgScope }),
+      db.household.count({ where: orgScope }),
+      db.space.count({ where: orgScope }),
+      db.callEvent.count({ where: { ...orgScope, createdAt: { gte: SEVEN } } }),
+      db.callEvent.count({ where: { ...orgScope, createdAt: { gte: THIRTY } } }),
       db.callEvent
         .groupBy({
           by: ["orgId"],
-          where: { ...filter, createdAt: { gte: THIRTY } },
+          where: { ...orgScope, createdAt: { gte: THIRTY } },
           _count: true,
         })
         .then((rows) => rows.length),

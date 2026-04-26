@@ -1,11 +1,16 @@
 import { Button, Input } from "@heroui/react";
-import { Form, redirect } from "react-router";
+import { data, Form, redirect } from "react-router";
 import type { Route } from "./+types/signup";
 import { createDistrict } from "~/domain/district/district.server";
 import { writeDistrictAudit } from "~/domain/district/audit.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { getPrisma } from "~/db.server";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
+import {
+  checkRateLimit,
+  clientIpFromRequest,
+  getRateLimiter,
+} from "~/domain/utils/rate-limit.server";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const user = getOptionalUserFromContext(context);
@@ -85,6 +90,18 @@ export default function DistrictSignup({ actionData }: Route.ComponentProps) {
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
+  const clientIp = clientIpFromRequest(request);
+  const rl = await checkRateLimit({
+    limiter: getRateLimiter(context, "RL_AUTH"),
+    key: "district-signup:" + clientIp,
+  });
+  if (!rl.ok) {
+    return data(
+      { error: "Too many attempts. Please try again in a minute." },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
+
   const form = await request.formData();
   const districtName = String(form.get("districtName") ?? "").trim();
   const adminName = String(form.get("adminName") ?? "").trim();
@@ -106,6 +123,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     };
   }
 
+  const db = getPrisma(context);
   const auth = getAuth(context);
   let signup;
   try {
@@ -113,6 +131,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       body: { name: adminName, email: adminEmail, password: adminPassword },
     });
   } catch (err) {
+    // Roll back the District row so a failed signup doesn't burn the slug
+    // or pollute the staff panel.
+    await db.district.delete({ where: { id: district.id } }).catch(() => {});
     return {
       error:
         err instanceof Error
@@ -121,10 +142,10 @@ export async function action({ request, context }: Route.ActionArgs) {
     };
   }
   if (!signup?.user?.id) {
+    await db.district.delete({ where: { id: district.id } }).catch(() => {});
     return { error: "Could not create the district admin account." };
   }
 
-  const db = getPrisma(context);
   await db.user.update({
     where: { id: signup.user.id },
     data: { districtId: district.id, role: "ADMIN" },

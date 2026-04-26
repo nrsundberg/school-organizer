@@ -172,6 +172,10 @@ export async function action({ context, params, request }: Route.ActionArgs) {
   }
   if (newStripeId !== district.stripeCustomerId) {
     updates.stripeCustomerId = newStripeId;
+    audits.push({
+      action: "district.stripe.changed",
+      details: { from: district.stripeCustomerId, to: newStripeId },
+    });
   }
   if (
     (newCompedUntil?.getTime() ?? null) !==
@@ -192,7 +196,7 @@ export async function action({ context, params, request }: Route.ActionArgs) {
     updates.billingNote = newBillingNote;
     audits.push({
       action: "district.billing.note.changed",
-      details: {},
+      details: { from: district.billingNote, to: newBillingNote },
     });
   }
 

@@ -11,6 +11,7 @@ export const DISTRICT_AUDIT_ACTIONS = [
   "district.schoolCap.changed",
   "district.trialEndsAt.changed",
   "district.comp.changed",
+  "district.stripe.changed",
 ] as const;
 
 export type DistrictAuditAction = (typeof DISTRICT_AUDIT_ACTIONS)[number];

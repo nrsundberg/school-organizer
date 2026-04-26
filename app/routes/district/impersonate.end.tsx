@@ -3,12 +3,14 @@ import type { Route } from "./+types/impersonate.end";
 import { endImpersonation } from "~/domain/district/impersonation.server";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
+import { requireDistrictAdmin } from "~/domain/district/route-guard.server";
 
 export function loader() {
   return new Response("Method Not Allowed", { status: 405 });
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
+  requireDistrictAdmin(context);
   const user = getOptionalUserFromContext(context);
   if (!user) throw new Response("Unauthorized", { status: 401 });
 
