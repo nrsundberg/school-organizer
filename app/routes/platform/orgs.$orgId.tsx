@@ -1,4 +1,4 @@
-import { data, Form, Link } from "react-router";
+import { data, Form, Link, useActionData } from "react-router";
 import { getPrisma } from "~/db.server";
 import type { Route } from "./+types/orgs.$orgId";
 import { requirePlatformAdmin } from "~/domain/auth/platform-admin.server";
@@ -7,7 +7,7 @@ import { buildUsageSnapshot, countOrgUsage } from "~/domain/billing/plan-usage.s
 import { setOrgComp, clearOrgComp, recordOrgAudit } from "~/domain/billing/comp.server";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
 import { getPublicEnv } from "~/domain/utils/host.server";
-import { tenantBoardUrlFromRequest } from "~/lib/org-slug";
+import { schoolBoardHostname, tenantBoardUrlFromRequest } from "~/lib/org-slug";
 import type { UsageSnapshot } from "~/lib/plan-usage-types";
 import {
   inviteUser,
@@ -288,9 +288,24 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       // auth.api.impersonateUser with asResponse: true returns a full Response
       // with Set-Cookie headers we can forward.
       const auth = getAuth(context);
-      const env = getPublicEnv(context);
-      const root = (env.PUBLIC_ROOT_DOMAIN ?? "").trim();
-      const tenantHomeUrl = root ? `https://${org.slug}.${root}/` : `https://${org.slug}.localhost/`;
+
+      // Land admin/controller targets directly on /admin — that's the
+      // debug surface the impersonator is here for. Other roles go to
+      // the public board (landing on /admin would 403 the loader).
+      const targetUser = await db.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+      const tenantPath =
+        targetUser?.role === "ADMIN" || targetUser?.role === "CONTROLLER"
+          ? "/admin"
+          : "/";
+      const requestUrl = new URL(request.url);
+      const boardHost = schoolBoardHostname(requestUrl.hostname, org.slug);
+      const origin = requestUrl.port
+        ? `${requestUrl.protocol}//${boardHost}:${requestUrl.port}`
+        : `${requestUrl.protocol}//${boardHost}`;
+      const tenantHomeUrl = `${origin}${tenantPath}`;
 
       let impersonateResponse: Response;
       try {
@@ -403,13 +418,17 @@ function UsageBlock({ snapshot }: { snapshot: UsageSnapshot }) {
 
 export default function PlatformOrgDetail({
   loaderData,
-  actionData,
 }: Route.ComponentProps) {
   const { org, usageSnapshot, users, auditLogs, tenantHomeUrl, publicRootDomain, currentUserId } = loaderData;
-  const inviteError = (actionData as { ok?: boolean; error?: string } | undefined)?.error;
+  const actionData = useActionData<typeof action>() as
+    | { ok: true }
+    | { ok: false; error: string }
+    | undefined;
   const stripeCustomerUrl = org.stripeCustomerId
     ? `https://dashboard.stripe.com/customers/${org.stripeCustomerId}`
     : null;
+  const actionError =
+    actionData && actionData.ok === false ? actionData.error : null;
 
   return (
     <div className="space-y-8">
@@ -420,6 +439,15 @@ export default function PlatformOrgDetail({
         <h1 className="mt-2 text-2xl font-bold">{org.name}</h1>
         <p className="mt-1 font-mono text-sm text-white/60">{org.slug}</p>
       </div>
+
+      {actionError && (
+        <div
+          role="alert"
+          className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+        >
+          {actionError}
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
@@ -737,9 +765,6 @@ export default function PlatformOrgDetail({
             Send invite
           </button>
         </Form>
-        {inviteError ? (
-          <p className="mt-3 text-sm text-red-400">{inviteError}</p>
-        ) : null}
       </div>
 
       {/* Users table with impersonation + invite controls */}
