@@ -239,6 +239,12 @@ export function getAuth(context: any) {
     plugins: [
       admin({
         adminRoles: ["ADMIN", "PLATFORM_ADMIN"],
+        // Stock `adminAc` grants `user:impersonate` but not
+        // `user:impersonate-admins`, so without this flag the plugin
+        // refuses every target whose role is in `adminRoles` — which is
+        // the whole point of platform staff impersonating school admins.
+        // Caller is already gated to PLATFORM_ADMIN by `requirePlatformAdmin`.
+        allowImpersonatingAdmins: true,
         roles: {
           ADMIN: adminAc,
           PLATFORM_ADMIN: adminAc,
