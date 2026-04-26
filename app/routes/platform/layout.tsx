@@ -24,6 +24,9 @@ export default function PlatformLayout() {
           <NavLink to="/platform" end className={navLinkClass}>
             Orgs
           </NavLink>
+          <NavLink to="/platform/districts" className={navLinkClass}>
+            Districts
+          </NavLink>
           <NavLink to="/platform/signups" className={navLinkClass}>
             Signups
           </NavLink>
