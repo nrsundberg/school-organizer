@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "postinstall": "prisma generate",
     "build": "prisma generate && react-router build",
     "dev": "react-router dev",
     "dev:worker": "npm run build && wrangler dev",
