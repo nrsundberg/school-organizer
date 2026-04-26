@@ -388,3 +388,8 @@ From `docs/research/2026-04-25-schools.md` (parent-comms during dismissal angle)
 - Should ship paired with the dispatcher chime (cheap, named-complaint fix) — note in spec, but keep it as a separate ticket so the chime isn't gated on geofence work.
 - Build size: M (S for the chime alone if we split).
 
+
+## [research: 2026-04-26]
+- sub-packet-print: One-button "today's sub packet" PDF per classroom — live dismissal chart with today's exceptions, photo roster, allergies, IEP/504 flags, drill quick-card. Replaces the stale paper sub binder. Strong signal across every elementary-teacher source. Source: docs/research/2026-04-26-schools.md (hypothesis 1).
+- sub-mode-qr-link: Per-classroom QR card → 12-hour scoped, audit-logged, no-account read-only view of today's dismissal data + drill cheatsheet. Validates the PowerSchool sub-portal pattern at the dismissal layer where no competitor has it. Source: docs/research/2026-04-26-schools.md (hypothesis 2).
+- todays-exceptions-diff: 1-line "what's different vs. the printed chart on the wall" banner at the top of every classroom dismissal screen. Tiny build, high leverage, useful for regular teachers and indispensable for subs. Source: docs/research/2026-04-26-schools.md (hypothesis 3).
