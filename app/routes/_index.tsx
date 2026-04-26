@@ -105,7 +105,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   ]);
 
   const role = user?.role ?? null;
-  const permitted = role === "CONTROLLER";
+  const permitted = role === "ADMIN" || role === "CONTROLLER";
   const maxSpaceNumber =
     spaces.length > 0 ? Math.max(...spaces.map((s) => s.spaceNumber)) : 0;
   const viewerDrawingEnabled = appSettings?.viewerDrawingEnabled ?? false;

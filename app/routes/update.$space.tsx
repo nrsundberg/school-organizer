@@ -2,12 +2,20 @@ import type { Route } from "./+types/update.$space";
 import { redirect } from "react-router";
 import { assertTrialAllowsNewPickup } from "~/domain/billing/trial-enforcement.server";
 import { getActorIdsFromContext, getOrgFromContext } from "~/domain/utils/global-context.server";
+import { protectToAdminAndGetPermissions } from "~/sessions.server";
 
 export async function action({ params, context }: Route.ActionArgs) {
   const { space } = params;
   if (space === undefined) {
     throw redirect("/");
   }
+
+  // Spot-call is privileged: only signed-in ADMIN/CONTROLLER users may
+  // record dismissals. The home-page UI hides the buttons from anyone
+  // else, but this server-side gate is what actually enforces it —
+  // throws 401/403 (Response, not redirect) so the fetcher submission
+  // surfaces a real failure rather than a silent UI bounce.
+  await protectToAdminAndGetPermissions(context);
 
   // Tenant routes always have an org (set by globalStorageMiddleware via
   // host resolution). Required strictly here because we route to a
