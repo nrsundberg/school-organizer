@@ -47,10 +47,10 @@ test.describe("marketing site", () => {
   }) => {
     await page.goto("/pricing");
 
-    // Each plan card renders a signup CTA whose href encodes the plan slug
-    // and billing cycle. Car Line / Campus use "Continue to Signup"; the
-    // District card keeps "Start Free Trial". Match by href so the test is
-    // resilient to label tweaks.
+    // Car Line / Campus go through the self-serve `/signup` flow with
+    // plan + cycle in the query string; the District CTA jumps straight
+    // to `/district/signup` (a separate guided flow). Match by href so
+    // the test is resilient to label/copy tweaks.
     await expect(
       page.locator('a[href="/signup?plan=car-line&cycle=monthly"]')
     ).toBeVisible();
@@ -58,7 +58,7 @@ test.describe("marketing site", () => {
       page.locator('a[href="/signup?plan=campus&cycle=monthly"]')
     ).toBeVisible();
     await expect(
-      page.locator('a[href="/signup?plan=district&cycle=monthly"]')
+      page.locator('a[href="/district/signup"]')
     ).toBeVisible();
   });
 
