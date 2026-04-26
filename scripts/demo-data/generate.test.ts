@@ -105,3 +105,24 @@ test("every demo org has at least one Org and one Account in the seed", async ()
     assert.ok(hasAccount, `${spec.slug}: missing Account insert`);
   }
 });
+
+import { emitSql } from "./emit-sql";
+
+test("emitSql escapes single quotes and renders NULL", () => {
+  const sql = emitSql({
+    wipeStatements: [],
+    seedStatements: [
+      { sql: `INSERT INTO "T" (a, b, c) VALUES (?, ?, ?)`, args: ["O'Brien", 42, null] },
+    ],
+  });
+  assert.match(sql, /VALUES \('O''Brien', 42, NULL\)/);
+});
+
+test("emitSql throws on arg-count mismatch", () => {
+  assert.throws(() =>
+    emitSql({
+      wipeStatements: [],
+      seedStatements: [{ sql: `INSERT INTO "T" VALUES (?, ?)`, args: ["x"] }],
+    }),
+  );
+});
