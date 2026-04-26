@@ -127,7 +127,7 @@ Remaining work is split into 0d.1 / 0d.2 / 0d.3 so a flaky single flow doesn't b
 
 ---
 
-### 0d.2. `[ ]` interaction-tests-signup-to-paid — Signup → Stripe Checkout redirect spec
+### 0d.2. `[x]` interaction-tests-signup-to-paid — Signup → Stripe Checkout redirect spec (shipped 2026-04-25 on `nightly-build/2026-04-25-0d2-signup-to-paid`, BLOCKED awaiting Noah's morning gate per `docs/nightly/2026-04-25-build.md`)
 
 **Depends on:** `e2e/fixtures/seeded-tenant.ts` landed.
 
