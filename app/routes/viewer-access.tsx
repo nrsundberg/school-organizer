@@ -1,4 +1,5 @@
 import { Button, Input } from "@heroui/react";
+import { useRef } from "react";
 import { data, Form, redirect, useNavigation, useRouteLoaderData } from "react-router";
 import { useTranslation } from "react-i18next";
 import { dataWithError } from "remix-toast";
@@ -92,7 +93,20 @@ export default function ViewerAccess({ loaderData, actionData }: Route.Component
   const { t } = useTranslation("auth");
   const nav = useNavigation();
   const isBusy = nav.state !== "idle";
-  const fieldError = (actionData as any)?.fieldError ?? loaderData.tokenError ?? loaderData.lockMessage;
+  const formRef = useRef<HTMLFormElement | null>(null);
+  // While a submit is mid-flight we explicitly hide the previous
+  // attempt's `fieldError` text. Without this, two consecutive wrong-PIN
+  // submits (different "N attempts left" strings) reuse the same <p>
+  // node and Playwright's locator can read the previous attempt's text
+  // before React Router has flushed the new `actionData` — RR holds it
+  // until both the action and the loader revalidation resolve. The
+  // imperative `onSubmit` cleanup below covers the gap between the
+  // click event and React's first re-render after `nav.state` flips
+  // to "submitting".
+  const fieldError =
+    nav.state === "submitting"
+      ? null
+      : ((actionData as any)?.fieldError ?? loaderData.tokenError ?? loaderData.lockMessage);
 
   // Pull tenant branding from the root loader so the header carries the
   // school's logo + primary color. `useRouteLoaderData` returns undefined
@@ -113,7 +127,23 @@ export default function ViewerAccess({ loaderData, actionData }: Route.Component
           <p className="text-white/60 text-sm mb-5">
             {t("viewerAccess.subtitle")}
           </p>
-          <Form method="post" className="space-y-3">
+          <Form
+            method="post"
+            className="space-y-3"
+            ref={formRef}
+            onSubmit={() => {
+              // Drop the previous attempt's inline error from the DOM
+              // synchronously, before `<Form>`'s fetch even starts.
+              // This is what gates the Playwright auto-wait inside
+              // `inlineError.innerText()` on the second submit — otherwise
+              // it reads the previous attempt's text before RR's
+              // action+revalidate cycle has flushed `actionData`.
+              const prev = formRef.current?.querySelector<HTMLElement>(
+                "[data-viewer-pin-error]",
+              );
+              if (prev) prev.remove();
+            }}
+          >
             <input type="hidden" name="next" value={loaderData.next} />
             <Input
               name="pin"
@@ -122,7 +152,14 @@ export default function ViewerAccess({ loaderData, actionData }: Route.Component
               autoFocus
               autoComplete="off"
             />
-            {fieldError ? <p className="text-sm text-red-400">{fieldError}</p> : null}
+            {fieldError ? (
+              <p
+                data-viewer-pin-error=""
+                className="text-sm text-red-400"
+              >
+                {fieldError}
+              </p>
+            ) : null}
             <Button type="submit" variant="primary" isPending={isBusy} className="w-full">
               {t("viewerAccess.submit")}
             </Button>
