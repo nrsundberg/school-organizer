@@ -17,19 +17,61 @@
  * against a real tenant host. Asserting status==302 is a sufficient
  * regression guard for the YOU_CANNOT_IMPERSONATE_ADMINS bug.
  */
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { createClient } from "@libsql/client";
 import { test, expect } from "../fixtures/seeded-tenant";
-import { generateId, hashPassword, randomToken } from "../fixtures/seed-helpers";
+import {
+  generateId,
+  hashPassword,
+  randomToken,
+  readBetterAuthSecret,
+  sessionCookieName,
+  signCookieValue,
+} from "../fixtures/seed-helpers";
 
 const COOKIE_PREFIX = "pickuproster";
-const SESSION_COOKIE = `${COOKIE_PREFIX}.session_token`;
+// `wrangler dev` runs with `ENVIRONMENT=development` (top-level vars in
+// wrangler.jsonc), so better-auth uses the unprefixed cookie name. The
+// value still has to be HMAC-signed with `BETTER_AUTH_SECRET` —
+// `getSignedCookie` returns null on raw tokens and the middleware would
+// redirect every authenticated route to `/login`.
+const SESSION_COOKIE = sessionCookieName({
+  cookiePrefix: COOKIE_PREFIX,
+  useSecureCookies: false,
+});
 
+/**
+ * Mirror the seeded-tenant fixture's D1 lookup. The spec inserts the
+ * platform-admin session row directly, and wrangler dev reads from the
+ * miniflare D1 sqlite under
+ * `.wrangler/state/v3/d1/miniflare-D1DatabaseObject/<hash>.sqlite` —
+ * NOT from `./dev.db`. A simpler `file:./dev.db` fallback would write
+ * to a different DB than wrangler reads, the session row would be
+ * invisible to the worker, `requirePlatformAdmin` would redirect to
+ * /login, and the test would fail with `location=/login?next=...`
+ * instead of the expected `/admin`.
+ */
 function databaseUrl(): string {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  // Mirror seeded-tenant fixture's lookup. Wrangler 4 stores the local D1 sqlite
-  // at .wrangler/state/v3/d1/miniflare-D1DatabaseObject/<hash>.sqlite — we
-  // cannot statically reference the hash so the fixture finds it dynamically.
-  // For this spec we accept DATABASE_URL or the dev.db fallback.
+  const wranglerD1Dir = path.resolve(
+    ".wrangler/state/v3/d1/miniflare-D1DatabaseObject",
+  );
+  if (fs.existsSync(wranglerD1Dir)) {
+    const candidates = fs
+      .readdirSync(wranglerD1Dir)
+      .filter((f) => f.endsWith(".sqlite") && !f.startsWith("metadata"));
+    if (candidates.length === 1) {
+      return `file:${path.join(wranglerD1Dir, candidates[0])}`;
+    }
+    if (candidates.length > 1) {
+      throw new Error(
+        `platform-impersonate spec: multiple wrangler local D1 sqlites in ${wranglerD1Dir} (${candidates.join(
+          ", ",
+        )}). Set DATABASE_URL to disambiguate.`,
+      );
+    }
+  }
   return "file:./dev.db";
 }
 
@@ -76,10 +118,19 @@ test.describe("@flow platform-impersonate — admin can impersonate org admin", 
       // (apex localhost) so the request hits the same host the platform
       // panel lives on. Send the session cookie via the Cookie header
       // because Playwright's request context isn't bound to any subdomain.
+      //
+      // The cookie value has to be `URL_ENCODED(<token>.<base64-hmac>)`
+      // because better-auth verifies the signature before doing the DB
+      // lookup. Sending just `<token>` looks like a forged cookie and
+      // gets dropped, after which `requirePlatformAdmin` throws a
+      // redirect to `/login?next=/platform/orgs/...` — not the 302 to
+      // `/admin` this test is asserting.
+      const betterAuthSecret = readBetterAuthSecret();
+      const signedCookieValue = await signCookieValue(sessionToken, betterAuthSecret);
       const url = tenant.marketingUrl(`/platform/orgs/${tenant.orgId}`);
       const response = await request.post(url, {
         headers: {
-          cookie: `${SESSION_COOKIE}=${sessionToken}`,
+          cookie: `${SESSION_COOKIE}=${signedCookieValue}`,
           "content-type": "application/x-www-form-urlencoded",
         },
         data: new URLSearchParams({

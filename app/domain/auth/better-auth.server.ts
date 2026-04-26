@@ -66,6 +66,22 @@ export function getAuth(context: any) {
   const secret = (env as any).BETTER_AUTH_SECRET ?? process.env.BETTER_AUTH_SECRET;
 
   const marketingHosts = marketingHostsFromEnv(envRecord);
+  // `wrangler dev` runs on a localhost port (8787 by default in CI, may
+  // differ locally). The browser sends Origin: http://localhost:8787 on
+  // auth API calls, but better-auth's origin check compares the bare
+  // strings — `pattern === origin` for non-wildcard entries — and the
+  // automatic `http://localhost` it derives from `allowedHosts` doesn't
+  // include the port, so every authed POST gets rejected with
+  // INVALID_ORIGIN. Adding an explicit `http://<host>:*` wildcard pattern
+  // for each localhost-style marketing host lets any port through in dev/
+  // CI without affecting production (publicRoot uses fixed 80/443).
+  const localhostLikeMarketingHosts = marketingHosts.filter(
+    (h) => h === "localhost" || h === "127.0.0.1",
+  );
+  const localhostTrustedOrigins = localhostLikeMarketingHosts.flatMap((h) => [
+    `http://${h}`,
+    `http://${h}:*`,
+  ]);
   const baseURLConfig =
     shareSubdomainCookies && publicRoot
       ? {
@@ -78,6 +94,7 @@ export function getAuth(context: any) {
             `https://${publicRoot}`,
             `https://www.${publicRoot}`,
             `https://*.${publicRoot}`,
+            ...localhostTrustedOrigins,
           ],
         }
       : {};

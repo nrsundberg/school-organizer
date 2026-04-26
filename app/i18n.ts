@@ -26,7 +26,6 @@ import HttpBackend from "i18next-http-backend";
 import {
   DEFAULT_LANGUAGE,
   DEFAULT_NAMESPACE,
-  I18N_NAMESPACES,
   LOCALE_COOKIE_NAME,
   SUPPORTED_LANGUAGE_CODES,
 } from "~/lib/i18n-config";
@@ -50,7 +49,23 @@ export async function initI18nClient(): Promise<typeof i18next> {
       supportedLngs: [...SUPPORTED_LANGUAGE_CODES],
       fallbackLng: DEFAULT_LANGUAGE,
       defaultNS: DEFAULT_NAMESPACE,
-      ns: [...I18N_NAMESPACES],
+      // Don't preload namespaces during init. We currently render SSR
+      // *without* an initialized i18next (entry.server.tsx renders the React
+      // tree directly), so the server emits raw translation keys ("signup.
+      // step1.title" etc). If the client preloads `common`/`auth`/… during
+      // init and then hydrates with translated strings, the SSR/CSR markup
+      // diverges on every i18n'd label and React aborts hydration with
+      // error #418. That mismatch reset the controlled-input state mid form-
+      // fill on /signup, which made the step-1 → step-2 transition fail in
+      // CI (e2e/flows/signup-step-bounce.spec.ts).
+      //
+      // Instead, leave `ns` empty so init returns without fetching anything,
+      // hydrate happens with zero translations (matching SSR), and the
+      // http backend lazy-loads each namespace the moment a component calls
+      // `useTranslation("ns")` post-hydrate. There's a brief flash of keys
+      // before the JSON arrives, but it's strictly better than a tree-wide
+      // hydration abort.
+      ns: [],
       // We only ship the short codes (`en`, `es`); strip region tags
       // ("en-US" → "en") so a browser-detected `pt-BR` doesn't try to load a
       // 404'ing `pt-BR/common.json`.
