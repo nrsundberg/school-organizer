@@ -53,7 +53,6 @@ function viewerAccess(
 function auth(overrides: Partial<AdminUsersAuth["api"]> = {}): AdminUsersAuth {
   return {
     api: {
-      createUser: async () => ({ user: { id: "created-user" } }),
       banUser: async () => {},
       unbanUser: async () => {},
       ...overrides,
@@ -163,93 +162,9 @@ test("loadAdminUsersData returns users, active locks, current user, and org rese
   assert.equal(lockFindCalls.length, 1);
 });
 
-test("handleAdminUsersAction creates a user with a temporary password and then applies the requested role", async () => {
-  const { prisma, calls } = prismaFixture();
-  const createCalls: unknown[] = [];
-
-  const outcome = await handleAdminUsersAction({
-    formData: formData({
-      action: "createUser",
-      name: "Ada Lovelace",
-      email: "ada@example.org",
-      role: "CONTROLLER",
-    }),
-    requestHeaders: new Headers({ cookie: "session=1" }),
-    requestUrl: "https://school.example.org/admin/users",
-    actor: actor(),
-    org: org(),
-    prisma,
-    auth: auth({
-      createUser: async (args) => {
-        createCalls.push(args);
-        return { user: { id: "created-user" } };
-      },
-    }),
-    hashPassword: async () => "unused",
-    viewerAccess: viewerAccess(),
-    makeTempPassword: () => "TempPass123",
-  });
-
-  // Outcome carries a translation-ready ServerMessage rather than a string —
-  // route boundary will resolve via t(key, params).
-  assert.deepEqual(outcome, {
-    kind: "success",
-    data: { tempPassword: "TempPass123" },
-    message: {
-      key: "admin:users.toasts.userCreated",
-      params: { password: "TempPass123" },
-    },
-  });
-  assert.deepEqual(createCalls, [
-    {
-      body: {
-        name: "Ada Lovelace",
-        email: "ada@example.org",
-        password: "TempPass123",
-        data: { mustChangePassword: true },
-      },
-      headers: new Headers({ cookie: "session=1" }),
-    },
-  ]);
-  assert.deepEqual(calls.userUpdates, [
-    { where: { id: "created-user" }, data: { role: "CONTROLLER" } },
-  ]);
-});
-
-test("handleAdminUsersAction returns the duplicate-account toast outcome without updating role", async () => {
-  const { prisma, calls } = prismaFixture();
-
-  const outcome = await handleAdminUsersAction({
-    formData: formData({
-      action: "createUser",
-      name: "Ada Lovelace",
-      email: "ada@example.org",
-      role: "ADMIN",
-    }),
-    requestHeaders: new Headers(),
-    requestUrl: "https://school.example.org/admin/users",
-    actor: actor(),
-    org: org(),
-    prisma,
-    auth: auth({
-      createUser: async () => {
-        throw Object.assign(new Error("account already exists"), {
-          status: 422,
-        });
-      },
-    }),
-    hashPassword: async () => "unused",
-    viewerAccess: viewerAccess(),
-    makeTempPassword: () => "TempPass123",
-  });
-
-  assert.deepEqual(outcome, {
-    kind: "error",
-    data: null,
-    message: { key: "admin:users.errors.emailExists" },
-  });
-  assert.deepEqual(calls.userUpdates, []);
-});
+// Note: user creation moved out of `handleAdminUsersAction` — the
+// /admin/users route action now calls `inviteUser` directly (see
+// app/domain/admin-users/invite-user.server.ts and its dedicated tests).
 
 test("handleAdminUsersAction gates password-reset toggles to admins and writes typed org data", async () => {
   const nonAdmin = prismaFixture();

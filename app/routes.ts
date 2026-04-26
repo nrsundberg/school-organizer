@@ -88,6 +88,7 @@ export default [
 
   route("platform", "routes/platform/layout.tsx", [
     index("routes/platform/index.tsx"),
+    route("users", "routes/platform/users.tsx"),
     route("orgs/new", "routes/platform/orgs.new.tsx"),
     route("orgs/:orgId", "routes/platform/orgs.$orgId.tsx"),
     route("signups", "routes/platform/signups.tsx"),
@@ -118,5 +119,6 @@ export default [
 
   route("billing-required", "routes/billing-required.tsx"),
   route("logout", "routes/auth/logout.ts"),
-  route("set-password", "routes/set-password.tsx")
+  route("set-password", "routes/set-password.tsx"),
+  route("accept-invite", "routes/accept-invite.tsx")
 ] satisfies RouteConfig;

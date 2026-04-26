@@ -70,6 +70,30 @@ export type PasswordResetMessage = {
 };
 
 /**
+ * "Staff created an account for you" invite. Single CTA: the magic link
+ * that lets the recipient set their password and sign in for the first
+ * time. No password is ever included.
+ */
+export type UserInviteMessage = {
+  kind: "user_invite";
+  to: string;
+  /** Optional greeting name; template falls back to "there". */
+  firstName: string | null;
+  /** Fully-qualified URL to /accept-invite, including the raw token. */
+  inviteUrl: string;
+  /** Days until the invite link expires — e.g. 7. */
+  expiryDays: number;
+  /**
+   * Friendly source label for the body copy. Pass the org/district name
+   * for org/district invites, or null for platform-staff invites
+   * (template falls back to a generic "Pickup Roster team" string).
+   */
+  invitedToLabel: string | null;
+  /** Recipient locale. Optional; defaults to "en". */
+  locale?: EmailLocale;
+};
+
+/**
  * Queue-heartbeat probe. Enqueued by the 2-minute status cron; dropped by the
  * consumer before reaching Resend. No template or email send is associated.
  */
@@ -85,7 +109,8 @@ export type SendableEmailMessage =
   | WelcomeMessage
   | TrialExpiringMessage
   | MidTrialCheckinMessage
-  | PasswordResetMessage;
+  | PasswordResetMessage
+  | UserInviteMessage;
 
 export type EmailMessage = SendableEmailMessage | ProbeMessage;
 

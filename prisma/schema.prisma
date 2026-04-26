@@ -36,6 +36,7 @@ model User {
   sessions                   Session[]
   accounts                   Account[]
   passwordResetTokens        PasswordResetToken[]
+  userInviteTokens           UserInviteToken[]
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
 
@@ -57,6 +58,28 @@ model PasswordResetToken {
   requestedAt       DateTime  @default(now())
   requestIp         String?
   requestUserAgent  String?
+
+  @@index([tokenHash])
+  @@index([userId])
+}
+
+/// Invite tokens for "staff creates a user" flow. The invitee clicks the link
+/// in the email, sets a password, and is signed in — no temp password is ever
+/// shown. Same sha256-hashed-token discipline as PasswordResetToken; longer
+/// TTL (default 7 days) and a separate model so the audit trail stays clean.
+model UserInviteToken {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// sha256(token) — hex-encoded. The raw token only lives in the email.
+  tokenHash       String
+  expiresAt       DateTime
+  usedAt          DateTime?
+  revokedAt       DateTime?
+  /// Userid of the staff member who issued the invite. Nullable for system
+  /// flows (e.g. district signup auto-provisions a school admin).
+  invitedByUserId String?
+  createdAt       DateTime  @default(now())
 
   @@index([tokenHash])
   @@index([userId])

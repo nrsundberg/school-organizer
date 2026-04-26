@@ -7,6 +7,11 @@ const TEMP_PASSWORD_CHARS =
   "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
 const TEMP_PASSWORD_LENGTH = 12;
 
+// New-user creation goes through the magic-link invite flow handled
+// directly by the route action (see app/routes/admin/users.tsx). This
+// shared handler still owns reset-password, change-role, ban, etc. — it
+// just doesn't mint plaintext passwords for brand-new users anymore.
+
 export type AdminUsersPrisma = Pick<
   PrismaClient,
   "account" | "org" | "session" | "user"
@@ -58,15 +63,6 @@ export type AdminUsersActionOutcome =
 
 export type AdminUsersAuth = {
   api: {
-    createUser(args: {
-      body: {
-        name: string;
-        email: string;
-        password: string;
-        data: { mustChangePassword: true };
-      };
-      headers: Headers;
-    }): Promise<{ user?: { id: string } } | null | undefined>;
     banUser(args: {
       body: { userId: string; banReason: string };
       headers: Headers;
@@ -110,13 +106,6 @@ export type HandleAdminUsersActionArgs = {
   viewerAccess: AdminUsersViewerAccess;
   makeTempPassword?: TempPasswordGenerator;
 };
-
-const createUserSchema = zfd.formData({
-  action: zfd.text(),
-  name: zfd.text(),
-  email: zfd.text(z.string().email()),
-  role: zfd.text(),
-});
 
 const resetPasswordSchema = zfd.formData({
   action: zfd.text(),
@@ -235,47 +224,11 @@ export async function handleAdminUsersAction({
 }: HandleAdminUsersActionArgs): Promise<AdminUsersActionOutcome> {
   const action = formAction(formData);
 
-  if (action === "createUser") {
-    const { name, email, role } = createUserSchema.parse(formData);
-    const tempPassword = makeTempPassword();
-    try {
-      const result = await auth.api.createUser({
-        body: {
-          name,
-          email,
-          password: tempPassword,
-          data: { mustChangePassword: true },
-        },
-        headers: requestHeaders,
-      });
-      if (!result?.user) throw new Error("Failed to create user");
-      await prisma.user.update({
-        where: { id: result.user.id },
-        data: { role },
-      });
-      return {
-        kind: "success",
-        data: { tempPassword },
-        message: {
-          key: "admin:users.toasts.userCreated",
-          params: { password: tempPassword },
-        },
-      };
-    } catch (error) {
-      if (isDuplicateUserError(error)) {
-        return {
-          kind: "error",
-          data: null,
-          message: { key: "admin:users.errors.emailExists" },
-        };
-      }
-      return {
-        kind: "error",
-        data: null,
-        message: { key: "admin:users.errors.createUserFailed" },
-      };
-    }
-  }
+  // `createUser` is no longer handled here — see /admin/users.tsx route
+  // action, which calls inviteUser (the magic-link flow) directly. We
+  // intentionally do not return a misleading success here; if a stale
+  // form ever posts `action=createUser`, fall through to the unknown
+  // action error so we notice instead of silently swallowing it.
 
   if (action === "resetPassword") {
     const { userId } = resetPasswordSchema.parse(formData);
