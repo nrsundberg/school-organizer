@@ -39,6 +39,7 @@ import { isMarketingHost } from "~/domain/utils/host.server";
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { ImpersonationBanner } from "~/components/ImpersonationBanner";
+import { DistrictImpersonationBanner } from "~/components/DistrictImpersonationBanner";
 import { Footer } from "~/components/Footer";
 import logo from "/logo-icon.svg?url";
 import { getBrandingFromOrg } from "~/domain/org/branding.server";
@@ -160,11 +161,25 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 
   let impersonatedBy: string | null = null;
+  let districtImpersonation: { active: boolean; orgName: string | null } = {
+    active: false,
+    orgName: null,
+  };
   if (user) {
     try {
       const auth = getAuth(context);
       const session = await auth.api.getSession({ headers: request.headers });
       impersonatedBy = (session?.session as any)?.impersonatedBy ?? null;
+      const impersonatedOrgId =
+        (session?.session as any)?.impersonatedOrgId ?? null;
+      if (impersonatedOrgId) {
+        // The org context resolved through globalStorageMiddleware already
+        // points at the impersonated org (it honors session.impersonatedOrgId).
+        districtImpersonation = {
+          active: true,
+          orgName: org?.name ?? null,
+        };
+      }
     } catch {
       // ignore
     }
@@ -196,6 +211,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       toast,
       user,
       impersonatedBy,
+      districtImpersonation,
       branding: getBrandingFromOrg(org),
       marketing,
       dashboardUrl,
@@ -289,6 +305,7 @@ export default function App({ loaderData }: Route.ComponentProps) {
     toast,
     user,
     impersonatedBy,
+    districtImpersonation,
     branding,
     supportEmail,
     sentryDsn,
@@ -355,6 +372,10 @@ export default function App({ loaderData }: Route.ComponentProps) {
         {impersonatedBy && user && (
           <ImpersonationBanner userName={user.name || user.email} />
         )}
+        <DistrictImpersonationBanner
+          active={districtImpersonation.active}
+          orgName={districtImpersonation.orgName}
+        />
         <ToastContainer />
         <main id="main-content" className="flex-1">
           <Outlet />

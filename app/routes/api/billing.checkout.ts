@@ -29,6 +29,19 @@ export async function action({ request, context }: Route.ActionArgs) {
     return redirectWithError("/login", "Sign in to continue.");
   }
 
+  // Schools inside a district have billing managed by the district.
+  const prismaForOrgCheck = getPrisma(context);
+  const orgRow = await prismaForOrgCheck.org.findUnique({
+    where: { id: user.orgId },
+    select: { districtId: true },
+  });
+  if (orgRow?.districtId) {
+    return new Response(
+      "Billing for this school is managed by your district.",
+      { status: 403 },
+    );
+  }
+
   // Rate limit by orgId (preferred) or client IP
   const clientIp = clientIpFromRequest(request);
   const rlResult = await checkRateLimit({

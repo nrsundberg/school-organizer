@@ -19,7 +19,7 @@ type NavItem = {
   end?: boolean;
 };
 
-const navItems: NavItem[] = [
+const baseNavItems: NavItem[] = [
   { to: "/admin", labelKey: "sidebar.dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/users", labelKey: "sidebar.users", icon: Users },
   { to: "/admin/households", labelKey: "sidebar.households", icon: Home },
@@ -28,11 +28,27 @@ const navItems: NavItem[] = [
   { to: "/admin/drills", labelKey: "sidebar.drills", icon: ClipboardList },
   { to: "/admin/history", labelKey: "sidebar.history", icon: History },
   { to: "/admin/branding", labelKey: "sidebar.branding", icon: Palette },
-  { to: "/admin/billing", labelKey: "sidebar.billing", icon: CreditCard },
 ];
 
-export default function AdminSidebar({ onLinkClick }: { onLinkClick?: () => void }) {
+const billingNavItem: NavItem = {
+  to: "/admin/billing",
+  labelKey: "sidebar.billing",
+  icon: CreditCard,
+};
+
+export default function AdminSidebar({
+  onLinkClick,
+  showBilling = true,
+}: {
+  onLinkClick?: () => void;
+  /**
+   * Hidden for orgs whose billing is managed by a district. Default true so
+   * non-district orgs are unaffected.
+   */
+  showBilling?: boolean;
+}) {
   const { t } = useTranslation("admin");
+  const navItems = showBilling ? [...baseNavItems, billingNavItem] : baseNavItems;
   return (
     <nav className="flex flex-col gap-1 p-4">
       <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-2 px-2">

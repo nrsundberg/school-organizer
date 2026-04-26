@@ -48,6 +48,9 @@ export async function loader({ context }: Route.LoaderArgs) {
     usage,
     pastDuePaymentBanner,
     compedUntil: org.compedUntil ? org.compedUntil.toISOString() : null,
+    // Schools inside a district don't manage their own billing — hide the
+    // sidebar Billing link.
+    orgIsInDistrict: !!org.districtId,
   };
 }
 
@@ -118,7 +121,8 @@ export function ErrorBoundary() {
 
 export default function AdminLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { usage, pastDuePaymentBanner, compedUntil } = useLoaderData<typeof loader>();
+  const { usage, pastDuePaymentBanner, compedUntil, orgIsInDistrict } =
+    useLoaderData<typeof loader>();
   const { t, i18n } = useTranslation("admin");
   const isComped = !!compedUntil && new Date(compedUntil) > new Date();
   const rootData = useRouteLoaderData("root") as
@@ -146,7 +150,7 @@ export default function AdminLayout() {
       <div className="flex flex-1">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-56 min-h-screen bg-[#1a1f1f] border-r border-white/10 flex-shrink-0">
-        <AdminSidebar />
+        <AdminSidebar showBilling={!orgIsInDistrict} />
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
@@ -184,7 +188,10 @@ export default function AdminLayout() {
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto">
-                <AdminSidebar onLinkClick={() => setDrawerOpen(false)} />
+                <AdminSidebar
+                  onLinkClick={() => setDrawerOpen(false)}
+                  showBilling={!orgIsInDistrict}
+                />
               </div>
             </div>
           </div>

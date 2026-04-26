@@ -1,4 +1,4 @@
-import { Form, Link, useNavigation } from "react-router";
+import { Form, Link, redirect, useNavigation } from "react-router";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/billing";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
@@ -15,6 +15,12 @@ export const meta: Route.MetaFunction = ({ data }) => [
 export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const org = getOptionalOrgFromContext(context);
+
+  // Schools inside a district don't manage their own billing — billing is
+  // owned by the district at /district/billing.
+  if (org?.districtId) {
+    throw redirect("/admin");
+  }
 
   const now = new Date();
   const trialDaysRemaining =

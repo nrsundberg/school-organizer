@@ -1,6 +1,7 @@
 import { data, redirect } from "react-router";
 import { redirectWithError } from "remix-toast";
 import type { Route } from "./+types/billing.portal";
+import { getPrisma } from "~/db.server";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
 import { createBillingPortalSessionForOrg } from "~/domain/billing/checkout.server";
 import {
@@ -17,6 +18,19 @@ export async function action({ request, context }: Route.ActionArgs) {
   const user = getOptionalUserFromContext(context);
   if (!user || !user.orgId) {
     return redirectWithError("/login", "Sign in to continue.");
+  }
+
+  // Schools inside a district have billing managed by the district.
+  const prismaForOrgCheck = getPrisma(context);
+  const orgRow = await prismaForOrgCheck.org.findUnique({
+    where: { id: user.orgId },
+    select: { districtId: true },
+  });
+  if (orgRow?.districtId) {
+    return new Response(
+      "Billing for this school is managed by your district.",
+      { status: 403 },
+    );
   }
 
   // Rate limit by orgId (preferred) or client IP

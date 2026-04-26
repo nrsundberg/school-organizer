@@ -166,3 +166,35 @@ export async function createBillingPortalSessionForOrg(params: {
 
   return { url: session.url };
 }
+
+export function assertDistrictHasStripeCustomer(district: {
+  id: string;
+  stripeCustomerId: string | null;
+}): void {
+  if (!district.stripeCustomerId) {
+    throw new Error(
+      "This district has no Stripe customer attached. Contact your account manager.",
+    );
+  }
+}
+
+export async function createBillingPortalSessionForDistrict(params: {
+  context: any;
+  district: { id: string; stripeCustomerId: string | null };
+  returnUrl: string;
+}): Promise<{ url: string }> {
+  const { context, district, returnUrl } = params;
+  assertDistrictHasStripeCustomer(district);
+
+  const stripe = requireStripeConfig(context);
+  const session = await stripe.client.billingPortal.sessions.create({
+    customer: district.stripeCustomerId!,
+    return_url: returnUrl,
+  });
+
+  if (!session.url) {
+    throw new Error("Stripe did not return a billing portal URL.");
+  }
+
+  return { url: session.url };
+}
