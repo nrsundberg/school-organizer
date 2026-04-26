@@ -374,13 +374,17 @@ export default function App({ loaderData }: Route.ComponentProps) {
         >
           Skip to main content
         </a>
-        {impersonatedBy && user && (
-          <ImpersonationBanner userName={user.name || user.email} />
+        {((impersonatedBy && user) || districtImpersonation.active) && (
+          <div className="sticky top-0 z-50">
+            {impersonatedBy && user && (
+              <ImpersonationBanner userName={user.name || user.email} />
+            )}
+            <DistrictImpersonationBanner
+              active={districtImpersonation.active}
+              orgName={districtImpersonation.orgName}
+            />
+          </div>
         )}
-        <DistrictImpersonationBanner
-          active={districtImpersonation.active}
-          orgName={districtImpersonation.orgName}
-        />
         <ToastContainer />
         <main id="main-content" className="flex-1">
           <Outlet />
