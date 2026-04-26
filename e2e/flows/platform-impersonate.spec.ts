@@ -19,10 +19,23 @@
  */
 import { createClient } from "@libsql/client";
 import { test, expect } from "../fixtures/seeded-tenant";
-import { generateId, hashPassword, randomToken } from "../fixtures/seed-helpers";
+import {
+  generateId,
+  hashPassword,
+  randomToken,
+  readBetterAuthSecret,
+  sessionCookieName,
+  signCookieValue,
+} from "../fixtures/seed-helpers";
 
 const COOKIE_PREFIX = "pickuproster";
-const SESSION_COOKIE = `${COOKIE_PREFIX}.session_token`;
+// In CI (and any env where wrangler dev inherits `ENVIRONMENT=production`
+// from `wrangler.jsonc`'s `vars`), better-auth runs with
+// `useSecureCookies: true` and looks for the `__Secure-`-prefixed name.
+// The cookie value also has to be HMAC-signed with `BETTER_AUTH_SECRET`
+// or `getSignedCookie` returns null and the global middleware redirects
+// every authenticated route to `/login`.
+const SESSION_COOKIE = sessionCookieName({ cookiePrefix: COOKIE_PREFIX });
 
 function databaseUrl(): string {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
@@ -76,10 +89,19 @@ test.describe("@flow platform-impersonate — admin can impersonate org admin", 
       // (apex localhost) so the request hits the same host the platform
       // panel lives on. Send the session cookie via the Cookie header
       // because Playwright's request context isn't bound to any subdomain.
+      //
+      // The cookie value has to be `URL_ENCODED(<token>.<base64-hmac>)`
+      // because better-auth verifies the signature before doing the DB
+      // lookup. Sending just `<token>` looks like a forged cookie and
+      // gets dropped, after which `requirePlatformAdmin` throws a
+      // redirect to `/login?next=/platform/orgs/...` — not the 302 to
+      // `/admin` this test is asserting.
+      const betterAuthSecret = readBetterAuthSecret();
+      const signedCookieValue = await signCookieValue(sessionToken, betterAuthSecret);
       const url = tenant.marketingUrl(`/platform/orgs/${tenant.orgId}`);
       const response = await request.post(url, {
         headers: {
-          cookie: `${SESSION_COOKIE}=${sessionToken}`,
+          cookie: `${SESSION_COOKIE}=${signedCookieValue}`,
           "content-type": "application/x-www-form-urlencoded",
         },
         data: new URLSearchParams({
