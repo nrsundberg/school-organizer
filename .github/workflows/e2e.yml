@@ -89,7 +89,7 @@ jobs:
         run: npx wrangler d1 migrations apply school-organizer --local
 
       - name: Run E2E tests
-        run: npx playwright test --project=${{ matrix.shard.project }}
+        run: npx playwright test --project=${{ matrix.shard.project }} --reporter=list,github,html
 
       - name: Upload Playwright report
         if: failure()
