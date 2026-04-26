@@ -5,6 +5,11 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { getPrisma } from "~/db.server";
 import { assertUserScopeXor } from "./user-scope.server";
 import {
+  shouldShareAuthCookiesAcrossSubdomains,
+  sharedSessionCookieDomain,
+  normalizeRootDomain,
+} from "./cookie-domain.server";
+import {
   hashPassword,
   verifyPassword,
   verifyPasswordBool,
@@ -26,35 +31,11 @@ export {
   type HashAlgo,
 };
 
-function normalizeRootDomain(env: Record<string, string | undefined>): string {
-  return (env.PUBLIC_ROOT_DOMAIN ?? "").trim().toLowerCase();
-}
-
-/**
- * Apex marketing + tenant subdomains share session cookies *only* in
- * production, where the Worker actually serves traffic from PUBLIC_ROOT_DOMAIN.
- * Staging deploys the same code at `*.workers.dev`, so emitting a cookie with
- * `Domain=pickuproster.com` would be silently dropped by the browser and the
- * session would never persist. Localhost-style roots skip for the same reason.
- */
-function shouldShareAuthCookiesAcrossSubdomains(
-  root: string,
-  isProductionDeploy: boolean,
-): boolean {
-  if (!isProductionDeploy || !root) return false;
-  if (root === "localhost" || root.endsWith(".localhost")) return false;
-  if (root.includes("127.0.0.1")) return false;
-  if (root.endsWith(".local")) return false;
-  return true;
-}
-
-/** Set-Cookie `Domain` for shared apex + tenant cookies, or null for host-only. */
-export function sharedSessionCookieDomain(context: any): string | null {
-  const env = context?.cloudflare?.env ?? process.env;
-  const isProductionDeploy = env.ENVIRONMENT === "production";
-  const root = normalizeRootDomain(env as Record<string, string | undefined>);
-  return shouldShareAuthCookiesAcrossSubdomains(root, isProductionDeploy) ? root : null;
-}
+// Re-export the cookie-domain helper for callers that already import it
+// from this module (viewer-access.server.ts). The implementation lives in
+// `./cookie-domain.server` so it can be unit-tested without dragging in
+// the Prisma adapter chain.
+export { sharedSessionCookieDomain };
 
 function marketingHostsFromEnv(env: Record<string, string | undefined>): string[] {
   return (env.MARKETING_HOSTS ?? "")
@@ -78,10 +59,9 @@ export function getAuth(context: any) {
 
   const db = getPrisma(context);
   const isProduction = env.ENVIRONMENT !== "development";
-  const isProductionDeploy = env.ENVIRONMENT === "production";
   const envRecord = env as Record<string, string | undefined>;
   const publicRoot = normalizeRootDomain(envRecord);
-  const shareSubdomainCookies = shouldShareAuthCookiesAcrossSubdomains(publicRoot, isProductionDeploy);
+  const shareSubdomainCookies = shouldShareAuthCookiesAcrossSubdomains(publicRoot, envRecord);
 
   const secret = (env as any).BETTER_AUTH_SECRET ?? process.env.BETTER_AUTH_SECRET;
 

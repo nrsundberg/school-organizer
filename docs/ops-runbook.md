@@ -43,9 +43,12 @@ that already ran the nightly gate (typecheck + tests + staging smoke).
 
    Then smoke the staging URL manually:
 
-   - `https://school-organizer-staging.sundbergne.workers.dev/` (marketing)
-   - `https://school-organizer-staging.sundbergne.workers.dev/healthz`
+   - `https://staging.pickuproster.com/` (marketing)
+   - `https://staging.pickuproster.com/healthz`
      → `{ "ok": true, "env": "staging" }`
+   - `https://{slug}.staging.pickuproster.com/` for a seeded tenant — this
+     is the host that exercises the same cross-subdomain auth + tenant
+     routing code paths as production.
    - `npx playwright test e2e/smoke.spec.ts --config=playwright.staging.config.ts`
 
 5. **Dismissal-window rule.** Do not deploy between 2:30pm and 4:00pm in
@@ -243,7 +246,11 @@ Everything below is already in `wrangler.jsonc`. This section is here so a
   - `pickuproster.com` and `www.pickuproster.com` → marketing (custom
     domain routes).
   - `*.pickuproster.com` → tenant boards (zone route).
-  - `school-organizer-staging.sundbergne.workers.dev` → staging.
+  - `staging.pickuproster.com` → staging marketing (custom domain).
+  - `*.staging.pickuproster.com` → staging tenant boards (zone route).
+  - `school-organizer-staging.sundbergne.workers.dev` → staging fallback
+    (workers.dev URL kept as a backup deploy target; cross-subdomain
+    sessions don't persist on this host — use the canonical apex).
 - **D1:**
   - Production: `school-organizer` (binding `D1_DATABASE`).
   - Staging: `school-organizer-staging`.
@@ -261,7 +268,37 @@ Everything below is already in `wrangler.jsonc`. This section is here so a
   - `0 10 * * *` — daily billing / trial maintenance.
   - `*/2 * * * *` — status probes.
 - **Key env vars:** `SENTRY_DSN`, `SUPPORT_EMAIL`, `PUBLIC_ROOT_DOMAIN`,
-  `MARKETING_HOSTS`, `PLATFORM_ADMIN_EMAILS`, `STRIPE_STATUS_URL`.
+  `MARKETING_HOSTS`, `PLATFORM_ADMIN_EMAILS`, `STRIPE_STATUS_URL`,
+  `DISABLE_CROSS_SUBDOMAIN_COOKIES` (kill switch — set truthy to fall
+  back to host-only cookies without redeploying).
+
+---
+
+## DNS setup (one-time, per environment)
+
+The `pickuproster.com` zone in Cloudflare must have these proxied DNS
+records for the Worker routes in `wrangler.jsonc` to resolve. Any
+zone migration or tenancy change reconstructs the same set:
+
+| Record | Type | Target | Proxied? | Purpose |
+|---|---|---|---|---|
+| `pickuproster.com` (apex) | A/AAAA or CNAME | (any — overridden by Worker route) | yes | Marketing apex |
+| `www.pickuproster.com` | CNAME | `pickuproster.com` | yes | Marketing www |
+| `*.pickuproster.com` | A/AAAA or CNAME | (any) | yes | Wildcard for prod tenants |
+| `staging.pickuproster.com` | A/AAAA or CNAME | (any) | yes | Staging apex |
+| `*.staging.pickuproster.com` | A/AAAA or CNAME | (any) | yes | Wildcard for staging tenants |
+
+The actual A target doesn't matter — Cloudflare's proxy intercepts the
+request and dispatches to the matching Worker route. Use the same
+placeholder (e.g. `192.0.2.1`) the prod records use.
+
+After adding records, deploy with `npm run deploy:staging` and verify
+`https://staging.pickuproster.com/healthz` returns `{ ok: true, env: "staging" }`.
+A 525/526 means the wildcard cert hasn't propagated yet — Cloudflare's
+default Universal SSL covers `*.pickuproster.com` but not the
+double-wildcard `*.staging.pickuproster.com`. Add an Advanced
+Certificate covering `staging.pickuproster.com` and
+`*.staging.pickuproster.com` if 5xx-cert errors persist after ~5 min.
 
 ---
 
