@@ -164,6 +164,40 @@ export const DEMO_TENANTS: readonly DemoTenantSpec[] = [
 ] as const;
 
 /**
+ * District-level rows for the demo. Each district has a `districtKey` that
+ * matches one or more `DemoTenantSpec.districtKey` — the generator joins
+ * on this to set `Org.districtId` for each member school.
+ *
+ * District.slug is independent of Org.slug (different table, different
+ * UNIQUE) so we keep the `-example` convention so anyone scanning the
+ * platform admin panel can immediately tell it's a demo.
+ */
+export interface DemoDistrictSpec {
+  /** Stable District.id used by wipe + insert SQL. */
+  districtId: string;
+  /** Joins to `DemoTenantSpec.districtKey`. */
+  districtKey: string;
+  /** District.slug (UNIQUE). */
+  slug: string;
+  /** District display name. */
+  name: string;
+  /** District brand colors — typically match the member-school palette. */
+  brandColor: string;
+  brandAccentColor: string;
+}
+
+export const DEMO_DISTRICTS: readonly DemoDistrictSpec[] = [
+  {
+    districtId: "dist_demo_westside",
+    districtKey: "westside",
+    slug: "westside-example",
+    name: "Westside Unified School District (Example)",
+    brandColor: "#7C2D12",
+    brandAccentColor: "#FACC15",
+  },
+] as const;
+
+/**
  * Drill templates each demo org gets cloned (subset of GLOBAL_TEMPLATES).
  * Keep this list short — admins add their own in the demo to show the
  * library picker, so the seeded list should not look "complete".

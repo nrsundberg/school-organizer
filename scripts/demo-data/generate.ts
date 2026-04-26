@@ -22,8 +22,10 @@
 
 import { hashPassword } from "../../app/domain/auth/password-hash";
 import {
+  DEMO_DISTRICTS,
   DEMO_DRILL_GLOBAL_KEYS,
   HISTORICAL_RUN_KEYS,
+  type DemoDistrictSpec,
   type DemoTenantSpec,
 } from "./specs";
 import {
@@ -128,21 +130,69 @@ export async function generate(
   const wipeStatements: SqlStatement[] = [];
   const seedStatements: SqlStatement[] = [];
 
-  // Wipe order: child tables first, then Org last. Same order as
-  // e2e/fixtures/seeded-tenant.ts teardownSeedRows.
+  // Wipe order: org-scoped child tables first, then Org, then District.
+  // District is "above" Org in the FK graph (Org.districtId references
+  // District.id, ON DELETE SET NULL). Deleting orgs first means the
+  // district rows are unreferenced when we delete them.
   for (const spec of specs) {
     wipeStatements.push(...buildWipe(spec.orgId));
   }
+  for (const d of DEMO_DISTRICTS) {
+    wipeStatements.push(...buildDistrictWipe(d.districtId));
+  }
+
+  // Districts must be inserted BEFORE the orgs that reference them.
+  for (const d of DEMO_DISTRICTS) {
+    seedStatements.push(buildDistrictInsert(d, now));
+  }
+
+  // Index districts by key so each org can resolve its parent districtId.
+  const districtIdByKey = new Map(
+    DEMO_DISTRICTS.map((d) => [d.districtKey, d.districtId]),
+  );
 
   // Pair each spec with its credential row by slug.
   const credBySlug = new Map(credentials.map((c) => [c.slug, c]));
   for (const spec of specs) {
     const cred = credBySlug.get(spec.slug);
     if (!cred) throw new Error(`No credential for ${spec.slug}`);
-    seedStatements.push(...(await buildSeedForOrg(spec, cred, now)));
+    const districtId = spec.districtKey
+      ? districtIdByKey.get(spec.districtKey) ?? null
+      : null;
+    seedStatements.push(...(await buildSeedForOrg(spec, cred, now, districtId)));
   }
 
   return { wipeStatements, seedStatements };
+}
+
+function buildDistrictWipe(districtId: string): SqlStatement[] {
+  // DistrictAuditLog cascades on District delete, but we delete it
+  // explicitly anyway so the wipe shape is symmetric with the demo's
+  // stable-id contract (every demo row deleted by its known id).
+  return [
+    {
+      sql: `DELETE FROM "DistrictAuditLog" WHERE districtId = ?`,
+      args: [districtId],
+    },
+    {
+      sql: `DELETE FROM "District" WHERE id = ?`,
+      args: [districtId],
+    },
+  ];
+}
+
+function buildDistrictInsert(d: DemoDistrictSpec, now: Date): SqlStatement {
+  const nowIso = now.toISOString();
+  // District has no brand-color columns (logo only) — we keep the colors
+  // on the spec for symmetry with `DemoTenantSpec` and so the demo
+  // district picks up the same palette as its member schools elsewhere
+  // (e.g. a future District.brandColor migration). For now they're
+  // metadata-only.
+  return {
+    sql: `INSERT INTO "District" (id, name, slug, status, billingPlan, schoolCap, createdAt, updatedAt)
+          VALUES (?, ?, ?, 'ACTIVE', 'DISTRICT', 5, ?, ?)`,
+    args: [d.districtId, d.name, d.slug, nowIso, nowIso],
+  };
 }
 
 function buildWipe(orgId: string): SqlStatement[] {
@@ -193,6 +243,7 @@ async function buildSeedForOrg(
   spec: DemoTenantSpec,
   cred: DemoCredential,
   now: Date,
+  districtId: string | null,
 ): Promise<SqlStatement[]> {
   const out: SqlStatement[] = [];
   const rng = new Rng(spec.randomSeed);
@@ -205,10 +256,13 @@ async function buildSeedForOrg(
   const viewerPin = (spec.randomSeed % 10000).toString().padStart(4, "0");
   const viewerPinHash = await hashPassword(viewerPin);
 
-  // 1. Org
+  // 1. Org. `districtId` is non-null only for member schools of a demo
+  // district (e.g. the Westside trio). When set the Org appears under
+  // that District in the platform admin panel and inherits district-
+  // level billing.
   out.push({
-    sql: `INSERT INTO "Org" (id, name, slug, brandColor, brandAccentColor, status, billingPlan, createdAt, updatedAt)
-          VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?)`,
+    sql: `INSERT INTO "Org" (id, name, slug, brandColor, brandAccentColor, status, billingPlan, districtId, createdAt, updatedAt)
+          VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?, ?)`,
     args: [
       spec.orgId,
       spec.name,
@@ -216,6 +270,7 @@ async function buildSeedForOrg(
       spec.brandColor,
       spec.brandAccentColor,
       spec.plan,
+      districtId,
       nowIso,
       nowIso,
     ],
