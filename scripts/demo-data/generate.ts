@@ -20,7 +20,7 @@
 //     use the `spaceNumber`, not the id, which is fine because Space
 //     has a `(orgId, spaceNumber)` UNIQUE.
 
-import { hashPassword } from "../../e2e/fixtures/seed-helpers";
+import { hashPassword } from "../../app/domain/auth/password-hash";
 import {
   DEMO_DRILL_GLOBAL_KEYS,
   HISTORICAL_RUN_KEYS,

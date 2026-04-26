@@ -31,7 +31,7 @@ test("generate is deterministic given the same now + env", async () => {
   // crypto.getRandomValues() for the salt (correct security behavior, not
   // a bug). Salts surface as "<salt-hex>:<key-hex>" args on the Account
   // and AppSettings rows, so we mask those positions before comparing.
-  const PWHASH = /^[0-9a-f]{32}:[0-9a-f]{64}$/;
+  const PWHASH = /^v2\$sha256\$\d+\$[0-9a-f]{32}\$[0-9a-f]{64}$/;
   const maskArgs = (args: typeof a.seedStatements[number]["args"]) =>
     args.map((arg) => (typeof arg === "string" && PWHASH.test(arg) ? "<pwhash>" : arg));
   for (let i = 0; i < a.seedStatements.length; i++) {
