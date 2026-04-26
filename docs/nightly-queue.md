@@ -277,10 +277,6 @@ Remaining work is split into 0d.1 / 0d.2 / 0d.3 so a flaky single flow doesn't b
 
 **Scope:** Currently e2e only covers auth + marketing. Add specs for: creating a student, activating a space, viewing history, editing branding.
 
-### 13. `[ ]` heroui-migration-cleanup — Close out the migration report
-
-**Scope:** Read `app/heroui-migration-report.md` (the migration report in the repo). Address any remaining items. Delete the report when it's done.
-
 ---
 
 ## How to add new workstreams
