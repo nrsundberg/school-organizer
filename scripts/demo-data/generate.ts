@@ -446,8 +446,8 @@ async function buildSeedForOrg(
     const state = { toggles, notes: `Demo replay — ${tpl.name}.`, actionItems: [] };
 
     out.push({
-      sql: `INSERT INTO "DrillRun" (id, orgId, templateId, state, status, activatedAt, endedAt, createdAt, updatedAt)
-            VALUES (?, ?, ?, ?, 'ENDED', ?, ?, ?, ?)`,
+      sql: `INSERT INTO "DrillRun" (id, orgId, templateId, state, status, activatedAt, endedAt, lastActorUserId, createdAt, updatedAt)
+            VALUES (?, ?, ?, ?, 'ENDED', ?, ?, ?, ?, ?)`,
       args: [
         runIdFor(spec.orgId, key, 1),
         spec.orgId,
@@ -455,6 +455,7 @@ async function buildSeedForOrg(
         JSON.stringify(state),
         startedAt.toISOString(),
         endedAt.toISOString(),
+        userIdFor(spec.orgId, "admin"),
         startedAt.toISOString(),
         endedAt.toISOString(),
       ],
@@ -533,9 +534,9 @@ async function buildSeedForOrg(
     const homeRoom = homerooms[c % homerooms.length]!;
     const spaceNumber = (c % spaceCount) + 1;
     out.push({
-      sql: `INSERT INTO "CallEvent" (orgId, spaceNumber, studentName, homeRoomSnapshot, createdAt)
-            VALUES (?, ?, ?, ?, ?)`,
-      args: [spec.orgId, spaceNumber, studentName, homeRoom, at.toISOString()],
+      sql: `INSERT INTO "CallEvent" (orgId, spaceNumber, studentName, homeRoomSnapshot, createdAt, actorUserId)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [spec.orgId, spaceNumber, studentName, homeRoom, at.toISOString(), userIdFor(spec.orgId, "controller")],
     });
   }
 

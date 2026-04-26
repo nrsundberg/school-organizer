@@ -97,14 +97,87 @@ async function seed() {
         sql: `SELECT id FROM "DrillTemplate" WHERE "orgId" = ? AND name = ?`,
         args: [orgId, "Fire drill"],
       });
+      let templateId: string | undefined;
       if (exists.rows.length === 0) {
-        const templateId = generateId();
+        templateId = generateId();
         await db.execute({
           sql: `INSERT INTO "DrillTemplate" (id, "orgId", name, definition, "createdAt", "updatedAt")
                 VALUES (?, ?, ?, ?, ?, ?)`,
           args: [templateId, orgId, "Fire drill", demoDefinition, now, now],
         });
         console.log(`✓ Seeded demo "Fire drill" checklist template for org ${orgId}`);
+      } else {
+        templateId = exists.rows[0].id as string;
+      }
+
+      // Historical DrillRuns for the seeded "Fire drill" template. Two
+      // ENDED runs (~7d and ~30d ago, ~12 minutes long) so the local
+      // /admin/drills history view has something to render. Each run is
+      // attributed to the seeded admin via lastActorUserId — required
+      // now that the dismissal "call a spot" path is locked down to
+      // ADMIN/CONTROLLER and historical rows must reflect a real human.
+      // Idempotent: skip if any DrillRun already exists for this template.
+      if (templateId) {
+        const existingRuns = await db.execute({
+          sql: `SELECT id FROM "DrillRun" WHERE "templateId" = ?`,
+          args: [templateId],
+        });
+        if (existingRuns.rows.length === 0) {
+          const runDurationMs = 12 * 60 * 1000;
+          const runs = [
+            {
+              daysAgo: 7,
+              state: {
+                toggles: {
+                  "fdrow-1:fdcol-check": "positive",
+                  "fdrow-2:fdcol-check": "positive",
+                  "fdrow-3:fdcol-check": "positive",
+                },
+                notes: "All clear. Office staff swept perimeter.",
+                actionItems: [],
+              },
+            },
+            {
+              daysAgo: 30,
+              state: {
+                toggles: {
+                  "fdrow-1:fdcol-check": "positive",
+                  "fdrow-2:fdcol-check": "positive",
+                },
+                notes:
+                  "K and Specials wings cleared in 3:42. Office wing slow — radio battery dead.",
+                actionItems: [],
+              },
+            },
+          ];
+          for (const run of runs) {
+            const runId = generateId();
+            const startedAt = new Date(
+              Date.now() - run.daysAgo * 24 * 60 * 60 * 1000,
+            );
+            const endedAt = new Date(startedAt.getTime() + runDurationMs);
+            const startedIso = startedAt.toISOString();
+            const endedIso = endedAt.toISOString();
+            await db.execute({
+              sql: `INSERT INTO "DrillRun" (id, "orgId", "templateId", state, status, "activatedAt", "endedAt", "lastActorUserId", "createdAt", "updatedAt")
+                    VALUES (?, ?, ?, ?, 'ENDED', ?, ?, ?, ?, ?)`,
+              args: [
+                runId,
+                orgId,
+                templateId,
+                JSON.stringify(run.state),
+                startedIso,
+                endedIso,
+                userId,
+                startedIso,
+                endedIso,
+              ],
+            });
+          }
+          console.log(
+            `✓ Seeded ${runs.length} historical "Fire drill" runs for org ${orgId}`,
+          );
+        }
       }
     }
   } catch (e) {
