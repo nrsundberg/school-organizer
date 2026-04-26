@@ -384,6 +384,7 @@
       "from": "From",
       "homeroom": "Homeroom",
       "searchPlaceholder": "Search name...",
+      "showImpersonatedOnly": "Only impersonated",
       "studentName": "Student name",
       "to": "To"
     },
@@ -397,8 +398,11 @@
       "uniqueStudents": "Unique students"
     },
     "table": {
+      "actor": "Acted by",
+      "anonymousActor": "Viewer (anonymous)",
       "ariaLabel": "Call history",
       "homeroom": "Homeroom",
+      "impersonatedBadge": "impersonated",
       "noCalls": "No calls in this range.",
       "space": "Space",
       "student": "Student",

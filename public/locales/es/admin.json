@@ -384,6 +384,7 @@
       "from": "Desde",
       "homeroom": "Salón principal",
       "searchPlaceholder": "Buscar nombre...",
+      "showImpersonatedOnly": "Solo suplantados",
       "studentName": "Nombre del estudiante",
       "to": "Hasta"
     },
@@ -397,8 +398,11 @@
       "uniqueStudents": "Estudiantes únicos"
     },
     "table": {
+      "actor": "Realizado por",
+      "anonymousActor": "Visitante (anónimo)",
       "ariaLabel": "Historial de llamadas",
       "homeroom": "Salón principal",
+      "impersonatedBadge": "suplantado",
       "noCalls": "No hay llamadas en este rango.",
       "space": "Espacio",
       "student": "Estudiante",
