@@ -1,7 +1,7 @@
 import type { Route } from "./+types/update.$space";
 import { redirect } from "react-router";
 import { assertTrialAllowsNewPickup } from "~/domain/billing/trial-enforcement.server";
-import { getOrgFromContext } from "~/domain/utils/global-context.server";
+import { getActorIdsFromContext, getOrgFromContext } from "~/domain/utils/global-context.server";
 
 export async function action({ params, context }: Route.ActionArgs) {
   const { space } = params;
@@ -23,6 +23,8 @@ export async function action({ params, context }: Route.ActionArgs) {
   const timestamp = new Date().toISOString();
   const env = (context as any).cloudflare.env;
 
+  const { actorUserId, onBehalfOfUserId } = getActorIdsFromContext(context);
+
   // Per-tenant Durable Object: each org gets its own isolate keyed by orgId,
   // so WebSocket broadcasts and hibernated sessions stay scoped to that
   // tenant. CF DOs are lazily materialized — no signup-time provisioning
@@ -37,7 +39,14 @@ export async function action({ params, context }: Route.ActionArgs) {
   await stub.fetch("https://internal/space-update", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ type: "ACTIVE", spaceNumber, timestamp, orgId: org.id }),
+    body: JSON.stringify({
+      type: "ACTIVE",
+      spaceNumber,
+      timestamp,
+      orgId: org.id,
+      actorUserId,
+      onBehalfOfUserId,
+    }),
   });
 
   return new Response("OK");

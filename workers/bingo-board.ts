@@ -48,8 +48,22 @@ export class BingoBoardDO {
          * adding a new caller, pass `orgId`.
          */
         orgId?: string;
+        /**
+         * Audit pair. Both null on anonymous viewer clicks; both non-null
+         * when an admin is impersonating; otherwise actorUserId is the
+         * authenticated user's id and onBehalfOfUserId is null.
+         */
+        actorUserId?: string | null;
+        onBehalfOfUserId?: string | null;
       };
-      const { type, spaceNumber, timestamp, orgId } = body;
+      const {
+        type,
+        spaceNumber,
+        timestamp,
+        orgId,
+        actorUserId,
+        onBehalfOfUserId,
+      } = body;
       const db = this.env.D1_DATABASE;
 
       if (type === "ACTIVE") {
@@ -89,16 +103,51 @@ export class BingoBoardDO {
         const result = orgId
           ? await db
               .prepare(
-                `INSERT INTO "CallEvent" (orgId, spaceNumber, studentId, studentName, homeRoomSnapshot, createdAt) VALUES (?, ?, ?, ?, ?, datetime('now')) RETURNING id, orgId, spaceNumber, studentId, studentName, homeRoomSnapshot, createdAt`
+                `INSERT INTO "CallEvent" (orgId, spaceNumber, studentId, studentName, homeRoomSnapshot, actorUserId, onBehalfOfUserId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now')) RETURNING id, orgId, spaceNumber, studentId, studentName, homeRoomSnapshot, actorUserId, onBehalfOfUserId, createdAt`
               )
-              .bind(orgId, spaceNumber, student?.id ?? null, studentName, student?.homeRoom ?? null)
-              .first<{ id: number; orgId: string; spaceNumber: number; studentId: number | null; studentName: string; homeRoomSnapshot: string | null; createdAt: string }>()
+              .bind(
+                orgId,
+                spaceNumber,
+                student?.id ?? null,
+                studentName,
+                student?.homeRoom ?? null,
+                actorUserId ?? null,
+                onBehalfOfUserId ?? null,
+              )
+              .first<{
+                id: number;
+                orgId: string;
+                spaceNumber: number;
+                studentId: number | null;
+                studentName: string;
+                homeRoomSnapshot: string | null;
+                actorUserId: string | null;
+                onBehalfOfUserId: string | null;
+                createdAt: string;
+              }>()
           : await db
               .prepare(
-                `INSERT INTO "CallEvent" (spaceNumber, studentId, studentName, homeRoomSnapshot, createdAt) VALUES (?, ?, ?, ?, datetime('now')) RETURNING id, orgId, spaceNumber, studentId, studentName, homeRoomSnapshot, createdAt`
+                `INSERT INTO "CallEvent" (spaceNumber, studentId, studentName, homeRoomSnapshot, actorUserId, onBehalfOfUserId, createdAt) VALUES (?, ?, ?, ?, ?, ?, datetime('now')) RETURNING id, orgId, spaceNumber, studentId, studentName, homeRoomSnapshot, actorUserId, onBehalfOfUserId, createdAt`
               )
-              .bind(spaceNumber, student?.id ?? null, studentName, student?.homeRoom ?? null)
-              .first<{ id: number; orgId: string; spaceNumber: number; studentId: number | null; studentName: string; homeRoomSnapshot: string | null; createdAt: string }>();
+              .bind(
+                spaceNumber,
+                student?.id ?? null,
+                studentName,
+                student?.homeRoom ?? null,
+                actorUserId ?? null,
+                onBehalfOfUserId ?? null,
+              )
+              .first<{
+                id: number;
+                orgId: string;
+                spaceNumber: number;
+                studentId: number | null;
+                studentName: string;
+                homeRoomSnapshot: string | null;
+                actorUserId: string | null;
+                onBehalfOfUserId: string | null;
+                createdAt: string;
+              }>();
 
         this.broadcast(JSON.stringify({ type: "spaceUpdate", spaceNumber, status: "ACTIVE", timestamp: ts }));
         if (result) {
