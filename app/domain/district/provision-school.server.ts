@@ -3,7 +3,7 @@ import { getPrisma } from "~/db.server";
 import { slugifyOrgName } from "~/lib/org-slug";
 import { writeDistrictAudit } from "./audit.server";
 import { computeCapState, getDistrictSchoolCount } from "./district.server";
-import { getAuth } from "~/domain/auth/better-auth.server";
+import { inviteUser } from "~/domain/admin-users/invite-user.server";
 
 export type ProvisionInput = {
   schoolName: string;
@@ -30,15 +30,14 @@ export function validateSchoolProvisioningInput(
  * Create a school under a district. Soft cap: if the district is at/over its
  * `schoolCap`, the school is still created and an audit-log entry is written.
  *
- * The school admin is created via better-auth with a long random password —
- * they reset it via /forgot-password on first login.
- *
- * TODO(v1.5): send a school-admin-invite email so the admin gets a direct
- * set-password link. For now we log a placeholder.
+ * The school admin is created passwordless via the magic-link invite flow —
+ * they get an email with a link to /accept-invite, set their password, and
+ * are signed in for the first time.
  */
 export async function provisionSchoolForDistrict(
   context: any,
   args: {
+    request: Request;
     district: District;
     actor: { id: string; email: string | null };
     input: ProvisionInput;
@@ -60,47 +59,34 @@ export async function provisionSchoolForDistrict(
       slug: input.schoolSlug,
       billingPlan: "DISTRICT",
       // School inherits the district trial status. The school admin
-      // signs in via /forgot-password and runs the existing onboarding
+      // signs in via the invite link and runs the existing onboarding
       // pipeline on first load.
       status: "TRIALING",
       districtId: args.district.id,
     },
   });
 
-  const auth = getAuth(context);
-  const tempPassword = crypto.randomUUID() + "Aa1!";
-  let signup;
-  try {
-    signup = await auth.api.signUpEmail({
-      body: {
-        name: input.adminName,
-        email: input.adminEmail,
-        password: tempPassword,
-      },
-    });
-  } catch (err) {
+  const result = await inviteUser(context, {
+    request: args.request,
+    email: input.adminEmail,
+    name: input.adminName,
+    role: "ADMIN",
+    scope: { kind: "org", id: org.id },
+    invitedByUserId: args.actor.id,
+    invitedByEmail: args.actor.email,
+    invitedToLabel: org.name,
+  });
+  if (!result.ok) {
     // Roll the org back so the district doesn't end up with an orphan school
     // counted against its cap.
     await db.org.delete({ where: { id: org.id } }).catch(() => {});
-    throw err instanceof Error
-      ? err
-      : new Error("Could not create the school admin user.");
-  }
-  if (!signup?.user?.id) {
-    await db.org.delete({ where: { id: org.id } }).catch(() => {});
+    if (result.error === "user-exists") {
+      throw new Error(
+        "A user with that email already exists. Use a different admin email or have the existing user join the school.",
+      );
+    }
     throw new Error("Could not create the school admin user.");
   }
-
-  await db.user.update({
-    where: { id: signup.user.id },
-    data: { orgId: org.id, role: "ADMIN" },
-  });
-
-  console.log(
-    `[district] provisioned school ${org.slug} under district ${args.district.id}; ` +
-      `school admin ${input.adminEmail} must use /forgot-password to set their password ` +
-      "(school-admin-invite email not yet implemented)",
-  );
 
   await writeDistrictAudit(context, {
     districtId: args.district.id,

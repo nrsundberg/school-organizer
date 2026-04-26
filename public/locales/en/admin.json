@@ -800,7 +800,7 @@
       "roleUpdated": "Role updated.",
       "sessionsRevoked": "Revoked {{count}} active session(s).",
       "userBanned": "User banned.",
-      "userCreated": "User created! Temp password: {{password}}",
+      "userInvited": "Invite sent to {{email}}.",
       "userDeleted": "User deleted.",
       "userUnbanned": "User unbanned.",
       "viewerLockReset": "Viewer lock reset.",

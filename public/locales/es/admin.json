@@ -800,7 +800,7 @@
       "roleUpdated": "Rol actualizado.",
       "sessionsRevoked": "Se revocaron {{count}} sesión(es) activa(s).",
       "userBanned": "Usuario suspendido.",
-      "userCreated": "¡Usuario creado! Contraseña temporal: {{password}}",
+      "userInvited": "Invitación enviada a {{email}}.",
       "userDeleted": "Usuario eliminado.",
       "userUnbanned": "Usuario reactivado.",
       "viewerLockReset": "Bloqueo de observador restablecido.",

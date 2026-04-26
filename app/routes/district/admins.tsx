@@ -3,14 +3,8 @@ import { Form, redirect } from "react-router";
 import type { Route } from "./+types/admins";
 import { requireDistrictAdmin } from "~/domain/district/route-guard.server";
 import { getPrisma } from "~/db.server";
-import { getAuth } from "~/domain/auth/better-auth.server";
-import { writeDistrictAudit } from "~/domain/district/audit.server";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
-
-function generateTempPassword(): string {
-  // Long random — the new admin resets via /forgot-password on first login.
-  return crypto.randomUUID() + "Aa1!";
-}
+import { inviteUser } from "~/domain/admin-users/invite-user.server";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const districtId = requireDistrictAdmin(context);
@@ -18,9 +12,19 @@ export async function loader({ context }: Route.LoaderArgs) {
   const admins = await db.user.findMany({
     where: { districtId },
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, email: true, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      mustChangePassword: true,
+      createdAt: true,
+    },
   });
-  return { admins };
+  const district = await db.district.findUnique({
+    where: { id: districtId },
+    select: { name: true },
+  });
+  return { admins, districtName: district?.name ?? "" };
 }
 
 export default function DistrictAdmins({
@@ -100,44 +104,28 @@ export async function action({ request, context }: Route.ActionArgs) {
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   if (!name || !email) return { error: "Name and email are required." };
 
-  const auth = getAuth(context);
-  let signup;
-  try {
-    signup = await auth.api.signUpEmail({
-      body: { name, email, password: generateTempPassword() },
-    });
-  } catch (err) {
-    return {
-      error:
-        err instanceof Error
-          ? err.message
-          : "Could not create the user.",
-    };
-  }
-  if (!signup?.user?.id) return { error: "Could not create the user." };
-
   const db = getPrisma(context);
-  await db.user.update({
-    where: { id: signup.user.id },
-    data: { districtId, role: "ADMIN" },
+  const district = await db.district.findUnique({
+    where: { id: districtId },
+    select: { name: true },
   });
 
-  // TODO(v1.5): send district-admin-invite email so the new admin gets a
-  // set-password link directly. For v1 they use /forgot-password to reset.
-  console.log(
-    `[district] invited admin ${email} to district ${districtId}; ` +
-      "user must use /forgot-password to set their password (no invite email yet)",
-  );
-
-  await writeDistrictAudit(context, {
-    districtId,
-    actorUserId: actor.id,
-    actorEmail: (actor as { email?: string }).email ?? null,
-    action: "district.admin.invited",
-    targetType: "User",
-    targetId: signup.user.id,
-    details: { invitedEmail: email },
+  const result = await inviteUser(context, {
+    request,
+    name,
+    email,
+    role: "ADMIN",
+    scope: { kind: "district", id: districtId },
+    invitedByUserId: actor.id,
+    invitedByEmail: (actor as { email?: string }).email ?? null,
+    invitedToLabel: district?.name ?? null,
   });
+  if (!result.ok) {
+    if (result.error === "user-exists") {
+      return { error: "A user with that email already exists." };
+    }
+    return { error: "Could not invite the user." };
+  }
 
   throw redirect("/district/admins");
 }

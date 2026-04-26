@@ -19,6 +19,10 @@ import {
   type AdminUsersAuth,
   type AdminUsersFetcherData,
 } from "~/domain/admin-users/admin-users.server";
+import {
+  inviteUser,
+  type InviteUserError,
+} from "~/domain/admin-users/invite-user.server";
 import { detectLocale } from "~/i18n.server";
 import { getFixedT } from "~/lib/t.server";
 import type { TFunction } from "i18next";
@@ -66,6 +70,31 @@ export async function action({ request, context }: Route.ActionArgs) {
   const org = getOrgFromContext(context);
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, ["admin", "errors"]);
+
+  // Intercept user creation: it now goes through the magic-link invite
+  // flow (no temp password is ever shown). Everything else still runs
+  // through the shared admin-users handler.
+  const action = String(formData.get("action") ?? "");
+  if (action === "createUser") {
+    const email = String(formData.get("email") ?? "").trim().toLowerCase();
+    const name = String(formData.get("name") ?? "").trim();
+    const role = String(formData.get("role") ?? "");
+    const result = await inviteUser(context, {
+      request,
+      email,
+      name,
+      role,
+      scope: { kind: "org", id: org.id },
+      invitedByUserId: me.id,
+      invitedByEmail: (me as { email?: string }).email ?? null,
+      invitedToLabel: org.name,
+    });
+    if (!result.ok) {
+      return dataWithError(null, inviteErrorMessage(result.error, t));
+    }
+    return dataWithSuccess(null, t("admin:users.toasts.userInvited", { email }));
+  }
+
   const outcome = await handleAdminUsersAction({
     formData,
     requestHeaders: request.headers,
@@ -84,6 +113,16 @@ export async function action({ request, context }: Route.ActionArgs) {
     },
   });
   return dataWithToast(outcome, t);
+}
+
+function inviteErrorMessage(error: InviteUserError, t: TFunction): string {
+  // Reuse existing keys where possible — translations already exist for
+  // duplicate-user / generic create-failed cases.
+  if (error === "user-exists") return t("admin:users.errors.emailExists");
+  if (error === "create-failed") return t("admin:users.errors.createUserFailed");
+  if (error === "invalid-email") return "Enter a valid email address.";
+  if (error === "invalid-name") return "Name is required.";
+  return t("admin:users.errors.createUserFailed");
 }
 
 function BanButton({ user, currentUserId }: { user: { id: string; name: string; banned: boolean; banReason: string | null }; currentUserId: string }) {

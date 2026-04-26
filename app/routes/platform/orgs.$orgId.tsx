@@ -9,6 +9,12 @@ import { getOptionalUserFromContext } from "~/domain/utils/global-context.server
 import { getPublicEnv } from "~/domain/utils/host.server";
 import { tenantBoardUrlFromRequest } from "~/lib/org-slug";
 import type { UsageSnapshot } from "~/lib/plan-usage-types";
+import {
+  inviteUser,
+  resendInvite,
+  type InviteUserError,
+} from "~/domain/admin-users/invite-user.server";
+import { revokePendingInvites } from "~/domain/auth/user-invite.server";
 
 export const meta: Route.MetaFunction = ({ data }) => [
   { title: data?.org ? `Platform — ${data.org.name}` : "Platform — Org" },
@@ -67,7 +73,14 @@ export async function loader({ context, params }: Route.LoaderArgs) {
     db.user.findMany({
       where: { orgId: org.id },
       orderBy: { createdAt: "asc" },
-      select: { id: true, email: true, role: true, createdAt: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        mustChangePassword: true,
+        createdAt: true,
+      },
     }),
   ]);
 
@@ -212,6 +225,59 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       return data({ ok: true });
     }
 
+    case "invite-user": {
+      const email = String(formData.get("email") ?? "").trim().toLowerCase();
+      const name = String(formData.get("name") ?? "").trim();
+      const role = String(formData.get("role") ?? "");
+      const result = await inviteUser(context, {
+        request,
+        email,
+        name,
+        scope: { kind: "org", id: orgId },
+        role,
+        invitedByUserId: me?.id ?? null,
+        invitedByEmail: (me as { email?: string } | null)?.email ?? null,
+        invitedToLabel: org.name,
+      });
+      if (!result.ok) {
+        return data(
+          { ok: false, error: inviteErrorMessage(result.error) },
+          { status: 400 },
+        );
+      }
+      return data({ ok: true });
+    }
+
+    case "resend-invite": {
+      const userId = String(formData.get("userId") ?? "");
+      if (!userId) {
+        return data({ ok: false, error: "Missing user." }, { status: 400 });
+      }
+      const result = await resendInvite(context, {
+        request,
+        userId,
+        invitedByUserId: me?.id ?? null,
+        invitedToLabel: org.name,
+      });
+      if (!result.ok) {
+        const msg =
+          result.error === "user-not-found"
+            ? "User not found."
+            : "User has already accepted their invite.";
+        return data({ ok: false, error: msg }, { status: 400 });
+      }
+      return data({ ok: true });
+    }
+
+    case "revoke-invite": {
+      const userId = String(formData.get("userId") ?? "");
+      if (!userId) {
+        return data({ ok: false, error: "Missing user." }, { status: 400 });
+      }
+      await revokePendingInvites(context, userId);
+      return data({ ok: true });
+    }
+
     case "impersonate": {
       const userId = String(formData.get("userId") ?? "").trim();
       if (!userId) {
@@ -273,6 +339,22 @@ function formatDt(d: Date | string) {
   return x.toISOString().replace("T", " ").slice(0, 19) + "Z";
 }
 
+function inviteErrorMessage(error: InviteUserError): string {
+  switch (error) {
+    case "invalid-email":
+      return "Enter a valid email address.";
+    case "invalid-name":
+      return "Name is required.";
+    case "user-exists":
+      return "A user with that email already exists.";
+    case "invalid-scope-role":
+      return "Invalid role for an org user.";
+    case "create-failed":
+    default:
+      return "Could not create the user.";
+  }
+}
+
 /** Convert a Date to a value suitable for datetime-local inputs (local time, no seconds). */
 function toLocalDatetime(d: Date | string | null | undefined): string {
   if (!d) return "";
@@ -319,8 +401,12 @@ function UsageBlock({ snapshot }: { snapshot: UsageSnapshot }) {
   );
 }
 
-export default function PlatformOrgDetail({ loaderData }: Route.ComponentProps) {
+export default function PlatformOrgDetail({
+  loaderData,
+  actionData,
+}: Route.ComponentProps) {
   const { org, usageSnapshot, users, auditLogs, tenantHomeUrl, publicRootDomain, currentUserId } = loaderData;
+  const inviteError = (actionData as { ok?: boolean; error?: string } | undefined)?.error;
   const stripeCustomerUrl = org.stripeCustomerId
     ? `https://dashboard.stripe.com/customers/${org.stripeCustomerId}`
     : null;
@@ -590,16 +676,83 @@ export default function PlatformOrgDetail({ loaderData }: Route.ComponentProps) 
         <UsageBlock snapshot={usageSnapshot} />
       </div>
 
-      {/* Users table with impersonation via route action */}
+      {/* Invite a user to this org */}
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#E9D500]">
+          Invite user to this org
+        </h2>
+        <p className="mb-3 text-xs text-white/55">
+          They&rsquo;ll get an email with a link to set their password and sign
+          in. Invite expires after 7 days.
+        </p>
+        <Form
+          method="post"
+          className="grid max-w-3xl gap-3 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end"
+        >
+          <input type="hidden" name="intent" value="invite-user" />
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-white/50" htmlFor="invite-name">
+              Name
+            </label>
+            <input
+              id="invite-name"
+              name="name"
+              required
+              className="app-field"
+              autoComplete="off"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-white/50" htmlFor="invite-email">
+              Email
+            </label>
+            <input
+              id="invite-email"
+              name="email"
+              type="email"
+              required
+              className="app-field"
+              autoComplete="off"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-white/50" htmlFor="invite-role">
+              Role
+            </label>
+            <select
+              id="invite-role"
+              name="role"
+              defaultValue="CONTROLLER"
+              className="app-field"
+            >
+              <option value="ADMIN">ADMIN</option>
+              <option value="CONTROLLER">CONTROLLER</option>
+              <option value="VIEWER">VIEWER</option>
+            </select>
+          </div>
+          <button
+            type="submit"
+            className="rounded-lg bg-[#E9D500] px-3 py-2 text-xs font-semibold text-[#193B4B] hover:brightness-95"
+          >
+            Send invite
+          </button>
+        </Form>
+        {inviteError ? (
+          <p className="mt-3 text-sm text-red-400">{inviteError}</p>
+        ) : null}
+      </div>
+
+      {/* Users table with impersonation + invite controls */}
       <div>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#E9D500]">Users</h2>
         <div className="overflow-x-auto rounded-xl border border-white/10">
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="bg-white/5 text-white/80">
               <tr>
                 <th className="px-3 py-2 font-semibold">ID</th>
                 <th className="px-3 py-2 font-semibold">Email</th>
                 <th className="px-3 py-2 font-semibold">Role</th>
+                <th className="px-3 py-2 font-semibold">Status</th>
                 <th className="px-3 py-2 font-semibold">Created</th>
                 <th className="px-3 py-2 font-semibold"> </th>
               </tr>
@@ -610,20 +763,57 @@ export default function PlatformOrgDetail({ loaderData }: Route.ComponentProps) 
                   <td className="px-3 py-2 font-mono text-[10px] text-white/50">{u.id}</td>
                   <td className="px-3 py-2 font-mono text-xs">{u.email}</td>
                   <td className="px-3 py-2">{u.role}</td>
+                  <td className="px-3 py-2">
+                    {u.mustChangePassword ? (
+                      <span className="inline-flex items-center rounded-full bg-yellow-500/15 px-2 py-0.5 text-xs text-yellow-300">
+                        Invite pending
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-green-500/15 px-2 py-0.5 text-xs text-green-300">
+                        Active
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-white/70">{formatDt(u.createdAt)}</td>
                   <td className="px-3 py-2 text-right">
-                    {currentUserId && u.id !== currentUserId ? (
-                      <Form method="post">
-                        <input type="hidden" name="intent" value="impersonate" />
-                        <input type="hidden" name="userId" value={u.id} />
-                        <button
-                          type="submit"
-                          className="rounded-md border border-[#E9D500]/40 bg-[#E9D500]/10 px-2 py-1 text-xs font-medium text-[#E9D500] hover:bg-[#E9D500]/20"
-                        >
-                          Impersonate
-                        </button>
-                      </Form>
-                    ) : null}
+                    <div className="flex justify-end gap-2">
+                      {u.mustChangePassword ? (
+                        <>
+                          <Form method="post">
+                            <input type="hidden" name="intent" value="resend-invite" />
+                            <input type="hidden" name="userId" value={u.id} />
+                            <button
+                              type="submit"
+                              className="rounded-md border border-white/20 px-2 py-1 text-xs font-medium text-white/80 hover:bg-white/5"
+                            >
+                              Resend
+                            </button>
+                          </Form>
+                          <Form method="post">
+                            <input type="hidden" name="intent" value="revoke-invite" />
+                            <input type="hidden" name="userId" value={u.id} />
+                            <button
+                              type="submit"
+                              className="rounded-md border border-red-500/30 px-2 py-1 text-xs font-medium text-red-300 hover:bg-red-500/10"
+                            >
+                              Revoke
+                            </button>
+                          </Form>
+                        </>
+                      ) : null}
+                      {currentUserId && u.id !== currentUserId ? (
+                        <Form method="post">
+                          <input type="hidden" name="intent" value="impersonate" />
+                          <input type="hidden" name="userId" value={u.id} />
+                          <button
+                            type="submit"
+                            className="rounded-md border border-[#E9D500]/40 bg-[#E9D500]/10 px-2 py-1 text-xs font-medium text-[#E9D500] hover:bg-[#E9D500]/20"
+                          >
+                            Impersonate
+                          </button>
+                        </Form>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}

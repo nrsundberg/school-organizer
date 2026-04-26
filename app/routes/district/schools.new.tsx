@@ -99,6 +99,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const form = await request.formData();
   try {
     await provisionSchoolForDistrict(context, {
+      request,
       district,
       actor: {
         id: user.id,
