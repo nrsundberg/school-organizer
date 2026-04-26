@@ -40,6 +40,8 @@
  *   not depend on cleanup for correctness — the unique slug per spec
  *   already guarantees isolation.
  */
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { test as base, expect, type Cookie } from "@playwright/test";
 import { createClient, type Client as LibsqlClient } from "@libsql/client";
 import {
@@ -106,7 +108,38 @@ function baseUrl(): URL {
 }
 
 function databaseUrl(): string {
-  return process.env.DATABASE_URL ?? "file:./dev.db";
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+
+  // The fixture and the wrangler-dev worker must read/write the same
+  // SQLite file, otherwise the seeded Org/User rows are invisible to the
+  // request handlers and every spec hits "no such table: Org" or empty
+  // tenant lookups. Wrangler 4 stores each local D1 at
+  //
+  //   .wrangler/state/v3/d1/miniflare-D1DatabaseObject/<hash>.sqlite
+  //
+  // where <hash> is derived from the binding name. There's also a
+  // metadata.sqlite in the same dir that we skip. Locate the binding
+  // file dynamically — the hash isn't a stable contract — and fall
+  // back to ./dev.db so the scripts/seed.ts dev-server flow still works.
+  const wranglerD1Dir = path.resolve(
+    ".wrangler/state/v3/d1/miniflare-D1DatabaseObject",
+  );
+  if (fs.existsSync(wranglerD1Dir)) {
+    const candidates = fs
+      .readdirSync(wranglerD1Dir)
+      .filter((f) => f.endsWith(".sqlite") && !f.startsWith("metadata"));
+    if (candidates.length === 1) {
+      return `file:${path.join(wranglerD1Dir, candidates[0])}`;
+    }
+    if (candidates.length > 1) {
+      throw new Error(
+        `seeded-tenant fixture: found multiple wrangler local D1 sqlites in ${wranglerD1Dir} (${candidates.join(
+          ", ",
+        )}). Set DATABASE_URL to disambiguate.`,
+      );
+    }
+  }
+  return "file:./dev.db";
 }
 
 /* ------------------------------------------------------------------ */

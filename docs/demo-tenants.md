@@ -36,7 +36,7 @@ Emits `demo-seed.staging.sql` then applies via `wrangler d1 execute --remote --e
 
 #### Preflight: confirm no slug collisions
 
-`Org.slug` is `UNIQUE`. The wipe deletes by `orgId`, NOT by slug — so if a real customer has signed up under one of the demo slugs (e.g. some clever buyer claimed `lincoln-example`), the wipe will skip them and the subsequent INSERT will fail inside the `BEGIN; ... COMMIT;` transaction (no harm done; the wipe is rolled back too, but you'll see a confusing UNIQUE error).
+`Org.slug` is `UNIQUE`. The wipe deletes by `orgId`, NOT by slug — so if a real customer has signed up under one of the demo slugs (e.g. some clever buyer claimed `lincoln-example`), the wipe will skip them and the subsequent INSERT will fail. Wrangler's `d1 execute --file` rolls the whole file back on failure (per its own message: "if the execution fails to complete, your DB will return to its original state and you can safely retry"), so no harm done — but you'll see a confusing UNIQUE error.
 
 Before you apply, confirm none of the five demo slugs are taken:
 
