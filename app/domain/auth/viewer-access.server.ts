@@ -5,8 +5,8 @@ import {
 } from "~/domain/auth/better-auth.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 
-const VIEWER_FID_COOKIE = "tome_viewer_fid";
-const VIEWER_SESSION_COOKIE = "tome_viewer_session";
+const VIEWER_FID_COOKIE = "pickuproster_viewer_fid";
+const VIEWER_SESSION_COOKIE = "pickuproster_viewer_session";
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const VIEWER_SESSION_DAYS = 180;
 

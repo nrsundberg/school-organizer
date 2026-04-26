@@ -2,7 +2,7 @@
  * viewer-pin critical path.
  *
  * Covers:
- *   1. Correct PIN issues a `tome_viewer_session` cookie and lands the
+ *   1. Correct PIN issues a `pickuproster_viewer_session` cookie and lands the
  *      visitor on the tenant root.
  *   2. Wrong PIN returns an error message without issuing the cookie.
  *   3. Repeated wrong PINs tick the "attempts left" counter — verifying
@@ -19,7 +19,7 @@
  */
 import { test, expect } from "../fixtures/seeded-tenant";
 
-const VIEWER_SESSION_COOKIE = "tome_viewer_session";
+const VIEWER_SESSION_COOKIE = "pickuproster_viewer_session";
 
 test.describe("@flow viewer-pin — access code gate", () => {
   test("correct PIN issues viewer-session cookie and redirects to /", async ({ page, tenant }) => {
@@ -33,7 +33,7 @@ test.describe("@flow viewer-pin — access code gate", () => {
     ]);
 
     // Verify the viewer-session cookie got set. Better Auth's cookie
-    // is tome.session_token; this is the separate viewer-access cookie
+    // is pickuproster.session_token; this is the separate viewer-access cookie
     // defined in app/domain/auth/viewer-access.server.ts.
     const cookies = await page.context().cookies();
     const viewerSession = cookies.find((c) => c.name === VIEWER_SESSION_COOKIE);

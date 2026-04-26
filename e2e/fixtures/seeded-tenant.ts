@@ -90,7 +90,7 @@ type Fixtures = {
 /* ------------------------------------------------------------------ */
 
 // Cookie prefix comes from better-auth config in app/domain/auth/better-auth.server.ts.
-const COOKIE_PREFIX = "tome";
+const COOKIE_PREFIX = "pickuproster";
 const BETTER_AUTH_COOKIE_NAME = `${COOKIE_PREFIX}.session_token`;
 
 // Sessions last 90 days in production. For an e2e fixture 1 day is plenty

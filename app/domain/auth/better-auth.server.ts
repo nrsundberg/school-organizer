@@ -136,7 +136,7 @@ export function getAuth(context: any) {
     secret,
     ...baseURLConfig,
     advanced: {
-      cookiePrefix: "tome",
+      cookiePrefix: "pickuproster",
       useSecureCookies: isProduction,
       ...(shareSubdomainCookies && publicRoot
         ? {
