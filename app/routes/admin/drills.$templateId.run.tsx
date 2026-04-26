@@ -5,7 +5,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills.$templateId.run";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
-import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
+import {
+  getActorIdsFromContext,
+  getOrgFromContext,
+  getTenantPrisma,
+} from "~/domain/utils/global-context.server";
 import {
   type RunState,
   cycleToggle,
@@ -35,6 +39,7 @@ export const meta: Route.MetaFunction = ({ data }) => [
 
 export async function loader({ context, params, request }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
+  const actor = getActorIdsFromContext(context);
   const prisma = getTenantPrisma(context);
   const templateId = params.templateId;
   if (!templateId) {
@@ -62,6 +67,8 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
         orgId,
         templateId,
         state: emptyRunState() as object,
+        lastActorUserId: actor.actorUserId,
+        lastActorOnBehalfOfUserId: actor.onBehalfOfUserId,
       },
       select: { id: true, state: true, updatedAt: true },
     });
@@ -90,6 +97,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
   const intent = String(formData.get("intent") ?? "");
 
   const orgId = getOrgFromContext(context).id;
+  const actor = getActorIdsFromContext(context);
 
   if (intent === "saveState") {
     const raw = String(formData.get("state") ?? "");
@@ -120,11 +128,21 @@ export async function action({ request, context, params }: Route.ActionArgs) {
     if (currentRun) {
       await prisma.drillRun.update({
         where: { id: currentRun.id },
-        data: { state: state as object },
+        data: {
+          state: state as object,
+          lastActorUserId: actor.actorUserId,
+          lastActorOnBehalfOfUserId: actor.onBehalfOfUserId,
+        },
       });
     } else {
       await prisma.drillRun.create({
-        data: { orgId, templateId, state: state as object },
+        data: {
+          orgId,
+          templateId,
+          state: state as object,
+          lastActorUserId: actor.actorUserId,
+          lastActorOnBehalfOfUserId: actor.onBehalfOfUserId,
+        },
       });
     }
     return dataWithSuccess(null, t("drills.run.toasts.saved"));
@@ -139,11 +157,21 @@ export async function action({ request, context, params }: Route.ActionArgs) {
     if (existingRun) {
       await prisma.drillRun.update({
         where: { id: existingRun.id },
-        data: { state: emptyRunState() as object },
+        data: {
+          state: emptyRunState() as object,
+          lastActorUserId: actor.actorUserId,
+          lastActorOnBehalfOfUserId: actor.onBehalfOfUserId,
+        },
       });
     } else {
       await prisma.drillRun.create({
-        data: { orgId, templateId, state: emptyRunState() as object },
+        data: {
+          orgId,
+          templateId,
+          state: emptyRunState() as object,
+          lastActorUserId: actor.actorUserId,
+          lastActorOnBehalfOfUserId: actor.onBehalfOfUserId,
+        },
       });
     }
     return dataWithSuccess(null, t("drills.run.toasts.cleared"));

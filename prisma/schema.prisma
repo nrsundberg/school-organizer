@@ -176,6 +176,13 @@ model DrillRun {
   activatedAt DateTime?
   pausedAt    DateTime?
   endedAt     DateTime?
+  /// Userid of the human who last touched this run (toggle, note, lifecycle
+  /// transition). Admin's id when impersonating; the user themself otherwise.
+  /// Drills are admin/teacher-only so this should be non-null in practice,
+  /// but the column is nullable for migration safety.
+  lastActorUserId           String?
+  /// Non-null when the most recent action was performed via impersonation.
+  lastActorOnBehalfOfUserId String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
@@ -485,6 +492,15 @@ model CallEvent {
   studentId        Int?
   studentName      String
   homeRoomSnapshot String?
+  /// Userid of the human who triggered the dismissal. When an admin
+  /// impersonates a parent and clicks, this is the ADMIN's id (the real
+  /// human), and `onBehalfOfUserId` is the impersonated user. Nullable
+  /// because the public board accepts anonymous viewer clicks; rows
+  /// pre-2026-04-25 are null and not backfilled.
+  actorUserId       String?
+  /// When non-null, the action was performed via impersonation and this
+  /// is the impersonated user's id. Always null outside impersonation.
+  onBehalfOfUserId  String?
   createdAt        DateTime @default(now())
 
   @@index([orgId])
@@ -494,6 +510,7 @@ model CallEvent {
   @@index([orgId, createdAt])
   @@index([orgId, spaceNumber])
   @@index([orgId, studentId])
+  @@index([orgId, onBehalfOfUserId])
 }
 
 enum Status {
