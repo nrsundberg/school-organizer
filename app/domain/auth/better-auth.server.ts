@@ -30,12 +30,18 @@ function normalizeRootDomain(env: Record<string, string | undefined>): string {
   return (env.PUBLIC_ROOT_DOMAIN ?? "").trim().toLowerCase();
 }
 
-/** Apex marketing + tenant subdomains share session cookies; localhost-style roots skip this. */
+/**
+ * Apex marketing + tenant subdomains share session cookies *only* in
+ * production, where the Worker actually serves traffic from PUBLIC_ROOT_DOMAIN.
+ * Staging deploys the same code at `*.workers.dev`, so emitting a cookie with
+ * `Domain=pickuproster.com` would be silently dropped by the browser and the
+ * session would never persist. Localhost-style roots skip for the same reason.
+ */
 function shouldShareAuthCookiesAcrossSubdomains(
   root: string,
-  isProduction: boolean,
+  isProductionDeploy: boolean,
 ): boolean {
-  if (!isProduction || !root) return false;
+  if (!isProductionDeploy || !root) return false;
   if (root === "localhost" || root.endsWith(".localhost")) return false;
   if (root.includes("127.0.0.1")) return false;
   if (root.endsWith(".local")) return false;
@@ -45,9 +51,9 @@ function shouldShareAuthCookiesAcrossSubdomains(
 /** Set-Cookie `Domain` for shared apex + tenant cookies, or null for host-only. */
 export function sharedSessionCookieDomain(context: any): string | null {
   const env = context?.cloudflare?.env ?? process.env;
-  const isProduction = env.ENVIRONMENT !== "development";
+  const isProductionDeploy = env.ENVIRONMENT === "production";
   const root = normalizeRootDomain(env as Record<string, string | undefined>);
-  return shouldShareAuthCookiesAcrossSubdomains(root, isProduction) ? root : null;
+  return shouldShareAuthCookiesAcrossSubdomains(root, isProductionDeploy) ? root : null;
 }
 
 function marketingHostsFromEnv(env: Record<string, string | undefined>): string[] {
@@ -72,9 +78,10 @@ export function getAuth(context: any) {
 
   const db = getPrisma(context);
   const isProduction = env.ENVIRONMENT !== "development";
+  const isProductionDeploy = env.ENVIRONMENT === "production";
   const envRecord = env as Record<string, string | undefined>;
   const publicRoot = normalizeRootDomain(envRecord);
-  const shareSubdomainCookies = shouldShareAuthCookiesAcrossSubdomains(publicRoot, isProduction);
+  const shareSubdomainCookies = shouldShareAuthCookiesAcrossSubdomains(publicRoot, isProductionDeploy);
 
   const secret = (env as any).BETTER_AUTH_SECRET ?? process.env.BETTER_AUTH_SECRET;
 
