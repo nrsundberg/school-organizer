@@ -1,0 +1,129 @@
+import type { District, Org } from "~/db";
+import { getPrisma } from "~/db.server";
+import { slugifyOrgName } from "~/lib/org-slug";
+import { writeDistrictAudit } from "./audit.server";
+import { computeCapState, getDistrictSchoolCount } from "./district.server";
+import { getAuth } from "~/domain/auth/better-auth.server";
+
+export type ProvisionInput = {
+  schoolName: string;
+  schoolSlug: string;
+  adminEmail: string;
+  adminName: string;
+};
+
+export function validateSchoolProvisioningInput(
+  raw: ProvisionInput,
+): ProvisionInput {
+  const schoolName = raw.schoolName.trim();
+  const schoolSlug = slugifyOrgName(raw.schoolSlug);
+  const adminEmail = raw.adminEmail.trim().toLowerCase();
+  const adminName = raw.adminName.trim();
+  if (!schoolName) throw new Error("School name is required.");
+  if (!schoolSlug) throw new Error("Valid school slug is required.");
+  if (!adminEmail) throw new Error("Admin email is required.");
+  if (!adminName) throw new Error("Admin name is required.");
+  return { schoolName, schoolSlug, adminEmail, adminName };
+}
+
+/**
+ * Create a school under a district. Soft cap: if the district is at/over its
+ * `schoolCap`, the school is still created and an audit-log entry is written.
+ *
+ * The school admin is created via better-auth with a long random password —
+ * they reset it via /forgot-password on first login.
+ *
+ * TODO(v1.5): send a school-admin-invite email so the admin gets a direct
+ * set-password link. For now we log a placeholder.
+ */
+export async function provisionSchoolForDistrict(
+  context: any,
+  args: {
+    district: District;
+    actor: { id: string; email: string | null };
+    input: ProvisionInput;
+  },
+): Promise<{ org: Org; capExceeded: boolean }> {
+  const input = validateSchoolProvisioningInput(args.input);
+  const db = getPrisma(context);
+
+  const slugTaken = await db.org.findUnique({
+    where: { slug: input.schoolSlug },
+  });
+  if (slugTaken) throw new Error("That school slug is already in use.");
+
+  const beforeCount = await getDistrictSchoolCount(context, args.district.id);
+
+  const org = await db.org.create({
+    data: {
+      name: input.schoolName,
+      slug: input.schoolSlug,
+      billingPlan: "DISTRICT",
+      // School inherits the district trial status. The school admin
+      // signs in via /forgot-password and runs the existing onboarding
+      // pipeline on first load.
+      status: "TRIALING",
+      districtId: args.district.id,
+    },
+  });
+
+  const auth = getAuth(context);
+  const tempPassword = crypto.randomUUID() + "Aa1!";
+  let signup;
+  try {
+    signup = await auth.api.signUpEmail({
+      body: {
+        name: input.adminName,
+        email: input.adminEmail,
+        password: tempPassword,
+      },
+    });
+  } catch (err) {
+    // Roll the org back so the district doesn't end up with an orphan school
+    // counted against its cap.
+    await db.org.delete({ where: { id: org.id } }).catch(() => {});
+    throw err instanceof Error
+      ? err
+      : new Error("Could not create the school admin user.");
+  }
+  if (!signup?.user?.id) {
+    await db.org.delete({ where: { id: org.id } }).catch(() => {});
+    throw new Error("Could not create the school admin user.");
+  }
+
+  await db.user.update({
+    where: { id: signup.user.id },
+    data: { orgId: org.id, role: "ADMIN" },
+  });
+
+  console.log(
+    `[district] provisioned school ${org.slug} under district ${args.district.id}; ` +
+      `school admin ${input.adminEmail} must use /forgot-password to set their password ` +
+      "(school-admin-invite email not yet implemented)",
+  );
+
+  await writeDistrictAudit(context, {
+    districtId: args.district.id,
+    actorUserId: args.actor.id,
+    actorEmail: args.actor.email,
+    action: "district.school.created",
+    targetType: "Org",
+    targetId: org.id,
+    details: { slug: org.slug, name: org.name },
+  });
+
+  const after = computeCapState(beforeCount + 1, args.district.schoolCap);
+  if (after.state === "over") {
+    await writeDistrictAudit(context, {
+      districtId: args.district.id,
+      actorUserId: args.actor.id,
+      actorEmail: args.actor.email,
+      action: "district.school.cap.exceeded",
+      targetType: "District",
+      targetId: args.district.id,
+      details: { count: after.count, cap: after.cap, over: after.over },
+    });
+  }
+
+  return { org, capExceeded: after.state === "over" };
+}

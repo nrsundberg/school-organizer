@@ -1,0 +1,144 @@
+import { Button, Input } from "@heroui/react";
+import { Form, redirect } from "react-router";
+import type { Route } from "./+types/signup";
+import { createDistrict } from "~/domain/district/district.server";
+import { writeDistrictAudit } from "~/domain/district/audit.server";
+import { getAuth } from "~/domain/auth/better-auth.server";
+import { getPrisma } from "~/db.server";
+import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
+
+export async function loader({ context }: Route.LoaderArgs) {
+  const user = getOptionalUserFromContext(context);
+  if (user) {
+    if ((user as { districtId?: string | null }).districtId) {
+      throw redirect("/district");
+    }
+    if (user.orgId) throw redirect("/admin");
+  }
+  return null;
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="block text-sm font-medium text-white/80">{label}</span>
+      {children}
+      {hint ? <span className="mt-1 block text-xs text-white/50">{hint}</span> : null}
+    </label>
+  );
+}
+
+export default function DistrictSignup({ actionData }: Route.ComponentProps) {
+  const error = (actionData as { error?: string } | undefined)?.error;
+  return (
+    <main className="min-h-screen bg-[#0f1414] px-4 py-12 text-white">
+      <div className="mx-auto max-w-md">
+        <h1 className="text-2xl font-semibold">Sign up your district</h1>
+        <p className="mt-2 text-sm text-white/60">
+          Provision schools for your district from one portal. One bill,
+          aggregate visibility, audit-logged access.
+        </p>
+        <Form method="post" className="mt-6 space-y-4">
+          <Field label="District name">
+            <Input name="districtName" required autoComplete="organization" />
+          </Field>
+          <Field label="Your name">
+            <Input name="adminName" required autoComplete="name" />
+          </Field>
+          <Field label="Email">
+            <Input
+              name="adminEmail"
+              type="email"
+              required
+              autoComplete="email"
+            />
+          </Field>
+          <Field label="Password" hint="At least 10 characters.">
+            <Input
+              name="adminPassword"
+              type="password"
+              required
+              minLength={10}
+              autoComplete="new-password"
+            />
+          </Field>
+          {error ? <p className="text-sm text-red-400">{error}</p> : null}
+          <Button
+            type="submit"
+            variant="primary"
+            className="w-full bg-[#E9D500] font-semibold text-[#193B4B]"
+          >
+            Create district
+          </Button>
+        </Form>
+      </div>
+    </main>
+  );
+}
+
+export async function action({ request, context }: Route.ActionArgs) {
+  const form = await request.formData();
+  const districtName = String(form.get("districtName") ?? "").trim();
+  const adminName = String(form.get("adminName") ?? "").trim();
+  const adminEmail = String(form.get("adminEmail") ?? "").trim().toLowerCase();
+  const adminPassword = String(form.get("adminPassword") ?? "");
+  if (!districtName || !adminName || !adminEmail || adminPassword.length < 10) {
+    return {
+      error:
+        "All fields are required, and the password must be at least 10 characters.",
+    };
+  }
+
+  let district;
+  try {
+    district = await createDistrict(context, { name: districtName });
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Could not create district.",
+    };
+  }
+
+  const auth = getAuth(context);
+  let signup;
+  try {
+    signup = await auth.api.signUpEmail({
+      body: { name: adminName, email: adminEmail, password: adminPassword },
+    });
+  } catch (err) {
+    return {
+      error:
+        err instanceof Error
+          ? err.message
+          : "Could not create the district admin account.",
+    };
+  }
+  if (!signup?.user?.id) {
+    return { error: "Could not create the district admin account." };
+  }
+
+  const db = getPrisma(context);
+  await db.user.update({
+    where: { id: signup.user.id },
+    data: { districtId: district.id, role: "ADMIN" },
+  });
+
+  await writeDistrictAudit(context, {
+    districtId: district.id,
+    actorUserId: signup.user.id,
+    actorEmail: adminEmail,
+    action: "district.admin.invited",
+    targetType: "User",
+    targetId: signup.user.id,
+    details: { firstAdmin: true },
+  });
+
+  throw redirect("/district");
+}

@@ -96,6 +96,24 @@ export default [
     route("webhooks", "routes/platform/webhooks.tsx"),
     route("webhooks/:eventId", "routes/platform/webhooks.$eventId.tsx"),
     route("audit", "routes/platform/audit.tsx"),
+    route("districts", "routes/platform/districts.tsx"),
+    route("districts/:slug", "routes/platform/districts.$slug.tsx"),
+  ]),
+
+  // District portal — district admins only (role-routed from /login).
+  // /district/signup is public and lives outside the layout.
+  route("district/signup", "routes/district/signup.tsx"),
+  route("district", "routes/district/layout.tsx", [
+    index("routes/district/index.tsx"),
+    route("schools", "routes/district/schools.tsx"),
+    route("schools/new", "routes/district/schools.new.tsx"),
+    route("schools/:orgId", "routes/district/schools.$orgId.tsx"),
+    route("schools/:orgId/impersonate", "routes/district/schools.$orgId.impersonate.tsx"),
+    route("admins", "routes/district/admins.tsx"),
+    route("billing", "routes/district/billing.tsx"),
+    route("billing/portal", "routes/district/billing.portal.tsx"),
+    route("audit", "routes/district/audit.tsx"),
+    route("impersonate/end", "routes/district/impersonate.end.tsx"),
   ]),
 
   route("billing-required", "routes/billing-required.tsx"),
