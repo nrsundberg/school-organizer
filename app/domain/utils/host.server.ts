@@ -94,7 +94,18 @@ export function resolveTenantSlugFromHost(request: Request, context: any): strin
   const env = getPublicEnv(context);
   const root = (env.PUBLIC_ROOT_DOMAIN ?? "").trim().toLowerCase();
   if (root) {
-    return tenantSlugFromHost(request, context);
+    // Production / staging: {slug}.PUBLIC_ROOT_DOMAIN.
+    const bySuffix = tenantSlugFromHost(request, context);
+    if (bySuffix) return bySuffix;
+    // Dev fallback: wrangler dev (and the e2e webServer) boot with the
+    // production PUBLIC_ROOT_DOMAIN baked in via wrangler.jsonc, but
+    // local dev and the seeded-tenant Playwright fixture drive tenant
+    // traffic over `{slug}.localhost`. Without this fall-through the
+    // tenant subdomain doesn't resolve a slug, resolveOrgByHost lands
+    // on the "first org by createdAt" backstop, and admin flows bounce
+    // to /login because the seeded admin's orgId doesn't match the
+    // wrong-tenant org the middleware picked.
+    return devTenantSlug(host);
   }
   return devTenantSlug(host) ?? legacySubdomainSlug(host);
 }
