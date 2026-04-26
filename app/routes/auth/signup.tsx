@@ -66,6 +66,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (!isMarketingHost(request, context)) {
     throw redirect(`${marketingOriginFromRequest(request, context)}/`);
   }
+  // Old links from before the dedicated /district/signup route may still
+  // pass ?plan=district. The flow they expect is the District wizard, not
+  // the school wizard, so bounce to the right place.
+  const url = new URL(request.url);
+  if (url.searchParams.get("plan") === "district") {
+    throw redirect("/district/signup");
+  }
   const user = getOptionalUserFromContext(context);
   if (user?.orgId) {
     const url = await getTenantBoardUrlForRequest(request, context);
@@ -76,7 +83,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // picks a tier — there is no public free tier. Exception: users who've
   // already completed step 1 (authed, no org yet) fall back to car-line so a
   // lost `?plan=` param mid-flow doesn't strand them.
-  const url = new URL(request.url);
   const planParam = url.searchParams.get("plan");
   const plan = normalizePublicPlan(planParam);
   if (!plan && !user) {

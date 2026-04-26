@@ -72,6 +72,12 @@ export function signupPathForPlan(
   plan: PublicPlanSlug,
   billingCycle: PublicBillingCycle
 ): string {
+  if (plan === "district") {
+    // District signup is a separate flow that creates a District (not Org)
+    // and asks for districtName + districtSlug. Cycle is irrelevant — district
+    // billing is sales-led, custom-priced, no public Stripe checkout.
+    return "/district/signup";
+  }
   const params = new URLSearchParams({
     plan,
     cycle: billingCycle
