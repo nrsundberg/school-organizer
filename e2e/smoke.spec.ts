@@ -103,16 +103,10 @@ test.describe("smoke: platform admin routes (unauthenticated -> redirect)", () =
 
 test.describe("smoke: api routes", () => {
   test("GET /api/healthz returns 200 JSON with ok: true", async ({ request }) => {
-    // BUG FOUND BY SMOKE SWEEP: /api/healthz is not whitelisted in
-    // `anonSkipsViewer` nor `publicMarketingPath` in
+    // Regression coverage for the 2026-04-26 P0 fix: /api/healthz must be
+    // whitelisted in anonSkipsViewer in
     // app/domain/utils/global-context.server.ts. Unauthenticated hits on
-    // marketing host get 302 → /login?next=/api/healthz. A health check
-    // endpoint must return 200 for external monitors; the guard should
-    // explicitly allow /api/healthz.
-    test.fixme(
-      true,
-      "BUG: /api/healthz 302s to /login when hit unauthenticated — not whitelisted in middleware",
-    );
+    // any host should land on the route handler, not bounce to /login.
     const res = await request.get("/api/healthz", { maxRedirects: 0 });
     expect(res.status()).toBe(200);
     const body = (await res.json()) as { ok?: boolean; ts?: string; env?: string };

@@ -202,6 +202,10 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   const isCheckOrgSlugApi = pathname === "/api/check-org-slug";
   const isBrandingLogoApi = pathname.startsWith("/api/branding/logo/");
   const isPlatform = pathname.startsWith("/platform");
+  // Health endpoint is public for external uptime monitors and the staging
+  // smoke test (see e2e/smoke.spec.ts). Must skip the anon -> /login redirect
+  // below so curl GET /api/healthz returns 200 { ok: true } regardless of host.
+  const isHealthz = pathname === "/api/healthz";
 
   const publicMarketingPath =
     pathname === "/pricing" ||
@@ -259,6 +263,7 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
     isCheckEmailApi ||
     isCheckOrgSlugApi ||
     isBrandingLogoApi ||
+    isHealthz ||
     publicMarketingPath;
 
   if (!user && !anonSkipsViewer) {
