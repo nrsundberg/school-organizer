@@ -251,11 +251,13 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         // Audit failure should not block impersonation
       }
 
-      // Forward the Set-Cookie headers from the auth response, then redirect
-      const setCookieHeader = impersonateResponse.headers.get("set-cookie");
+      // Forward the Set-Cookie headers from the auth response, then redirect.
+      // Headers#get("set-cookie") joins multiple cookies with ", " which
+      // corrupts any cookie value containing a comma (e.g. dates) — use
+      // getSetCookie() to preserve each cookie as its own header.
       const headers = new Headers();
-      if (setCookieHeader) {
-        headers.set("set-cookie", setCookieHeader);
+      for (const cookie of impersonateResponse.headers.getSetCookie()) {
+        headers.append("set-cookie", cookie);
       }
       headers.set("location", tenantHomeUrl);
       return new Response(null, { status: 302, headers });

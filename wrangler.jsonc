@@ -152,14 +152,31 @@
 	// (defined in MARKETING_HOSTS so marketing renders on the staging host).
 	"env": {
 		"staging": {
-			"routes": [],  // staging does not bind pickuproster.com routes; prod owns them (fixes wrangler 10020 on deploy)
+			// Staging mirrors prod's apex + wildcard layout on
+			// `staging.pickuproster.com`. This makes cross-subdomain auth,
+			// impersonation, and tenant routing exercise the same code paths
+			// in staging as they do in prod. workers_dev stays on as a
+			// fallback URL.
+			// In the pickuproster.com zone, DNS records `staging` (proxied)
+			// and `*.staging` (proxied wildcard) must exist before deploy
+			// or Cloudflare will 404 on tenant subdomains.
+			"routes": [
+				{
+					"pattern": "staging.pickuproster.com",
+					"custom_domain": true
+				},
+				{
+					"pattern": "*.staging.pickuproster.com/*",
+					"zone_name": "pickuproster.com"
+				}
+			],
 			"name": "school-organizer-staging",
 			"workers_dev": true,
 			"vars": {
 				"SENTRY_DSN": "",
 				"ENVIRONMENT": "staging",
-				"PUBLIC_ROOT_DOMAIN": "pickuproster.com",
-				"MARKETING_HOSTS": "localhost,127.0.0.1,school-organizer-staging.sundbergne.workers.dev",
+				"PUBLIC_ROOT_DOMAIN": "staging.pickuproster.com",
+				"MARKETING_HOSTS": "localhost,127.0.0.1,staging.pickuproster.com,www.staging.pickuproster.com,school-organizer-staging.sundbergne.workers.dev",
 				"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
 				"SUPPORT_EMAIL": "support@pickuproster.com",
 				"STRIPE_STATUS_URL": "https://www.stripe-status.com/api/v2/status.json"
