@@ -208,7 +208,6 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
       }
       setRecentCars((prev) => [{
         ...event,
-        orgId: (event as { orgId?: string }).orgId ?? "",
         createdAt: new Date(event.createdAt),
       }, ...prev].slice(0, 20));
     },

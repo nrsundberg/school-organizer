@@ -12,10 +12,13 @@ type CallEventUpdate = {
   type: "callEvent";
   event: {
     id: number;
+    orgId: string;
     spaceNumber: number;
     studentId: number | null;
     studentName: string;
     homeRoomSnapshot: string | null;
+    actorUserId: string | null;
+    onBehalfOfUserId: string | null;
     createdAt: string;
   };
 };

@@ -35,10 +35,13 @@ export async function broadcastCallEvent(
   orgId: string,
   event: {
     id: number;
+    orgId: string;
     spaceNumber: number;
     studentId: number | null;
     studentName: string;
     homeRoomSnapshot: string | null;
+    actorUserId: string | null;
+    onBehalfOfUserId: string | null;
     createdAt: Date;
   },
 ) {

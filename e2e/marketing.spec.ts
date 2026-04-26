@@ -47,19 +47,19 @@ test.describe("marketing site", () => {
   }) => {
     await page.goto("/pricing");
 
-    const trialLinks = page.getByRole("link", { name: "Start Free Trial" });
-    await expect(trialLinks.nth(0)).toHaveAttribute(
-      "href",
-      "/signup?plan=car-line"
-    );
-    await expect(trialLinks.nth(1)).toHaveAttribute(
-      "href",
-      "/signup?plan=campus"
-    );
-    await expect(trialLinks.nth(2)).toHaveAttribute(
-      "href",
-      "/signup?plan=district"
-    );
+    // Each plan card renders a signup CTA whose href encodes the plan slug
+    // and billing cycle. Car Line / Campus use "Continue to Signup"; the
+    // District card keeps "Start Free Trial". Match by href so the test is
+    // resilient to label tweaks.
+    await expect(
+      page.locator('a[href="/signup?plan=car-line&cycle=monthly"]')
+    ).toBeVisible();
+    await expect(
+      page.locator('a[href="/signup?plan=campus&cycle=monthly"]')
+    ).toBeVisible();
+    await expect(
+      page.locator('a[href="/signup?plan=district&cycle=monthly"]')
+    ).toBeVisible();
   });
 
   test("/status is publicly reachable", async ({ page }) => {
