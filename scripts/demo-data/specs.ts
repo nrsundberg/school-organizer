@@ -48,10 +48,12 @@ export interface DemoTenantSpec {
   classroomCount: number;
   /**
    * Approximate household count. The generator creates exactly this many
-   * Household rows; ~30% of households will then be assigned 2 students
-   * (siblings) and the rest 1, so the actual student-to-household ratio
-   * lands between 1.0 and ~1.3. If `studentCount` exceeds what those
-   * households can absorb the extras share an existing household.
+   * Household rows; ~30% are assigned a sibling (2 students) and the
+   * rest get 1, giving an average ratio of ~1.3 student per household.
+   * If `studentCount` exceeds that capacity the generator wraps and
+   * existing households receive a third (or more) student — preserves
+   * FK integrity but means a few siblings groups will look larger than
+   * the ~30% target. For Lincoln (350/220 ≈ 1.59) this is intentional.
    */
   householdCount: number;
   /** Number of past CallEvents to replay across the trailing 21 days. */

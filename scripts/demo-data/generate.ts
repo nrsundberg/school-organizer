@@ -72,6 +72,24 @@ class Rng {
   }
 }
 
+// ---------- Demo-data tunables ----------
+
+/** Hard cap on car-line spaces per org — even big schools rarely have more. */
+const MAX_SPACES_PER_ORG = 60;
+/** UTC minutes-of-day window for synthetic CallEvent timestamps (~14:30–15:15). */
+const DISMISSAL_WINDOW_START_UTC_MIN = 14 * 60 + 30;
+const DISMISSAL_WINDOW_END_UTC_MIN = 15 * 60 + 15;
+/** How far back past CallEvents are scattered (days). */
+const PAST_CALL_EVENTS_LOOKBACK_DAYS = 21;
+/** Out of 10, the chance a household gets two students (siblings). */
+const SIBLING_PROBABILITY_TENTHS = 3;
+/** Day offsets for the historical DrillRun timestamps (one per HISTORICAL_RUN_KEYS). */
+const DRILL_RUN_OFFSET_DAYS = 14;
+/** Synthetic length of a historical drill run, in minutes. */
+const HISTORICAL_DRILL_RUN_DURATION_MIN = 12;
+/** Every Nth row in a historical drill run is intentionally left blank (=> ~80% completion). */
+const HISTORICAL_DRILL_BLANK_EVERY_N = 5;
+
 // ---------- ID builders (stable, deterministic) ----------
 
 function userIdFor(orgId: string, role: "admin" | "controller"): string {
@@ -91,6 +109,12 @@ function runIdFor(orgId: string, globalKey: string, n: number): string {
 }
 function programIdFor(orgId: string, n: number): string {
   return `prog_demo_${orgId.replace(/^org_demo_/, "")}_${n.toString().padStart(2, "0")}`;
+}
+function cancellationIdFor(orgId: string, n: number): string {
+  return `pc_demo_${orgId.replace(/^org_demo_/, "")}_${n.toString().padStart(2, "0")}`;
+}
+function dismissalExceptionIdFor(orgId: string, n: number): string {
+  return `de_demo_${orgId.replace(/^org_demo_/, "")}_${n.toString().padStart(2, "0")}`;
 }
 
 // ---------- Public entry points (Task 5 fills in buildSeedForOrg) ----------
@@ -242,10 +266,10 @@ async function buildSeedForOrg(
   const homerooms: string[] = [];
   const startIdx = spec.teacherNameOffset % TEACHER_LAST_NAMES.length;
   for (let i = 0; i < spec.classroomCount; i++) {
-    const name = TEACHER_LAST_NAMES[(startIdx + i) % TEACHER_LAST_NAMES.length];
+    const name = TEACHER_LAST_NAMES[(startIdx + i) % TEACHER_LAST_NAMES.length]!;
     // Ensure uniqueness within an org: append a grade when we wrap.
     const wrapped = i >= TEACHER_LAST_NAMES.length;
-    const homeRoom = wrapped ? `${name} ${Math.floor(i / TEACHER_LAST_NAMES.length) + 1}` : name!;
+    const homeRoom = wrapped ? `${name} ${Math.floor(i / TEACHER_LAST_NAMES.length) + 1}` : name;
     homerooms.push(homeRoom);
     out.push({
       sql: `INSERT INTO "Teacher" (homeRoom, orgId) VALUES (?, ?)`,
@@ -254,7 +278,7 @@ async function buildSeedForOrg(
   }
 
   // 5. Spaces. Three per classroom, capped at 60. Numbered 1..N.
-  const spaceCount = Math.min(spec.classroomCount * 3, 60);
+  const spaceCount = Math.min(spec.classroomCount * 3, MAX_SPACES_PER_ORG);
   for (let n = 1; n <= spaceCount; n++) {
     out.push({
       sql: `INSERT INTO "Space" (spaceNumber, status, orgId) VALUES (?, 'EMPTY', ?)`,
@@ -287,13 +311,18 @@ async function buildSeedForOrg(
   // ~30% of households have 2 children (siblings) and the rest have 1.
   // Assign every Nth student a spaceNumber (so the demo board has cars
   // already on it when a viewer first hits /).
-  let nextHousehold = 0;
+  if (spec.studentCount > 0 && householdIds.length === 0) {
+    throw new Error(
+      `Spec ${spec.slug}: studentCount > 0 requires at least one household`,
+    );
+  }
+  let nextHousehold = -1;
   let pending = 0; // how many students this household still wants
   for (let s = 0; s < spec.studentCount; s++) {
     if (pending <= 0) {
       // Pick a fresh household; with 30% odds it gets 2 students.
       nextHousehold = (nextHousehold + 1) % householdIds.length;
-      pending = rng.next() % 10 < 3 ? 2 : 1;
+      pending = rng.next() % 10 < SIBLING_PROBABILITY_TENTHS ? 2 : 1;
     }
     const householdId = householdIds[nextHousehold]!;
     pending -= 1;
@@ -339,9 +368,9 @@ async function buildSeedForOrg(
     const key = HISTORICAL_RUN_KEYS[i]!;
     const tpl = getGlobalTemplate(key);
     if (!tpl) throw new Error(`Global template missing for historical run: ${key}`);
-    const runDaysAgo = (i + 1) * 14;
+    const runDaysAgo = (i + 1) * DRILL_RUN_OFFSET_DAYS;
     const startedAt = new Date(now.getTime() - runDaysAgo * 24 * 60 * 60 * 1000);
-    const endedAt = new Date(startedAt.getTime() + 12 * 60 * 1000); // 12 min run
+    const endedAt = new Date(startedAt.getTime() + HISTORICAL_DRILL_RUN_DURATION_MIN * 60 * 1000);
 
     // Build a partial RunState: mark every toggle column on every row
     // as "positive" for ~80% of rows; rest left blank. This makes the
@@ -349,7 +378,7 @@ async function buildSeedForOrg(
     const toggles: Record<string, "positive" | "negative"> = {};
     let rowIdx = 0;
     for (const row of tpl.definition.rows) {
-      const include = rowIdx % 5 !== 0; // skip every 5th row (~80%)
+      const include = rowIdx % HISTORICAL_DRILL_BLANK_EVERY_N !== 0;
       if (include) {
         for (const col of tpl.definition.columns) {
           if (col.kind === "toggle") {
@@ -397,7 +426,7 @@ async function buildSeedForOrg(
       sql: `INSERT INTO "ProgramCancellation" (id, orgId, programId, cancellationDate, title, message, deliveryMode, createdAt, updatedAt)
             VALUES (?, ?, ?, ?, ?, ?, 'IN_APP', ?, ?)`,
       args: [
-        `pc_demo_${spec.orgId.replace(/^org_demo_/, "")}_01`,
+        cancellationIdFor(spec.orgId, 1),
         spec.orgId,
         programIdFor(spec.orgId, 0),
         cancelDate.toISOString(),
@@ -421,7 +450,7 @@ async function buildSeedForOrg(
       sql: `INSERT INTO "DismissalException" (id, orgId, householdId, scheduleKind, exceptionDate, dayOfWeek, dismissalPlan, pickupContactName, isActive, createdAt, updatedAt)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
       args: [
-        `de_demo_${spec.orgId.replace(/^org_demo_/, "")}_${e.toString().padStart(2, "0")}`,
+        dismissalExceptionIdFor(spec.orgId, e),
         spec.orgId,
         householdIds[e]!,
         scheduleKind,
@@ -442,8 +471,8 @@ async function buildSeedForOrg(
   // realistically.
   for (let c = 0; c < spec.pastCallEvents; c++) {
     const minutesAgo =
-      rng.intBetween(0, 21) * 24 * 60 + // 0..21 days
-      rng.intBetween(870, 915); // 14:30..15:15 of that day (UTC minutes)
+      rng.intBetween(0, PAST_CALL_EVENTS_LOOKBACK_DAYS) * 24 * 60 +
+      rng.intBetween(DISMISSAL_WINDOW_START_UTC_MIN, DISMISSAL_WINDOW_END_UTC_MIN);
     const at = new Date(now.getTime() - minutesAgo * 60 * 1000);
     const studentName = `${rng.pick(FIRST_NAMES)} ${rng.pick(LAST_NAMES)}`;
     const homeRoom = homerooms[c % homerooms.length]!;
