@@ -34,6 +34,18 @@ Emits `demo-seed.staging.sql` then applies via `wrangler d1 execute --remote --e
 
 ### Production
 
+#### Preflight: confirm no slug collisions
+
+`Org.slug` is `UNIQUE`. The wipe deletes by `orgId`, NOT by slug — so if a real customer has signed up under one of the demo slugs (e.g. some clever buyer claimed `lincoln-example`), the wipe will skip them and the subsequent INSERT will fail inside the `BEGIN; ... COMMIT;` transaction (no harm done; the wipe is rolled back too, but you'll see a confusing UNIQUE error).
+
+Before you apply, confirm none of the five demo slugs are taken:
+
+```sh
+wrangler d1 execute school-organizer --remote --command "SELECT id, slug FROM Org WHERE slug IN ('bhs-example','lincoln-example','westside-elem-example','westside-middle-example','westside-hs-example') AND id NOT LIKE 'org_demo_%'"
+```
+
+If this returns any rows, rename the conflicting demo slug in `scripts/demo-data/specs.ts` (and bump `randomSeed` so anything derived stays deterministic) before proceeding.
+
 For safety the prod path is two-step:
 
 ```sh
@@ -61,6 +73,8 @@ Password resolution order:
 3. Derived from `DEMO_PASSWORD_SEED` (sha256-truncated)
 
 The script prints the resolved credentials at the end of every run. Save them out-of-band — they are not stored anywhere else.
+
+The summary is the only place the plaintext is printed. Don't pipe the seed output to a log file or paste it into a ticket — the SQL files we emit only contain the PBKDF2 hash, but the terminal output reveals the plaintext. CI environments that log stdout are not safe to run this in unless redacted.
 
 ## Updating the seeded data
 
