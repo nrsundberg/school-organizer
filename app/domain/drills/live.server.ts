@@ -1,4 +1,5 @@
 import type { PrismaClient } from "~/db";
+import type { ActorIds } from "~/domain/auth/impersonate-gate.server";
 import { emptyRunState, type RunState } from "./types";
 
 /**
@@ -108,6 +109,7 @@ export async function startDrillRun(
   orgId: string,
   templateId: string,
   initialState: RunState = emptyRunState(),
+  actor: ActorIds = { actorUserId: null, onBehalfOfUserId: null },
 ) {
   try {
     return await prisma.drillRun.create({
@@ -117,6 +119,8 @@ export async function startDrillRun(
         status: "LIVE",
         activatedAt: new Date(),
         state: initialState as object,
+        lastActorUserId: actor.actorUserId,
+        lastActorOnBehalfOfUserId: actor.onBehalfOfUserId,
       },
     });
   } catch (err) {
@@ -141,6 +145,7 @@ export async function pauseDrillRun(
   prisma: PrismaClient,
   orgId: string,
   runId: string,
+  actor: ActorIds = { actorUserId: null, onBehalfOfUserId: null },
 ) {
   const run = await prisma.drillRun.findFirst({
     where: { id: runId, orgId },
@@ -159,6 +164,8 @@ export async function pauseDrillRun(
     data: {
       status: "PAUSED",
       pausedAt: new Date(),
+      lastActorUserId: actor.actorUserId,
+      lastActorOnBehalfOfUserId: actor.onBehalfOfUserId,
     },
   });
 }
@@ -176,6 +183,7 @@ export async function resumeDrillRun(
   prisma: PrismaClient,
   orgId: string,
   runId: string,
+  actor: ActorIds = { actorUserId: null, onBehalfOfUserId: null },
 ) {
   const run = await prisma.drillRun.findFirst({
     where: { id: runId, orgId },
@@ -194,6 +202,8 @@ export async function resumeDrillRun(
     data: {
       status: "LIVE",
       pausedAt: null,
+      lastActorUserId: actor.actorUserId,
+      lastActorOnBehalfOfUserId: actor.onBehalfOfUserId,
     },
   });
 }
@@ -211,6 +221,7 @@ export async function endDrillRun(
   prisma: PrismaClient,
   orgId: string,
   runId: string,
+  actor: ActorIds = { actorUserId: null, onBehalfOfUserId: null },
 ) {
   const run = await prisma.drillRun.findFirst({
     where: { id: runId, orgId },
@@ -229,6 +240,8 @@ export async function endDrillRun(
     data: {
       status: "ENDED",
       endedAt: new Date(),
+      lastActorUserId: actor.actorUserId,
+      lastActorOnBehalfOfUserId: actor.onBehalfOfUserId,
     },
   });
 }
@@ -250,6 +263,7 @@ export async function updateLiveRunState(
   orgId: string,
   runId: string,
   state: RunState,
+  actor: ActorIds = { actorUserId: null, onBehalfOfUserId: null },
 ) {
   const run = await prisma.drillRun.findFirst({
     where: { id: runId, orgId },
@@ -268,6 +282,10 @@ export async function updateLiveRunState(
   }
   return prisma.drillRun.update({
     where: { id: runId },
-    data: { state: state as object },
+    data: {
+      state: state as object,
+      lastActorUserId: actor.actorUserId,
+      lastActorOnBehalfOfUserId: actor.onBehalfOfUserId,
+    },
   });
 }

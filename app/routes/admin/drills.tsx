@@ -3,7 +3,11 @@ import { ClipboardList, Library, Radio } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
-import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
+import {
+  getActorIdsFromContext,
+  getOrgFromContext,
+  getTenantPrisma,
+} from "~/domain/utils/global-context.server";
 import { defaultTemplateDefinition } from "~/domain/drills/types";
 import { startDrillRun } from "~/domain/drills/live.server";
 import { dataWithError, dataWithSuccess } from "remix-toast";
@@ -79,8 +83,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       return dataWithError(null, t("drills.list.errors.missingId"));
     }
     const orgId = getOrgFromContext(context).id;
+    const actor = getActorIdsFromContext(context);
     try {
-      await startDrillRun(prisma, orgId, id);
+      await startDrillRun(prisma, orgId, id, undefined, actor);
     } catch (err) {
       if (err instanceof Response && err.status === 409) {
         return dataWithError(null, t("drills.list.errors.anotherLive"));

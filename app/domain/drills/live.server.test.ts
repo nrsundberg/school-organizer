@@ -30,6 +30,8 @@ interface FakeDrillRunRow {
   activatedAt: Date | null;
   pausedAt: Date | null;
   endedAt: Date | null;
+  lastActorUserId: string | null;
+  lastActorOnBehalfOfUserId: string | null;
 }
 
 interface CreateArgs {
@@ -39,6 +41,8 @@ interface CreateArgs {
     status: Status;
     activatedAt?: Date | null;
     state: object;
+    lastActorUserId?: string | null;
+    lastActorOnBehalfOfUserId?: string | null;
   };
 }
 
@@ -49,6 +53,8 @@ interface UpdateArgs {
     pausedAt: Date | null;
     endedAt: Date | null;
     state: object;
+    lastActorUserId: string | null;
+    lastActorOnBehalfOfUserId: string | null;
   }>;
 }
 
@@ -102,6 +108,8 @@ class FakePrisma {
         activatedAt: data.activatedAt ?? null,
         pausedAt: null,
         endedAt: null,
+        lastActorUserId: data.lastActorUserId ?? null,
+        lastActorOnBehalfOfUserId: data.lastActorOnBehalfOfUserId ?? null,
       };
       this.rows.push(row);
       return row;
@@ -116,6 +124,10 @@ class FakePrisma {
       if (args.data.pausedAt !== undefined) next.pausedAt = args.data.pausedAt;
       if (args.data.endedAt !== undefined) next.endedAt = args.data.endedAt;
       if (args.data.state !== undefined) next.state = args.data.state;
+      if (args.data.lastActorUserId !== undefined)
+        next.lastActorUserId = args.data.lastActorUserId;
+      if (args.data.lastActorOnBehalfOfUserId !== undefined)
+        next.lastActorOnBehalfOfUserId = args.data.lastActorOnBehalfOfUserId;
       this.rows[idx] = next;
       return next;
     },
@@ -386,6 +398,59 @@ if (!mod) {
       const fake = new FakePrisma();
       const active = await live.getActiveDrillRun(P(fake), ORG);
       assert.equal(active, null);
+    });
+  });
+
+  describe("actor stamping", () => {
+    it("startDrillRun records lastActor when called with an actor", async () => {
+      const prisma = new FakePrisma();
+      const run = await live.startDrillRun(
+        P(prisma),
+        "org_a",
+        "tpl_a",
+        undefined,
+        { actorUserId: "u_admin", onBehalfOfUserId: null },
+      );
+      assert.equal(run.lastActorUserId, "u_admin");
+      assert.equal(run.lastActorOnBehalfOfUserId, null);
+    });
+
+    it("updateLiveRunState stamps lastActor with impersonation context", async () => {
+      const prisma = new FakePrisma();
+      const run = await live.startDrillRun(
+        P(prisma),
+        "org_a",
+        "tpl_a",
+        undefined,
+        { actorUserId: "u_admin", onBehalfOfUserId: null },
+      );
+      const updated = await live.updateLiveRunState(
+        P(prisma),
+        "org_a",
+        run.id,
+        { toggles: {}, notes: "n", actionItems: [] },
+        { actorUserId: "u_admin", onBehalfOfUserId: "u_target" },
+      );
+      assert.equal(updated.lastActorUserId, "u_admin");
+      assert.equal(updated.lastActorOnBehalfOfUserId, "u_target");
+    });
+
+    it("pauseDrillRun stamps lastActor", async () => {
+      const prisma = new FakePrisma();
+      const run = await live.startDrillRun(
+        P(prisma),
+        "org_a",
+        "tpl_a",
+        undefined,
+        { actorUserId: "u_admin", onBehalfOfUserId: null },
+      );
+      const paused = await live.pauseDrillRun(
+        P(prisma),
+        "org_a",
+        run.id,
+        { actorUserId: "u_other_admin", onBehalfOfUserId: null },
+      );
+      assert.equal(paused.lastActorUserId, "u_other_admin");
     });
   });
 }
