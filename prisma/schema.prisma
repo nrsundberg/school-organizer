@@ -582,8 +582,9 @@ model CallEvent {
   /// Userid of the human who triggered the dismissal. When an admin
   /// impersonates a parent and clicks, this is the ADMIN's id (the real
   /// human), and `onBehalfOfUserId` is the impersonated user. Nullable
-  /// because the public board accepts anonymous viewer clicks; rows
-  /// pre-2026-04-25 are null and not backfilled.
+  /// only for legacy rows pre-2026-04-26 (before the action endpoint
+  /// was auth-gated to ADMIN/CONTROLLER, see update.$space.tsx); new
+  /// CallEvent rows are always attributed to a signed-in actor.
   actorUserId       String?
   /// When non-null, the action was performed via impersonation and this
   /// is the impersonated user's id. Always null outside impersonation.
