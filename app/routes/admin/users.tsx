@@ -122,7 +122,7 @@ function BanButton({ user, currentUserId }: { user: { id: string; name: string; 
             <p className="text-white/50 text-sm mb-4">{t("users.ban.body")}</p>
             <label className="text-sm text-white/60 mb-1 block">{t("users.ban.reasonLabel")}</label>
             <input
-              className="w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white text-sm mb-4 outline-none focus:border-blue-500"
+              className="w-full app-field mb-4 focus:border-blue-500"
               placeholder={t("users.ban.reasonPlaceholder")}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -330,7 +330,7 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
               name="role"
               value={newUserRole}
               onChange={(e) => setNewUserRole(e.target.value)}
-              className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white w-32 text-sm"
+              className="app-field w-32"
             >
               <option value="CONTROLLER">{t("users.create.controller")}</option>
               <option value="ADMIN">{t("users.create.admin")}</option>
@@ -367,7 +367,7 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                         name="role"
                         defaultValue={user.role ?? "VIEWER"}
                         onChange={(e) => e.currentTarget.form?.requestSubmit()}
-                        className="rounded-lg border border-white/20 bg-white/5 px-2 py-1 text-white text-sm"
+                        className="app-field"
                       >
                         <option value="VIEWER">{t("users.create.viewer")}</option>
                         <option value="CONTROLLER">{t("users.create.controller")}</option>

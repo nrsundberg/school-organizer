@@ -102,7 +102,7 @@ export default function PlatformAudit({ loaderData }: Route.ComponentProps) {
           <select
             name="orgId"
             defaultValue={orgId}
-            className="rounded-lg border border-white/15 bg-[#0f1414] px-3 py-2 text-white focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
+            className="app-field focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
           >
             <option value="">All orgs</option>
             {orgs.map((o) => (
@@ -119,7 +119,7 @@ export default function PlatformAudit({ loaderData }: Route.ComponentProps) {
             name="actor"
             defaultValue={actor}
             placeholder="user ID substring"
-            className="min-w-[180px] rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-white placeholder:text-white/40 focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
+            className="min-w-[180px] app-field focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
@@ -129,7 +129,7 @@ export default function PlatformAudit({ loaderData }: Route.ComponentProps) {
             name="action"
             defaultValue={action}
             placeholder="comp.set"
-            className="min-w-[140px] rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-white placeholder:text-white/40 focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
+            className="min-w-[140px] app-field focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
@@ -138,7 +138,7 @@ export default function PlatformAudit({ loaderData }: Route.ComponentProps) {
             type="date"
             name="since"
             defaultValue={since}
-            className="rounded-lg border border-white/15 bg-[#0f1414] px-3 py-2 text-white focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
+            className="app-field focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
           />
         </label>
         <button

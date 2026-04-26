@@ -382,7 +382,7 @@ export default function AdminBranding({ loaderData }: Route.ComponentProps) {
                   name="customDomain"
                   defaultValue={loaderData.customDomain}
                   placeholder={t("branding.customDomainPlaceholder")}
-                  className="rounded border border-white/15 bg-white/5 px-3 py-2 text-white text-sm placeholder:text-white/30"
+                  className="app-field"
                 />
               </label>
               {domainError ? (

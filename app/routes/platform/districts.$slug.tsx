@@ -42,7 +42,7 @@ export default function PlatformDistrictDetail({
             type="number"
             min={1}
             defaultValue={district.schoolCap}
-            className="block w-full rounded border border-white/15 bg-white/5 px-2 py-1 text-white"
+            className="block w-full app-field"
           />
         </label>
         <label className="block">
@@ -55,7 +55,7 @@ export default function PlatformDistrictDetail({
                 ? new Date(district.trialEndsAt).toISOString().slice(0, 10)
                 : ""
             }
-            className="block w-full rounded border border-white/15 bg-white/5 px-2 py-1 text-white"
+            className="block w-full app-field"
           />
         </label>
         <label className="block">
@@ -63,7 +63,7 @@ export default function PlatformDistrictDetail({
           <input
             name="stripeCustomerId"
             defaultValue={district.stripeCustomerId ?? ""}
-            className="block w-full rounded border border-white/15 bg-white/5 px-2 py-1 text-white font-mono text-xs"
+            className="block w-full app-field font-mono text-xs"
           />
         </label>
         <label className="block">
@@ -76,7 +76,7 @@ export default function PlatformDistrictDetail({
                 ? new Date(district.compedUntil).toISOString().slice(0, 10)
                 : ""
             }
-            className="block w-full rounded border border-white/15 bg-white/5 px-2 py-1 text-white"
+            className="block w-full app-field"
           />
         </label>
         <label className="flex items-center gap-2">
@@ -92,7 +92,7 @@ export default function PlatformDistrictDetail({
           <textarea
             name="billingNote"
             defaultValue={district.billingNote ?? ""}
-            className="block w-full rounded border border-white/15 bg-white/5 px-2 py-1 text-white"
+            className="block w-full app-field"
           />
         </label>
         <button

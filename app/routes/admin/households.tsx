@@ -604,7 +604,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
             <Field label={t("households.assign.householdLabel")}>
               <select
                 name="householdId"
-                className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                className="app-field"
                 defaultValue=""
               >
                 <option value="">
@@ -648,7 +648,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
             <Field label={t("households.exceptions.householdLabel")}>
               <select
                 name="householdId"
-                className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                className="app-field"
                 defaultValue=""
                 required
               >
@@ -667,7 +667,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
               <Field label={t("households.exceptions.scheduleLabel")}>
                 <select
                   name="scheduleKind"
-                  className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                  className="app-field"
                   defaultValue="DATE"
                 >
                   <option value="DATE">
@@ -681,7 +681,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
               <Field label={t("households.exceptions.dismissalPlanLabel")}>
                 <select
                   name="dismissalPlan"
-                  className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                  className="app-field"
                   defaultValue={DISMISSAL_PLANS[0]}
                 >
                   {DISMISSAL_PLANS.map((plan) => (
@@ -695,13 +695,13 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
                 <input
                   type="date"
                   name="exceptionDate"
-                  className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                  className="app-field"
                 />
               </Field>
               <Field label={t("households.exceptions.weeklyDayLabel")}>
                 <select
                   name="dayOfWeek"
-                  className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                  className="app-field"
                   defaultValue="1"
                 >
                   {WEEKDAYS.map((_weekday, index) => (
@@ -715,14 +715,14 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
                 <input
                   type="date"
                   name="startsOn"
-                  className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                  className="app-field"
                 />
               </Field>
               <Field label={t("households.exceptions.endsOnLabel")}>
                 <input
                   type="date"
                   name="endsOn"
-                  className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                  className="app-field"
                 />
               </Field>
               <Field label={t("households.exceptions.pickupContactLabel")}>
@@ -827,7 +827,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
             <Field label={t("households.cancellations.existingProgramLabel")}>
               <select
                 name="programId"
-                className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                className="app-field"
                 defaultValue=""
               >
                 <option value="">
@@ -851,7 +851,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
                 <input
                   type="date"
                   name="cancellationDate"
-                  className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white"
+                  className="app-field"
                   required
                 />
               </Field>
@@ -953,7 +953,7 @@ function RoiPanel({ roi }: { roi: LoaderData["roi"] }) {
               type="date"
               name="from"
               defaultValue={roi.range.from}
-              className="rounded-lg border border-white/20 bg-black/20 px-3 py-2 text-sm text-white"
+              className="app-field"
             />
           </Field>
           <Field label={t("households.roi.toLabel")}>
@@ -961,7 +961,7 @@ function RoiPanel({ roi }: { roi: LoaderData["roi"] }) {
               type="date"
               name="to"
               defaultValue={roi.range.to}
-              className="rounded-lg border border-white/20 bg-black/20 px-3 py-2 text-sm text-white"
+              className="app-field"
             />
           </Field>
           <Button type="submit" variant="secondary" className="self-end">

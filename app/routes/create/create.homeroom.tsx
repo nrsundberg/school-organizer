@@ -189,7 +189,7 @@ export default function CreateHomeroom() {
                 <select
                   onChange={(e) => { if (e.target.value) { handleStudentSelect(e.target.value); e.target.value = ""; } }}
                   disabled={isSubmitting}
-                  className="rounded-lg border border-gray-500 bg-gray-900 px-3 py-2 text-gray-100 focus:border-primary focus:outline-none disabled:opacity-60"
+                  className="app-field disabled:opacity-60"
                 >
                   <option value="">{t("create.homeroom.selectStudent")}</option>
                   {availableStudents.map((student) => (

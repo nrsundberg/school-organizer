@@ -332,7 +332,7 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
           updateRoomFilter(value);
         }}
         placeholder={t("index.homeroomPlaceholder")}
-        className="w-full rounded-lg border border-gray-500 bg-gray-900 px-3 py-2 text-gray-100 [color-scheme:dark] focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D500]"
+        className="w-full app-field [color-scheme:dark] focus-visible:ring-2 focus-visible:ring-[#E9D500]"
       />
       <datalist id="homepage-homeroom-options">
         {homeRooms.map((room) => (

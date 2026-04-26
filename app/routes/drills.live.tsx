@@ -396,7 +396,7 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
               onBlur={flushNotes}
               rows={4}
               disabled={readOnly}
-              className="w-full rounded-lg border border-white/20 bg-[#1a1f1f] px-3 py-2 text-white text-sm placeholder:text-white/30 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full app-field disabled:opacity-60 disabled:cursor-not-allowed"
               placeholder={t("drillsLive.notesPlaceholder")}
             />
           </section>
@@ -436,7 +436,7 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
                       onChange={(e) => updateActionItem(item.id, e.target.value)}
                       onBlur={flushNotes}
                       disabled={readOnly}
-                      className="flex-1 min-w-[12rem] rounded border border-white/15 bg-[#1a1f1f] px-2 py-1.5 text-sm text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="flex-1 min-w-[12rem] app-field disabled:opacity-60 disabled:cursor-not-allowed"
                       placeholder={t("drillsLive.followUpPlaceholder")}
                     />
                     {!readOnly && (

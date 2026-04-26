@@ -143,7 +143,7 @@ export default function NewCompedOrg() {
             type="text"
             required
             minLength={2}
-            className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+            className="app-field"
           />
         </div>
         <div className="flex flex-col gap-1">
@@ -154,7 +154,7 @@ export default function NewCompedOrg() {
             type="text"
             required
             pattern="[a-z0-9-]+"
-            className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+            className="app-field"
           />
         </div>
         <div className="flex flex-col gap-1">
@@ -164,7 +164,7 @@ export default function NewCompedOrg() {
             name="adminEmail"
             type="email"
             required
-            className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+            className="app-field"
           />
           <p className="text-xs text-white/40">
             If this email is already a user, they&apos;ll be attached to the
@@ -179,7 +179,7 @@ export default function NewCompedOrg() {
             id="plan"
             name="plan"
             defaultValue="FREE"
-            className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+            className="app-field"
           >
             {VALID_PLANS.map((p) => (
               <option key={p} value={p}>{p}</option>

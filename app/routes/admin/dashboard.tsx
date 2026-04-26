@@ -296,7 +296,7 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
                 max={5000}
                 value={gridSize}
                 onChange={(e) => setGridSize(e.target.value)}
-                className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white w-32 disabled:opacity-50"
+                className="app-field w-32 disabled:opacity-50"
                 disabled={hasExistingGrid}
               />
             </label>
@@ -327,7 +327,7 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
               })}
               value={extendTo}
               onChange={(e) => setExtendTo(e.target.value)}
-              className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white w-36"
+              className="app-field w-36"
             />
           </label>
           <Button variant="secondary" type="submit">
@@ -348,7 +348,7 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
               })}
               value={reduceTo}
               onChange={(e) => setReduceTo(e.target.value)}
-              className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white w-36"
+              className="app-field w-36"
             />
           </label>
           <Button variant="danger" type="submit">

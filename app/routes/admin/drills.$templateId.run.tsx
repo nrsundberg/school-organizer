@@ -341,7 +341,7 @@ export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
           value={state.notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={4}
-          className="w-full rounded-lg border border-white/20 bg-[#1a1f1f] px-3 py-2 text-white text-sm placeholder:text-white/30"
+          className="w-full app-field"
           placeholder={t("drills.run.notesPlaceholder")}
         />
       </section>
@@ -374,7 +374,7 @@ export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
                 <input
                   value={item.text}
                   onChange={(e) => updateActionItem(item.id, e.target.value)}
-                  className="flex-1 min-w-[12rem] rounded border border-white/15 bg-[#1a1f1f] px-2 py-1.5 text-sm text-white"
+                  className="flex-1 min-w-[12rem] app-field"
                   placeholder={t("drills.run.itemPlaceholder")}
                 />
                 <button

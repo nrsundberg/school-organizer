@@ -154,7 +154,7 @@ export default function EditStudent({ loaderData }: Route.ComponentProps) {
                   onChange={(e) => setHomeRoom(e.target.value)}
                   disabled={isSubmitting}
                   placeholder={t("edit.student.homeroomPlaceholder")}
-                  className="rounded-lg border border-gray-500 bg-gray-900 px-3 py-2 text-gray-100 focus:border-primary focus:outline-none disabled:opacity-60"
+                  className="app-field disabled:opacity-60"
                 />
                 <datalist id="homeroom-options">
                   {homerooms.map((teacher) => (

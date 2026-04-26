@@ -386,7 +386,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                     <input
                       value={col.label}
                       onChange={(e) => updateColumn(ci, { label: e.target.value })}
-                      className="rounded border border-white/20 bg-white/5 px-2 py-1 text-white text-xs font-semibold"
+                      className="app-field text-xs font-semibold"
                       aria-label={t("drills.edit.columnLabel", { n: ci + 1 })}
                     />
                     <select
@@ -394,7 +394,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                       onChange={(e) =>
                         updateColumn(ci, { kind: e.target.value === "toggle" ? "toggle" : "text" })
                       }
-                      className="rounded border border-white/20 bg-[#1a1f1f] px-2 py-1 text-white text-xs"
+                      className="app-field text-xs"
                     >
                       <option value="text">{t("drills.edit.kindText")}</option>
                       <option value="toggle">{t("drills.edit.kindToggle")}</option>
@@ -441,7 +441,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                       <input
                         value={row.cells[col.id] ?? ""}
                         onChange={(e) => updateRowCell(ri, col.id, e.target.value)}
-                        className="w-full min-w-[6rem] rounded border border-white/15 bg-white/5 px-2 py-1.5 text-white"
+                        className="w-full min-w-[6rem] app-field"
                       />
                     ) : (
                       <span className="text-white/30 text-xs">{t("drills.edit.checkOnRun")}</span>

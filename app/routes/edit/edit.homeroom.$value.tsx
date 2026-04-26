@@ -168,7 +168,7 @@ export default function EditHomeroom({ loaderData }: Route.ComponentProps) {
                     }
                   }}
                   disabled={isSubmitting}
-                  className="rounded-lg border border-gray-500 bg-gray-900 px-3 py-2 text-gray-100 focus:border-primary focus:outline-none disabled:opacity-60"
+                  className="app-field disabled:opacity-60"
                 >
                   <option value="">{t("edit.homeroom.selectStudent")}</option>
                   {availableStudents.map((student: any) => (

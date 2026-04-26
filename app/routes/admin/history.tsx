@@ -431,7 +431,7 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
           <select
             name="room"
             defaultValue={filters.room}
-            className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white text-sm w-48"
+            className="app-field w-48"
           >
             <option value="">{t("history.filters.allHomerooms")}</option>
             {homerooms.map((room) => (

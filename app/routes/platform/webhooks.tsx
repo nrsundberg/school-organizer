@@ -57,7 +57,7 @@ export default function PlatformWebhooks({ loaderData }: Route.ComponentProps) {
             name="type"
             defaultValue={type}
             placeholder="customer.subscription"
-            className="min-w-[220px] rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-white placeholder:text-white/40 focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
+            className="min-w-[220px] app-field focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
@@ -66,7 +66,7 @@ export default function PlatformWebhooks({ loaderData }: Route.ComponentProps) {
             type="date"
             name="since"
             defaultValue={since}
-            className="rounded-lg border border-white/15 bg-[#0f1414] px-3 py-2 text-white focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
+            className="app-field focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
           />
         </label>
         <button

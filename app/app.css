@@ -12,3 +12,38 @@
   --color-primary: #3D6B9A;
   --color-secondary: #A86C10;
 }
+
+/* Lift HeroUI form-field surfaces in dark mode so inputs visibly pop
+ * against the app and auth backgrounds. Overrides documented HeroUI v3
+ * tokens; --color-field-border-hover/focus auto-derive via color-mix
+ * in @heroui/styles/themes/shared/theme.css. */
+.dark,
+[data-theme="dark"] {
+  --field-background: oklch(0.30 0.005 286);   /* ~#3a3d40 */
+  --field-border:     oklch(0.42 0.005 286);   /* ~#5a5d62 */
+}
+
+/* Shared utility for hand-rolled <input>/<select>/<textarea> so they
+ * visually match HeroUI fields. Lives in the components layer so that
+ * Tailwind utilities applied alongside `app-field` (e.g. focus:border-blue-500
+ * on the user-ban modal, focus:border-[#E9D500]/50 on platform pages) still
+ * win the cascade. Layout classes stay on the element. */
+@layer components {
+  .app-field {
+    background-color: oklch(0.30 0.005 286);
+    border: 1px solid oklch(0.42 0.005 286);
+    color: #fff;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    outline: none;
+    transition: background-color 150ms, border-color 150ms, box-shadow 150ms;
+  }
+  .app-field::placeholder { color: rgb(255 255 255 / 0.45); }
+  .app-field:hover:not(:focus) { border-color: rgb(255 255 255 / 0.30); }
+  .app-field:focus,
+  .app-field:focus-visible {
+    border-color: rgb(255 255 255 / 0.55);
+    box-shadow: 0 0 0 2px rgb(255 255 255 / 0.10);
+  }
+}

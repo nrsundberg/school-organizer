@@ -128,7 +128,7 @@ export default function PlatformIndex({ loaderData }: Route.ComponentProps) {
             name="search"
             defaultValue={search}
             placeholder="Name or slug"
-            className="min-w-[200px] rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-white placeholder:text-white/40 focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
+            className="min-w-[200px] app-field focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
@@ -136,7 +136,7 @@ export default function PlatformIndex({ loaderData }: Route.ComponentProps) {
           <select
             name="plan"
             defaultValue={plan}
-            className="rounded-lg border border-white/15 bg-[#0f1414] px-3 py-2 text-white focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
+            className="app-field focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
           >
             <option value="">All</option>
             {BILLING_PLANS.map((p) => (
@@ -151,7 +151,7 @@ export default function PlatformIndex({ loaderData }: Route.ComponentProps) {
           <select
             name="status"
             defaultValue={status}
-            className="rounded-lg border border-white/15 bg-[#0f1414] px-3 py-2 text-white focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
+            className="app-field focus:border-[#E9D500]/50 focus:outline-none focus:ring-1 focus:ring-[#E9D500]/40"
           >
             <option value="">All</option>
             {ORG_STATUSES.map((s) => (

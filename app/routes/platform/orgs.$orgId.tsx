@@ -440,7 +440,7 @@ export default function PlatformOrgDetail({ loaderData }: Route.ComponentProps) 
                 type="datetime-local"
                 name="compedUntil"
                 defaultValue={toLocalDatetime(org.compedUntil)}
-                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white w-full"
+                className="app-field w-full"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -450,7 +450,7 @@ export default function PlatformOrgDetail({ loaderData }: Route.ComponentProps) 
                 name="billingNote"
                 defaultValue={org.billingNote ?? ""}
                 rows={3}
-                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white w-full resize-none"
+                className="app-field w-full resize-none"
                 placeholder="Optional internal note"
               />
             </div>
@@ -487,7 +487,7 @@ export default function PlatformOrgDetail({ loaderData }: Route.ComponentProps) 
                 id="billingPlan"
                 name="billingPlan"
                 defaultValue={org.billingPlan ?? "FREE"}
-                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white w-full"
+                className="app-field w-full"
               >
                 <option value="FREE">FREE</option>
                 <option value="CAR_LINE">CAR_LINE</option>
@@ -522,7 +522,7 @@ export default function PlatformOrgDetail({ loaderData }: Route.ComponentProps) 
               min={1}
               max={365}
               defaultValue={14}
-              className="rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white w-full"
+              className="app-field w-full"
             />
             <button
               type="submit"

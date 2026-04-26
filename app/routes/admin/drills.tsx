@@ -137,7 +137,7 @@ export default function AdminDrillList({ loaderData }: Route.ComponentProps) {
               type="text"
               required
               placeholder={t("drills.list.namePlaceholder")}
-              className="rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-white"
+              className="app-field"
             />
           </label>
           <button type="submit" className={btnPrimary}>
