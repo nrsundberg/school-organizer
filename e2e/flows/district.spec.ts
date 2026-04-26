@@ -1,4 +1,4 @@
-import { test, expect } from "../fixtures/district-fixtures";
+import { test, expect, safeFill } from "../fixtures/district-fixtures";
 
 test.describe("district portal", () => {
   test("signup -> create school -> appears in schools list", async ({
@@ -15,10 +15,12 @@ test.describe("district portal", () => {
     await expect(districtPage).toHaveURL(/\/district\/schools\/new$/);
 
     const stamp = Date.now();
-    await districtPage.fill("[name=schoolName]", "Central Elementary");
-    await districtPage.fill("[name=schoolSlug]", `central-${stamp}`);
-    await districtPage.fill("[name=adminName]", "School Admin");
-    await districtPage.fill(
+    await expect(districtPage.locator("[name=schoolName]")).toBeVisible();
+    await safeFill(districtPage, "[name=schoolName]", "Central Elementary");
+    await safeFill(districtPage, "[name=schoolSlug]", `central-${stamp}`);
+    await safeFill(districtPage, "[name=adminName]", "School Admin");
+    await safeFill(
+      districtPage,
       "[name=adminEmail]",
       `school-${stamp}@example.test`,
     );
@@ -35,10 +37,15 @@ test.describe("district portal", () => {
     for (let i = 0; i < 4; i++) {
       const stamp = `${Date.now()}-${i}`;
       await districtPage.goto("/district/schools/new");
-      await districtPage.fill("[name=schoolName]", `Cap School ${i}`);
-      await districtPage.fill("[name=schoolSlug]", `cap-${stamp}`);
-      await districtPage.fill("[name=adminName]", `Cap Admin ${i}`);
-      await districtPage.fill("[name=adminEmail]", `cap-${stamp}@example.test`);
+      await expect(districtPage.locator("[name=schoolName]")).toBeVisible();
+      await safeFill(districtPage, "[name=schoolName]", `Cap School ${i}`);
+      await safeFill(districtPage, "[name=schoolSlug]", `cap-${stamp}`);
+      await safeFill(districtPage, "[name=adminName]", `Cap Admin ${i}`);
+      await safeFill(
+        districtPage,
+        "[name=adminEmail]",
+        `cap-${stamp}@example.test`,
+      );
       await districtPage.click("button:has-text('Create school')");
       await expect(districtPage).toHaveURL(/\/district\/schools$/);
     }
