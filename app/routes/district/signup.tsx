@@ -115,38 +115,24 @@ export async function action({ request, context }: Route.ActionArgs) {
     };
   }
 
-  // Skip district onboarding entirely for platform admins — they don't need
-  // a District. The /platform layout's loader gates on isPlatformAdmin, so a
-  // user without orgId/districtId still sees the staff panel.
-  if (
-    isPlatformAdmin(
-      { email: adminEmail, role: "VIEWER" },
-      context,
-    )
-  ) {
-    throw redirect("/platform");
-  }
-
-  let district;
-  try {
-    district = await createDistrict(context, { name: districtName });
-  } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : "Could not create district.",
-    };
-  }
-
   const db = getPrisma(context);
   const auth = getAuth(context);
-  let signup;
+
+  // Create the user first so we have a session cookie to forward on the
+  // redirect. `returnHeaders: true` is what gives us the Set-Cookie headers
+  // — without it, better-auth drops them and the browser never gets the
+  // session, leaving the post-redirect loader to bounce to /login.
+  const setCookieHeaders = new Headers();
+  let signupResult: {
+    headers: Headers;
+    response: { user?: { id: string }; token?: string | null };
+  };
   try {
-    signup = await auth.api.signUpEmail({
+    signupResult = await auth.api.signUpEmail({
       body: { name: adminName, email: adminEmail, password: adminPassword },
+      returnHeaders: true,
     });
   } catch (err) {
-    // Roll back the District row so a failed signup doesn't burn the slug
-    // or pollute the staff panel.
-    await db.district.delete({ where: { id: district.id } }).catch(() => {});
     return {
       error:
         err instanceof Error
@@ -154,25 +140,49 @@ export async function action({ request, context }: Route.ActionArgs) {
           : "Could not create the district admin account.",
     };
   }
-  if (!signup?.user?.id) {
-    await db.district.delete({ where: { id: district.id } }).catch(() => {});
+  for (const c of signupResult.headers.getSetCookie?.() ?? []) {
+    setCookieHeaders.append("Set-Cookie", c);
+  }
+  const userId = signupResult.response?.user?.id;
+  if (!userId) {
     return { error: "Could not create the district admin account." };
   }
 
+  // Skip district onboarding entirely for platform admins — they don't need
+  // a District. The /platform layout's loader gates on isPlatformAdmin, so a
+  // user without orgId/districtId still sees the staff panel.
+  if (isPlatformAdmin({ email: adminEmail, role: "VIEWER" }, context)) {
+    await db.user.update({
+      where: { id: userId },
+      data: { role: "PLATFORM_ADMIN" },
+    });
+    throw redirect("/platform", { headers: setCookieHeaders });
+  }
+
+  let district;
+  try {
+    district = await createDistrict(context, { name: districtName });
+  } catch (err) {
+    await db.user.delete({ where: { id: userId } }).catch(() => {});
+    return {
+      error: err instanceof Error ? err.message : "Could not create district.",
+    };
+  }
+
   await db.user.update({
-    where: { id: signup.user.id },
+    where: { id: userId },
     data: { districtId: district.id, role: "ADMIN" },
   });
 
   await writeDistrictAudit(context, {
     districtId: district.id,
-    actorUserId: signup.user.id,
+    actorUserId: userId,
     actorEmail: adminEmail,
     action: "district.admin.invited",
     targetType: "User",
-    targetId: signup.user.id,
+    targetId: userId,
     details: { firstAdmin: true },
   });
 
-  throw redirect("/district");
+  throw redirect("/district", { headers: setCookieHeaders });
 }
