@@ -18,6 +18,7 @@ test-results/
 /blob-report/
 /playwright/.cache/
 .worktrees/
+.claude/worktrees/
 docs/agent-reports/*.patch
 flow-tmp.mjs
 scan-tmp.mjs
