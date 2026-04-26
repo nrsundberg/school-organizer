@@ -15,6 +15,7 @@ import type { Route } from "./+types/signup";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
 import {
   isMarketingHost,
+  isPlatformAdmin,
   marketingOriginFromRequest
 } from "~/domain/utils/host.server";
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
@@ -181,6 +182,19 @@ export async function action({ request, context }: Route.ActionArgs) {
   const userId = session.user.id;
   const email = session.user.email;
 
+  // Skip school onboarding entirely for platform admins — they don't need
+  // an Org. The /platform layout's loader gates on isPlatformAdmin, so a
+  // user without orgId/districtId still sees the staff panel.
+  const sessionUser = session.user as { email: string; role?: string };
+  if (
+    isPlatformAdmin(
+      { email: sessionUser.email, role: sessionUser.role ?? "VIEWER" },
+      context,
+    )
+  ) {
+    throw redirect("/platform");
+  }
+
   // 2. Parse FormData
   const formData = await request.formData();
   const parsed = step3Schema.safeParse(formData, {
@@ -270,6 +284,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
 type RootLoader = {
   user?: { id: string; orgId: string | null } | null;
+  isPlatformAdmin?: boolean;
 };
 
 export default function Signup({ loaderData }: Route.ComponentProps) {
@@ -348,6 +363,14 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
       updateStepParam(2, { replace: true });
     }
   }, [hasNoOrg, step, updateStepParam]);
+
+  // Platform admins (per PLATFORM_ADMIN_EMAILS) don't need to set up an
+  // org — once they've authed they go straight to the staff panel.
+  useEffect(() => {
+    if (justSignedUp && rootData?.isPlatformAdmin === true) {
+      window.location.href = "/platform";
+    }
+  }, [justSignedUp, rootData?.isPlatformAdmin]);
 
   const setStep = useCallback(
     (n: number) => {

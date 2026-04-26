@@ -6,6 +6,7 @@ import { writeDistrictAudit } from "~/domain/district/audit.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { getPrisma } from "~/db.server";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
+import { isPlatformAdmin } from "~/domain/utils/host.server";
 import {
   checkRateLimit,
   clientIpFromRequest,
@@ -112,6 +113,18 @@ export async function action({ request, context }: Route.ActionArgs) {
       error:
         "All fields are required, and the password must be at least 10 characters.",
     };
+  }
+
+  // Skip district onboarding entirely for platform admins — they don't need
+  // a District. The /platform layout's loader gates on isPlatformAdmin, so a
+  // user without orgId/districtId still sees the staff panel.
+  if (
+    isPlatformAdmin(
+      { email: adminEmail, role: "VIEWER" },
+      context,
+    )
+  ) {
+    throw redirect("/platform");
   }
 
   let district;

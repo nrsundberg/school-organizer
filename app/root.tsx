@@ -35,7 +35,7 @@ import {
   getOptionalOrgFromContext,
   getTenantPrisma
 } from "~/domain/utils/global-context.server";
-import { isMarketingHost } from "~/domain/utils/host.server";
+import { isMarketingHost, isPlatformAdmin } from "~/domain/utils/host.server";
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { ImpersonationBanner } from "~/components/ImpersonationBanner";
@@ -128,6 +128,10 @@ export const links: Route.LinksFunction = () => [
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = context.get(userContext) ?? null;
+  const isPlatformAdminFlag = isPlatformAdmin(
+    user as { email: string; role: string } | null,
+    context,
+  );
   const org = getOptionalOrgFromContext(context);
   const marketing = isMarketingHost(request, context);
   const { toast, headers } = await getToast(request);
@@ -210,6 +214,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     {
       toast,
       user,
+      isPlatformAdmin: isPlatformAdminFlag,
       impersonatedBy,
       districtImpersonation,
       branding: getBrandingFromOrg(org),
