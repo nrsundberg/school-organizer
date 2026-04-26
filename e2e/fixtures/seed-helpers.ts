@@ -13,6 +13,8 @@
  * pulling the whole Better Auth + Prisma + D1 runtime into a Node test
  * process.
  */
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 // Must match PBKDF2 params in app/domain/auth/better-auth.server.ts.
 const PBKDF2_ITERATIONS = 100_000;
@@ -160,13 +162,6 @@ export function sessionCookieName(opts: {
  */
 export function readBetterAuthSecret(devVarsPath = ".dev.vars"): string {
   if (process.env.BETTER_AUTH_SECRET) return process.env.BETTER_AUTH_SECRET;
-  // Lazy require so this module stays usable in environments without
-  // node:fs (e.g. if someone imports the helpers from a non-Node test
-  // runner). All e2e callers run under Node so this is fine in practice.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const fs = require("node:fs") as typeof import("node:fs");
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const path = require("node:path") as typeof import("node:path");
   const candidates = [
     path.resolve(devVarsPath),
     path.resolve(process.cwd(), devVarsPath),
