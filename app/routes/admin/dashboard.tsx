@@ -135,9 +135,14 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   if (action === "clear") {
-    await prisma.$transaction([
-      prisma.space.updateMany({ data: { status: Status.EMPTY, timestamp: null } }),
-      prisma.callEvent.deleteMany(),
+    // D1's adapter ignores Prisma $transaction (see prisma:warn in logs); drop
+    // to the raw D1 binding so the two writes run in a single atomic batch.
+    // Bypassing the tenant extension means we inject orgId by hand.
+    const d1 = (context as any).cloudflare.env.D1_DATABASE as D1Database;
+    await d1.batch([
+      d1.prepare('UPDATE "Space" SET status = ?, timestamp = NULL WHERE orgId = ?')
+        .bind(Status.EMPTY, org.id),
+      d1.prepare('DELETE FROM "CallEvent" WHERE orgId = ?').bind(org.id),
     ]);
     try {
       await broadcastBoardReset((context as any).cloudflare.env, org.id);

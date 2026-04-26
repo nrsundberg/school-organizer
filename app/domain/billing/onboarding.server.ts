@@ -67,12 +67,10 @@ export async function ensureOrgForUser(params: {
   // Attach the signup user as the org's first ADMIN. The user who creates an
   // org is always the initial admin — they need to invite additional users,
   // configure branding, billing, etc.
-  await db.$transaction([
-    db.user.update({
-      where: { id: userId },
-      data: { orgId: org.id, role: "ADMIN" },
-    }),
-  ]);
+  await db.user.update({
+    where: { id: userId },
+    data: { orgId: org.id, role: "ADMIN" },
+  });
 
   // Fire-and-forget welcome email via the EMAIL_QUEUE. Failures here must not
   // block signup — enqueueEmail swallows errors and logs.
