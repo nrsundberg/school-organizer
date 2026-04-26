@@ -314,6 +314,7 @@ No data migration. Greenfield — the user has explicitly stated DB wipe pre-lau
 - Memberships table for users who are both district admin AND school admin of one school in their district
 - Per-student aggregate metering with pooled caps
 - Migration tooling to merge existing standalone orgs into newly contracted districts (currently a manual `reparentOrgToDistrict` script)
+- DB-harness-backed cross-district isolation unit tests — v1 covers the user-visible path through the Playwright signup-and-cap E2E in `e2e/flows/district.spec.ts`. The plan's Task 9.2 is deferred to v1.5 because the existing test infra mocks `getPrisma(context)` and there's no in-memory Prisma harness yet for direct DB-backed isolation assertions.
 
 ## 15. Acceptance criteria
 

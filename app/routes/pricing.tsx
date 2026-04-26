@@ -357,6 +357,20 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
               </dd>
             </div>
           </dl>
+
+          {/* Hardship-pricing note. Intentionally untranslated for v1 — */}
+          {/* sales conversation, not core marketing copy. */}
+          <aside className="mt-12 rounded-xl border border-blue-400/30 bg-blue-400/5 p-5 text-sm text-white/80">
+            <h3 className="mb-1 font-semibold text-white">
+              Mid-year sign-ups &amp; small private schools
+            </h3>
+            <p>
+              Joining mid-school-year, or running a small private school
+              where the listed pricing isn&rsquo;t workable? Mention it
+              during your free trial — our team will work with you on
+              pricing.
+            </p>
+          </aside>
         </div>
       </div>
     </div>
