@@ -1,5 +1,5 @@
 import { Form, Link, redirect } from "react-router";
-import { ClipboardList, Library, Radio } from "lucide-react";
+import { ClipboardList, History, Library, Radio } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
@@ -120,13 +120,22 @@ export default function AdminDrillList({ loaderData }: Route.ComponentProps) {
       <section className="rounded-xl border border-white/10 bg-white/5 p-4">
         <div className="flex items-center justify-between gap-3 mb-3">
           <h2 className="text-sm font-semibold text-white/70">{t("drills.list.newHeading")}</h2>
-          <Link
-            to="/admin/drills/library"
-            className={`${btnSecondary} text-xs`}
-          >
-            <Library className="w-3.5 h-3.5 mr-1.5 inline" />
-            {t("drills.list.startFromLibrary")}
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to="/admin/drills/history"
+              className={`${btnSecondary} text-xs`}
+            >
+              <History className="w-3.5 h-3.5 mr-1.5 inline" />
+              {t("drills.list.viewHistory")}
+            </Link>
+            <Link
+              to="/admin/drills/library"
+              className={`${btnSecondary} text-xs`}
+            >
+              <Library className="w-3.5 h-3.5 mr-1.5 inline" />
+              {t("drills.list.startFromLibrary")}
+            </Link>
+          </div>
         </div>
         <Form method="post" className="flex flex-wrap gap-3 items-end">
           <input type="hidden" name="intent" value="create" />
