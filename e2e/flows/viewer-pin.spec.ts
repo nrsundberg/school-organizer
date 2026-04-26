@@ -55,9 +55,13 @@ test.describe("@flow viewer-pin — access code gate", () => {
     await page.getByRole("button", { name: /^Continue$/ }).click();
 
     // The action reports `{ fieldError: "Invalid PIN. N attempts left." }`
-    // and stays on /viewer-access.
+    // and stays on /viewer-access. The same message also pops as a toast,
+    // so scope the locator to the form's inline error to avoid Playwright's
+    // strict-mode ambiguity.
     await expect(page).toHaveURL(/\/viewer-access/);
-    await expect(page.getByText(/Invalid PIN\.\s+\d+ attempts left/i)).toBeVisible();
+    await expect(
+      page.locator("#main-content").getByText(/Invalid PIN\.\s+\d+ attempts left/i),
+    ).toBeVisible();
 
     const cookies = await page.context().cookies();
     const viewerSession = cookies.find((c) => c.name === VIEWER_SESSION_COOKIE);
@@ -73,18 +77,20 @@ test.describe("@flow viewer-pin — access code gate", () => {
     const wrong1 = tenant.viewerPin === "000000" ? "999999" : "000000";
     const wrong2 = tenant.viewerPin === "111111" ? "888888" : "111111";
 
+    // Same "Invalid PIN" message appears as both a toast and inline error,
+    // so scope to #main-content to avoid strict-mode collisions.
+    const inlineError = page
+      .locator("#main-content")
+      .getByText(/Invalid PIN\.\s+(\d+) attempts left/i);
+
     await page.getByPlaceholder("Access code").fill(wrong1);
     await page.getByRole("button", { name: /^Continue$/ }).click();
-    const firstError = await page
-      .getByText(/Invalid PIN\.\s+(\d+) attempts left/i)
-      .innerText();
+    const firstError = await inlineError.innerText();
     const firstCount = Number(firstError.match(/(\d+) attempts left/i)?.[1] ?? "");
 
     await page.getByPlaceholder("Access code").fill(wrong2);
     await page.getByRole("button", { name: /^Continue$/ }).click();
-    const secondError = await page
-      .getByText(/Invalid PIN\.\s+(\d+) attempts left/i)
-      .innerText();
+    const secondError = await inlineError.innerText();
     const secondCount = Number(secondError.match(/(\d+) attempts left/i)?.[1] ?? "");
 
     // Counter must strictly decrement — if it doesn't, the lockout

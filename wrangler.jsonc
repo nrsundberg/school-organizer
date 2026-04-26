@@ -8,33 +8,34 @@
 	"assets": {
 		"directory": "./build/client"
 	},
-	// Apex + www use Custom Domains; tenant subdomains use a zone route (wildcard not supported on custom_domain in wrangler).
-	// In the pickuproster.com zone, add a proxied DNS record for *.pickuproster.com (or each slug); otherwise {slug}.pickuproster.com will not resolve.
-	"routes": [
-		{
-			"pattern": "pickuproster.com",
-			"custom_domain": true
-		},
-		{
-			"pattern": "www.pickuproster.com",
-			"custom_domain": true
-		},
-		{
-			"pattern": "*.pickuproster.com/*",
-			"zone_name": "pickuproster.com"
-		}
-	],
+	// Production routes live in `env.production.routes` — NOT here at the
+	// top level. Top-level routes poison `wrangler dev`: with a
+	// `custom_domain: true` route, wrangler rewrites every incoming
+	// `request.url.host` to the route pattern (`pickuproster.com`),
+	// regardless of the actual `Host` header. That breaks every spec
+	// driven against `{slug}.localhost:8787` because `resolveOrgByHost`
+	// can't see the tenant subdomain. Deploy via
+	// `wrangler deploy --env production` (see `npm run deploy`).
+	// Top-level config is what `wrangler dev` and `wrangler deploy` (no
+	// `--env`) consume. We treat it as the *development* baseline so cookies
+	// don't pick up the production `__Secure-` prefix (which can't ride
+	// http://localhost). Production deploys use `wrangler deploy --env
+	// production`, which switches ENVIRONMENT back to "production" via
+	// `env.production.vars` below.
 	"vars": {
 		"SENTRY_DSN": "",
-		"ENVIRONMENT": "production",
-		// Apex and www serve marketing; {slug}.pickuproster.com are tenant boards (see MARKETING_HOSTS for local preview).
+		"ENVIRONMENT": "development",
 		"PUBLIC_ROOT_DOMAIN": "pickuproster.com",
-		// Local dev plus default *.workers.dev URL so preview deploys show marketing on the worker hostname (not a tenant board).
 		"MARKETING_HOSTS": "localhost,127.0.0.1,school-organizer.sundbergne.workers.dev",
 		"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
 		"SUPPORT_EMAIL": "support@pickuproster.com",
-		// Public Stripe status feed. Swap to a test double by setting this var locally or in a preview env.
-		"STRIPE_STATUS_URL": "https://www.stripe-status.com/api/v2/status.json"
+		"STRIPE_STATUS_URL": "https://www.stripe-status.com/api/v2/status.json",
+		// Browsers drop cookies whose Domain attribute (`pickuproster.com`)
+		// doesn't match the request host (`localhost` / `*.localhost`). In
+		// dev/CI we want host-only cookies so the same auth flow that works
+		// in prod still works behind the localhost wrangler. Production
+		// keeps Domain-scoped cookies via env.production.vars below.
+		"DISABLE_CROSS_SUBDOMAIN_COOKIES": "1"
 	},
 	// Crons:
 	//  - `0 10 * * *`  — daily billing / trial maintenance (runBilling scheduler)
@@ -151,6 +152,113 @@
 	// Staging URL: school-organizer-staging.<your-subdomain>.workers.dev
 	// (defined in MARKETING_HOSTS so marketing renders on the staging host).
 	"env": {
+		"production": {
+			// Apex + www use Custom Domains; tenant subdomains use a zone route
+			// (wildcard not supported on custom_domain in wrangler). In the
+			// pickuproster.com zone, add a proxied DNS record for
+			// *.pickuproster.com (or each slug); otherwise
+			// {slug}.pickuproster.com will not resolve.
+			//
+			// These are scoped under env.production (not top-level) so
+			// `wrangler dev` doesn't rewrite every request's URL host to
+			// match — which would break tenant subdomain routing in tests.
+			"routes": [
+				{
+					"pattern": "pickuproster.com",
+					"custom_domain": true
+				},
+				{
+					"pattern": "www.pickuproster.com",
+					"custom_domain": true
+				},
+				{
+					"pattern": "*.pickuproster.com/*",
+					"zone_name": "pickuproster.com"
+				}
+			],
+			"name": "school-organizer",
+			"vars": {
+				"SENTRY_DSN": "",
+				"ENVIRONMENT": "production",
+				"PUBLIC_ROOT_DOMAIN": "pickuproster.com",
+				"MARKETING_HOSTS": "localhost,127.0.0.1,school-organizer.sundbergne.workers.dev",
+				"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
+				"SUPPORT_EMAIL": "support@pickuproster.com",
+				"STRIPE_STATUS_URL": "https://www.stripe-status.com/api/v2/status.json"
+			},
+			"triggers": {
+				"crons": [
+					"0 10 * * *",
+					"*/2 * * * *"
+				]
+			},
+			"d1_databases": [
+				{
+					"binding": "D1_DATABASE",
+					"database_name": "school-organizer",
+					"database_id": "35284987-f919-47e9-884d-d2f921324352",
+					"migrations_dir": "migrations"
+				}
+			],
+			"r2_buckets": [
+				{
+					"binding": "ORG_BRANDING_BUCKET",
+					"bucket_name": "pickup-roster-org-branding",
+					"preview_bucket_name": "pickup-roster-org-branding"
+				}
+			],
+			"durable_objects": {
+				"bindings": [
+					{
+						"name": "BINGO_BOARD",
+						"class_name": "BingoBoardDO"
+					}
+				]
+			},
+			"migrations": [
+				{
+					"tag": "v1",
+					"new_sqlite_classes": [
+						"BingoBoardDO"
+					]
+				}
+			],
+			"ratelimits": [
+				{
+					"name": "RL_AUTH",
+					"namespace_id": "1001",
+					"simple": {
+						"limit": 10,
+						"period": 60
+					}
+				},
+				{
+					"name": "RL_BILLING",
+					"namespace_id": "1002",
+					"simple": {
+						"limit": 20,
+						"period": 60
+					}
+				}
+			],
+			"queues": {
+				"producers": [
+					{
+						"binding": "EMAIL_QUEUE",
+						"queue": "pickup-roster-email"
+					}
+				],
+				"consumers": [
+					{
+						"queue": "pickup-roster-email",
+						"max_batch_size": 10,
+						"max_batch_timeout": 5,
+						"max_retries": 3,
+						"dead_letter_queue": "pickup-roster-email-dlq"
+					}
+				]
+			}
+		},
 		"staging": {
 			// Staging mirrors prod's apex + wildcard layout on
 			// `staging.pickuproster.com`. This makes cross-subdomain auth,

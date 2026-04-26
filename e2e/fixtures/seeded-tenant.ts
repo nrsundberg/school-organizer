@@ -48,7 +48,10 @@ import {
   generateId,
   hashPassword,
   randomToken,
+  readBetterAuthSecret,
+  sessionCookieName,
   shortSlug,
+  signCookieValue,
 } from "./seed-helpers";
 
 /* ------------------------------------------------------------------ */
@@ -90,8 +93,11 @@ type Fixtures = {
 /* ------------------------------------------------------------------ */
 
 // Cookie prefix comes from better-auth config in app/domain/auth/better-auth.server.ts.
+// In CI / local dev, wrangler.jsonc env.production.vars.ENVIRONMENT=production sets
+// useSecureCookies=true, so the on-the-wire name is __Secure-pickuproster.session_token.
+// The value must also be HMAC-SHA-256 signed with BETTER_AUTH_SECRET — better-auth's
+// `getSignedCookie` rejects raw tokens.
 const COOKIE_PREFIX = "pickuproster";
-const BETTER_AUTH_COOKIE_NAME = `${COOKIE_PREFIX}.session_token`;
 
 // Sessions last 90 days in production. For an e2e fixture 1 day is plenty
 // and avoids any clock-skew weirdness on CI runners.
@@ -305,9 +311,24 @@ export const test = base.extend<Fixtures>({
     const host = `${state.org.slug}.localhost`;
     const marketingHost = "localhost";
 
+    // Match better-auth's wire format. The cookie value must be
+    // `URL_ENCODED(<token>.<base64-hmac-sha256>)` — `getSignedCookie`
+    // rejects raw tokens. The wrapping name carries the `__Secure-` prefix
+    // only when `useSecureCookies` is true; wrangler.jsonc top-level vars
+    // pin ENVIRONMENT=development for dev/CI, so `useSecureCookies` is
+    // false and the unprefixed name is what the worker reads. (Chromium
+    // refuses to set `__Secure-` cookies on http:// URLs anyway, so the
+    // prefixed form would not survive `addCookies`.)
+    const secret = readBetterAuthSecret();
+    const cookieName = sessionCookieName({
+      cookiePrefix: COOKIE_PREFIX,
+      useSecureCookies: false,
+    });
+    const cookieValue = await signCookieValue(state.session.token, secret);
+
     const adminCookie: Cookie = {
-      name: BETTER_AUTH_COOKIE_NAME,
-      value: state.session.token,
+      name: cookieName,
+      value: cookieValue,
       // Use the tenant host. Better Auth reads the cookie host-scoped in
       // dev — we're not setting Domain=.localhost because Playwright
       // treats localhost + subdomain as different hosts for cookie
@@ -317,6 +338,10 @@ export const test = base.extend<Fixtures>({
       path: "/",
       expires: Math.floor(state.session.expiresAt.getTime() / 1000),
       httpOnly: true,
+      // The fixture seeds against http://*.localhost:8787, so the cookie
+      // can't carry the Secure attribute (browsers drop Secure cookies on
+      // HTTP). The `__Secure-` *name* prefix is what better-auth keys on,
+      // not the Secure attribute.
       secure: false,
       sameSite: "Lax",
     };

@@ -148,12 +148,12 @@ export default function CreateStudent({ loaderData }: Route.ComponentProps) {
             <h2 className="text-lg font-semibold">{t("create.student.basicInfo")}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1">
-                <label className="text-sm text-gray-400">{t("create.student.firstName")}</label>
-                <Input name="firstName" placeholder={t("create.student.firstNamePlaceholder")} value={firstName} onChange={(e) => setFirstName(e.target.value)} required disabled={isSubmitting} />
+                <label htmlFor="firstName" className="text-sm text-gray-400">{t("create.student.firstName")}</label>
+                <Input id="firstName" name="firstName" placeholder={t("create.student.firstNamePlaceholder")} value={firstName} onChange={(e) => setFirstName(e.target.value)} required disabled={isSubmitting} />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-sm text-gray-400">{t("create.student.lastName")}</label>
-                <Input name="lastName" placeholder={t("create.student.lastNamePlaceholder")} value={lastName} onChange={(e) => setLastName(e.target.value)} required disabled={isSubmitting} />
+                <label htmlFor="lastName" className="text-sm text-gray-400">{t("create.student.lastName")}</label>
+                <Input id="lastName" name="lastName" placeholder={t("create.student.lastNamePlaceholder")} value={lastName} onChange={(e) => setLastName(e.target.value)} required disabled={isSubmitting} />
               </div>
             </div>
           </div>
@@ -162,13 +162,14 @@ export default function CreateStudent({ loaderData }: Route.ComponentProps) {
             <h2 className="text-lg font-semibold">{t("create.student.assignmentsOptional")}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1">
-                <label className="text-sm text-gray-400">{t("create.student.spaceLabel")}</label>
-                <Input type="number" name="spaceNum" placeholder={t("create.student.spacePlaceholder")} value={spaceNumber} onChange={(e) => setSpaceNumber(e.target.value)} disabled={isSubmitting} />
+                <label htmlFor="spaceNum" className="text-sm text-gray-400">{t("create.student.spaceLabel")}</label>
+                <Input id="spaceNum" type="number" name="spaceNum" placeholder={t("create.student.spacePlaceholder")} value={spaceNumber} onChange={(e) => setSpaceNumber(e.target.value)} disabled={isSubmitting} />
                 <p className="text-xs text-gray-400">{t("create.student.leaveEmpty")}</p>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-sm text-gray-400">{t("create.student.homeroomLabel")}</label>
+                <label htmlFor="homeRoom" className="text-sm text-gray-400">{t("create.student.homeroomLabel")}</label>
                 <input
+                  id="homeRoom"
                   name="homeRoom"
                   list="homeroom-options"
                   placeholder={t("create.student.homeroomPlaceholder")}

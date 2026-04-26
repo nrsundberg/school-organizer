@@ -31,13 +31,15 @@ import {
 } from "../fixtures/seed-helpers";
 
 const COOKIE_PREFIX = "pickuproster";
-// In CI (and any env where wrangler dev inherits `ENVIRONMENT=production`
-// from `wrangler.jsonc`'s `vars`), better-auth runs with
-// `useSecureCookies: true` and looks for the `__Secure-`-prefixed name.
-// The cookie value also has to be HMAC-signed with `BETTER_AUTH_SECRET`
-// or `getSignedCookie` returns null and the global middleware redirects
-// every authenticated route to `/login`.
-const SESSION_COOKIE = sessionCookieName({ cookiePrefix: COOKIE_PREFIX });
+// `wrangler dev` runs with `ENVIRONMENT=development` (top-level vars in
+// wrangler.jsonc), so better-auth uses the unprefixed cookie name. The
+// value still has to be HMAC-signed with `BETTER_AUTH_SECRET` —
+// `getSignedCookie` returns null on raw tokens and the middleware would
+// redirect every authenticated route to `/login`.
+const SESSION_COOKIE = sessionCookieName({
+  cookiePrefix: COOKIE_PREFIX,
+  useSecureCookies: false,
+});
 
 /**
  * Mirror the seeded-tenant fixture's D1 lookup. The spec inserts the
