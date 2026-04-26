@@ -33,11 +33,7 @@ import {
   TEACHER_LAST_NAMES,
 } from "./name-pools";
 import { getGlobalTemplate } from "../../app/domain/drills/library";
-import {
-  adminEmailFor,
-  controllerEmailFor,
-  type DemoCredential,
-} from "./credentials";
+import { type DemoCredential } from "./credentials";
 
 export type SqlArg = string | number | null;
 export interface SqlStatement {
@@ -83,9 +79,6 @@ function userIdFor(orgId: string, role: "admin" | "controller"): string {
 }
 function accountIdFor(orgId: string, role: "admin" | "controller"): string {
   return `acc_demo_${orgId.replace(/^org_demo_/, "")}_${role}`;
-}
-function appSettingsIdFor(orgId: string): string {
-  return `aps_demo_${orgId.replace(/^org_demo_/, "")}`;
 }
 function householdIdFor(orgId: string, n: number): string {
   return `hh_demo_${orgId.replace(/^org_demo_/, "")}_${n.toString().padStart(4, "0")}`;
