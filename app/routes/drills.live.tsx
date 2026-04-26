@@ -9,6 +9,7 @@ import { detectLocale } from "~/i18n.server";
 
 export const handle = { i18n: ["roster"] };
 import {
+  getActorIdsFromContext,
   getOptionalUserFromContext,
   getOrgFromContext,
   getTenantPrisma,
@@ -114,6 +115,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const org = getOrgFromContext(context);
   const prisma = getTenantPrisma(context);
   const isAdmin = userIsAdmin(user);
+  const actor = getActorIdsFromContext(context);
 
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "roster");
@@ -138,19 +140,19 @@ export async function action({ request, context }: Route.ActionArgs) {
   try {
     if (intent === "pause") {
       requireAdmin();
-      await pauseDrillRun(prisma, org.id, runId);
+      await pauseDrillRun(prisma, org.id, runId, actor);
       return dataWithSuccess(null, t("drillsLive.toasts.paused"));
     }
 
     if (intent === "resume") {
       requireAdmin();
-      await resumeDrillRun(prisma, org.id, runId);
+      await resumeDrillRun(prisma, org.id, runId, actor);
       return dataWithSuccess(null, t("drillsLive.toasts.resumed"));
     }
 
     if (intent === "end") {
       requireAdmin();
-      await endDrillRun(prisma, org.id, runId);
+      await endDrillRun(prisma, org.id, runId, actor);
       // After ending, the user no longer needs the takeover. Send them home.
       throw redirect("/");
     }
@@ -164,7 +166,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         return dataWithError(null, t("drillsLive.errors.invalidStateJson"));
       }
       const next = parseRunState(parsed as Prisma.JsonValue);
-      await updateLiveRunState(prisma, org.id, runId, next);
+      await updateLiveRunState(prisma, org.id, runId, next, actor);
       return dataWithSuccess(null, t("drillsLive.toasts.saved"));
     }
 

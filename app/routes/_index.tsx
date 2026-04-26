@@ -89,7 +89,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 20
     }),
-    prisma.appSettings.findUnique({ where: { id: "default" } }),
+    prisma.appSettings.findFirst(),
     prisma.programCancellation.findMany({
       where: {
         cancellationDate: {

@@ -41,6 +41,8 @@ type CallEventRow = {
   studentName: string;
   homeRoomSnapshot: string | null;
   createdAt: Date;
+  actorUserId: string | null;
+  onBehalfOfUserId: string | null;
 };
 
 type ParsedFilters = {
@@ -50,6 +52,7 @@ type ParsedFilters = {
   toIso: string; // YYYY-MM-DD for form prefill
   room: string | null;
   q: string | null;
+  impersonatedOnly: boolean;
 };
 
 /**
@@ -66,6 +69,7 @@ function parseFilters(url: URL): ParsedFilters {
   const rawTo = url.searchParams.get("to");
   const rawRoom = url.searchParams.get("room");
   const rawQ = url.searchParams.get("q");
+  const rawImpersonated = url.searchParams.get("impersonated");
 
   const fromDate = parseDateInput(rawFrom, defaultFrom, false);
   // For `to`, interpret as end-of-day so a single calendar day includes events
@@ -79,6 +83,7 @@ function parseFilters(url: URL): ParsedFilters {
     toIso: toYmd(toDate),
     room: rawRoom && rawRoom.trim() !== "" ? rawRoom.trim() : null,
     q: rawQ && rawQ.trim() !== "" ? rawQ.trim() : null,
+    impersonatedOnly: rawImpersonated === "1",
   };
 }
 
@@ -123,6 +128,9 @@ async function fetchCallEvents(
   if (filters.room) {
     where.homeRoomSnapshot = filters.room;
   }
+  if (filters.impersonatedOnly) {
+    where.onBehalfOfUserId = { not: null };
+  }
 
   const rows = (await prisma.callEvent.findMany({
     where: where as any,
@@ -157,6 +165,8 @@ function buildCsv(rows: CallEventRow[]): string {
     "homeRoom",
     "spaceNumber",
     "studentId",
+    "actorUserId",
+    "onBehalfOfUserId",
   ].join(",");
   const body = rows
     .map((r) =>
@@ -166,6 +176,8 @@ function buildCsv(rows: CallEventRow[]): string {
         csvEscape(r.homeRoomSnapshot ?? ""),
         csvEscape(r.spaceNumber),
         csvEscape(r.studentId ?? ""),
+        csvEscape(r.actorUserId ?? ""),
+        csvEscape(r.onBehalfOfUserId ?? ""),
       ].join(","),
     )
     .join("\n");
@@ -299,6 +311,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       to: filters.toIso,
       room: filters.room ?? "",
       q: filters.q ?? "",
+      impersonatedOnly: filters.impersonatedOnly,
     },
     rows: rows.map((r) => ({
       id: r.id,
@@ -310,6 +323,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       homeRoomSnapshot: r.homeRoomSnapshot,
       spaceNumber: r.spaceNumber,
       studentId: r.studentId,
+      actorUserId: r.actorUserId,
+      onBehalfOfUserId: r.onBehalfOfUserId,
     })),
     truncated,
     rowCap: ROW_CAP,
@@ -374,6 +389,7 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
   if (filters.to) csvParams.set("to", filters.to);
   if (filters.room) csvParams.set("room", filters.room);
   if (filters.q) csvParams.set("q", filters.q);
+  if (filters.impersonatedOnly) csvParams.set("impersonated", "1");
   const csvHref = `?${csvParams.toString()}`;
 
   return (
@@ -435,6 +451,16 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
             className="w-52"
           />
         </label>
+        <label className="flex items-center gap-2 text-xs text-white/60 mt-5">
+          <input
+            type="checkbox"
+            name="impersonated"
+            value="1"
+            defaultChecked={filters.impersonatedOnly}
+            className="rounded border-white/20 bg-white/5"
+          />
+          {t("history.filters.showImpersonatedOnly")}
+        </label>
         <Button type="submit" variant="primary">
           {t("history.filters.apply")}
         </Button>
@@ -484,6 +510,7 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
                   <TableColumn>{t("history.table.student")}</TableColumn>
                   <TableColumn>{t("history.table.homeroom")}</TableColumn>
                   <TableColumn>{t("history.table.space")}</TableColumn>
+                  <TableColumn>{t("history.table.actor")}</TableColumn>
                 </TableHeader>
                 <TableBody items={rows as any[]}>
                   {(row: any) => (
@@ -496,6 +523,24 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
                         )}
                       </TableCell>
                       <TableCell>{row.spaceNumber}</TableCell>
+                      <TableCell>
+                        {row.actorUserId ? (
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="font-mono text-xs text-white/80">
+                              {row.actorUserId}
+                            </span>
+                            {row.onBehalfOfUserId && (
+                              <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-200">
+                                {t("history.table.impersonatedBadge")}
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-white/40">
+                            {t("history.table.anonymousActor")}
+                          </span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   )}
                 </TableBody>

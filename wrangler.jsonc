@@ -64,7 +64,7 @@
 			// for the row whose name is `school-organizer`. The string below
 			// is intentionally invalid so a deploy without filling this in
 			// fails loudly instead of silently routing prod to staging.
-			"database_id": "399295fb-9f0d-42a9-a271-8619366caa1d",
+			"database_id": "35284987-f919-47e9-884d-d2f921324352",
 			"migrations_dir": "migrations"
 		}
 	],
@@ -168,7 +168,7 @@
 				{
 					"binding": "D1_DATABASE",
 					"database_name": "school-organizer-staging",
-					"database_id": "88aac5de-1ee7-42e5-b784-3ecd3a4e331f",
+					"database_id": "fc7bcf62-c40f-474e-9bec-64dfd0bd1135",
 					"migrations_dir": "migrations"
 				}
 			],

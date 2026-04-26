@@ -12,13 +12,34 @@ import {
   marketingOriginFromRequest,
   resolveTenantSlugFromHost
 } from "~/domain/utils/host.server";
+import {
+  resolveActorIds,
+  type ActorIds
+} from "~/domain/auth/impersonate-gate.server";
 
 export const userContext = createContext<User | null>(null);
 export const orgContext = createContext<Org | null>(null);
+
+// Two distinct impersonation surfaces:
+//
+// - `impersonatedByContext` carries the better-auth platform-admin → user
+//   impersonation (admin acting AS another User). It feeds the actor-pair
+//   (actorUserId / onBehalfOfUserId) on write paths (CallEvent, DrillRun).
+//
+// - `impersonationContext` carries the district-admin → school impersonation
+//   (district admin acting INTO a child Org). It does NOT change the user;
+//   it only redirects tenant-extension queries to the impersonated org and
+//   drives the visible "End impersonation" banner.
+//
+// They can stack — a platform admin who is acting as a district admin user
+// could in principle start a district impersonation. The nested-impersonation
+// gate on master refuses better-auth nested impersonation; district
+// impersonation is gated separately by `requireDistrictAdmin`.
 export const impersonationContext = createContext<{
   active: boolean;
   orgId: string | null;
 } | null>(null);
+export const impersonatedByContext = createContext<string | null>(null);
 
 export const getOptionalUserFromContext = (context: any): User | null => {
   return context.get(userContext) ?? null;
@@ -28,6 +49,23 @@ export const getImpersonationFromContext = (
   context: any,
 ): { active: boolean; orgId: string | null } => {
   return context.get(impersonationContext) ?? { active: false, orgId: null };
+};
+
+export const getImpersonatedByFromContext = (context: any): string | null => {
+  return context.get(impersonatedByContext) ?? null;
+};
+
+/**
+ * Resolve the audit pair (actorUserId, onBehalfOfUserId) for the current
+ * request. `actorUserId` is the human who clicked (admin's id when
+ * impersonating); `onBehalfOfUserId` is the impersonated user's id, or null.
+ *
+ * For anonymous viewer requests (no session) both are null.
+ */
+export const getActorIdsFromContext = (context: any): ActorIds => {
+  const user = getOptionalUserFromContext(context);
+  const impersonatedBy = getImpersonatedByFromContext(context);
+  return resolveActorIds(user?.id ?? null, impersonatedBy);
 };
 
 export const getUserFromContext = (context: any): User => {
@@ -95,6 +133,7 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   }
 
   let impersonatedOrgId: string | null = null;
+  let impersonatedBy: string | null = null;
   try {
     const auth = getAuth(context);
     const session = await auth.api.getSession({
@@ -112,11 +151,15 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
         (session.session as { impersonatedOrgId?: string | null } | null)
           ?.impersonatedOrgId ?? null;
     }
+    impersonatedBy =
+      (session?.session as { impersonatedBy?: string | null } | undefined)
+        ?.impersonatedBy ?? null;
   } catch {
     // No session — that's fine, board is public
   }
 
   context.set(userContext, user);
+  context.set(impersonatedByContext, impersonatedBy);
 
   const onMarketingHost = isMarketingHost(request, context);
   // Impersonation takes precedence over both host-resolved and user.orgId.

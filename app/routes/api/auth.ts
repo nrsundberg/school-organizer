@@ -2,6 +2,7 @@ import type { Route } from "./+types/auth";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { getPrisma } from "~/db.server";
 import { isPlatformAdmin } from "~/domain/utils/host.server";
+import { assertNotAlreadyImpersonating } from "~/domain/auth/impersonate-gate.server";
 
 /**
  * Better-auth's admin plugin authorizes `/api/auth/admin/impersonate-user`
@@ -26,18 +27,10 @@ async function gateImpersonateOrPassThrough(
   request: Request,
   context: any,
 ): Promise<Response | null> {
-  // Preserve the body for the eventual better-auth handler call. We read
-  // a clone for our own check and pass the original request through.
-  const body = await request.clone().json().catch(() => null);
-  const targetUserId =
-    body && typeof body === "object" && "userId" in body
-      ? String((body as Record<string, unknown>).userId ?? "")
-      : "";
-  if (!targetUserId) {
-    // Let better-auth surface its own validation error.
-    return null;
-  }
-
+  // Resolve the session FIRST, before any body parsing. The audit
+  // invariants (no nested impersonation, must be authenticated) hold
+  // regardless of the request body shape — running them up front means a
+  // future better-auth body-shape change cannot silently bypass the gate.
   const auth = getAuth(context);
   const session = await auth.api.getSession({ headers: request.headers });
   const actor = session?.user;
@@ -48,8 +41,31 @@ async function gateImpersonateOrPassThrough(
     );
   }
 
-  // Staff bypass — platform admins can impersonate across tenants.
+  // Audit invariant: refuse nested impersonation. Even platform admins must
+  // stop the current impersonation before starting a new one — otherwise
+  // Session.impersonatedBy gets overwritten and the original admin's
+  // identity is lost.
+  const currentImpersonatedBy =
+    (session?.session as { impersonatedBy?: string | null } | undefined)
+      ?.impersonatedBy ?? null;
+  const nested = assertNotAlreadyImpersonating(currentImpersonatedBy);
+  if (nested) return nested;
+
+  // Staff bypass — platform admins can impersonate across tenants
+  // (post-nested-guard, so even staff cannot nest).
   if (isPlatformAdmin({ email: actor.email, role: actor.role ?? "" }, context)) {
+    return null;
+  }
+
+  // For tenant admins: parse the body to extract the target userId and
+  // enforce same-org scoping. If the body is malformed or lacks userId,
+  // let better-auth surface its own validation error.
+  const body = await request.clone().json().catch(() => null);
+  const targetUserId =
+    body && typeof body === "object" && "userId" in body
+      ? String((body as Record<string, unknown>).userId ?? "")
+      : "";
+  if (!targetUserId) {
     return null;
   }
 

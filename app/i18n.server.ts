@@ -38,8 +38,7 @@ import {
   pickSupportedLanguage,
   type SupportedLanguage,
 } from "~/lib/i18n-config";
-import { getPrisma } from "~/db.server";
-import { getOptionalUserFromContext, getOptionalOrgFromContext } from "~/domain/utils/global-context.server";
+import { getOptionalUserFromContext, getOptionalOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 
 /**
  * The `lng` cookie wrapped as a react-router `Cookie` object — the shape
@@ -184,20 +183,23 @@ export async function getTeacherPrintLocale(
   teacherId: number | string,
 ): Promise<SupportedLanguage> {
   try {
-    const prisma = getPrisma(context);
     const id = typeof teacherId === "string" ? parseInt(teacherId, 10) : teacherId;
     if (!Number.isFinite(id)) {
       return getOrgDefaultLocale(context);
     }
-    const teacher = await prisma.teacher.findUnique({
+    // Tenant-scoped: the extension AND-injects the request's orgId so a
+    // teacherId belonging to another org returns null instead of leaking
+    // that org's locale.
+    const prisma = getTenantPrisma(context);
+    const teacher = await prisma.teacher.findFirst({
       where: { id },
-      select: { locale: true, orgId: true },
+      select: { locale: true },
     });
     if (teacher?.locale && isSupportedLanguage(teacher.locale)) {
       return teacher.locale;
     }
   } catch {
-    // Fall through to org default.
+    // Fall through to org default (also catches the no-org-in-context path).
   }
   return getOrgDefaultLocale(context);
 }

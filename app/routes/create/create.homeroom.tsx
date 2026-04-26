@@ -57,7 +57,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return { error: t("create.homeroom.errors.nameRequired") };
     }
 
-    const existingTeacher = await prisma.teacher.findUnique({
+    const existingTeacher = await prisma.teacher.findFirst({
       where: { homeRoom: homeRoom.trim() }
     });
 

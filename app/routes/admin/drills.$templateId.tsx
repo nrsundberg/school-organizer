@@ -7,7 +7,11 @@ import { getFormProps, getInputProps } from "@conform-to/react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills.$templateId";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
-import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
+import {
+  getActorIdsFromContext,
+  getOrgFromContext,
+  getTenantPrisma,
+} from "~/domain/utils/global-context.server";
 import type { Prisma } from "~/db";
 import { type ColumnDef, type TemplateDefinition, parseTemplateDefinition } from "~/domain/drills/types";
 import { ChecklistPreview } from "~/domain/drills/ChecklistTable";
@@ -117,8 +121,9 @@ export async function action({ request, context, params }: Route.ActionArgs) {
 
     if (result.intent === "start-live") {
       const orgId = getOrgFromContext(context).id;
+      const actor = getActorIdsFromContext(context);
       try {
-        await startDrillRun(prisma, orgId, id);
+        await startDrillRun(prisma, orgId, id, undefined, actor);
       } catch (err) {
         // startDrillRun throws a Response (409) when another drill is already
         // active. Surface it as a toast instead of crashing the route.

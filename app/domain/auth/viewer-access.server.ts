@@ -3,7 +3,7 @@ import {
   sharedSessionCookieDomain,
   verifyPassword,
 } from "~/domain/auth/better-auth.server";
-import { getTenantPrisma } from "~/domain/utils/global-context.server";
+import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 
 const VIEWER_FID_COOKIE = "tome_viewer_fid";
 const VIEWER_SESSION_COOKIE = "tome_viewer_session";
@@ -89,7 +89,7 @@ export async function hasValidViewerAccess({ request, context }: Ctx): Promise<b
   if (!token) return false;
   const tokenHash = await sha256Hex(token);
   const now = new Date();
-  const session = await prisma.viewerAccessSession.findUnique({ where: { tokenHash } });
+  const session = await prisma.viewerAccessSession.findFirst({ where: { tokenHash } });
   if (!session) return false;
   if (session.revokedAt) return false;
   if (session.expiresAt <= now) return false;
@@ -100,7 +100,7 @@ export async function getViewerLockState(ctx: Ctx): Promise<{ locked: boolean; m
   const prisma = getTenantPrisma(ctx.context);
   const { clientKey, setCookie } = await getOrCreateFingerprint(ctx);
   const now = new Date();
-  const row = await prisma.viewerAccessAttempt.findUnique({ where: { clientKey } });
+  const row = await prisma.viewerAccessAttempt.findFirst({ where: { clientKey } });
   if (!row) return { locked: false, message: null, setCookie };
   if (row.requiresAdminReset) {
     return { locked: true, message: "Too many failed attempts. Access is locked until an admin resets it.", setCookie };
@@ -139,7 +139,7 @@ export async function verifyViewerPinAndIssueSession(ctx: Ctx, pin: string): Pro
     return { ok: false, message: lock.message ?? "Access temporarily locked.", headers };
   }
 
-  const appSettings = await prisma.appSettings.findUnique({ where: { id: "default" } });
+  const appSettings = await prisma.appSettings.findFirst();
   const pinHash = appSettings?.viewerPinHash;
   if (!pinHash) {
     return { ok: false, message: "Viewer PIN is not configured yet. Contact an admin.", headers };
@@ -157,7 +157,7 @@ export async function verifyViewerPinAndIssueSession(ctx: Ctx, pin: string): Pro
       try {
         const newHash = await hashPassword(pin);
         await prisma.appSettings.updateMany({
-          where: { id: "default", viewerPinHash: pinHash },
+          where: { viewerPinHash: pinHash },
           data: { viewerPinHash: newHash },
         });
       } catch (err) {
@@ -175,59 +175,45 @@ export async function verifyViewerPinAndIssueSession(ctx: Ctx, pin: string): Pro
   }
 
   if (!valid) {
-    const existing = await prisma.viewerAccessAttempt.findUnique({ where: { clientKey } });
+    const existing = await prisma.viewerAccessAttempt.findFirst({ where: { clientKey } });
     const attempts = (existing?.failedCount ?? 0) + 1;
+    const persistAttempt = async (data: {
+      failedCount: number;
+      stage: number;
+      requiresAdminReset?: boolean;
+      lockedUntil?: Date | null;
+      lastFailedAt: Date;
+      ipHint: string;
+    }) => {
+      if (existing) {
+        await prisma.viewerAccessAttempt.updateMany({ where: { clientKey }, data });
+      } else {
+        await prisma.viewerAccessAttempt.create({ data: { clientKey, ...data } });
+      }
+    };
     if (attempts >= 4) {
       if ((existing?.stage ?? 0) >= 1) {
-        await prisma.viewerAccessAttempt.upsert({
-          where: { clientKey },
-          update: {
-            failedCount: attempts,
-            stage: 2,
-            requiresAdminReset: true,
-            lockedUntil: null,
-            lastFailedAt: now,
-            ipHint: hint,
-          },
-          create: {
-            clientKey,
-            failedCount: attempts,
-            stage: 2,
-            requiresAdminReset: true,
-            lockedUntil: null,
-            lastFailedAt: now,
-            ipHint: hint,
-          },
+        await persistAttempt({
+          failedCount: attempts,
+          stage: 2,
+          requiresAdminReset: true,
+          lockedUntil: null,
+          lastFailedAt: now,
+          ipHint: hint,
         });
         return { ok: false, message: "Too many failed attempts. Access is now locked until an admin resets it.", headers };
       }
-      await prisma.viewerAccessAttempt.upsert({
-        where: { clientKey },
-        update: {
-          failedCount: attempts,
-          stage: 1,
-          lockedUntil: new Date(Date.now() + ONE_DAY_MS),
-          requiresAdminReset: false,
-          lastFailedAt: now,
-          ipHint: hint,
-        },
-        create: {
-          clientKey,
-          failedCount: attempts,
-          stage: 1,
-          lockedUntil: new Date(Date.now() + ONE_DAY_MS),
-          requiresAdminReset: false,
-          lastFailedAt: now,
-          ipHint: hint,
-        },
+      await persistAttempt({
+        failedCount: attempts,
+        stage: 1,
+        lockedUntil: new Date(Date.now() + ONE_DAY_MS),
+        requiresAdminReset: false,
+        lastFailedAt: now,
+        ipHint: hint,
       });
       return { ok: false, message: "Too many failed attempts. Locked for 24 hours.", headers };
     }
-    await prisma.viewerAccessAttempt.upsert({
-      where: { clientKey },
-      update: { failedCount: attempts, lastFailedAt: now, ipHint: hint },
-      create: { clientKey, failedCount: attempts, stage: 0, ipHint: hint, lastFailedAt: now },
-    });
+    await persistAttempt({ failedCount: attempts, stage: 0, lastFailedAt: now, ipHint: hint });
     return { ok: false, message: `Invalid PIN. ${Math.max(0, 4 - attempts)} attempts left.`, headers };
   }
 
@@ -239,11 +225,12 @@ export async function verifyViewerPinAndIssueSession(ctx: Ctx, pin: string): Pro
 
 export async function setViewerPin(context: any, pin: string): Promise<void> {
   const prisma = getTenantPrisma(context);
+  const org = getOrgFromContext(context);
   const hash = await hashPassword(pin);
   await prisma.appSettings.upsert({
-    where: { id: "default" },
+    where: { orgId: org.id },
     update: { viewerPinHash: hash },
-    create: { id: "default", viewerDrawingEnabled: false, viewerPinHash: hash },
+    create: { viewerDrawingEnabled: false, viewerPinHash: hash },
   });
 }
 
@@ -281,7 +268,7 @@ export async function consumeViewerMagicLink(ctx: Ctx, rawToken: string): Promis
   const headers = new Headers();
   const tokenHash = await sha256Hex(rawToken);
   const now = new Date();
-  const row = await prisma.viewerMagicLink.findUnique({ where: { tokenHash } });
+  const row = await prisma.viewerMagicLink.findFirst({ where: { tokenHash } });
   if (!row) return { ok: false, message: "Magic link is invalid.", headers };
   if (row.revokedAt) return { ok: false, message: "Magic link has been revoked.", headers };
   if (row.usedAt) return { ok: false, message: "Magic link has already been used.", headers };

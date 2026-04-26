@@ -1,4 +1,4 @@
--- Migration number: 0024 	 2026-04-25T23:47:58.787Z
+-- Migration number: 0025 	 2026-04-25T23:47:58.787Z
 
 -- District table
 CREATE TABLE "District" (
