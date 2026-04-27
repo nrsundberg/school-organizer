@@ -197,6 +197,15 @@
     }
   },
   "drills": {
+    "mode": {
+      "label": "Modo",
+      "drill": "Simulacro — ejercicio planificado",
+      "actual": "Evento real — esto es una emergencia real",
+      "falseAlarm": "Falsa alarma — alerta real que resultó infundada",
+      "drillShort": "Simulacro",
+      "actualShort": "Evento real",
+      "falseAlarmShort": "Falsa alarma"
+    },
     "edit": {
       "addRow": "Agregar fila",
       "addText": "Columna de texto",
@@ -241,9 +250,34 @@
         "saveButton": "Guardar audiencia predeterminada",
         "saved": "Audiencia predeterminada guardada."
       },
+      "cadence": {
+        "heading": "Cadencia requerida",
+        "help": "Cuántos simulacros se requieren al año (p. ej., NFPA 101 simulacros mensuales de incendio = 12). Déjalo vacío para no rastrear la cadencia — no se mostrará el indicador \"vencido\" en la lista.",
+        "fieldLabel": "Simulacros por año",
+        "placeholder": "p. ej., 12",
+        "saveButton": "Guardar cadencia",
+        "saved": "Cadencia guardada."
+      },
       "toasts": {
         "layoutSaved": "Diseño guardado.",
-        "nameSaved": "Nombre guardado."
+        "nameSaved": "Nombre guardado.",
+        "instructionsSaved": "Instrucciones guardadas."
+      },
+      "instructions": {
+        "heading": "Notas / Instrucciones (POE)",
+        "help": "Directiva en Markdown mostrada a quienes ejecutan el simulacro antes de iniciarlo (p. ej. \"Cerraduras, Luces, Fuera de Vista\"). Opcional.",
+        "placeholder": "**Evacuación por incendio** — active la alarma, salga en fila única al punto de reunión, pase lista, reporte ausentes.",
+        "saveButton": "Guardar instrucciones"
+      },
+      "followUp": {
+        "heading": "Tareas de seguimiento por defecto",
+        "help": "Elementos de la lista que cada nuevo simulacro tendrá precargados — p. ej. \"Reponer botiquín\" o \"Notificar al distrito\". Se guarda al pulsar Guardar diseño.",
+        "addItem": "Añadir tarea",
+        "removeItem": "Eliminar tarea",
+        "empty": "Aún no hay tareas de seguimiento por defecto.",
+        "itemPlaceholder": "p. ej. Enviar al oficial de seguridad del distrito el registro del simulacro",
+        "itemLabel": "Tarea de seguimiento {{n}}",
+        "savedWithLayout": "Se guarda al pulsar Guardar diseño arriba."
       }
     },
     "library": {
@@ -262,7 +296,9 @@
       "section_other": " · {{count}} secciones",
       "step_one": "{{count}} paso",
       "step_other": "{{count}} pasos",
-      "subtitle": "Plantillas predefinidas alineadas con NFPA, SRP v4.2, FEMA, NWS y otros estándares de seguridad. Clona una para hacerla editable en tu organización."
+      "subtitle": "Plantillas predefinidas alineadas con NFPA, SRP v4.2, FEMA, NWS y otros estándares de seguridad. Clona una para hacerla editable en tu organización.",
+      "teacherFanoutHint_one": "{{count}} docente se completará automáticamente",
+      "teacherFanoutHint_other": "{{count}} docentes se completarán automáticamente"
     },
     "list": {
       "activeBanner": {
@@ -301,7 +337,13 @@
       "startLive": "Iniciar simulacro en vivo",
       "subtitle": "Plantillas para incendio, encierro, refugio en el lugar, reunificación y más. Crea las tuyas o empieza desde la biblioteca global.",
       "updated": "Actualizada {{when}}",
-      "yourTemplates": "Tus plantillas"
+      "yourTemplates": "Tus plantillas",
+      "cadence": {
+        "overdue": "Vencido {{days}}d",
+        "overdueTitle": "Pasó la cadencia requerida — programa un simulacro.",
+        "dueIn": "Vence en {{days}}d",
+        "dueTitle": "Dentro de la ventana de cadencia requerida."
+      }
     },
     "metaEdit": "Editar – {{name}}",
     "metaEditFallback": "Editar lista",
@@ -368,6 +410,8 @@
         "notesChanged": "Notas actualizadas",
         "paused": "Simulacro pausado",
         "resumed": "Simulacro reanudado",
+        "rowAttested": "Salón confirmado",
+        "rowUnattested": "Confirmación de salón borrada",
         "started": "Simulacro iniciado",
         "unknownActor": "desconocido",
         "viaImpersonator": "vía {{admin}}"
@@ -383,6 +427,27 @@
         "play": "Reproducir",
         "speed": "{{x}}x",
         "trackAriaLabel": "Haga clic para buscar"
+      }
+    },
+    "table": {
+      "mode": "Modo",
+      "signoff": "Firma"
+    },
+    "signoff": {
+      "button": "Firmar",
+      "help": "Atestigua que este simulacro ocurrió. Lo requieren algunos departamentos de educación estatales.",
+      "indicator": "Firmado",
+      "pill": "Firmado por {{actor}} el {{when}}",
+      "errors": {
+        "alreadySigned": "Este simulacro ya fue firmado.",
+        "missingId": "Falta el id del simulacro.",
+        "noUser": "La firma requiere un usuario con sesión iniciada.",
+        "notEnded": "Solo se pueden firmar simulacros finalizados.",
+        "notFound": "Simulacro no encontrado.",
+        "unknown": "Acción de firma desconocida."
+      },
+      "toasts": {
+        "signed": "Simulacro firmado."
       }
     }
   },

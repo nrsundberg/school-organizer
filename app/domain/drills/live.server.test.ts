@@ -33,6 +33,10 @@ interface FakeDrillRunRow {
   lastActorUserId: string | null;
   lastActorOnBehalfOfUserId: string | null;
   audience: "STAFF_ONLY" | "EVERYONE";
+  // Mirrors the new DrillRun.mode column. Defaults to "DRILL" on the row
+  // when create() is called without it, so older callers that don't pass
+  // mode explicitly continue to behave like planned drills.
+  mode: "DRILL" | "ACTUAL" | "FALSE_ALARM";
 }
 
 interface CreateArgs {
@@ -45,6 +49,7 @@ interface CreateArgs {
     lastActorUserId?: string | null;
     lastActorOnBehalfOfUserId?: string | null;
     audience?: "STAFF_ONLY" | "EVERYONE";
+    mode?: "DRILL" | "ACTUAL" | "FALSE_ALARM";
   };
 }
 
@@ -169,6 +174,7 @@ class FakePrisma {
         lastActorUserId: data.lastActorUserId ?? null,
         lastActorOnBehalfOfUserId: data.lastActorOnBehalfOfUserId ?? null,
         audience: data.audience ?? "EVERYONE",
+        mode: data.mode ?? "DRILL",
       };
       this.rows.push(row);
       return row;
@@ -392,6 +398,7 @@ if (!mod) {
       toggles: { "row1:col1": "positive" },
       notes: "halfway",
       actionItems: [],
+      classroomAttestations: {},
     };
 
     it("updates state on a LIVE run", async () => {
@@ -487,7 +494,7 @@ if (!mod) {
         P(prisma),
         "org_a",
         run.id,
-        { toggles: {}, notes: "n", actionItems: [] },
+        { toggles: {}, notes: "n", actionItems: [], classroomAttestations: {} },
         { actorUserId: "u_admin", onBehalfOfUserId: "u_target" },
       );
       assert.equal(updated.lastActorUserId, "u_admin");
@@ -522,6 +529,7 @@ if (!mod) {
         toggles: { "r:c": "positive" },
         notes: "kickoff",
         actionItems: [],
+        classroomAttestations: {},
       };
       const run = await live.startDrillRun(
         P(fake),
@@ -574,6 +582,7 @@ if (!mod) {
         toggles: { "r1:c1": "positive", "r2:c2": "negative" },
         notes: "",
         actionItems: [],
+        classroomAttestations: {},
       };
       await live.updateLiveRunState(P(fake), ORG, run.id, next, ACTOR);
       const evs = fake._events().filter(
@@ -591,7 +600,12 @@ if (!mod) {
         P(fake),
         ORG,
         run.id,
-        { toggles: {}, notes: "first pass complete", actionItems: [] },
+        {
+          toggles: {},
+          notes: "first pass complete",
+          actionItems: [],
+          classroomAttestations: {},
+        },
         ACTOR,
       );
       const evs = fake
@@ -614,6 +628,7 @@ if (!mod) {
           toggles: {},
           notes: "",
           actionItems: [{ id: "a1", text: "follow up", done: false }],
+          classroomAttestations: {},
         },
         ACTOR,
       );
@@ -635,6 +650,7 @@ if (!mod) {
         toggles: { "r:c": "positive" },
         notes: "n",
         actionItems: [],
+        classroomAttestations: {},
       };
       const run = await live.startDrillRun(
         P(fake),
@@ -710,6 +726,64 @@ if (!mod) {
         "org-1",
       );
       assert.equal(active?.audience, "STAFF_ONLY");
+    });
+  });
+
+  describe("startDrillRun mode", () => {
+    // Mode is the 7th argument (after audience). Same coercion semantics as
+    // audience: omitting it from the call site results in the column-default
+    // ("DRILL"). ACTUAL/FALSE_ALARM must be opted into explicitly.
+    it("defaults mode to DRILL when caller omits it", async () => {
+      const fake = new FakePrisma();
+      const run = await live.startDrillRun(P(fake), "org-1", "tpl-1");
+      const stored = fake._all().find((r) => r.id === run.id)!;
+      assert.equal(stored.mode, "DRILL");
+    });
+
+    it("writes ACTUAL when caller passes it", async () => {
+      const fake = new FakePrisma();
+      const run = await live.startDrillRun(
+        P(fake),
+        "org-1",
+        "tpl-1",
+        undefined,
+        undefined,
+        undefined,
+        "ACTUAL",
+      );
+      const stored = fake._all().find((r) => r.id === run.id)!;
+      assert.equal(stored.mode, "ACTUAL");
+    });
+
+    it("writes FALSE_ALARM when caller passes it", async () => {
+      const fake = new FakePrisma();
+      const run = await live.startDrillRun(
+        P(fake),
+        "org-1",
+        "tpl-1",
+        undefined,
+        undefined,
+        undefined,
+        "FALSE_ALARM",
+      );
+      const stored = fake._all().find((r) => r.id === run.id)!;
+      assert.equal(stored.mode, "FALSE_ALARM");
+    });
+
+    it("audience and mode are independent — both flow through", async () => {
+      const fake = new FakePrisma();
+      const run = await live.startDrillRun(
+        P(fake),
+        "org-1",
+        "tpl-1",
+        undefined,
+        undefined,
+        "STAFF_ONLY",
+        "ACTUAL",
+      );
+      const stored = fake._all().find((r) => r.id === run.id)!;
+      assert.equal(stored.audience, "STAFF_ONLY");
+      assert.equal(stored.mode, "ACTUAL");
     });
   });
 }

@@ -21,6 +21,17 @@
     "adminControls": "Controles de administrador",
     "adminHelper": "Eres administrador — los demás solo ven la lista de verificación.",
     "adminLink": "Administración",
+    "attest": {
+      "attest": "Confirmar todo en orden",
+      "attestedBy": "{{name}} a las {{time}}",
+      "columnHeader": "Confirmado",
+      "issue": "¿Problema?",
+      "issueNotePlaceholder": "¿Qué pasó? (opcional)",
+      "issueNoteSave": "Marcar",
+      "summary": "{{attested}} de {{total}} salones confirmados · {{issues}} problemas",
+      "undo": "Deshacer confirmación",
+      "viewerLabel": "Observador"
+    },
     "audience": {
       "everyone": "Todos",
       "staffOnly": "Solo personal"

@@ -5,6 +5,7 @@ import {
   parseRunState,
   type DrillAudience,
   type DrillEventPayload,
+  type DrillMode,
   type RunState,
 } from "./types";
 import { diffRunStates } from "./replay";
@@ -138,6 +139,7 @@ export async function startDrillRun(
   initialState: RunState = emptyRunState(),
   actor: ActorIds = { actorUserId: null, onBehalfOfUserId: null },
   audience: DrillAudience = "EVERYONE",
+  mode: DrillMode = "DRILL",
 ) {
   const now = new Date();
   try {
@@ -156,6 +158,7 @@ export async function startDrillRun(
         lastActorUserId: actor.actorUserId,
         lastActorOnBehalfOfUserId: actor.onBehalfOfUserId,
         audience,
+        mode,
       },
     });
     await prisma.drillRunEvent.create({

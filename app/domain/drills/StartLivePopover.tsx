@@ -3,7 +3,7 @@ import { useFetcher } from "react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Radio } from "lucide-react";
-import type { DrillAudience } from "~/domain/drills/types";
+import type { DrillAudience, DrillMode } from "~/domain/drills/types";
 
 export function StartLivePopover({
   templateId,
@@ -16,6 +16,10 @@ export function StartLivePopover({
 }) {
   const { t } = useTranslation("admin");
   const [audience, setAudience] = useState<DrillAudience>(defaultAudience);
+  // Mode always defaults to "DRILL" — there is no per-template mode default
+  // because ACTUAL/FALSE_ALARM are deliberate per-event choices, not a
+  // standing preference. Admin must explicitly opt out of DRILL.
+  const [mode, setMode] = useState<DrillMode>("DRILL");
   const [open, setOpen] = useState(false);
   const fetcher = useFetcher();
 
@@ -42,6 +46,41 @@ export function StartLivePopover({
               {t("drills.list.startConfirm.subhead", { name: templateName })}
             </p>
           </div>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-xs font-semibold uppercase tracking-wide text-white/50">
+              {t("drills.mode.label")}
+            </legend>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="radio"
+                name="mode"
+                value="DRILL"
+                checked={mode === "DRILL"}
+                onChange={() => setMode("DRILL")}
+              />
+              <span>{t("drills.mode.drill")}</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="radio"
+                name="mode"
+                value="ACTUAL"
+                checked={mode === "ACTUAL"}
+                onChange={() => setMode("ACTUAL")}
+              />
+              <span>{t("drills.mode.actual")}</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="radio"
+                name="mode"
+                value="FALSE_ALARM"
+                checked={mode === "FALSE_ALARM"}
+                onChange={() => setMode("FALSE_ALARM")}
+              />
+              <span>{t("drills.mode.falseAlarm")}</span>
+            </label>
+          </fieldset>
           <fieldset className="flex flex-col gap-2">
             <legend className="text-xs font-semibold uppercase tracking-wide text-white/50">
               {t("drills.list.startConfirm.audienceLabel")}

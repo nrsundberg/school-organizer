@@ -197,6 +197,15 @@
     }
   },
   "drills": {
+    "mode": {
+      "label": "Mode",
+      "drill": "Drill — planned exercise",
+      "actual": "Real event — this is an actual emergency",
+      "falseAlarm": "False alarm — real alert that turned out unfounded",
+      "drillShort": "Drill",
+      "actualShort": "Real event",
+      "falseAlarmShort": "False alarm"
+    },
     "edit": {
       "addRow": "Add row",
       "addText": "Text column",
@@ -241,9 +250,34 @@
         "saveButton": "Save audience default",
         "saved": "Audience default saved."
       },
+      "cadence": {
+        "heading": "Required cadence",
+        "help": "How many runs per year are required (e.g. NFPA 101 monthly fire drills = 12). Leave empty to skip cadence tracking — no \"overdue\" pill will be shown on the list.",
+        "fieldLabel": "Runs per year",
+        "placeholder": "e.g. 12",
+        "saveButton": "Save cadence",
+        "saved": "Cadence saved."
+      },
       "toasts": {
         "layoutSaved": "Layout saved.",
-        "nameSaved": "Name saved."
+        "nameSaved": "Name saved.",
+        "instructionsSaved": "Instructions saved."
+      },
+      "instructions": {
+        "heading": "Notes / Instructions (SOP)",
+        "help": "Markdown directive shown to runners before the drill starts (e.g. \"Locks, Lights, Out of Sight\"). Optional.",
+        "placeholder": "**Fire Evacuation** — sound the alarm, single-file to the assigned assembly point, take roll, report missing.",
+        "saveButton": "Save instructions"
+      },
+      "followUp": {
+        "heading": "Default follow-up tasks",
+        "help": "Pre-populated checklist items every new run starts with — e.g. \"Refill first-aid kit\" or \"Notify district\". Saved when you Save layout.",
+        "addItem": "Add follow-up item",
+        "removeItem": "Remove follow-up item",
+        "empty": "No default follow-up items yet.",
+        "itemPlaceholder": "e.g. Email district safety officer the drill log",
+        "itemLabel": "Default follow-up item {{n}}",
+        "savedWithLayout": "Saved when you click Save layout above."
       }
     },
     "library": {
@@ -262,7 +296,9 @@
       "section_other": " · {{count}} sections",
       "step_one": "{{count}} step",
       "step_other": "{{count}} steps",
-      "subtitle": "Pre-built templates aligned to NFPA, SRP v4.2, FEMA, NWS, and other safety standards. Clone one to make it editable in your org."
+      "subtitle": "Pre-built templates aligned to NFPA, SRP v4.2, FEMA, NWS, and other safety standards. Clone one to make it editable in your org.",
+      "teacherFanoutHint_one": "{{count}} teacher will be auto-filled",
+      "teacherFanoutHint_other": "{{count}} teachers will be auto-filled"
     },
     "list": {
       "activeBanner": {
@@ -302,7 +338,13 @@
       "subtitle": "Templates for fire, lockdown, shelter-in-place, reunification, and more. Build your own or start from the global library.",
       "updated": "Updated {{when}}",
       "viewHistory": "View history",
-      "yourTemplates": "Your templates"
+      "yourTemplates": "Your templates",
+      "cadence": {
+        "overdue": "Overdue {{days}}d",
+        "overdueTitle": "Past the required cadence — schedule a run.",
+        "dueIn": "Due in {{days}}d",
+        "dueTitle": "Within the required cadence window."
+      }
     },
     "metaEdit": "Edit – {{name}}",
     "metaEditFallback": "Edit checklist",
@@ -379,6 +421,8 @@
         "notesChanged": "Notes updated",
         "paused": "Drill paused",
         "resumed": "Drill resumed",
+        "rowAttested": "Classroom attested",
+        "rowUnattested": "Classroom attestation cleared",
         "started": "Drill started",
         "unknownActor": "unknown",
         "viaImpersonator": "via {{admin}}"
@@ -417,10 +461,29 @@
       "audience": "Audience",
       "duration": "Duration",
       "ended": "Ended",
+      "mode": "Mode",
+      "signoff": "Sign-off",
       "started": "Started",
       "status": "Status",
       "template": "Template",
       "truncated": "Showing the most recent {{cap}} runs."
+    },
+    "signoff": {
+      "button": "Sign off",
+      "help": "Attest that this drill happened. Required by some state DOEs.",
+      "indicator": "Signed",
+      "pill": "Signed off by {{actor}} on {{when}}",
+      "errors": {
+        "alreadySigned": "This drill has already been signed off.",
+        "missingId": "Missing drill id.",
+        "noUser": "Sign-off requires a signed-in user.",
+        "notEnded": "Only ended drills can be signed off.",
+        "notFound": "Drill not found.",
+        "unknown": "Unknown sign-off action."
+      },
+      "toasts": {
+        "signed": "Drill signed off."
+      }
     }
   },
   "edit": {

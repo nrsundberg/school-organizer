@@ -1,5 +1,16 @@
 import { Form, Link, redirect, useFetcher } from "react-router";
-import { ArrowDown, ArrowLeft, ArrowUp, Eye, Plus, Trash2, Users } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  CalendarClock,
+  Eye,
+  FileText,
+  ListChecks,
+  Plus,
+  Trash2,
+  Users,
+} from "lucide-react";
 import { StartLivePopover } from "~/domain/drills/StartLivePopover";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
@@ -14,7 +25,13 @@ import {
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
 import type { Prisma } from "~/db";
-import { type ColumnDef, type DrillAudience, type TemplateDefinition, parseTemplateDefinition } from "~/domain/drills/types";
+import {
+  type ColumnDef,
+  type DrillAudience,
+  type TemplateDefinition,
+  parseTemplateDefinition,
+  seedRunStateFromTemplate,
+} from "~/domain/drills/types";
 import { ChecklistPreview } from "~/domain/drills/ChecklistTable";
 import { startDrillRun } from "~/domain/drills/live.server";
 import { parseIntent } from "~/lib/forms.server";
@@ -47,11 +64,30 @@ const renameSchema = z.object({
 const startLiveWithAudienceSchema = z.object({
   intent: z.literal("start-live"),
   audience: z.enum(["STAFF_ONLY", "EVERYONE"]).default("EVERYONE"),
+  // Mode default mirrors the column default. ACTUAL/FALSE_ALARM are explicit
+  // per-event overrides; there is no template-level default.
+  mode: z.enum(["DRILL", "ACTUAL", "FALSE_ALARM"]).default("DRILL"),
 });
 
 const setDefaultAudienceSchema = z.object({
   intent: z.literal("setDefaultAudience"),
   audience: z.enum(["STAFF_ONLY", "EVERYONE"]),
+});
+
+const saveInstructionsSchema = z.object({
+  intent: z.literal("saveInstructions"),
+  instructions: z.string().max(8000, "Instructions are too long.").default(""),
+});
+
+// Cadence target. Empty input clears the column (no cadence tracking).
+// Hard-cap at 365 because once-a-day is the most aggressive pattern that
+// makes sense on a business-day-aware product; numbers above that are
+// almost certainly typos that would make the "next due" math useless.
+const setCadenceSchema = z.object({
+  intent: z.literal("setCadence"),
+  requiredPerYear: z
+    .union([z.literal(""), z.coerce.number().int().min(1).max(365)])
+    .transform((v) => (v === "" ? null : v)),
 });
 
 const saveDefinitionSchema = zfd.formData({
@@ -90,7 +126,15 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   }
   const template = await prisma.drillTemplate.findFirst({
     where: { id },
-    select: { id: true, name: true, definition: true, updatedAt: true, defaultAudience: true },
+    select: {
+      id: true,
+      name: true,
+      definition: true,
+      updatedAt: true,
+      defaultAudience: true,
+      requiredPerYear: true,
+      instructions: true,
+    },
   });
   if (!template) {
     throw new Response("Not found", { status: 404 });
@@ -115,6 +159,8 @@ export async function action({ request, context, params }: Route.ActionArgs) {
     "start-live": startLiveWithAudienceSchema,
     setDefaultAudience: setDefaultAudienceSchema,
     saveDefinition: saveDefinitionSchema,
+    setCadence: setCadenceSchema,
+    saveInstructions: saveInstructionsSchema,
   });
   if (!result.success) return result.response;
 
@@ -138,14 +184,22 @@ export async function action({ request, context, params }: Route.ActionArgs) {
     if (result.intent === "start-live") {
       const orgId = getOrgFromContext(context).id;
       const actor = getActorIdsFromContext(context);
+      const tpl = await prisma.drillTemplate.findFirst({
+        where: { id },
+        select: { definition: true },
+      });
+      const initialState = tpl
+        ? seedRunStateFromTemplate(parseTemplateDefinition(tpl.definition))
+        : undefined;
       try {
         await startDrillRun(
           prisma,
           orgId,
           id,
-          undefined,
+          initialState,
           actor,
           result.data.audience,
+          result.data.mode,
         );
       } catch (err) {
         // startDrillRun throws a Response (409) when another drill is already
@@ -167,6 +221,23 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         data: { definition: result.data.definition as unknown as Prisma.InputJsonValue },
       });
       return dataWithSuccess(null, t("drills.edit.toasts.layoutSaved"));
+    }
+
+    if (result.intent === "setCadence") {
+      await prisma.drillTemplate.update({
+        where: { id },
+        data: { requiredPerYear: result.data.requiredPerYear },
+      });
+      return dataWithSuccess(null, t("drills.edit.cadence.saved"));
+    }
+
+    if (result.intent === "saveInstructions") {
+      const trimmed = result.data.instructions.trim();
+      await prisma.drillTemplate.update({
+        where: { id },
+        data: { instructions: trimmed.length > 0 ? trimmed : null },
+      });
+      return dataWithSuccess(null, t("drills.edit.toasts.instructionsSaved"));
     }
   } catch (err) {
     // A redirect from start-live must propagate — React Router surfaces
@@ -192,10 +263,21 @@ function newId(): string {
 }
 
 function cloneDefinition(def: TemplateDefinition): TemplateDefinition {
-  return {
+  const cloned: TemplateDefinition = {
     columns: def.columns.map((c) => ({ ...c })),
-    rows: def.rows.map((r) => ({ id: r.id, cells: { ...r.cells } })),
+    rows: def.rows.map((r) => {
+      const row: typeof r = { id: r.id, cells: { ...r.cells } };
+      if (r.sectionId !== undefined) row.sectionId = r.sectionId;
+      return row;
+    }),
   };
+  if (def.sections && def.sections.length > 0) {
+    cloned.sections = def.sections.map((s) => ({ ...s }));
+  }
+  if (def.defaultActionItems && def.defaultActionItems.length > 0) {
+    cloned.defaultActionItems = [...def.defaultActionItems];
+  }
+  return cloned;
 }
 
 export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) {
@@ -324,6 +406,38 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
     });
   }, []);
 
+  const addDefaultActionItem = useCallback(() => {
+    setDefinition((d) => {
+      const next = cloneDefinition(d);
+      next.defaultActionItems = [...(next.defaultActionItems ?? []), ""];
+      return next;
+    });
+  }, []);
+
+  const updateDefaultActionItem = useCallback((index: number, value: string) => {
+    setDefinition((d) => {
+      const next = cloneDefinition(d);
+      const items = [...(next.defaultActionItems ?? [])];
+      items[index] = value;
+      next.defaultActionItems = items;
+      return next;
+    });
+  }, []);
+
+  const removeDefaultActionItem = useCallback((index: number) => {
+    setDefinition((d) => {
+      const next = cloneDefinition(d);
+      const items = [...(next.defaultActionItems ?? [])];
+      items.splice(index, 1);
+      if (items.length === 0) {
+        delete next.defaultActionItems;
+      } else {
+        next.defaultActionItems = items;
+      }
+      return next;
+    });
+  }, []);
+
   const saveDefinition = () => {
     const fd = new FormData();
     fd.set("intent", "saveDefinition");
@@ -436,6 +550,123 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
             {t("drills.edit.defaultAudience.saveButton")}
           </button>
         </Form>
+      </section>
+
+      <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <div className="flex items-start gap-3">
+          <CalendarClock className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h2 className="text-sm font-semibold text-white">
+              {t("drills.edit.cadence.heading")}
+            </h2>
+            <p className="text-white/50 text-xs mt-0.5">
+              {t("drills.edit.cadence.help")}
+            </p>
+          </div>
+        </div>
+        <Form method="post" className="flex flex-wrap items-end gap-3 mt-3">
+          <input type="hidden" name="intent" value="setCadence" />
+          <label className={`${formClasses.labelStack} flex-1 min-w-[12rem] max-w-xs`}>
+            {t("drills.edit.cadence.fieldLabel")}
+            <input
+              type="number"
+              name="requiredPerYear"
+              min={1}
+              max={365}
+              step={1}
+              key={`${template.id}-${template.updatedAt.toISOString()}-cadence`}
+              defaultValue={template.requiredPerYear ?? ""}
+              placeholder={t("drills.edit.cadence.placeholder")}
+              className={formClasses.input}
+            />
+          </label>
+          <button type="submit" className={formClasses.btnSecondary}>
+            {t("drills.edit.cadence.saveButton")}
+          </button>
+        </Form>
+      </section>
+
+      <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <div className="flex items-start gap-3">
+          <FileText className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h2 className="text-sm font-semibold text-white">
+              {t("drills.edit.instructions.heading")}
+            </h2>
+            <p className="text-white/50 text-xs mt-0.5">
+              {t("drills.edit.instructions.help")}
+            </p>
+          </div>
+        </div>
+        <Form method="post" className="flex flex-col gap-2 mt-3">
+          <input type="hidden" name="intent" value="saveInstructions" />
+          <textarea
+            name="instructions"
+            key={`${template.id}-${template.updatedAt.toISOString()}-instructions`}
+            defaultValue={template.instructions ?? ""}
+            rows={5}
+            className="w-full app-field font-mono text-xs"
+            placeholder={t("drills.edit.instructions.placeholder")}
+          />
+          <button
+            type="submit"
+            className={`${formClasses.btnSecondary} self-start`}
+          >
+            {t("drills.edit.instructions.saveButton")}
+          </button>
+        </Form>
+      </section>
+
+      <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <div className="flex items-start gap-3">
+          <ListChecks className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h2 className="text-sm font-semibold text-white">
+              {t("drills.edit.followUp.heading")}
+            </h2>
+            <p className="text-white/50 text-xs mt-0.5">
+              {t("drills.edit.followUp.help")}
+            </p>
+          </div>
+        </div>
+        <ul className="flex flex-col gap-2 mt-3">
+          {(definition.defaultActionItems ?? []).length === 0 ? (
+            <li className="text-white/40 text-xs">{t("drills.edit.followUp.empty")}</li>
+          ) : (
+            (definition.defaultActionItems ?? []).map((item, index) => (
+              <li key={index} className="flex items-center gap-2">
+                <input
+                  value={item}
+                  onChange={(e) => updateDefaultActionItem(index, e.target.value)}
+                  className="flex-1 min-w-[12rem] app-field text-sm"
+                  placeholder={t("drills.edit.followUp.itemPlaceholder")}
+                  aria-label={t("drills.edit.followUp.itemLabel", { n: index + 1 })}
+                />
+                <button
+                  type="button"
+                  onClick={() => removeDefaultActionItem(index)}
+                  className="p-2 text-rose-300 hover:bg-rose-500/10 rounded"
+                  aria-label={t("drills.edit.followUp.removeItem")}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+        <div className="flex flex-wrap gap-2 mt-3">
+          <button
+            type="button"
+            onClick={addDefaultActionItem}
+            className={formClasses.btnSecondary}
+          >
+            <Plus className="w-4 h-4 mr-1 inline" />
+            {t("drills.edit.followUp.addItem")}
+          </button>
+          <p className="text-xs text-white/40 self-center">
+            {t("drills.edit.followUp.savedWithLayout")}
+          </p>
+        </div>
       </section>
 
       <div className="overflow-x-auto rounded-xl border border-white/10">

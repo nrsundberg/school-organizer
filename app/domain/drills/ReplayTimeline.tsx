@@ -47,6 +47,11 @@ function dotClassForKind(kind: DrillEventKind): string {
   ) {
     return "bg-emerald-400";
   }
+  // Per-classroom attestation overlay — distinct teal so reviewers can spot
+  // which moments were "Mrs. Smith attested" vs cell flips at a glance.
+  if (kind === "row_attested" || kind === "row_unattested") {
+    return "bg-teal-400";
+  }
   return "bg-white/40";
 }
 
