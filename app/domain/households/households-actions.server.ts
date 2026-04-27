@@ -8,6 +8,7 @@ import {
   parseOptionalDateOnly,
   toDateInputValue,
 } from "~/domain/dismissal/schedule";
+import { chunk, chunkedFindMany } from "~/db/chunked-in";
 import {
   defaultHouseholdName,
   parseStudentIds,
@@ -69,10 +70,15 @@ export async function createHousehold({
     return errorResult("errors:households.chooseAtLeastOneStudent");
   }
 
-  const students = await prisma.student.findMany({
-    where: { id: { in: studentIds } },
-    select: { id: true, firstName: true, lastName: true },
-  });
+  type StudentRow = { id: number; firstName: string; lastName: string };
+  const students = await chunkedFindMany<number, StudentRow>(
+    studentIds,
+    (idChunk) =>
+      prisma.student.findMany({
+        where: { id: { in: idChunk } },
+        select: { id: true, firstName: true, lastName: true },
+      }) as Promise<StudentRow[]>,
+  );
   if (students.length === 0) {
     return errorResult("errors:households.noMatchingStudents");
   }
@@ -90,10 +96,12 @@ export async function createHousehold({
     },
   });
 
-  await prisma.student.updateMany({
-    where: { id: { in: students.map((student) => student.id) } },
-    data: { householdId: household.id },
-  });
+  for (const idChunk of chunk(students.map((student) => student.id))) {
+    await prisma.student.updateMany({
+      where: { id: { in: idChunk } },
+      data: { householdId: household.id },
+    });
+  }
 
   return {
     ok: true,
@@ -153,10 +161,12 @@ export async function assignStudentsToHousehold({
     return errorResult("errors:households.chooseHouseholdAndStudents");
   }
 
-  await prisma.student.updateMany({
-    where: { id: { in: studentIds } },
-    data: { householdId },
-  });
+  for (const idChunk of chunk(studentIds)) {
+    await prisma.student.updateMany({
+      where: { id: { in: idChunk } },
+      data: { householdId },
+    });
+  }
   return {
     ok: true,
     data: null,
