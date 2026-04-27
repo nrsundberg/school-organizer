@@ -77,6 +77,17 @@ export type SeededTenant = {
   homeroomName: string;
   /** Pre-seeded space number. */
   spaceNumber: number;
+  /** The billing plan the seeded org was created with. Set per-spec via `test.use({ tenantBillingPlan: ... })`; default `"CAR_LINE"`. */
+  billingPlan: NonNullable<SeedOptions["billingPlan"]>;
+  /**
+   * Direct libsql handle to the same dev.db the Worker is reading. Specs
+   * that need to read back what an action wrote (e.g. assert
+   * `Org.customDomain` in the branding-gate spec, or that
+   * `Space.status` flipped in the dismissal spec) should use this rather
+   * than spinning up a second client per spec. The fixture closes the
+   * client during teardown.
+   */
+  db: LibsqlClient;
 
   /** Build a `http://{slug}.localhost:<port>{path}` URL. Defaults to the Playwright baseURL port. */
   tenantUrl: (path: string) => string;
@@ -86,6 +97,20 @@ export type SeededTenant = {
 
 type Fixtures = {
   tenant: SeededTenant;
+};
+
+/**
+ * Per-spec options. Override via `test.use({ tenantBillingPlan: "CAMPUS" })`
+ * inside a `describe` block, or globally in `playwright.config.ts > use`.
+ *
+ * `tenantBillingPlan` controls the `billingPlan` column on the seeded `Org`
+ * row, which gates behavior on routes like `/admin/branding`,
+ * `/admin/billing`, and `/admin/history`. The default is `"CAR_LINE"`,
+ * matching the prior fixture behavior so existing flow specs are
+ * unaffected.
+ */
+type Options = {
+  tenantBillingPlan: NonNullable<SeedOptions["billingPlan"]>;
 };
 
 /* ------------------------------------------------------------------ */
@@ -285,16 +310,18 @@ async function teardownSeedRows(db: LibsqlClient, state: SeededState): Promise<v
 /* Fixture                                                             */
 /* ------------------------------------------------------------------ */
 
-export const test = base.extend<Fixtures>({
-  tenant: async ({}, use, testInfo) => {
+export const test = base.extend<Fixtures, Options>({
+  // Per-test fixture option: a spec block can override via
+  // `test.use({ tenantBillingPlan: "CAMPUS" })`. Defaults to "CAR_LINE"
+  // so existing flow specs stay unchanged.
+  tenantBillingPlan: ["CAR_LINE", { option: true }],
+
+  tenant: async ({ tenantBillingPlan }, use) => {
     const db = createClient({ url: databaseUrl() });
     // The tenant host lives on a subdomain of the Playwright baseURL.
     // Wrangler dev serves every Host header on its listening port, so
     // {slug}.localhost:PORT works without any /etc/hosts changes.
-    const opts: SeedOptions = {
-      billingPlan:
-        (testInfo.project.metadata?.tenantBillingPlan as SeedOptions["billingPlan"]) ?? "CAR_LINE",
-    };
+    const opts: SeedOptions = { billingPlan: tenantBillingPlan };
 
     let state: SeededState | null = null;
     try {
@@ -356,6 +383,8 @@ export const test = base.extend<Fixtures>({
       viewerPin: state.appSettings.viewerPin,
       homeroomName: state.teacher.homeRoom,
       spaceNumber: state.space.spaceNumber,
+      billingPlan: opts.billingPlan ?? "CAR_LINE",
+      db,
       tenantUrl: (path: string) => `${url.protocol}//${host}:${port}${path.startsWith("/") ? path : `/${path}`}`,
       marketingUrl: (path: string) => `${url.protocol}//${marketingHost}:${port}${path.startsWith("/") ? path : `/${path}`}`,
     };
