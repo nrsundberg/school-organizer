@@ -258,7 +258,6 @@
     },
     "list": {
       "confirmDelete": "Delete this template?",
-      "confirmStartLive": "Start a live drill for \"{{name}}\"? Everyone in this school will be redirected to the live checklist.",
       "createBlank": "Create blank",
       "delete": "Delete",
       "editLayout": "Edit layout",
@@ -274,6 +273,15 @@
       "nameLabel": "Name",
       "namePlaceholder": "e.g. Lockdown, Fire evacuation, Reunification",
       "newHeading": "New checklist template",
+      "startConfirm": {
+        "heading": "Start live drill",
+        "subhead": "Choose the audience for {{name}}.",
+        "audienceLabel": "Audience",
+        "audienceEveryone": "Everyone — staff and viewer-pin guests see the takeover",
+        "audienceStaffOnly": "Staff only — viewer-pin guests continue to see the normal board",
+        "confirm": "Start live drill",
+        "cancel": "Cancel"
+      },
       "startFromLibrary": "Start from library",
       "startLive": "Start live drill",
       "subtitle": "Templates for fire, lockdown, shelter-in-place, reunification, and more. Build your own or start from the global library.",

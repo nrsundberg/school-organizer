@@ -258,7 +258,6 @@
     },
     "list": {
       "confirmDelete": "¿Eliminar esta plantilla?",
-      "confirmStartLive": "¿Iniciar un simulacro en vivo para \"{{name}}\"? Todos en esta escuela serán redirigidos a la lista de verificación en vivo.",
       "createBlank": "Crear en blanco",
       "delete": "Eliminar",
       "editLayout": "Editar diseño",
@@ -274,6 +273,15 @@
       "nameLabel": "Nombre",
       "namePlaceholder": "p. ej., Encierro, Evacuación por incendio, Reunificación",
       "newHeading": "Nueva plantilla de lista",
+      "startConfirm": {
+        "heading": "Iniciar simulacro",
+        "subhead": "Elige la audiencia para {{name}}.",
+        "audienceLabel": "Audiencia",
+        "audienceEveryone": "Todos — el personal y los invitados con PIN ven el simulacro",
+        "audienceStaffOnly": "Solo personal — los invitados con PIN siguen viendo el tablero normal",
+        "confirm": "Iniciar simulacro",
+        "cancel": "Cancelar"
+      },
       "startFromLibrary": "Empezar desde la biblioteca",
       "startLive": "Iniciar simulacro en vivo",
       "subtitle": "Plantillas para incendio, encierro, refugio en el lugar, reunificación y más. Crea las tuyas o empieza desde la biblioteca global.",
