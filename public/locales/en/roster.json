@@ -21,6 +21,11 @@
     "adminControls": "Admin controls",
     "adminHelper": "You're an admin — non-admins see the checklist only.",
     "adminLink": "Admin",
+    "audience": {
+      "everyone": "Everyone",
+      "staffOnly": "Staff only"
+    },
+    "audienceBadge": "Audience: {{label}}",
     "bannerLive": "LIVE DRILL",
     "bannerPaused": "PAUSED",
     "elapsedFrozen": "frozen at",
@@ -47,13 +52,16 @@
     "pause": "Pause drill",
     "removeItem": "Remove item",
     "resume": "Resume drill",
+    "savedIndicator": {
+      "saving": "Saving…",
+      "saved": "Saved · just now"
+    },
     "source": "Source: {{authority}}",
     "subtitleLive": "Tap toggle cells as units check in. Changes sync to everyone signed in.",
     "subtitlePaused": "Drill is paused — checklist is read-only until an admin resumes.",
     "toasts": {
       "paused": "Drill paused.",
-      "resumed": "Drill resumed.",
-      "saved": "Saved."
+      "resumed": "Drill resumed."
     }
   },
   "homerooms": {

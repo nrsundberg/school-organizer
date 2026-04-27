@@ -1,5 +1,6 @@
 import { Form, Link, redirect, useFetcher } from "react-router";
-import { ArrowDown, ArrowLeft, ArrowUp, Eye, Plus, Radio, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Eye, Plus, Trash2, Users } from "lucide-react";
+import { StartLivePopover } from "~/domain/drills/StartLivePopover";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
@@ -13,7 +14,7 @@ import {
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
 import type { Prisma } from "~/db";
-import { type ColumnDef, type TemplateDefinition, parseTemplateDefinition } from "~/domain/drills/types";
+import { type ColumnDef, type DrillAudience, type TemplateDefinition, parseTemplateDefinition } from "~/domain/drills/types";
 import { ChecklistPreview } from "~/domain/drills/ChecklistTable";
 import { startDrillRun } from "~/domain/drills/live.server";
 import { parseIntent } from "~/lib/forms.server";
@@ -43,8 +44,14 @@ const renameSchema = z.object({
   name: z.string().trim().min(1, "Name is required.").max(120, "Name is too long."),
 });
 
-const startLiveSchema = z.object({
+const startLiveWithAudienceSchema = z.object({
   intent: z.literal("start-live"),
+  audience: z.enum(["STAFF_ONLY", "EVERYONE"]).default("EVERYONE"),
+});
+
+const setDefaultAudienceSchema = z.object({
+  intent: z.literal("setDefaultAudience"),
+  audience: z.enum(["STAFF_ONLY", "EVERYONE"]),
 });
 
 const saveDefinitionSchema = zfd.formData({
@@ -83,7 +90,7 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   }
   const template = await prisma.drillTemplate.findFirst({
     where: { id },
-    select: { id: true, name: true, definition: true, updatedAt: true },
+    select: { id: true, name: true, definition: true, updatedAt: true, defaultAudience: true },
   });
   if (!template) {
     throw new Response("Not found", { status: 404 });
@@ -105,7 +112,8 @@ export async function action({ request, context, params }: Route.ActionArgs) {
 
   const result = await parseIntent(request, {
     rename: renameSchema,
-    "start-live": startLiveSchema,
+    "start-live": startLiveWithAudienceSchema,
+    setDefaultAudience: setDefaultAudienceSchema,
     saveDefinition: saveDefinitionSchema,
   });
   if (!result.success) return result.response;
@@ -119,11 +127,26 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       return dataWithSuccess(null, t("drills.edit.toasts.nameSaved"));
     }
 
+    if (result.intent === "setDefaultAudience") {
+      await prisma.drillTemplate.update({
+        where: { id },
+        data: { defaultAudience: result.data.audience },
+      });
+      return dataWithSuccess(null, t("drills.edit.defaultAudience.saved"));
+    }
+
     if (result.intent === "start-live") {
       const orgId = getOrgFromContext(context).id;
       const actor = getActorIdsFromContext(context);
       try {
-        await startDrillRun(prisma, orgId, id, undefined, actor);
+        await startDrillRun(
+          prisma,
+          orgId,
+          id,
+          undefined,
+          actor,
+          result.data.audience,
+        );
       } catch (err) {
         // startDrillRun throws a Response (409) when another drill is already
         // active. Surface it as a toast instead of crashing the route.
@@ -182,7 +205,6 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
     cloneDefinition(parseTemplateDefinition(template.definition)),
   );
   const saveFetcher = useFetcher();
-  const liveFetcher = useFetcher();
 
   // Conform-managed rename form. `useAppForm` wires up zod validation + the
   // action's `lastResult` automatically. We keep the intent as a hidden input
@@ -375,6 +397,47 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
         {t("drills.edit.intro")}
       </p>
 
+      <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <div className="flex items-start gap-3">
+          <Users className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h2 className="text-sm font-semibold text-white">
+              {t("drills.edit.defaultAudience.heading")}
+            </h2>
+            <p className="text-white/50 text-xs mt-0.5">
+              {t("drills.edit.defaultAudience.help")}
+            </p>
+          </div>
+        </div>
+        <Form method="post" className="flex flex-col gap-2 mt-3">
+          <input type="hidden" name="intent" value="setDefaultAudience" />
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="radio"
+              name="audience"
+              value="EVERYONE"
+              defaultChecked={template.defaultAudience !== "STAFF_ONLY"}
+            />
+            <span>{t("drills.edit.defaultAudience.everyone")}</span>
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="radio"
+              name="audience"
+              value="STAFF_ONLY"
+              defaultChecked={template.defaultAudience === "STAFF_ONLY"}
+            />
+            <span>{t("drills.edit.defaultAudience.staffOnly")}</span>
+          </label>
+          <button
+            type="submit"
+            className={`${formClasses.btnSecondary} self-start mt-2`}
+          >
+            {t("drills.edit.defaultAudience.saveButton")}
+          </button>
+        </Form>
+      </section>
+
       <div className="overflow-x-auto rounded-xl border border-white/10">
         <table className="w-full text-sm min-w-[640px]">
           <thead>
@@ -488,17 +551,11 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
       </button>
 
       <div className="flex flex-wrap gap-3">
-        <liveFetcher.Form method="post">
-          <input type="hidden" name="intent" value="start-live" />
-          <button
-            type="submit"
-            className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500 transition-colors disabled:opacity-50"
-            disabled={liveFetcher.state !== "idle"}
-          >
-            <Radio className="w-4 h-4" />
-            {t("drills.edit.startLive")}
-          </button>
-        </liveFetcher.Form>
+        <StartLivePopover
+          templateId={template.id}
+          templateName={template.name}
+          defaultAudience={(template.defaultAudience ?? "EVERYONE") as DrillAudience}
+        />
         <Link
           to={`/admin/drills/${template.id}/run`}
           className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"

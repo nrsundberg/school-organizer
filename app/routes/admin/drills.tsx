@@ -1,5 +1,5 @@
 import { Form, Link, redirect } from "react-router";
-import { ClipboardList, History, Library, Radio } from "lucide-react";
+import { ClipboardList, History, Library } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
@@ -8,7 +8,8 @@ import {
   getOrgFromContext,
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
-import { defaultTemplateDefinition } from "~/domain/drills/types";
+import { defaultTemplateDefinition, parseDrillAudience, type DrillAudience } from "~/domain/drills/types";
+import { StartLivePopover } from "~/domain/drills/StartLivePopover";
 import { startDrillRun } from "~/domain/drills/live.server";
 import { dataWithError, dataWithSuccess } from "remix-toast";
 import { getFixedT } from "~/lib/t.server";
@@ -32,7 +33,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const prisma = getTenantPrisma(context);
   const templates = await prisma.drillTemplate.findMany({
     orderBy: { updatedAt: "desc" },
-    select: { id: true, name: true, updatedAt: true },
+    select: { id: true, name: true, updatedAt: true, defaultAudience: true },
   });
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
@@ -82,16 +83,15 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!id) {
       return dataWithError(null, t("drills.list.errors.missingId"));
     }
+    const audience = parseDrillAudience(formData.get("audience"));
     const orgId = getOrgFromContext(context).id;
     const actor = getActorIdsFromContext(context);
     try {
-      await startDrillRun(prisma, orgId, id, undefined, actor);
+      await startDrillRun(prisma, orgId, id, undefined, actor, audience);
     } catch (err) {
       if (err instanceof Response && err.status === 409) {
         return dataWithError(null, t("drills.list.errors.anotherLive"));
       }
-      // Surface the real error to logs so "it just 500s" is never the whole
-      // story — wrangler tail will show what actually threw.
       console.error("[drills.list] start-live failed", err);
       throw err;
     }
@@ -100,6 +100,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   return dataWithError(null, t("drills.list.errors.unknown"));
 }
+
 
 export default function AdminDrillList({ loaderData }: Route.ComponentProps) {
   const { templates } = loaderData;
@@ -180,30 +181,11 @@ export default function AdminDrillList({ loaderData }: Route.ComponentProps) {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {/*
-                    "Run" starts a live drill — same red button treatment as
-                    the edit page so it's unmistakably the "real" action,
-                    not a preview. Posts to the list action which calls
-                    startDrillRun and redirects to /drills/live.
-                  */}
-                  <Form
-                    method="post"
-                    onSubmit={(e) =>
-                      !confirm(
-                        t("drills.list.confirmStartLive", { name: tpl.name }),
-                      ) && e.preventDefault()
-                    }
-                  >
-                    <input type="hidden" name="intent" value="start-live" />
-                    <input type="hidden" name="id" value={tpl.id} />
-                    <button
-                      type="submit"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-rose-500 transition-colors"
-                    >
-                      <Radio className="w-3.5 h-3.5" />
-                      {t("drills.list.startLive")}
-                    </button>
-                  </Form>
+                  <StartLivePopover
+                    templateId={tpl.id}
+                    templateName={tpl.name}
+                    defaultAudience={(tpl.defaultAudience ?? "EVERYONE") as DrillAudience}
+                  />
                   <Link
                     to={`/admin/drills/${tpl.id}`}
                     className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors"

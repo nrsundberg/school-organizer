@@ -1,15 +1,20 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  DRILL_AUDIENCES,
+  DRILL_AUDIENCE_LABELS,
   DRILL_TYPES,
   DRILL_TYPE_LABELS,
   defaultTemplateDefinition,
+  isDrillAudience,
   isDrillRunStatus,
   isDrillType,
+  parseDrillAudience,
   parseRunState,
   parseTemplateDefinition,
   toggleKey,
 } from "./types";
+import type { DrillAudience } from "./types";
 
 describe("parseTemplateDefinition", () => {
   it("passes valid columns/rows/sections through", () => {
@@ -223,5 +228,36 @@ describe("DRILL_TYPE_LABELS", () => {
       Object.keys(DRILL_TYPE_LABELS).length,
       DRILL_TYPES.length,
     );
+  });
+});
+
+describe("DrillAudience", () => {
+  it("isDrillAudience accepts both tiers", () => {
+    assert.equal(isDrillAudience("STAFF_ONLY"), true);
+    assert.equal(isDrillAudience("EVERYONE"), true);
+  });
+
+  it("isDrillAudience rejects garbage", () => {
+    assert.equal(isDrillAudience("everyone"), false);
+    assert.equal(isDrillAudience(""), false);
+    assert.equal(isDrillAudience(undefined), false);
+    assert.equal(isDrillAudience({} as unknown), false);
+  });
+
+  it("parseDrillAudience round-trips valid input", () => {
+    assert.equal(parseDrillAudience("STAFF_ONLY"), "STAFF_ONLY");
+    assert.equal(parseDrillAudience("EVERYONE"), "EVERYONE");
+  });
+
+  it("parseDrillAudience defaults invalid input to EVERYONE", () => {
+    assert.equal(parseDrillAudience(null), "EVERYONE");
+    assert.equal(parseDrillAudience("staff_only"), "EVERYONE");
+    assert.equal(parseDrillAudience(42), "EVERYONE");
+  });
+
+  it("DRILL_AUDIENCE_LABELS has both tiers", () => {
+    const labels: Record<DrillAudience, string> = DRILL_AUDIENCE_LABELS;
+    assert.equal(typeof labels.STAFF_ONLY, "string");
+    assert.equal(typeof labels.EVERYONE, "string");
   });
 });

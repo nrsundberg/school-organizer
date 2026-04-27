@@ -32,6 +32,7 @@ interface FakeDrillRunRow {
   endedAt: Date | null;
   lastActorUserId: string | null;
   lastActorOnBehalfOfUserId: string | null;
+  audience: "STAFF_ONLY" | "EVERYONE";
 }
 
 interface CreateArgs {
@@ -43,6 +44,7 @@ interface CreateArgs {
     state: object;
     lastActorUserId?: string | null;
     lastActorOnBehalfOfUserId?: string | null;
+    audience?: "STAFF_ONLY" | "EVERYONE";
   };
 }
 
@@ -166,6 +168,7 @@ class FakePrisma {
         endedAt: null,
         lastActorUserId: data.lastActorUserId ?? null,
         lastActorOnBehalfOfUserId: data.lastActorOnBehalfOfUserId ?? null,
+        audience: data.audience ?? "EVERYONE",
       };
       this.rows.push(row);
       return row;
@@ -665,6 +668,48 @@ if (!mod) {
       const paused = fake._events().find((e) => e.kind === "paused")!;
       assert.equal(paused.actorUserId, "u_admin");
       assert.equal(paused.onBehalfOfUserId, "u_target");
+    });
+  });
+
+  describe("startDrillRun audience", () => {
+    it("defaults audience to EVERYONE when caller omits it", async () => {
+      const fake = new FakePrisma();
+      const run = await live.startDrillRun(
+        P(fake),
+        "org-1",
+        "tpl-1",
+      );
+      assert.equal(run.audience, "EVERYONE");
+    });
+
+    it("writes STAFF_ONLY when caller passes it", async () => {
+      const fake = new FakePrisma();
+      const run = await live.startDrillRun(
+        P(fake),
+        "org-1",
+        "tpl-1",
+        undefined,
+        undefined,
+        "STAFF_ONLY",
+      );
+      assert.equal(run.audience, "STAFF_ONLY");
+    });
+
+    it("getActiveDrillRun returns the audience field", async () => {
+      const fake = new FakePrisma();
+      await live.startDrillRun(
+        P(fake),
+        "org-1",
+        "tpl-1",
+        undefined,
+        undefined,
+        "STAFF_ONLY",
+      );
+      const active = await live.getActiveDrillRun(
+        P(fake),
+        "org-1",
+      );
+      assert.equal(active?.audience, "STAFF_ONLY");
     });
   });
 }

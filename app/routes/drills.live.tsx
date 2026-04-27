@@ -1,4 +1,4 @@
-import { Form, Link, redirect, useFetcher, useRevalidator } from "react-router";
+import { Form, Link, redirect, useFetcher } from "react-router";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, ArrowLeft, Check, Pause, Play, Plus, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -16,13 +16,14 @@ import {
 } from "~/domain/utils/global-context.server";
 import {
   cycleToggle,
+  parseDrillAudience,
   parseRunState,
   parseTemplateDefinition,
   toggleKey,
+  type DrillAudience,
   type RunState,
 } from "~/domain/drills/types";
 import { ChecklistTable } from "~/domain/drills/ChecklistTable";
-import { userIsAdmin } from "~/domain/drills/live-redirect.server";
 import {
   endDrillRun,
   getActiveDrillRun,
@@ -30,6 +31,7 @@ import {
   resumeDrillRun,
   updateLiveRunState,
 } from "~/domain/drills/live.server";
+import { hasValidViewerAccess } from "~/domain/auth/viewer-access.server";
 import type { Prisma } from "~/db";
 
 export const meta: Route.MetaFunction = ({ data }) => [
@@ -49,35 +51,51 @@ const btnGhost =
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = getOptionalUserFromContext(context);
-  if (!user) {
-    throw new Response("Not authenticated", { status: 401 });
-  }
   const org = getOrgFromContext(context);
   const prisma = getTenantPrisma(context);
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "roster");
 
-  // Wrap the DB fetch so a thrown error surfaces with context rather than
-  // an opaque 500. The prior implementation let any throw bubble straight
-  // to the worker boundary, which replies with empty-body 500 — leaving
-  // "live drill clicks just crash" with no actionable log. Now the real
-  // stack shows up in wrangler tail.
+  // Compute membership: STAFF if signed-in user; else VIEWER_PIN if a valid
+  // viewer cookie is present; else not allowed at all.
+  let membership: "STAFF" | "VIEWER_PIN" | null = null;
+  if (user) {
+    membership = "STAFF";
+  } else if (await hasValidViewerAccess({ request, context })) {
+    membership = "VIEWER_PIN";
+  }
+  if (membership === null) {
+    throw new Response("Not authenticated", { status: 401 });
+  }
+
   let run;
   try {
     run = await getActiveDrillRun(prisma, org.id);
   } catch (err) {
     console.error(
-      `[drills.live] loader getActiveDrillRun threw (org=${org.id}, user=${user.id})`,
+      `[drills.live] loader getActiveDrillRun threw (org=${org.id})`,
       err,
     );
     throw err;
   }
   if (!run) {
-    // Nothing to take over — bounce back to the home board.
     throw redirect("/");
   }
 
-  const isAdmin = userIsAdmin(user);
+  const audience: DrillAudience = parseDrillAudience(run.audience);
+
+  // Audience gate: viewer-pin guests can only see EVERYONE drills. 404 (not
+  // 401) because logging in won't change the answer for them.
+  if (membership === "VIEWER_PIN" && audience === "STAFF_ONLY") {
+    throw new Response("Not found", { status: 404 });
+  }
+
+  // Admin = signed-in user with ADMIN/CONTROLLER role. Used purely for showing
+  // the admin sidebar (pause/resume/end). Inlined here to avoid resurrecting
+  // the deleted `userIsAdmin` helper just for one call site.
+  const isAdmin =
+    !!user && (user.role === "ADMIN" || user.role === "CONTROLLER");
+
   const paused = run.status === "PAUSED";
   const metaTitle = paused
     ? t("drillsLive.metaPaused", { name: run.template.name })
@@ -91,6 +109,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       pausedAtIso: run.pausedAt?.toISOString() ?? null,
       state: run.state,
       updatedAtIso: run.updatedAt.toISOString(),
+      audience,
     },
     template: {
       id: run.template.id,
@@ -102,7 +121,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     },
     isAdmin,
     paused,
-    userName: user.name || user.email,
+    userName: user?.name || user?.email || "viewer",
     metaTitle,
   };
 }
@@ -114,7 +133,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
   const org = getOrgFromContext(context);
   const prisma = getTenantPrisma(context);
-  const isAdmin = userIsAdmin(user);
+  const isAdmin = user.role === "ADMIN" || user.role === "CONTROLLER";
   const actor = getActorIdsFromContext(context);
 
   const locale = await detectLocale(request, context);
@@ -167,7 +186,10 @@ export async function action({ request, context }: Route.ActionArgs) {
       }
       const next = parseRunState(parsed as Prisma.JsonValue);
       await updateLiveRunState(prisma, org.id, runId, next, actor);
-      return dataWithSuccess(null, t("drillsLive.toasts.saved"));
+      // No toast — the page renders an inline "Saving…/Saved" indicator
+      // instead. Returning a non-null body so fetcher.data signals
+      // success to the client.
+      return { ok: true };
     }
 
     return dataWithError(null, t("drillsLive.errors.unknownAction"));
@@ -206,8 +228,30 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
   const def = useMemo(() => parseTemplateDefinition(template.definition), [template.definition]);
   const [state, setState] = useState<RunState>(() => parseRunState(run.state));
   const fetcher = useFetcher();
-  const revalidator = useRevalidator();
   const [elapsed, setElapsed] = useState(() => formatElapsed(run.activatedAtIso));
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+
+  // When a save succeeds (fetcher returns idle with non-error data), stamp
+  // "lastSavedAt" so the inline indicator shows "Saved · just now" briefly.
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data && !("error" in fetcher.data)) {
+      setLastSavedAt(Date.now());
+    }
+  }, [fetcher.state, fetcher.data]);
+
+  // Auto-clear the saved indicator after 1500ms.
+  useEffect(() => {
+    if (lastSavedAt === null) return;
+    const id = setTimeout(() => setLastSavedAt(null), 1500);
+    return () => clearTimeout(id);
+  }, [lastSavedAt]);
+
+  const saveStatus: "idle" | "saving" | "saved" =
+    fetcher.state !== "idle"
+      ? "saving"
+      : lastSavedAt !== null
+        ? "saved"
+        : "idle";
 
   // Re-sync local state whenever the loader returns a new revision (e.g. after
   // a successful save the fetcher revalidates and we mirror it back).
@@ -224,14 +268,6 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
     }, 1000);
     return () => clearInterval(i);
   }, [paused, run.activatedAtIso]);
-
-  // Revalidate after a successful action so other clients see fresh data on
-  // their next interaction. We don't poll — collaboration is best-effort.
-  useEffect(() => {
-    if (fetcher.state === "idle" && fetcher.data != null) {
-      revalidator.revalidate();
-    }
-  }, [fetcher.state, fetcher.data, revalidator]);
 
   const readOnly = paused;
 
@@ -360,6 +396,14 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
         <div className="text-sm font-mono tabular-nums">
           {paused ? t("drillsLive.elapsedFrozen") : t("drillsLive.elapsedRunning")} {elapsed}
         </div>
+        <span className="ml-2 inline-flex items-center rounded-full border border-white/30 bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+          {t("drillsLive.audienceBadge", {
+            label:
+              run.audience === "STAFF_ONLY"
+                ? t("drillsLive.audience.staffOnly")
+                : t("drillsLive.audience.everyone"),
+          })}
+        </span>
       </div>
 
       <div className="flex-1 flex flex-col xl:flex-row gap-6 p-6 max-w-[1400px] w-full mx-auto">
@@ -378,6 +422,23 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
                 <ArrowLeft className="w-4 h-4 mr-1" />
                 {t("drillsLive.adminLink")}
               </Link>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end h-5 -mb-2 text-xs">
+            {saveStatus === "saving" && (
+              <span className="text-white/50 inline-flex items-center gap-1">
+                <span
+                  aria-hidden="true"
+                  className="h-1.5 w-1.5 rounded-full bg-white/50 animate-pulse"
+                />
+                {t("drillsLive.savedIndicator.saving")}
+              </span>
+            )}
+            {saveStatus === "saved" && (
+              <span className="text-emerald-300/80">
+                {t("drillsLive.savedIndicator.saved")}
+              </span>
             )}
           </div>
 

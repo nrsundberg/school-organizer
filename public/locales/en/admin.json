@@ -233,6 +233,14 @@
       "saving": "Saving…",
       "startLive": "Start live drill",
       "templateName": "Template name",
+      "defaultAudience": {
+        "heading": "Audience for live runs",
+        "help": "Default selection when an admin starts a live drill from this template. Admins can change it at start time.",
+        "everyone": "Everyone — staff and viewer-pin guests",
+        "staffOnly": "Staff only — viewer-pin guests see the normal board",
+        "saveButton": "Save audience default",
+        "saved": "Audience default saved."
+      },
       "toasts": {
         "layoutSaved": "Layout saved.",
         "nameSaved": "Name saved."
@@ -258,7 +266,6 @@
     },
     "list": {
       "confirmDelete": "Delete this template?",
-      "confirmStartLive": "Start a live drill for \"{{name}}\"? Everyone in this school will be redirected to the live checklist.",
       "createBlank": "Create blank",
       "delete": "Delete",
       "editLayout": "Edit layout",
@@ -274,6 +281,15 @@
       "nameLabel": "Name",
       "namePlaceholder": "e.g. Lockdown, Fire evacuation, Reunification",
       "newHeading": "New checklist template",
+      "startConfirm": {
+        "heading": "Start live drill",
+        "subhead": "Choose the audience for {{name}}.",
+        "audienceLabel": "Audience",
+        "audienceEveryone": "Everyone — staff and viewer-pin guests see the takeover",
+        "audienceStaffOnly": "Staff only — viewer-pin guests continue to see the normal board",
+        "confirm": "Start live drill",
+        "cancel": "Cancel"
+      },
       "startFromLibrary": "Start from library",
       "startLive": "Start live drill",
       "subtitle": "Templates for fire, lockdown, shelter-in-place, reunification, and more. Build your own or start from the global library.",
@@ -367,6 +383,10 @@
       "noItems": "No follow-up items recorded.",
       "noNotes": "No notes recorded.",
       "notesHeading": "Notes",
+      "audience": {
+        "everyone": "Audience: Everyone",
+        "staffOnly": "Audience: Staff only"
+      },
       "print": "Print",
       "subhead": "Run on {{started}} · {{duration}}",
       "timeline": {

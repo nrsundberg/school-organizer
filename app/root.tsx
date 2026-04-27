@@ -52,8 +52,10 @@ import {
 import { getActiveDrillRun } from "~/domain/drills/live.server";
 import {
   liveDrillRedirectTarget,
-  userIsAdmin
+  type AudienceMembership
 } from "~/domain/drills/live-redirect.server";
+import { parseDrillAudience } from "~/domain/drills/types";
+import { hasValidViewerAccess } from "~/domain/auth/viewer-access.server";
 import { getCspNonceFromRequest } from "~/lib/csp";
 
 export const middleware: MiddlewareFunction<Response>[] = [
@@ -136,31 +138,40 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const marketing = isMarketingHost(request, context);
   const { toast, headers } = await getToast(request);
 
-  // Live drill takeover: when a drill is LIVE or PAUSED in this org, non-admin
-  // signed-in users are force-redirected to /drills/live. Admins stay on
-  // whatever route they requested so they can manage things. The allow-list
-  // (logout, /api/*, static assets) is encapsulated in liveDrillRedirectTarget
-  // so it's unit-testable and consistent across callers.
-  if (!marketing && user && org && !userIsAdmin(user)) {
-    try {
-      const prisma = getTenantPrisma(context);
-      const activeRun = await getActiveDrillRun(prisma, org.id);
-      if (activeRun) {
-        const url = new URL(request.url);
-        const target = liveDrillRedirectTarget({
-          user,
-          pathname: url.pathname,
-          hasActiveDrill: true,
-          isAdmin: false
-        });
-        if (target) {
-          throw redirect(target);
+  // Live drill takeover: when a drill is LIVE or PAUSED in this org, every
+  // caller in the audience (STAFF, plus VIEWER_PIN if audience === EVERYONE)
+  // is redirected to /drills/live. Anonymous callers and out-of-audience
+  // viewer-pin guests stay on whatever route they requested. The allow-list
+  // (logout, /api/*, /admin/*, static assets) is encapsulated in
+  // liveDrillRedirectTarget so it's unit-testable and consistent.
+  if (!marketing && org) {
+    let membership: AudienceMembership = "NONE";
+    if (user) {
+      membership = "STAFF";
+    } else if (await hasValidViewerAccess({ request, context })) {
+      membership = "VIEWER_PIN";
+    }
+
+    if (membership !== "NONE") {
+      try {
+        const prisma = getTenantPrisma(context);
+        const activeRun = await getActiveDrillRun(prisma, org.id);
+        if (activeRun) {
+          const url = new URL(request.url);
+          const target = liveDrillRedirectTarget({
+            membership,
+            audience: parseDrillAudience(activeRun.audience),
+            pathname: url.pathname,
+          });
+          if (target) {
+            throw redirect(target);
+          }
         }
+      } catch (e) {
+        // Let redirects propagate; swallow DB lookup errors so a transient D1
+        // hiccup doesn't take down the whole app shell.
+        if (e instanceof Response) throw e;
       }
-    } catch (e) {
-      // Let redirects propagate; swallow DB lookup errors so a transient D1
-      // hiccup doesn't take down the whole app shell.
-      if (e instanceof Response) throw e;
     }
   }
 

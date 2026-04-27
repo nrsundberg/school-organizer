@@ -21,6 +21,11 @@
     "adminControls": "Controles de administrador",
     "adminHelper": "Eres administrador — los demás solo ven la lista de verificación.",
     "adminLink": "Administración",
+    "audience": {
+      "everyone": "Todos",
+      "staffOnly": "Solo personal"
+    },
+    "audienceBadge": "Audiencia: {{label}}",
     "bannerLive": "SIMULACRO EN VIVO",
     "bannerPaused": "PAUSADO",
     "elapsedFrozen": "congelado en",
@@ -47,13 +52,16 @@
     "pause": "Pausar simulacro",
     "removeItem": "Eliminar tarea",
     "resume": "Reanudar simulacro",
+    "savedIndicator": {
+      "saving": "Guardando…",
+      "saved": "Guardado · ahora"
+    },
     "source": "Fuente: {{authority}}",
     "subtitleLive": "Toca las celdas conforme las unidades reportan. Los cambios se sincronizan con todos los conectados.",
     "subtitlePaused": "El simulacro está pausado — la lista de verificación es de solo lectura hasta que un administrador lo reanude.",
     "toasts": {
       "paused": "Simulacro pausado.",
-      "resumed": "Simulacro reanudado.",
-      "saved": "Guardado."
+      "resumed": "Simulacro reanudado."
     }
   },
   "homerooms": {
