@@ -96,23 +96,37 @@ export async function hasValidViewerAccess({ request, context }: Ctx): Promise<b
   return true;
 }
 
-export async function getViewerLockState(ctx: Ctx): Promise<{ locked: boolean; message: string | null; setCookie?: string }> {
+export async function getViewerLockState(ctx: Ctx): Promise<{
+  locked: boolean;
+  message: string | null;
+  setCookie?: string;
+  clientKey: string;
+  ipHint: string;
+}> {
   const prisma = getTenantPrisma(ctx.context);
-  const { clientKey, setCookie } = await getOrCreateFingerprint(ctx);
+  const { clientKey, setCookie, ipHint: hint } = await getOrCreateFingerprint(ctx);
   const now = new Date();
   const row = await prisma.viewerAccessAttempt.findFirst({ where: { clientKey } });
-  if (!row) return { locked: false, message: null, setCookie };
+  if (!row) return { locked: false, message: null, setCookie, clientKey, ipHint: hint };
   if (row.requiresAdminReset) {
-    return { locked: true, message: "Too many failed attempts. Access is locked until an admin resets it.", setCookie };
+    return {
+      locked: true,
+      message: "Too many failed attempts. Access is locked until an admin resets it.",
+      setCookie,
+      clientKey,
+      ipHint: hint,
+    };
   }
   if (row.lockedUntil && row.lockedUntil > now) {
     return {
       locked: true,
       message: `Too many failed attempts. Try again after ${row.lockedUntil.toLocaleString()}.`,
       setCookie,
+      clientKey,
+      ipHint: hint,
     };
   }
-  return { locked: false, message: null, setCookie };
+  return { locked: false, message: null, setCookie, clientKey, ipHint: hint };
 }
 
 async function createViewerSession(context: any, source: "pin" | "magic"): Promise<{ token: string; expiresAt: Date }> {
@@ -146,7 +160,13 @@ export async function verifyViewerPinAndIssueSession(ctx: Ctx, pin: string): Pro
   }
 
   const { ok: valid, needsRehash } = await verifyPassword(pinHash, pin);
-  const { clientKey, ipHint: hint } = await getOrCreateFingerprint(ctx);
+  // Reuse the fingerprint already computed by getViewerLockState above.
+  // Calling getOrCreateFingerprint a second time would re-read request
+  // cookies (still without our just-issued fid cookie!) and generate a
+  // different random fid, causing the Set-Cookie header and the DB
+  // attempt rows to disagree. That's the bug e2e/flows/viewer-pin.spec.ts
+  // line 74 ("attempts counter decrements") guards against.
+  const { clientKey, ipHint: hint } = lock;
   const now = new Date();
 
   if (valid && needsRehash) {

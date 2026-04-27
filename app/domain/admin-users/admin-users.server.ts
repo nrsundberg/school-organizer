@@ -190,7 +190,14 @@ export async function loadAdminUsersData({
   currentUserId,
 }: LoadAdminUsersDataArgs): Promise<AdminUsersLoaderData> {
   const [users, locks] = await Promise.all([
-    prisma.user.findMany({ orderBy: { name: "asc" } }),
+    // User is excluded from TENANT_MODELS (better-auth needs unscoped
+    // access for sign-in/session resolution), so the Prisma extension
+    // does NOT auto-scope this query — we must filter by orgId here or
+    // a tenant-subdomain admin sees every user across the entire app.
+    prisma.user.findMany({
+      where: { orgId: org.id },
+      orderBy: { name: "asc" },
+    }),
     tenantPrisma.viewerAccessAttempt.findMany({
       where: {
         OR: [
@@ -208,6 +215,30 @@ export async function loadAdminUsersData({
     currentUserId,
     passwordResetEnabled: org.passwordResetEnabled !== false,
   };
+}
+
+/**
+ * Throws a 404 Response when `userId` does not belong to `orgId`. The
+ * Prisma tenant extension does not auto-scope `User`/`Session`/`Account`
+ * mutations (those tables are intentionally global for better-auth), so
+ * every action that operates on a user-by-id MUST call this first or a
+ * tenant admin can mutate users in other tenants by guessing ids.
+ *
+ * 404 (not 403) is intentional: it does not leak the existence of a
+ * user in some other tenant.
+ */
+export async function requireTargetInOrg(
+  prisma: AdminUsersPrisma,
+  userId: string,
+  orgId: string,
+): Promise<void> {
+  const target = await prisma.user.findFirst({
+    where: { id: userId, orgId },
+    select: { id: true },
+  });
+  if (!target) {
+    throw new Response("Not Found", { status: 404 });
+  }
 }
 
 export async function handleAdminUsersAction({
@@ -232,6 +263,7 @@ export async function handleAdminUsersAction({
 
   if (action === "resetPassword") {
     const { userId } = resetPasswordSchema.parse(formData);
+    await requireTargetInOrg(prisma, userId, org.id);
     const tempPassword = makeTempPassword();
     const hashed = await hashPassword(tempPassword);
     const account = await prisma.account.findFirst({
@@ -264,6 +296,7 @@ export async function handleAdminUsersAction({
 
   if (action === "changeRole") {
     const { userId, role } = changeRoleSchema.parse(formData);
+    await requireTargetInOrg(prisma, userId, org.id);
     await prisma.user.update({ where: { id: userId }, data: { role } });
     return {
       kind: "success",
@@ -281,6 +314,7 @@ export async function handleAdminUsersAction({
         message: { key: "admin:users.errors.missingId" },
       };
     }
+    await requireTargetInOrg(prisma, userId, org.id);
     const result = await prisma.session.deleteMany({ where: { userId } });
     return {
       kind: "success",
@@ -360,6 +394,7 @@ export async function handleAdminUsersAction({
 
   if (action === "deleteUser") {
     const userId = uncheckedFormText(formData, "userId");
+    await requireTargetInOrg(prisma, userId, org.id);
     await prisma.user.delete({ where: { id: userId } });
     return {
       kind: "warning",
@@ -370,6 +405,7 @@ export async function handleAdminUsersAction({
 
   if (action === "ban") {
     const userId = uncheckedFormText(formData, "userId");
+    await requireTargetInOrg(prisma, userId, org.id);
     const reason = formData.get("banReason");
     const banReason =
       typeof reason === "string" && reason ? reason : "Banned by admin";
@@ -386,6 +422,7 @@ export async function handleAdminUsersAction({
 
   if (action === "unban") {
     const userId = uncheckedFormText(formData, "userId");
+    await requireTargetInOrg(prisma, userId, org.id);
     await auth.api.unbanUser({ body: { userId }, headers: requestHeaders });
     return {
       kind: "success",

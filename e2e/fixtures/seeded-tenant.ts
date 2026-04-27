@@ -113,7 +113,7 @@ function baseUrl(): URL {
   return new URL(process.env.PLAYWRIGHT_BASE_URL ?? DEFAULT_BASE_URL);
 }
 
-function databaseUrl(): string {
+export function databaseUrl(): string {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
 
   // The fixture and the wrangler-dev worker must read/write the same

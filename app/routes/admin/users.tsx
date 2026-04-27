@@ -3,26 +3,25 @@ import { Button, Input, Table, TableBody, TableCell, TableColumn, TableContent, 
 import { Ban, KeyRound, Link as LinkIcon, LogIn, RotateCcw, ShieldX, Trash2, UserCheck } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { toast as notify } from "react-toastify";
 import type { Route } from "./+types/users";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getPrisma } from "~/db.server";
 import { getAuth, hashPassword } from "~/domain/auth/better-auth.server";
-import { authClient } from "~/lib/auth-client";
 import { dataWithError, dataWithSuccess, dataWithWarning } from "remix-toast";
 import { createViewerMagicLink, resetViewerLock, revokeAllViewerSessions, setViewerPin } from "~/domain/auth/viewer-access.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 import {
   handleAdminUsersAction,
   loadAdminUsersData,
+  requireTargetInOrg,
   type AdminUsersActionOutcome,
-  type AdminUsersAuth,
   type AdminUsersFetcherData,
 } from "~/domain/admin-users/admin-users.server";
 import {
   inviteUser,
   type InviteUserError,
 } from "~/domain/admin-users/invite-user.server";
+import { assertNotAlreadyImpersonating } from "~/domain/auth/impersonate-gate.server";
 import { detectLocale } from "~/i18n.server";
 import { getFixedT } from "~/lib/t.server";
 import type { TFunction } from "i18next";
@@ -65,7 +64,7 @@ function dataWithToast(outcome: AdminUsersActionOutcome, t: TFunction) {
 export async function action({ request, context }: Route.ActionArgs) {
   const me = await protectToAdminAndGetPermissions(context);
   const prisma = getPrisma(context);
-  const auth: AdminUsersAuth = getAuth(context);
+  const auth = getAuth(context);
   const formData = await request.formData();
   const org = getOrgFromContext(context);
   const locale = await detectLocale(request, context);
@@ -95,23 +94,82 @@ export async function action({ request, context }: Route.ActionArgs) {
     return dataWithSuccess(null, t("admin:users.toasts.userInvited", { email }));
   }
 
-  const outcome = await handleAdminUsersAction({
-    formData,
-    requestHeaders: request.headers,
-    requestUrl: request.url,
-    actor: me,
-    org,
-    prisma,
-    auth,
-    hashPassword,
-    viewerAccess: {
-      setPin: (pin) => setViewerPin(context, pin),
-      revokeAllSessions: () => revokeAllViewerSessions(context),
-      resetLock: (clientKey) => resetViewerLock(context, clientKey),
-      createMagicLink: (createdByUserId, daysValid) =>
-        createViewerMagicLink(context, createdByUserId, daysValid),
-    },
-  });
+  if (action === "impersonateUser") {
+    // Impersonation goes through better-auth's admin plugin, which sets a
+    // new session cookie. We do it server-side (not via authClient in the
+    // browser) so we can enforce tenant scope here — the admin plugin
+    // itself only checks the actor's role, not the target's org.
+    const userId = String(formData.get("userId") ?? "");
+    if (!userId) {
+      return dataWithError(null, t("admin:users.errors.missingId"));
+    }
+    try {
+      await requireTargetInOrg(prisma, userId, org.id);
+    } catch (err) {
+      if (err instanceof Response) {
+        return dataWithError(null, t("admin:users.errors.userNotFound"));
+      }
+      throw err;
+    }
+
+    // Refuse nested impersonation — better-auth would silently overwrite
+    // Session.impersonatedBy and lose the original admin's identity.
+    const session = await auth.api.getSession({ headers: request.headers });
+    const impersonatedBy =
+      (session?.session as { impersonatedBy?: string | null } | undefined)
+        ?.impersonatedBy ?? null;
+    if (assertNotAlreadyImpersonating(impersonatedBy)) {
+      return dataWithError(null, t("admin:users.table.impersonateNestedError"));
+    }
+
+    const response = await auth.api.impersonateUser({
+      body: { userId },
+      headers: request.headers,
+      asResponse: true,
+    });
+    if (!response.ok) {
+      return dataWithError(null, t("admin:users.table.impersonateGenericError"));
+    }
+
+    // Forward the new-session Set-Cookie headers on a redirect to /, so the
+    // browser navigates as the impersonated user.
+    const redirectHeaders = new Headers();
+    for (const cookie of response.headers.getSetCookie?.() ?? []) {
+      redirectHeaders.append("Set-Cookie", cookie);
+    }
+    redirectHeaders.set("Location", "/");
+    return new Response(null, { status: 303, headers: redirectHeaders });
+  }
+
+  let outcome: AdminUsersActionOutcome;
+  try {
+    outcome = await handleAdminUsersAction({
+      formData,
+      requestHeaders: request.headers,
+      requestUrl: request.url,
+      actor: me,
+      org,
+      prisma,
+      auth,
+      hashPassword,
+      viewerAccess: {
+        setPin: (pin) => setViewerPin(context, pin),
+        revokeAllSessions: () => revokeAllViewerSessions(context),
+        resetLock: (clientKey) => resetViewerLock(context, clientKey),
+        createMagicLink: (createdByUserId, daysValid) =>
+          createViewerMagicLink(context, createdByUserId, daysValid),
+      },
+    });
+  } catch (err) {
+    // requireTargetInOrg throws a 404 Response on cross-tenant userId
+    // attempts. Surface as a toast instead of bubbling to the error
+    // boundary — same outcome (mutation refused) but better UX and no
+    // existence leak (404 message is identical to "user not found").
+    if (err instanceof Response && err.status === 404) {
+      return dataWithError(null, t("admin:users.errors.userNotFound"));
+    }
+    throw err;
+  }
   return dataWithToast(outcome, t);
 }
 
@@ -186,34 +244,23 @@ function BanButton({ user, currentUserId }: { user: { id: string; name: string; 
 
 function ImpersonateButton({ user, currentUserId }: { user: { id: string; name: string }; currentUserId: string }) {
   const { t } = useTranslation("admin");
-  const [isLoading, setIsLoading] = useState(false);
+  const fetcher = useFetcher();
   if (user.id === currentUserId) return null;
+  const isLoading = fetcher.state !== "idle";
 
+  // Submits server-side. The action verifies the target is in the current
+  // org, then forwards better-auth's Set-Cookie headers on a 303 to /. If
+  // tenant-scope or nested-impersonation checks fail, the route returns
+  // a toast via dataWithError instead of a redirect.
   return (
-    <Button
-      size="sm"
-      variant="ghost"
-      isDisabled={isLoading}
-      onPress={async () => {
-        setIsLoading(true);
-        const { error } = await authClient.admin.impersonateUser({ userId: user.id });
-        if (error) {
-          setIsLoading(false);
-          const code =
-            (error as { code?: string } | null | undefined)?.code ?? null;
-          const msg =
-            code === "IMPERSONATION_NESTED"
-              ? t("users.table.impersonateNestedError")
-              : t("users.table.impersonateGenericError");
-          notify.error(msg);
-        } else {
-          window.location.href = "/";
-        }
-      }}
-    >
-      <LogIn className="w-3 h-3" />
-      {isLoading ? t("users.table.impersonating") : t("users.table.impersonate")}
-    </Button>
+    <fetcher.Form method="post">
+      <input type="hidden" name="action" value="impersonateUser" />
+      <input type="hidden" name="userId" value={user.id} />
+      <Button size="sm" variant="ghost" type="submit" isDisabled={isLoading}>
+        <LogIn className="w-3 h-3" />
+        {isLoading ? t("users.table.impersonating") : t("users.table.impersonate")}
+      </Button>
+    </fetcher.Form>
   );
 }
 
