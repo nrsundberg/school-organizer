@@ -73,7 +73,17 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const prisma = getTenantPrisma(context);
   const user = getOptionalUserFromContext(context);
-  const filterRooms = new URL(request.url).searchParams.get("room");
+  const filterRoomsParam = new URL(request.url).searchParams.get("room");
+  // Cap the room filter list: this query string is attacker-controllable
+  // and feeds an `IN (?, …)` clause. 50 is well above any realistic
+  // homeroom count and well below D1's per-statement variable limit.
+  const filterRoomList = filterRoomsParam
+    ? filterRoomsParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 50)
+    : null;
 
   const today = new Date();
   const todayStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
@@ -84,7 +94,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     prisma.callEvent.findMany({
       where: {
         studentId: { not: null },
-        homeRoomSnapshot: filterRooms ? { in: filterRooms.split(",") } : undefined,
+        homeRoomSnapshot:
+          filterRoomList && filterRoomList.length > 0
+            ? { in: filterRoomList }
+            : undefined,
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 20

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Form } from "react-router";
+import { Form, Link } from "react-router";
 import { Button, Input, TextArea } from "@heroui/react";
 import { CalendarClock, Home, Megaphone, TrendingUp, UserMinus, Users } from "lucide-react";
 import { dataWithError, dataWithSuccess, dataWithWarning } from "remix-toast";
@@ -20,6 +20,7 @@ import {
   toDateInputValue,
 } from "~/domain/dismissal/schedule";
 import { buildRoiDashboardSnapshot } from "~/domain/dismissal/roi.server";
+import { chunk, chunkedFindMany, groupBy } from "~/db/chunked-in";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 import { broadcastProgramCancellation } from "~/lib/broadcast.server";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
@@ -61,49 +62,54 @@ function weekdayLabel(t: TFunction, index: number): string {
   return key ? t(`households.weekdays.${key}`) : t("households.exceptions.scheduleWeeklyFallback");
 }
 
+const HOUSEHOLDS_PAGE_SIZE = 50;
+
 export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
-  const roiRange = dateRangeFromSearchParams(new URL(request.url));
+  const url = new URL(request.url);
+  const roiRange = dateRangeFromSearchParams(url);
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
 
+  // Pagination + name search. Schools can grow into the hundreds of
+  // households; loading them all on one page is both slow and unusable.
+  const searchQuery = (url.searchParams.get("q") ?? "").trim();
+  const requestedPage = Number(url.searchParams.get("page") ?? "1");
+  const page =
+    Number.isFinite(requestedPage) && requestedPage >= 1
+      ? Math.floor(requestedPage)
+      : 1;
+  const householdSearchWhere = searchQuery
+    ? { name: { contains: searchQuery } }
+    : {};
+
+  // Avoid Prisma `include` on Household's children: with N households
+  // Prisma fans out into `WHERE householdId IN (?, …N…)` which overflows
+  // D1's bound-parameter cap once N grows past ~500. Same trap on the
+  // `activeExceptions` → household join below. Fetch parents and
+  // children separately, chunk the IN list, stitch in JS.
   const [
     households,
+    totalHouseholds,
+    householdOptions,
     unassignedStudents,
     allStudents,
     roi,
-    activeExceptions,
+    activeExceptionsRaw,
     programs,
     recentCancellations,
   ] = await Promise.all([
     prisma.household.findMany({
+      where: householdSearchWhere,
       orderBy: { name: "asc" },
-      include: {
-        students: {
-          orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            homeRoom: true,
-            spaceNumber: true,
-          },
-        },
-        exceptions: {
-          where: { isActive: true },
-          orderBy: [
-            { scheduleKind: "asc" },
-            { exceptionDate: "asc" },
-            { createdAt: "desc" },
-          ],
-          select: {
-            id: true,
-            dismissalPlan: true,
-            scheduleKind: true,
-          },
-        },
-      },
+      skip: (page - 1) * HOUSEHOLDS_PAGE_SIZE,
+      take: HOUSEHOLDS_PAGE_SIZE,
+    }),
+    prisma.household.count({ where: householdSearchWhere }),
+    prisma.household.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
     }),
     prisma.student.findMany({
       where: { householdId: null },
@@ -139,12 +145,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         dismissalPlan: true,
         pickupContactName: true,
         notes: true,
-        household: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        householdId: true,
       },
     }),
     prisma.afterSchoolProgram.findMany({
@@ -161,9 +162,117 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }),
   ]);
 
+  type HouseholdStudentRow = {
+    id: number;
+    firstName: string;
+    lastName: string;
+    homeRoom: string | null;
+    spaceNumber: number | null;
+    householdId: string | null;
+  };
+  type HouseholdExceptionRow = {
+    id: string;
+    dismissalPlan: string;
+    scheduleKind: string;
+    householdId: string | null;
+  };
+  type HouseholdRefRow = { id: string; name: string };
+  type ActiveExceptionRaw = (typeof activeExceptionsRaw)[number];
+
+  const householdIds: string[] = households.map(
+    (household: { id: string }) => household.id,
+  );
+  const exceptionHouseholdIds: string[] = Array.from(
+    new Set(
+      activeExceptionsRaw
+        .map((exception: ActiveExceptionRaw) =>
+          exception.householdId as string | null,
+        )
+        .filter((id: string | null): id is string => typeof id === "string"),
+    ),
+  );
+
+  const [householdStudents, householdExceptions, exceptionHouseholds] =
+    await Promise.all([
+      chunkedFindMany<string, HouseholdStudentRow>(householdIds, (idChunk) =>
+        prisma.student.findMany({
+          where: { householdId: { in: idChunk } },
+          orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            homeRoom: true,
+            spaceNumber: true,
+            householdId: true,
+          },
+        }) as Promise<HouseholdStudentRow[]>,
+      ),
+      chunkedFindMany<string, HouseholdExceptionRow>(householdIds, (idChunk) =>
+        prisma.dismissalException.findMany({
+          where: { householdId: { in: idChunk }, isActive: true },
+          orderBy: [
+            { scheduleKind: "asc" },
+            { exceptionDate: "asc" },
+            { createdAt: "desc" },
+          ],
+          select: {
+            id: true,
+            dismissalPlan: true,
+            scheduleKind: true,
+            householdId: true,
+          },
+        }) as Promise<HouseholdExceptionRow[]>,
+      ),
+      chunkedFindMany<string, HouseholdRefRow>(exceptionHouseholdIds, (idChunk) =>
+        prisma.household.findMany({
+          where: { id: { in: idChunk } },
+          select: { id: true, name: true },
+        }) as Promise<HouseholdRefRow[]>,
+      ),
+    ]);
+
+  const studentsByHousehold = groupBy(
+    householdStudents,
+    (student) => student.householdId ?? "",
+  );
+  const exceptionsByHousehold = groupBy(
+    householdExceptions,
+    (exception) => exception.householdId ?? "",
+  );
+  const householdLookup = new Map(
+    exceptionHouseholds.map((household) => [household.id, household] as const),
+  );
+
+  const householdsWithChildren = households.map((household: { id: string }) => ({
+    ...household,
+    students: (studentsByHousehold.get(household.id) ?? []).map(
+      ({ householdId: _ignored, ...student }) => student,
+    ),
+    exceptions: (exceptionsByHousehold.get(household.id) ?? []).map(
+      ({ householdId: _ignored, ...exception }) => exception,
+    ),
+  }));
+
+  const activeExceptions = activeExceptionsRaw.map(
+    ({ householdId, ...exception }: ActiveExceptionRaw) => ({
+      ...exception,
+      household: householdId ? householdLookup.get(householdId) ?? null : null,
+    }),
+  );
+
+  const totalPages = Math.max(1, Math.ceil(totalHouseholds / HOUSEHOLDS_PAGE_SIZE));
   return {
     metaTitle: t("households.metaTitle"),
-    households,
+    households: householdsWithChildren,
+    householdOptions,
+    pagination: {
+      page,
+      pageSize: HOUSEHOLDS_PAGE_SIZE,
+      totalHouseholds,
+      totalPages,
+      searchQuery,
+    },
     unassignedStudents,
     allStudents,
     roi,
@@ -214,10 +323,15 @@ export async function action({ request, context }: Route.ActionArgs) {
         return dataWithError(null, t("households.errors.chooseStudent"));
       }
 
-      const students = await prisma.student.findMany({
-        where: { id: { in: studentIds } },
-        select: { id: true, firstName: true, lastName: true },
-      });
+      type StudentRow = { id: number; firstName: string; lastName: string };
+      const students = await chunkedFindMany<number, StudentRow>(
+        studentIds,
+        (idChunk) =>
+          prisma.student.findMany({
+            where: { id: { in: idChunk } },
+            select: { id: true, firstName: true, lastName: true },
+          }) as Promise<StudentRow[]>,
+      );
       if (students.length === 0) {
         return dataWithError(null, t("households.errors.noMatchingStudents"));
       }
@@ -235,10 +349,12 @@ export async function action({ request, context }: Route.ActionArgs) {
         },
       });
 
-      await prisma.student.updateMany({
-        where: { id: { in: students.map((student) => student.id) } },
-        data: { householdId: household.id },
-      });
+      for (const idChunk of chunk(students.map((student) => student.id))) {
+        await prisma.student.updateMany({
+          where: { id: { in: idChunk } },
+          data: { householdId: household.id },
+        });
+      }
 
       return dataWithSuccess(
         null,
@@ -277,10 +393,12 @@ export async function action({ request, context }: Route.ActionArgs) {
         );
       }
 
-      await prisma.student.updateMany({
-        where: { id: { in: studentIds } },
-        data: { householdId },
-      });
+      for (const idChunk of chunk(studentIds)) {
+        await prisma.student.updateMany({
+          where: { id: { in: idChunk } },
+          data: { householdId },
+        });
+      }
       return dataWithSuccess(null, t("households.actions.studentAssignmentUpdated"));
     }
 
@@ -501,6 +619,8 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
   const {
     households,
+    householdOptions,
+    pagination,
     unassignedStudents,
     allStudents,
     roi,
@@ -610,7 +730,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
                 <option value="">
                   {t("households.assign.householdPlaceholder")}
                 </option>
-                {households.map((household: HouseholdRecord) => (
+                {householdOptions.map((household: { id: string; name: string }) => (
                   <option key={household.id} value={household.id}>
                     {household.name}
                   </option>
@@ -655,7 +775,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
                 <option value="">
                   {t("households.exceptions.householdPlaceholder")}
                 </option>
-                {households.map((household: HouseholdRecord) => (
+                {householdOptions.map((household: { id: string; name: string }) => (
                   <option key={household.id} value={household.id}>
                     {household.name}
                   </option>
@@ -906,18 +1026,111 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-2">
-        {households.length === 0 ? (
-          <div className="rounded-xl border border-white/10 bg-white/5 p-8 text-center text-white/50">
-            {t("households.list.empty")}
-          </div>
-        ) : (
-          households.map((household: HouseholdRecord) => (
-            <HouseholdCard key={household.id} household={household} />
-          ))
-        )}
+      <section className="flex flex-col gap-4">
+        <Form
+          method="get"
+          className="flex flex-wrap items-end gap-2"
+          role="search"
+        >
+          <Field label={t("households.search.label")}>
+            <Input
+              name="q"
+              type="search"
+              defaultValue={pagination.searchQuery}
+              placeholder={t("households.search.placeholder")}
+              className="min-w-64"
+            />
+          </Field>
+          <Button type="submit" variant="secondary">
+            {t("households.search.submit")}
+          </Button>
+          {pagination.searchQuery ? (
+            <Link
+              to="?"
+              className="rounded-full border border-white/15 px-3 py-2 text-sm text-white/70 hover:border-white/30 hover:text-white"
+            >
+              {t("households.search.clear")}
+            </Link>
+          ) : null}
+          <p className="ml-auto text-sm text-white/50">
+            {t("households.pagination.totalCount", {
+              count: pagination.totalHouseholds,
+            })}
+          </p>
+        </Form>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          {households.length === 0 ? (
+            <div className="rounded-xl border border-white/10 bg-white/5 p-8 text-center text-white/50 xl:col-span-2">
+              {pagination.searchQuery
+                ? t("households.list.noResults", {
+                    query: pagination.searchQuery,
+                  })
+                : t("households.list.empty")}
+            </div>
+          ) : (
+            households.map((household: HouseholdRecord) => (
+              <HouseholdCard key={household.id} household={household} />
+            ))
+          )}
+        </div>
+
+        {pagination.totalPages > 1 ? (
+          <HouseholdsPaginationControls pagination={pagination} t={t} />
+        ) : null}
       </section>
     </div>
+  );
+}
+
+function HouseholdsPaginationControls({
+  pagination,
+  t,
+}: {
+  pagination: LoaderData["pagination"];
+  t: TFunction;
+}) {
+  const { page, totalPages, searchQuery } = pagination;
+  const buildHref = (targetPage: number) => {
+    const params = new URLSearchParams();
+    if (targetPage > 1) params.set("page", String(targetPage));
+    if (searchQuery) params.set("q", searchQuery);
+    const qs = params.toString();
+    return qs ? `?${qs}` : "?";
+  };
+  const prevPage = page > 1 ? page - 1 : null;
+  const nextPage = page < totalPages ? page + 1 : null;
+  return (
+    <nav
+      className="flex items-center justify-between gap-3 text-sm"
+      aria-label={t("households.pagination.ariaLabel")}
+    >
+      {prevPage ? (
+        <Link
+          to={buildHref(prevPage)}
+          rel="prev"
+          className="rounded-full border border-white/15 px-3 py-1 text-white/80 hover:border-white/30 hover:text-white"
+        >
+          {t("households.pagination.prev")}
+        </Link>
+      ) : (
+        <span aria-hidden="true" />
+      )}
+      <p className="text-white/60">
+        {t("households.pagination.pageOf", { page, totalPages })}
+      </p>
+      {nextPage ? (
+        <Link
+          to={buildHref(nextPage)}
+          rel="next"
+          className="rounded-full border border-white/15 px-3 py-1 text-white/80 hover:border-white/30 hover:text-white"
+        >
+          {t("households.pagination.next")}
+        </Link>
+      ) : (
+        <span aria-hidden="true" />
+      )}
+    </nav>
   );
 }
 

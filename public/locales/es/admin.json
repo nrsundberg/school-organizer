@@ -542,6 +542,7 @@
       "exceptions_one": " · {{count}} excepción activa",
       "exceptions_other": " · {{count}} excepciones activas",
       "noHomeroom": "Sin salón principal",
+      "noResults": "No hay hogares que coincidan con \"{{query}}\".",
       "noSpace": "Sin espacio",
       "noStudentsAssigned": "No hay estudiantes asignados.",
       "savePickupContext": "Guardar contexto de recogida",
@@ -550,6 +551,20 @@
       "students_other": "{{count}} estudiantes"
     },
     "metaTitle": "Administración – Hogares",
+    "pagination": {
+      "ariaLabel": "Paginación de la lista de hogares",
+      "next": "Siguiente",
+      "pageOf": "Página {{page}} de {{totalPages}}",
+      "prev": "Anterior",
+      "totalCount_one": "{{count}} hogar",
+      "totalCount_other": "{{count}} hogares"
+    },
+    "search": {
+      "clear": "Limpiar",
+      "label": "Buscar hogares",
+      "placeholder": "Buscar por nombre",
+      "submit": "Buscar"
+    },
     "roi": {
       "assumptions": "Supuestos: {{minutes}} minutos por llamada de familia evitada, {{exceptions}} llamada evitada por cada ocurrencia de excepción y {{cancellations}} llamadas evitadas por cada cancelación de programa.",
       "eyebrow": "Resumen de ROI familiar",

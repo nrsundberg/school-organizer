@@ -582,6 +582,7 @@
       "exceptions_one": " · {{count}} active exception",
       "exceptions_other": " · {{count}} active exceptions",
       "noHomeroom": "No homeroom",
+      "noResults": "No households match \"{{query}}\".",
       "noSpace": "No space",
       "noStudentsAssigned": "No students assigned.",
       "savePickupContext": "Save pickup context",
@@ -590,6 +591,20 @@
       "students_other": "{{count}} students"
     },
     "metaTitle": "Admin – Households",
+    "pagination": {
+      "ariaLabel": "Household list pagination",
+      "next": "Next",
+      "pageOf": "Page {{page}} of {{totalPages}}",
+      "prev": "Previous",
+      "totalCount_one": "{{count}} household",
+      "totalCount_other": "{{count}} households"
+    },
+    "search": {
+      "clear": "Clear",
+      "label": "Search households",
+      "placeholder": "Search by name",
+      "submit": "Search"
+    },
     "roi": {
       "assumptions": "Assumptions: {{minutes}} minutes per avoided family call, {{exceptions}} call avoided per exception occurrence, and {{cancellations}} calls avoided per program cancellation.",
       "eyebrow": "Family ROI snapshot",
