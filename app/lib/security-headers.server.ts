@@ -12,7 +12,10 @@
  *   `.has()` before being written.
  * - `Strict-Transport-Security` is skipped in development so `localhost`
  *   and `*.workers.dev` preview URLs don't end up HSTS-pinned in the
- *   browser. All other headers apply in every environment.
+ *   browser. The CSP `upgrade-insecure-requests` directive is similarly
+ *   skipped in dev — see the comment in `buildEnforcingCsp` for the
+ *   WebKit-on-plain-HTTP failure mode it triggers. Other headers apply
+ *   in every environment.
  * - CSP ships enforcing. Scripts use a per-request nonce threaded through
  *   React Router SSR; styles keep `'unsafe-inline'` because third-party UI
  *   libraries in this app still inject inline style attributes/tags at
@@ -43,8 +46,8 @@
  *   `X-Frame-Options: DENY` and is honored by modern browsers in
  *   preference to the legacy header.
  */
-function buildEnforcingCsp(cspNonce: string): string {
-  return [
+function buildEnforcingCsp(cspNonce: string, isDev: boolean): string {
+  const directives = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${cspNonce}' https://js.stripe.com`,
     "style-src 'self' 'unsafe-inline'",
@@ -55,9 +58,21 @@ function buildEnforcingCsp(cspNonce: string): string {
     "base-uri 'self'",
     "form-action 'self' https://checkout.stripe.com https://billing.stripe.com",
     "frame-ancestors 'none'",
-    "object-src 'none'",
-    "upgrade-insecure-requests"
-  ].join("; ");
+    "object-src 'none'"
+  ];
+  // `upgrade-insecure-requests` is a no-op on prod (already HTTPS) but it
+  // breaks WebKit (iPhone Safari, Linux WPE WebKit used by Playwright) when
+  // the page is loaded over plain HTTP: WebKit upgrades every subresource
+  // request to https://, the dev/CI server has no TLS, and the JS bundle
+  // fails to load with "TLS error caused the secure connection to fail".
+  // Hydration never runs and i18n keys stay literal forever. Chrome treats
+  // http://localhost as a potentially-trustworthy URL and skips the upgrade,
+  // which is why the bug is invisible there. Skip the directive in dev so
+  // the same WebKit code paths Playwright exercises in CI also work locally.
+  if (!isDev) {
+    directives.push("upgrade-insecure-requests");
+  }
+  return directives.join("; ");
 }
 
 const HSTS_VALUE = "max-age=63072000; includeSubDomains; preload";
@@ -96,13 +111,19 @@ export function applySecurityHeaders(
     setIfMissing(headers, name, value);
   }
 
+  const isDev = env.ENVIRONMENT === "development";
+
   // HSTS only in prod. Localhost, wrangler dev, and preview workers.dev
   // URLs should not burn HSTS pins into browsers.
-  if (env.ENVIRONMENT !== "development") {
+  if (!isDev) {
     setIfMissing(headers, "Strict-Transport-Security", HSTS_VALUE);
   }
 
-  setIfMissing(headers, "Content-Security-Policy", buildEnforcingCsp(cspNonce));
+  setIfMissing(
+    headers,
+    "Content-Security-Policy",
+    buildEnforcingCsp(cspNonce, isDev)
+  );
 
   return new Response(response.body, {
     status: response.status,

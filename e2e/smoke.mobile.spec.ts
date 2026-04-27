@@ -89,6 +89,16 @@ async function smokeMobile(page: import("@playwright/test").Page, spec: RouteSpe
   assertNotServerError(spec.path, response);
   assertAllowedFinalPath(spec, page.url());
   await assertLandmark(page, spec);
+  // Settle i18n hydration before measuring horizontal overflow. SSR ships
+  // raw translation keys (e.g. "forgotPassword.emailPlaceholder") which are
+  // significantly longer than the resolved English copy; on routes whose
+  // landmark spec is generic enough (`role: heading`) to match the SSR
+  // literal-key heading, `assertLandmark` returns before the http backend's
+  // `/locales/{lng}/{ns}.json` fetches finish, and `scrollWidth` ends up
+  // measuring the inflated literal-key layout. Waiting for networkidle
+  // gives those fetches time to complete; we swallow the timeout because
+  // some routes legitimately keep network busy (e.g. status-page polling).
+  await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
   await assertNoHorizontalOverflow(page, spec);
 
   if (pageErrors.length > 0) {
