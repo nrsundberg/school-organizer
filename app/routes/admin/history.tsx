@@ -158,7 +158,30 @@ function csvEscape(value: string | number | null | undefined): string {
   return s;
 }
 
-function buildCsv(rows: CallEventRow[]): string {
+async function resolveActorNames(
+  prisma: ReturnType<typeof getTenantPrisma>,
+  rows: CallEventRow[],
+): Promise<Map<string, string>> {
+  const actorIds = new Set<string>();
+  for (const r of rows) {
+    if (r.actorUserId) actorIds.add(r.actorUserId);
+  }
+  if (!actorIds.size) return new Map();
+  const users = await prisma.user.findMany({
+    where: { id: { in: Array.from(actorIds) } },
+    select: { id: true, name: true },
+  });
+  const out = new Map<string, string>();
+  for (const u of users) {
+    if (u.name && u.name.trim() !== "") out.set(u.id, u.name);
+  }
+  return out;
+}
+
+function buildCsv(
+  rows: CallEventRow[],
+  actorNameById: Map<string, string>,
+): string {
   const header = [
     "createdAt",
     "studentName",
@@ -166,6 +189,7 @@ function buildCsv(rows: CallEventRow[]): string {
     "spaceNumber",
     "studentId",
     "actorUserId",
+    "actorUserName",
     "onBehalfOfUserId",
   ].join(",");
   const body = rows
@@ -177,6 +201,9 @@ function buildCsv(rows: CallEventRow[]): string {
         csvEscape(r.spaceNumber),
         csvEscape(r.studentId ?? ""),
         csvEscape(r.actorUserId ?? ""),
+        csvEscape(
+          r.actorUserId ? actorNameById.get(r.actorUserId) ?? "" : "",
+        ),
         csvEscape(r.onBehalfOfUserId ?? ""),
       ].join(","),
     )
@@ -267,7 +294,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   if (isCsv) {
     const rows = await fetchCallEvents(prisma, filters, {});
-    const csv = buildCsv(rows);
+    const actorNameById = await resolveActorNames(prisma, rows);
+    const csv = buildCsv(rows, actorNameById);
     const filename = `call-history-${filters.fromIso}-${filters.toIso}.csv`;
     return new Response(csv, {
       status: 200,
@@ -283,6 +311,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const fetched = await fetchCallEvents(prisma, filters, { limit: ROW_CAP });
   const truncated = fetched.length > ROW_CAP;
   const rows = truncated ? fetched.slice(0, ROW_CAP) : fetched;
+
+  // Resolve actor user IDs to display names so the table can show the human
+  // name with the opaque id revealed on hover. One batched query regardless
+  // of row count.
+  const actorNameById = await resolveActorNames(prisma, rows);
 
   // Summary is computed over the rendered (possibly truncated) result set.
   // If the user hit truncation, the UI notice tells them so; a full summary
@@ -324,6 +357,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       spaceNumber: r.spaceNumber,
       studentId: r.studentId,
       actorUserId: r.actorUserId,
+      actorUserName: r.actorUserId
+        ? actorNameById.get(r.actorUserId) ?? null
+        : null,
       onBehalfOfUserId: r.onBehalfOfUserId,
     })),
     truncated,
@@ -526,8 +562,11 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
                       <TableCell>
                         {row.actorUserId ? (
                           <span className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-xs text-white/80">
-                              {row.actorUserId}
+                            <span
+                              className="text-sm text-white/80"
+                              title={row.actorUserId}
+                            >
+                              {row.actorUserName ?? row.actorUserId}
                             </span>
                             {row.onBehalfOfUserId && (
                               <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-200">
