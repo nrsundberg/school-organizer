@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useActionData, useNavigation } from "react-router";
 import { Button } from "@heroui/react";
 import { data } from "react-router";
-import { dataWithError, dataWithSuccess } from "remix-toast";
+import { dataWithError, redirectWithSuccess } from "remix-toast";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/branding";
 import { getPrisma } from "~/db.server";
@@ -211,7 +211,10 @@ export async function action({ request, context }: Route.ActionArgs) {
     });
   }
 
-  return dataWithSuccess(null, t("branding.saved"));
+  // Redirect, not data: under single-fetch, action+loader share one request, so
+  // a toast cookie set by `dataWithSuccess` is invisible to the same loader and
+  // shows one click late.
+  return redirectWithSuccess("/admin/branding", t("branding.saved"));
 }
 
 export default function AdminBranding({ loaderData }: Route.ComponentProps) {
