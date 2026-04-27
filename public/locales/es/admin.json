@@ -301,6 +301,13 @@
       "teacherFanoutHint_other": "{{count}} docentes se completarán automáticamente"
     },
     "list": {
+      "activeBanner": {
+        "confirmEnd": "¿Terminar el simulacro en vivo ahora?",
+        "endDrill": "Terminar simulacro",
+        "endedToast": "Simulacro terminado.",
+        "openLive": "Abrir página en vivo",
+        "startedAt": "Iniciado {{when}}"
+      },
       "confirmDelete": "¿Eliminar esta plantilla?",
       "createBlank": "Crear en blanco",
       "delete": "Eliminar",

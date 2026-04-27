@@ -17,7 +17,9 @@ import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
 import {
   isDrillRunStatus,
+  parseDrillAudience,
   parseDrillMode,
+  type DrillAudience,
   type DrillMode,
   type DrillRunStatus,
 } from "~/domain/drills/types";
@@ -42,6 +44,7 @@ type HistoryRow = {
   status: DrillRunStatus;
   /** "DRILL" | "ACTUAL" | "FALSE_ALARM" — captured at start time. */
   mode: DrillMode;
+  audience: DrillAudience;
   createdAtIso: string;
   activatedAtIso: string | null;
   endedAtIso: string | null;
@@ -92,6 +95,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       templateName: r.template?.name ?? "(deleted template)",
       status,
       mode: parseDrillMode(r.mode),
+      audience: parseDrillAudience(r.audience),
       createdAtIso: r.createdAt.toISOString(),
       activatedAtIso: r.activatedAt ? r.activatedAt.toISOString() : null,
       endedAtIso: r.endedAt ? r.endedAt.toISOString() : null,
@@ -197,6 +201,23 @@ function StatusChip({ status }: { status: DrillRunStatus }) {
   );
 }
 
+function AudienceChip({ audience }: { audience: DrillAudience }) {
+  const { t } = useTranslation("admin");
+  const cls =
+    audience === "STAFF_ONLY"
+      ? "bg-blue-500/20 text-blue-200 border border-blue-500/40"
+      : "bg-white/10 text-white/70 border border-white/20";
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}
+    >
+      {audience === "STAFF_ONLY"
+        ? t("drillsHistory.replay.audience.staffOnly")
+        : t("drillsHistory.replay.audience.everyone")}
+    </span>
+  );
+}
+
 export default function AdminDrillsHistory({
   loaderData,
 }: Route.ComponentProps) {
@@ -240,6 +261,7 @@ export default function AdminDrillsHistory({
                 <TableColumn>{t("drillsHistory.table.duration")}</TableColumn>
                 <TableColumn>{t("drillsHistory.table.mode")}</TableColumn>
                 <TableColumn>{t("drillsHistory.table.status")}</TableColumn>
+                <TableColumn>{t("drillsHistory.table.audience")}</TableColumn>
                 <TableColumn>{t("drillsHistory.table.actor")}</TableColumn>
                 <TableColumn>{t("drillsHistory.table.signoff")}</TableColumn>
               </TableHeader>
@@ -275,6 +297,9 @@ export default function AdminDrillsHistory({
                     </TableCell>
                     <TableCell>
                       <StatusChip status={row.status} />
+                    </TableCell>
+                    <TableCell>
+                      <AudienceChip audience={row.audience} />
                     </TableCell>
                     <TableCell>
                       {row.lastActorUserId ? (

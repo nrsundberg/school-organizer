@@ -301,6 +301,13 @@
       "teacherFanoutHint_other": "{{count}} teachers will be auto-filled"
     },
     "list": {
+      "activeBanner": {
+        "confirmEnd": "End the live drill now?",
+        "endDrill": "End drill",
+        "endedToast": "Drill ended.",
+        "openLive": "Open live page",
+        "startedAt": "Started {{when}}"
+      },
       "confirmDelete": "Delete this template?",
       "createBlank": "Create blank",
       "delete": "Delete",
@@ -451,6 +458,7 @@
     "table": {
       "actor": "Actor",
       "ariaLabel": "Drill run history",
+      "audience": "Audience",
       "duration": "Duration",
       "ended": "Ended",
       "mode": "Mode",
