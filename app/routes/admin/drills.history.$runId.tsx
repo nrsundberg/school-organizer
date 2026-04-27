@@ -10,9 +10,11 @@ import {
 import {
   emptyRunState,
   isDrillRunStatus,
+  parseDrillAudience,
   parseDrillEventPayload,
   parseRunState,
   parseTemplateDefinition,
+  type DrillAudience,
   type DrillRunStatus,
   type RunState,
 } from "~/domain/drills/types";
@@ -164,6 +166,7 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
     run: {
       id: run.id,
       status,
+      audience: parseDrillAudience(run.audience),
       state: run.state,
       startedIso: start.toISOString(),
       endedIso: end ? end.toISOString() : null,
@@ -198,6 +201,23 @@ function StatusChip({ status }: { status: DrillRunStatus }) {
         />
       )}
       {t(`drillsHistory.status.${status}`)}
+    </span>
+  );
+}
+
+function AudienceChip({ audience }: { audience: DrillAudience }) {
+  const { t } = useTranslation("admin");
+  const cls =
+    audience === "STAFF_ONLY"
+      ? "bg-blue-500/20 text-blue-200 border border-blue-500/40"
+      : "bg-white/10 text-white/70 border border-white/20";
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}
+    >
+      {audience === "STAFF_ONLY"
+        ? t("drillsHistory.replay.audience.staffOnly")
+        : t("drillsHistory.replay.audience.everyone")}
     </span>
   );
 }
@@ -242,6 +262,7 @@ export default function AdminDrillsHistoryReplay({
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold text-white">{template.name}</h1>
           <StatusChip status={run.status} />
+          <AudienceChip audience={run.audience} />
         </div>
         <p className="text-white/50 text-sm mt-1">
           {t("drillsHistory.replay.subhead", {

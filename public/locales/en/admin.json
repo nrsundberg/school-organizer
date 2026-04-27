@@ -383,6 +383,10 @@
       "noItems": "No follow-up items recorded.",
       "noNotes": "No notes recorded.",
       "notesHeading": "Notes",
+      "audience": {
+        "everyone": "Audience: Everyone",
+        "staffOnly": "Audience: Staff only"
+      },
       "print": "Print",
       "subhead": "Run on {{started}} · {{duration}}",
       "timeline": {

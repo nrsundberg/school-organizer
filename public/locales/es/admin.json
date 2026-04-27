@@ -365,6 +365,10 @@
         "unknownActor": "desconocido",
         "viaImpersonator": "vía {{admin}}"
       },
+      "audience": {
+        "everyone": "Audiencia: Todos",
+        "staffOnly": "Audiencia: Solo personal"
+      },
       "liveRunNotice": "La reproducción estará disponible después de que finalice el simulacro.",
       "timeline": {
         "ariaLabel": "Línea de tiempo de la reproducción del simulacro",
