@@ -134,6 +134,39 @@ export function parseDrillAudience(v: unknown): DrillAudience {
   return isDrillAudience(v) ? v : "EVERYONE";
 }
 
+/**
+ * Drill mode — distinguishes planned exercises from real events captured in
+ * the same UI. State DOEs typically require this distinction for compliance.
+ * "DRILL" is the historical default; everything before this feature shipped
+ * was, by definition, a drill.
+ */
+export type DrillMode = "DRILL" | "ACTUAL" | "FALSE_ALARM";
+
+export const DRILL_MODES: readonly DrillMode[] = [
+  "DRILL",
+  "ACTUAL",
+  "FALSE_ALARM",
+] as const;
+
+export const DRILL_MODE_LABELS: Record<DrillMode, string> = {
+  DRILL: "Drill",
+  ACTUAL: "Real event",
+  FALSE_ALARM: "False alarm",
+};
+
+export function isDrillMode(v: unknown): v is DrillMode {
+  return v === "DRILL" || v === "ACTUAL" || v === "FALSE_ALARM";
+}
+
+/**
+ * Coerce arbitrary input (DB column read, form value) to a `DrillMode`,
+ * defaulting to "DRILL" so older rows / corrupt input read as planned
+ * exercises (matches the column default and pre-feature semantics).
+ */
+export function parseDrillMode(v: unknown): DrillMode {
+  return isDrillMode(v) ? v : "DRILL";
+}
+
 export interface ActionItem {
   id: string;
   text: string;
@@ -167,6 +200,32 @@ export function cycleToggle(cur: ToggleValue | null | undefined): ToggleValue | 
   return "positive";
 }
 
+/**
+ * One classroom's "I'm accounted for" attestation, captured per-row on the
+ * shared run sheet. Lets each teacher (or the staffer holding their phone)
+ * sign off "all 22 of my kids are here / I have an issue" without forcing
+ * everyone to share the same toggle column. The shared-spreadsheet model
+ * (toggles / notes / actionItems) stays untouched — this is purely an
+ * additive overlay layered on top.
+ *
+ *   - byUserId   — actor's user id when the click happened on the staff
+ *                  side; null on viewer-pin / anonymous clicks.
+ *   - byLabel    — display name to show inline ("Mrs. Smith", "Room 204").
+ *                  Always populated so the row always renders something
+ *                  even when byUserId is null.
+ *   - attestedAt — ISO timestamp; renders as HH:MM next to the byLabel.
+ *   - status     — "all-clear" by default; flipped to "issue" when the
+ *                  teacher needs to flag a missing student / problem.
+ *   - note       — optional free-text shown next to "issue" attestations.
+ */
+export interface ClassroomAttestation {
+  byUserId: string | null;
+  byLabel: string;
+  attestedAt: string;
+  status: "all-clear" | "issue";
+  note?: string;
+}
+
 export interface RunState {
   /**
    * Map of `${rowId}:${colId}` → ToggleValue. Keys missing from the map
@@ -176,6 +235,13 @@ export interface RunState {
   toggles: Record<string, ToggleValue>;
   notes: string;
   actionItems: ActionItem[];
+  /**
+   * Per-classroom attestation overlay, keyed by the row id from the
+   * template definition (one row = one classroom). Missing key means the
+   * row hasn't been attested yet. Older RunState payloads predate this
+   * field — `parseRunState` defaults missing/garbage entries to `{}`.
+   */
+  classroomAttestations: Record<string, ClassroomAttestation>;
 }
 
 function newId(): string {
@@ -208,7 +274,12 @@ export function defaultTemplateDefinition(): TemplateDefinition {
 }
 
 export function emptyRunState(): RunState {
-  return { toggles: {}, notes: "", actionItems: [] };
+  return {
+    toggles: {},
+    notes: "",
+    actionItems: [],
+    classroomAttestations: {},
+  };
 }
 
 export function toggleKey(rowId: string, columnId: string): string {
@@ -295,7 +366,9 @@ export type DrillEventKind =
   | "action_added"
   | "action_edited"
   | "action_toggled"
-  | "action_removed";
+  | "action_removed"
+  | "row_attested"
+  | "row_unattested";
 
 export type DrillEventPayload =
   | { kind: "started"; initialState: RunState }
@@ -312,7 +385,18 @@ export type DrillEventPayload =
   | { kind: "action_added"; item: ActionItem }
   | { kind: "action_edited"; id: string; prev: string; next: string }
   | { kind: "action_toggled"; id: string; prev: boolean; next: boolean }
-  | { kind: "action_removed"; id: string };
+  | { kind: "action_removed"; id: string }
+  | {
+      kind: "row_attested";
+      rowId: string;
+      prev: ClassroomAttestation | null;
+      next: ClassroomAttestation;
+    }
+  | {
+      kind: "row_unattested";
+      rowId: string;
+      prev: ClassroomAttestation;
+    };
 
 export function isDrillEventKind(v: unknown): v is DrillEventKind {
   return (
@@ -325,7 +409,9 @@ export function isDrillEventKind(v: unknown): v is DrillEventKind {
     v === "action_added" ||
     v === "action_edited" ||
     v === "action_toggled" ||
-    v === "action_removed"
+    v === "action_removed" ||
+    v === "row_attested" ||
+    v === "row_unattested"
   );
 }
 
@@ -342,6 +428,36 @@ function parseActionItem(raw: unknown): ActionItem | null {
     text: typeof r.text === "string" ? r.text : "",
     done: !!r.done,
   };
+}
+
+/**
+ * Coerce arbitrary stored value into a `ClassroomAttestation`. Returns
+ * `null` when the input can't be salvaged so callers (parseRunState,
+ * parseDrillEventPayload) can drop the row defensively rather than render
+ * a partial entry.
+ */
+function parseClassroomAttestation(raw: unknown): ClassroomAttestation | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Partial<ClassroomAttestation> & { byUserId?: unknown };
+  // attestedAt + byLabel are the two display-load-bearing fields; if either
+  // is missing we'd render "✓ undefined @ NaN", so drop the entry.
+  if (typeof r.attestedAt !== "string" || typeof r.byLabel !== "string") {
+    return null;
+  }
+  const status: ClassroomAttestation["status"] =
+    r.status === "issue" ? "issue" : "all-clear";
+  const byUserId =
+    typeof r.byUserId === "string" && r.byUserId.length > 0 ? r.byUserId : null;
+  const out: ClassroomAttestation = {
+    byUserId,
+    byLabel: r.byLabel,
+    attestedAt: r.attestedAt,
+    status,
+  };
+  if (typeof r.note === "string" && r.note.length > 0) {
+    out.note = r.note;
+  }
+  return out;
 }
 
 /**
@@ -406,6 +522,21 @@ export function parseDrillEventPayload(
       if (!id) return null;
       return { kind, id };
     }
+    case "row_attested": {
+      const rowId = typeof p.rowId === "string" ? p.rowId : null;
+      if (!rowId) return null;
+      const next = parseClassroomAttestation(p.next);
+      if (!next) return null;
+      const prev = parseClassroomAttestation(p.prev);
+      return { kind, rowId, prev, next };
+    }
+    case "row_unattested": {
+      const rowId = typeof p.rowId === "string" ? p.rowId : null;
+      if (!rowId) return null;
+      const prev = parseClassroomAttestation(p.prev);
+      if (!prev) return null;
+      return { kind, rowId, prev };
+    }
   }
 }
 
@@ -444,5 +575,24 @@ export function parseRunState(raw: Prisma.JsonValue): RunState {
           done: !!a.done,
         }))
     : [];
-  return { toggles, notes, actionItems };
+  // Per-classroom attestation overlay. Older RunState payloads predate
+  // the field; treat missing/garbage as `{}`. Each entry is run through
+  // the per-attestation coercer so a single corrupt row doesn't poison
+  // the rest of the overlay.
+  const classroomAttestations: Record<string, ClassroomAttestation> = {};
+  if (
+    s.classroomAttestations &&
+    typeof s.classroomAttestations === "object" &&
+    !Array.isArray(s.classroomAttestations)
+  ) {
+    for (const [rowId, val] of Object.entries(
+      s.classroomAttestations as Record<string, unknown>,
+    )) {
+      const parsed = parseClassroomAttestation(val);
+      if (parsed) {
+        classroomAttestations[rowId] = parsed;
+      }
+    }
+  }
+  return { toggles, notes, actionItems, classroomAttestations };
 }

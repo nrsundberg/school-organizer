@@ -3,18 +3,22 @@ import assert from "node:assert/strict";
 import {
   DRILL_AUDIENCES,
   DRILL_AUDIENCE_LABELS,
+  DRILL_MODES,
+  DRILL_MODE_LABELS,
   DRILL_TYPES,
   DRILL_TYPE_LABELS,
   defaultTemplateDefinition,
   isDrillAudience,
+  isDrillMode,
   isDrillRunStatus,
   isDrillType,
   parseDrillAudience,
+  parseDrillMode,
   parseRunState,
   parseTemplateDefinition,
   toggleKey,
 } from "./types";
-import type { DrillAudience } from "./types";
+import type { DrillAudience, DrillMode } from "./types";
 
 describe("parseTemplateDefinition", () => {
   it("passes valid columns/rows/sections through", () => {
@@ -144,19 +148,27 @@ describe("parseRunState", () => {
     assert.deepEqual(out.toggles, {});
     assert.equal(out.notes, "");
     assert.deepEqual(out.actionItems, []);
+    assert.deepEqual(out.classroomAttestations, {});
   });
 
   it("garbage input → emptyRunState", () => {
-    assert.deepEqual(parseRunState(null), { toggles: {}, notes: "", actionItems: [] });
+    assert.deepEqual(parseRunState(null), {
+      toggles: {},
+      notes: "",
+      actionItems: [],
+      classroomAttestations: {},
+    });
     assert.deepEqual(parseRunState("nope" as unknown as null), {
       toggles: {},
       notes: "",
       actionItems: [],
+      classroomAttestations: {},
     });
     assert.deepEqual(parseRunState(7 as unknown as null), {
       toggles: {},
       notes: "",
       actionItems: [],
+      classroomAttestations: {},
     });
   });
 
@@ -176,6 +188,113 @@ describe("parseRunState", () => {
     assert.equal(out.actionItems[1].id, "a2");
     assert.equal(out.actionItems[1].text, "");
     assert.equal(out.actionItems[1].done, false);
+  });
+
+  // --- classroomAttestations migration / coercion ---------------------
+  // Older runs predate the field, so absence must round-trip to `{}`.
+  // Garbage entries inside an otherwise-valid map must be dropped without
+  // poisoning siblings, and known-good entries must come through verbatim.
+
+  it("legacy state without classroomAttestations defaults to empty map", () => {
+    const out = parseRunState({
+      toggles: {},
+      notes: "n",
+      actionItems: [],
+    } as object);
+    assert.deepEqual(out.classroomAttestations, {});
+  });
+
+  it("classroomAttestations as null/array/string falls back to empty map", () => {
+    assert.deepEqual(
+      parseRunState({ classroomAttestations: null } as object).classroomAttestations,
+      {},
+    );
+    assert.deepEqual(
+      parseRunState({ classroomAttestations: [1, 2, 3] } as object).classroomAttestations,
+      {},
+    );
+    assert.deepEqual(
+      parseRunState({ classroomAttestations: "garbage" } as object).classroomAttestations,
+      {},
+    );
+  });
+
+  it("preserves valid classroomAttestation entries verbatim", () => {
+    const out = parseRunState({
+      classroomAttestations: {
+        "row-1": {
+          byUserId: "user-abc",
+          byLabel: "Mrs. Smith",
+          attestedAt: "2025-04-27T15:32:00.000Z",
+          status: "all-clear",
+        },
+        "row-2": {
+          byUserId: null,
+          byLabel: "Room 204",
+          attestedAt: "2025-04-27T15:33:00.000Z",
+          status: "issue",
+          note: "Missing one student",
+        },
+      },
+    } as object);
+    assert.deepEqual(out.classroomAttestations["row-1"], {
+      byUserId: "user-abc",
+      byLabel: "Mrs. Smith",
+      attestedAt: "2025-04-27T15:32:00.000Z",
+      status: "all-clear",
+    });
+    assert.deepEqual(out.classroomAttestations["row-2"], {
+      byUserId: null,
+      byLabel: "Room 204",
+      attestedAt: "2025-04-27T15:33:00.000Z",
+      status: "issue",
+      note: "Missing one student",
+    });
+  });
+
+  it("drops garbage attestation entries without affecting valid siblings", () => {
+    const out = parseRunState({
+      classroomAttestations: {
+        good: {
+          byUserId: "u1",
+          byLabel: "Mrs. Lee",
+          attestedAt: "2025-04-27T15:32:00.000Z",
+          status: "all-clear",
+        },
+        // Missing attestedAt → drop
+        "bad-1": { byLabel: "no time" },
+        // Missing byLabel → drop
+        "bad-2": { attestedAt: "2025-04-27T15:33:00.000Z" },
+        // Not an object → drop
+        "bad-3": 42,
+        // Status falls back to all-clear when garbage
+        weird: {
+          byLabel: "X",
+          attestedAt: "2025-04-27T15:34:00.000Z",
+          status: "purple",
+        },
+      },
+    } as object);
+    assert.deepEqual(Object.keys(out.classroomAttestations).sort(), ["good", "weird"]);
+    assert.equal(out.classroomAttestations["weird"].status, "all-clear");
+    // Coerces non-string byUserId to null.
+    assert.equal(out.classroomAttestations["weird"].byUserId, null);
+  });
+
+  it("strips an empty-string note rather than carrying it through", () => {
+    const out = parseRunState({
+      classroomAttestations: {
+        r1: {
+          byUserId: null,
+          byLabel: "X",
+          attestedAt: "2025-04-27T15:32:00.000Z",
+          status: "issue",
+          note: "",
+        },
+      },
+    } as object);
+    // note is optional; empty strings should not be persisted as a key.
+    assert.equal("note" in out.classroomAttestations.r1, false);
   });
 });
 
@@ -259,5 +378,48 @@ describe("DrillAudience", () => {
     const labels: Record<DrillAudience, string> = DRILL_AUDIENCE_LABELS;
     assert.equal(typeof labels.STAFF_ONLY, "string");
     assert.equal(typeof labels.EVERYONE, "string");
+  });
+});
+
+describe("DrillMode", () => {
+  it("isDrillMode accepts every defined mode", () => {
+    for (const m of DRILL_MODES) {
+      assert.equal(isDrillMode(m), true, `isDrillMode rejected ${m}`);
+    }
+  });
+
+  it("isDrillMode rejects garbage", () => {
+    assert.equal(isDrillMode("drill"), false); // case-sensitive
+    assert.equal(isDrillMode(""), false);
+    assert.equal(isDrillMode("REAL"), false);
+    assert.equal(isDrillMode(null), false);
+    assert.equal(isDrillMode(42), false);
+    assert.equal(isDrillMode({} as unknown), false);
+  });
+
+  it("parseDrillMode round-trips every valid mode", () => {
+    for (const m of DRILL_MODES) {
+      assert.equal(parseDrillMode(m), m);
+    }
+  });
+
+  it("parseDrillMode defaults invalid input to DRILL", () => {
+    // Matches the schema column default — older rows / bad form input read
+    // back as a planned drill rather than escalating to ACTUAL.
+    assert.equal(parseDrillMode(null), "DRILL");
+    assert.equal(parseDrillMode(undefined), "DRILL");
+    assert.equal(parseDrillMode(""), "DRILL");
+    assert.equal(parseDrillMode("actual"), "DRILL"); // case-sensitive
+    assert.equal(parseDrillMode("REAL"), "DRILL");
+    assert.equal(parseDrillMode(42), "DRILL");
+  });
+
+  it("DRILL_MODE_LABELS has an entry for every mode and no extras", () => {
+    const labels: Record<DrillMode, string> = DRILL_MODE_LABELS;
+    for (const m of DRILL_MODES) {
+      assert.ok(labels[m], `DRILL_MODE_LABELS missing ${m}`);
+      assert.equal(typeof labels[m], "string");
+    }
+    assert.equal(Object.keys(labels).length, DRILL_MODES.length);
   });
 });

@@ -8,14 +8,19 @@ import {
   TableHeader,
   TableRow,
 } from "@heroui/react";
-import { History } from "lucide-react";
+import { BadgeCheck, History } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills.history";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getTenantPrisma } from "~/domain/utils/global-context.server";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
-import { isDrillRunStatus, type DrillRunStatus } from "~/domain/drills/types";
+import {
+  isDrillRunStatus,
+  parseDrillMode,
+  type DrillMode,
+  type DrillRunStatus,
+} from "~/domain/drills/types";
 
 export const handle = { i18n: ["admin", "common"] };
 
@@ -35,12 +40,16 @@ type HistoryRow = {
   templateId: string;
   templateName: string;
   status: DrillRunStatus;
+  /** "DRILL" | "ACTUAL" | "FALSE_ALARM" — captured at start time. */
+  mode: DrillMode;
   createdAtIso: string;
   activatedAtIso: string | null;
   endedAtIso: string | null;
   /** Server-computed; null when both endpoints are missing. */
   durationSeconds: number | null;
   lastActorUserId: string | null;
+  /** True when a responsible party has signed off the drill record. */
+  isSignedOff: boolean;
 };
 
 function computeDurationSeconds(
@@ -82,6 +91,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       // hard-deleted with a stale row, fall back to a placeholder.
       templateName: r.template?.name ?? "(deleted template)",
       status,
+      mode: parseDrillMode(r.mode),
       createdAtIso: r.createdAt.toISOString(),
       activatedAtIso: r.activatedAt ? r.activatedAt.toISOString() : null,
       endedAtIso: r.endedAt ? r.endedAt.toISOString() : null,
@@ -91,6 +101,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         r.endedAt,
       ),
       lastActorUserId: r.lastActorUserId,
+      isSignedOff: !!r.signedOffAt,
     };
   });
 
@@ -132,6 +143,29 @@ export function formatDurationSeconds(secs: number | null): string {
   const h = Math.floor(m / 60);
   const remM = m % 60;
   return remM === 0 ? `${h}h` : `${h}h ${remM}m`;
+}
+
+/**
+ * Mode badge, mirroring the one on the replay detail page. Local copy (rather
+ * than a cross-route import) so the history list keeps working even if the
+ * detail route changes shape — the badges are visually identical and there
+ * are only three modes, so duplication is cheaper than coupling.
+ */
+function ModeChip({ mode }: { mode: DrillMode }) {
+  const { t } = useTranslation("admin");
+  const cls =
+    mode === "ACTUAL"
+      ? "bg-amber-500/25 text-amber-100 border border-amber-400/50"
+      : mode === "FALSE_ALARM"
+        ? "bg-purple-500/20 text-purple-100 border border-purple-400/40"
+        : "bg-white/10 text-white/70 border border-white/20";
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}
+    >
+      {t(`drills.mode.${mode === "ACTUAL" ? "actualShort" : mode === "FALSE_ALARM" ? "falseAlarmShort" : "drillShort"}`)}
+    </span>
+  );
 }
 
 function StatusChip({ status }: { status: DrillRunStatus }) {
@@ -204,8 +238,10 @@ export default function AdminDrillsHistory({
                 <TableColumn>{t("drillsHistory.table.started")}</TableColumn>
                 <TableColumn>{t("drillsHistory.table.ended")}</TableColumn>
                 <TableColumn>{t("drillsHistory.table.duration")}</TableColumn>
+                <TableColumn>{t("drillsHistory.table.mode")}</TableColumn>
                 <TableColumn>{t("drillsHistory.table.status")}</TableColumn>
                 <TableColumn>{t("drillsHistory.table.actor")}</TableColumn>
+                <TableColumn>{t("drillsHistory.table.signoff")}</TableColumn>
               </TableHeader>
               <TableBody items={rows as any[]}>
                 {(row: any) => (
@@ -235,12 +271,25 @@ export default function AdminDrillsHistory({
                       {formatDurationSeconds(row.durationSeconds)}
                     </TableCell>
                     <TableCell>
+                      <ModeChip mode={row.mode} />
+                    </TableCell>
+                    <TableCell>
                       <StatusChip status={row.status} />
                     </TableCell>
                     <TableCell>
                       {row.lastActorUserId ? (
                         <span className="font-mono text-xs text-white/80">
                           {row.lastActorUserId}
+                        </span>
+                      ) : (
+                        <span className="text-white/40">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {row.isSignedOff ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-100">
+                          <BadgeCheck className="w-3 h-3" />
+                          {t("drillsHistory.signoff.indicator")}
                         </span>
                       ) : (
                         <span className="text-white/40">—</span>

@@ -197,6 +197,15 @@
     }
   },
   "drills": {
+    "mode": {
+      "label": "Modo",
+      "drill": "Simulacro — ejercicio planificado",
+      "actual": "Evento real — esto es una emergencia real",
+      "falseAlarm": "Falsa alarma — alerta real que resultó infundada",
+      "drillShort": "Simulacro",
+      "actualShort": "Evento real",
+      "falseAlarmShort": "Falsa alarma"
+    },
     "edit": {
       "addRow": "Agregar fila",
       "addText": "Columna de texto",
@@ -377,6 +386,8 @@
         "notesChanged": "Notas actualizadas",
         "paused": "Simulacro pausado",
         "resumed": "Simulacro reanudado",
+        "rowAttested": "Salón confirmado",
+        "rowUnattested": "Confirmación de salón borrada",
         "started": "Simulacro iniciado",
         "unknownActor": "desconocido",
         "viaImpersonator": "vía {{admin}}"
@@ -392,6 +403,27 @@
         "play": "Reproducir",
         "speed": "{{x}}x",
         "trackAriaLabel": "Haga clic para buscar"
+      }
+    },
+    "table": {
+      "mode": "Modo",
+      "signoff": "Firma"
+    },
+    "signoff": {
+      "button": "Firmar",
+      "help": "Atestigua que este simulacro ocurrió. Lo requieren algunos departamentos de educación estatales.",
+      "indicator": "Firmado",
+      "pill": "Firmado por {{actor}} el {{when}}",
+      "errors": {
+        "alreadySigned": "Este simulacro ya fue firmado.",
+        "missingId": "Falta el id del simulacro.",
+        "noUser": "La firma requiere un usuario con sesión iniciada.",
+        "notEnded": "Solo se pueden firmar simulacros finalizados.",
+        "notFound": "Simulacro no encontrado.",
+        "unknown": "Acción de firma desconocida."
+      },
+      "toasts": {
+        "signed": "Simulacro firmado."
       }
     }
   },

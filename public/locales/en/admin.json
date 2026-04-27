@@ -197,6 +197,15 @@
     }
   },
   "drills": {
+    "mode": {
+      "label": "Mode",
+      "drill": "Drill — planned exercise",
+      "actual": "Real event — this is an actual emergency",
+      "falseAlarm": "False alarm — real alert that turned out unfounded",
+      "drillShort": "Drill",
+      "actualShort": "Real event",
+      "falseAlarmShort": "False alarm"
+    },
     "edit": {
       "addRow": "Add row",
       "addText": "Text column",
@@ -388,6 +397,8 @@
         "notesChanged": "Notes updated",
         "paused": "Drill paused",
         "resumed": "Drill resumed",
+        "rowAttested": "Classroom attested",
+        "rowUnattested": "Classroom attestation cleared",
         "started": "Drill started",
         "unknownActor": "unknown",
         "viaImpersonator": "via {{admin}}"
@@ -425,10 +436,29 @@
       "ariaLabel": "Drill run history",
       "duration": "Duration",
       "ended": "Ended",
+      "mode": "Mode",
+      "signoff": "Sign-off",
       "started": "Started",
       "status": "Status",
       "template": "Template",
       "truncated": "Showing the most recent {{cap}} runs."
+    },
+    "signoff": {
+      "button": "Sign off",
+      "help": "Attest that this drill happened. Required by some state DOEs.",
+      "indicator": "Signed",
+      "pill": "Signed off by {{actor}} on {{when}}",
+      "errors": {
+        "alreadySigned": "This drill has already been signed off.",
+        "missingId": "Missing drill id.",
+        "noUser": "Sign-off requires a signed-in user.",
+        "notEnded": "Only ended drills can be signed off.",
+        "notFound": "Drill not found.",
+        "unknown": "Unknown sign-off action."
+      },
+      "toasts": {
+        "signed": "Drill signed off."
+      }
     }
   },
   "edit": {
