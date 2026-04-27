@@ -234,6 +234,9 @@ model DrillTemplate {
   /// Stable slug matching a key in the global library. Null for purely-custom templates.
   globalKey    String?
   definition   Json
+  /// Default audience for new live runs from this template:
+  /// "STAFF_ONLY" | "EVERYONE". Pre-selected on the start-live confirm.
+  defaultAudience String     @default("EVERYONE")
   runs         DrillRun[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -255,6 +258,9 @@ model DrillRun {
   state       Json
   /// DRAFT | LIVE | PAUSED | ENDED. Backfill default is ENDED so historical runs are archived.
   status      String        @default("ENDED")
+  /// Audience this run was started with: "STAFF_ONLY" | "EVERYONE".
+  /// Frozen at start time. See DrillTemplate.defaultAudience.
+  audience    String        @default("EVERYONE")
   activatedAt DateTime?
   pausedAt    DateTime?
   endedAt     DateTime?
