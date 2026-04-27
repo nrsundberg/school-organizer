@@ -244,7 +244,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     exceptionHouseholds.map((household) => [household.id, household] as const),
   );
 
-  const householdsWithChildren = households.map((household: { id: string }) => ({
+  const householdsWithChildren = households.map((household) => ({
     ...household,
     students: (studentsByHousehold.get(household.id) ?? []).map(
       ({ householdId: _ignored, ...student }) => student,
