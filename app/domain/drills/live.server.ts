@@ -3,6 +3,7 @@ import type { ActorIds } from "~/domain/auth/impersonate-gate.server";
 import {
   emptyRunState,
   parseRunState,
+  type DrillAudience,
   type DrillEventPayload,
   type RunState,
 } from "./types";
@@ -136,6 +137,7 @@ export async function startDrillRun(
   templateId: string,
   initialState: RunState = emptyRunState(),
   actor: ActorIds = { actorUserId: null, onBehalfOfUserId: null },
+  audience: DrillAudience = "EVERYONE",
 ) {
   const now = new Date();
   try {
@@ -153,6 +155,7 @@ export async function startDrillRun(
         state: initialState as object,
         lastActorUserId: actor.actorUserId,
         lastActorOnBehalfOfUserId: actor.onBehalfOfUserId,
+        audience,
       },
     });
     await prisma.drillRunEvent.create({
