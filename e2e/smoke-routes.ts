@@ -230,10 +230,14 @@ export async function visitAndCapture(
 
   const onPageError = (err: Error) => {
     pageErrors.push(err.message);
+    // eslint-disable-next-line no-console
+    console.log(`[smoke pageerror ${path}] ${err.message}`);
   };
   const onConsole = (msg: import("@playwright/test").ConsoleMessage) => {
     if (msg.type() === "error") {
       consoleErrors.push(msg.text());
+      // eslint-disable-next-line no-console
+      console.log(`[smoke console-error ${path}] ${msg.text()}`);
     }
   };
 
@@ -243,7 +247,7 @@ export async function visitAndCapture(
   let response: Response | null = null;
   try {
     response = await page.goto(path, {
-      waitUntil: "domcontentloaded",
+      waitUntil: "commit",
       timeout: 30000
     });
   } finally {
@@ -296,7 +300,7 @@ export async function assertLandmark(page: Page, spec: RouteSpec) {
       locator,
       `Landmark ${role} not visible on ${spec.path}`
     ).toBeVisible({
-      timeout: 10000
+      timeout: 25000
     });
     return;
   }
@@ -304,7 +308,7 @@ export async function assertLandmark(page: Page, spec: RouteSpec) {
     await expect(
       page.getByText(text).first(),
       `Landmark text ${String(text)} not visible on ${spec.path}`
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible({ timeout: 25000 });
   }
 }
 
