@@ -136,6 +136,7 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
     t("pricing.features.campus.everythingCarLine"),
     t("pricing.features.campus.caps"),
     t("pricing.features.campus.reports"),
+    t("pricing.features.campus.drillReplay"),
     t("pricing.features.campus.brand"),
     t("pricing.features.campus.familyApp"),
     t("pricing.features.campus.onboarding"),
