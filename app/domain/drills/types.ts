@@ -103,6 +103,37 @@ export function isDrillRunStatus(v: unknown): v is DrillRunStatus {
   return v === "DRAFT" || v === "LIVE" || v === "PAUSED" || v === "ENDED";
 }
 
+/**
+ * Live-drill audience scoping. STAFF_ONLY hides the takeover from viewer-pin
+ * guests (they continue to see the normal board); EVERYONE shows it to staff
+ * and viewer-pin guests. Anonymous callers (no user, no viewer pin) are never
+ * redirected regardless of audience.
+ */
+export type DrillAudience = "STAFF_ONLY" | "EVERYONE";
+
+export const DRILL_AUDIENCES: readonly DrillAudience[] = [
+  "STAFF_ONLY",
+  "EVERYONE",
+] as const;
+
+export const DRILL_AUDIENCE_LABELS: Record<DrillAudience, string> = {
+  STAFF_ONLY: "Staff only",
+  EVERYONE: "Everyone",
+};
+
+export function isDrillAudience(v: unknown): v is DrillAudience {
+  return v === "STAFF_ONLY" || v === "EVERYONE";
+}
+
+/**
+ * Coerce arbitrary input (DB column read, form value) to a `DrillAudience`,
+ * defaulting to "EVERYONE" so older rows / corrupt input behave like
+ * pre-feature visibility (everyone in audience).
+ */
+export function parseDrillAudience(v: unknown): DrillAudience {
+  return isDrillAudience(v) ? v : "EVERYONE";
+}
+
 export interface ActionItem {
   id: string;
   text: string;
