@@ -243,7 +243,7 @@ export async function visitAndCapture(
   let response: Response | null = null;
   try {
     response = await page.goto(path, {
-      waitUntil: "domcontentloaded",
+      waitUntil: "commit",
       timeout: 30000
     });
   } finally {
