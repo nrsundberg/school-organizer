@@ -248,6 +248,136 @@ export function parseTemplateDefinition(raw: Prisma.JsonValue): TemplateDefiniti
   return result;
 }
 
+/**
+ * The replay log: discrete deltas applied to a `RunState` over the course of
+ * a single DrillRun. Persisted one-row-per-event in the `DrillRunEvent` table
+ * so the history page can scrub through every change. The `applyEvent` /
+ * `diffRunStates` helpers in `./replay` are the canonical reducers.
+ */
+export type DrillEventKind =
+  | "started"
+  | "paused"
+  | "resumed"
+  | "ended"
+  | "cell_toggled"
+  | "notes_changed"
+  | "action_added"
+  | "action_edited"
+  | "action_toggled"
+  | "action_removed";
+
+export type DrillEventPayload =
+  | { kind: "started"; initialState: RunState }
+  | { kind: "paused" }
+  | { kind: "resumed" }
+  | { kind: "ended" }
+  | {
+      kind: "cell_toggled";
+      key: string;
+      prev: ToggleValue | null;
+      next: ToggleValue | null;
+    }
+  | { kind: "notes_changed"; prev: string; next: string }
+  | { kind: "action_added"; item: ActionItem }
+  | { kind: "action_edited"; id: string; prev: string; next: string }
+  | { kind: "action_toggled"; id: string; prev: boolean; next: boolean }
+  | { kind: "action_removed"; id: string };
+
+export function isDrillEventKind(v: unknown): v is DrillEventKind {
+  return (
+    v === "started" ||
+    v === "paused" ||
+    v === "resumed" ||
+    v === "ended" ||
+    v === "cell_toggled" ||
+    v === "notes_changed" ||
+    v === "action_added" ||
+    v === "action_edited" ||
+    v === "action_toggled" ||
+    v === "action_removed"
+  );
+}
+
+function parseToggleOrNull(v: unknown): ToggleValue | null {
+  return v === "positive" || v === "negative" ? v : null;
+}
+
+function parseActionItem(raw: unknown): ActionItem | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Partial<ActionItem>;
+  if (typeof r.id !== "string") return null;
+  return {
+    id: r.id,
+    text: typeof r.text === "string" ? r.text : "",
+    done: !!r.done,
+  };
+}
+
+/**
+ * Coerce a stored payload (possibly stale or corrupt) into a `DrillEventPayload`.
+ * Returns `null` when the payload can't be salvaged; callers should drop those
+ * events on read rather than crash the page.
+ */
+export function parseDrillEventPayload(
+  kind: string,
+  raw: Prisma.JsonValue,
+): DrillEventPayload | null {
+  if (!isDrillEventKind(kind)) return null;
+  const p = (raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  switch (kind) {
+    case "started":
+      return { kind, initialState: parseRunState((p.initialState as Prisma.JsonValue) ?? {}) };
+    case "paused":
+    case "resumed":
+    case "ended":
+      return { kind };
+    case "cell_toggled": {
+      const key = typeof p.key === "string" ? p.key : null;
+      if (!key) return null;
+      return {
+        kind,
+        key,
+        prev: parseToggleOrNull(p.prev),
+        next: parseToggleOrNull(p.next),
+      };
+    }
+    case "notes_changed":
+      return {
+        kind,
+        prev: typeof p.prev === "string" ? p.prev : "",
+        next: typeof p.next === "string" ? p.next : "",
+      };
+    case "action_added": {
+      const item = parseActionItem(p.item);
+      if (!item) return null;
+      return { kind, item };
+    }
+    case "action_edited": {
+      const id = typeof p.id === "string" ? p.id : null;
+      if (!id) return null;
+      return {
+        kind,
+        id,
+        prev: typeof p.prev === "string" ? p.prev : "",
+        next: typeof p.next === "string" ? p.next : "",
+      };
+    }
+    case "action_toggled": {
+      const id = typeof p.id === "string" ? p.id : null;
+      if (!id) return null;
+      return { kind, id, prev: !!p.prev, next: !!p.next };
+    }
+    case "action_removed": {
+      const id = typeof p.id === "string" ? p.id : null;
+      if (!id) return null;
+      return { kind, id };
+    }
+  }
+}
+
 export function parseRunState(raw: Prisma.JsonValue): RunState {
   const obj = raw as unknown;
   if (!obj || typeof obj !== "object") {

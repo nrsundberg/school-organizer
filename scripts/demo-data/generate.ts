@@ -209,6 +209,16 @@ function buildWipe(orgId: string): SqlStatement[] {
     t("DismissalException"),
     t("ProgramCancellation"),
     t("AfterSchoolProgram"),
+    // DrillRunEvent.runId → DrillRun has ON DELETE CASCADE, so wiping
+    // DrillRun clears children automatically. We still emit an explicit
+    // DELETE so the demo's stable-id contract is respected (every demo
+    // row deleted by a known scope) and so the wipe block is symmetric
+    // with the rest of the table list. Subquery-scope by orgId because
+    // DrillRunEvent has no orgId column of its own.
+    {
+      sql: `DELETE FROM "DrillRunEvent" WHERE runId IN (SELECT id FROM "DrillRun" WHERE orgId = ?)`,
+      args: [orgId],
+    },
     t("DrillRun"),
     t("DrillTemplate"),
     t("Student"),
@@ -425,7 +435,8 @@ async function buildSeedForOrg(
     if (!tpl) throw new Error(`Global template missing for historical run: ${key}`);
     const runDaysAgo = (i + 1) * DRILL_RUN_OFFSET_DAYS;
     const startedAt = new Date(now.getTime() - runDaysAgo * 24 * 60 * 60 * 1000);
-    const endedAt = new Date(startedAt.getTime() + HISTORICAL_DRILL_RUN_DURATION_MIN * 60 * 1000);
+    const durationMs = HISTORICAL_DRILL_RUN_DURATION_MIN * 60 * 1000;
+    const endedAt = new Date(startedAt.getTime() + durationMs);
 
     // Build a partial RunState: mark every toggle column on every row
     // as "positive" for ~80% of rows; rest left blank. This makes the
@@ -443,23 +454,94 @@ async function buildSeedForOrg(
       }
       rowIdx++;
     }
-    const state = { toggles, notes: `Demo replay — ${tpl.name}.`, actionItems: [] };
+    const notes = `Demo replay — ${tpl.name}.`;
+    const state = { toggles, notes, actionItems: [] };
+
+    const runId = runIdFor(spec.orgId, key, 1);
+    const actorUserId = userIdFor(spec.orgId, "admin");
 
     out.push({
       sql: `INSERT INTO "DrillRun" (id, orgId, templateId, state, status, activatedAt, endedAt, lastActorUserId, createdAt, updatedAt)
             VALUES (?, ?, ?, ?, 'ENDED', ?, ?, ?, ?, ?)`,
       args: [
-        runIdFor(spec.orgId, key, 1),
+        runId,
         spec.orgId,
         templateIdFor(spec.orgId, key),
         JSON.stringify(state),
         startedAt.toISOString(),
         endedAt.toISOString(),
-        userIdFor(spec.orgId, "admin"),
+        actorUserId,
         startedAt.toISOString(),
         endedAt.toISOString(),
       ],
     });
+
+    // Synthetic event log so /admin/drills/history/<runId> has a replay
+    // timeline immediately after seeding. Pure SQL inserts, no
+    // applyEvent reducer — keeps this generator dependency-light and
+    // lets the demo SQL render identically across environments.
+    //
+    // Stable event IDs derived from spec.orgId + run key + index so a
+    // re-run produces the same primary keys (the snapshot test relies
+    // on this).
+    const orgKey = spec.orgId.replace(/^org_demo_/, "");
+    const eventIdFor = (n: number) => `evt_demo_${orgKey}_${key}_${n}`;
+    const insertEvent = (
+      n: number,
+      occurredAt: Date,
+      payload: Record<string, unknown>,
+    ) => {
+      out.push({
+        sql: `INSERT INTO "DrillRunEvent" (id, runId, kind, payload, actorUserId, onBehalfOfUserId, occurredAt)
+              VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          eventIdFor(n),
+          runId,
+          payload.kind as string,
+          JSON.stringify(payload),
+          actorUserId,
+          null,
+          occurredAt.toISOString(),
+        ],
+      });
+    };
+
+    let eventIdx = 0;
+    // 1. started — replay engine bootstraps from initialState.
+    insertEvent(eventIdx++, startedAt, {
+      kind: "started",
+      initialState: { toggles: {}, notes: "", actionItems: [] },
+    });
+
+    // 2. cell_toggled — one per final toggle, spread linearly across
+    // the first 80% of the drill window. Iteration order matches the
+    // insertion order on `toggles` (preserved by V8/D8 object key order
+    // for non-integer keys), so the replay reconstructs the final map.
+    const toggleEntries = Object.entries(toggles);
+    const totalToggles = toggleEntries.length;
+    for (let t = 0; t < totalToggles; t++) {
+      const [toggleKeyStr, nextVal] = toggleEntries[t]!;
+      const offsetMs = totalToggles > 0 ? (t / totalToggles) * (durationMs * 0.8) : 0;
+      const occurredAt = new Date(startedAt.getTime() + offsetMs);
+      insertEvent(eventIdx++, occurredAt, {
+        kind: "cell_toggled",
+        key: toggleKeyStr,
+        prev: null,
+        next: nextVal,
+      });
+    }
+
+    // 3. notes_changed — single event at 85% mark capturing the final
+    // notes string verbatim (matches the run's `state.notes`).
+    const notesAt = new Date(startedAt.getTime() + durationMs * 0.85);
+    insertEvent(eventIdx++, notesAt, {
+      kind: "notes_changed",
+      prev: "",
+      next: notes,
+    });
+
+    // 4. ended — terminal lifecycle event at endedAt.
+    insertEvent(eventIdx++, endedAt, { kind: "ended" });
   }
 
   // 10. After-school programs.

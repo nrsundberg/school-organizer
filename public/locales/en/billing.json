@@ -70,6 +70,7 @@
       "campus": {
         "brand": "Full custom branding — logo upload + custom domain",
         "caps": "Up to 300 families, 900 students, 80 classrooms",
+        "drillReplay": "Drill replay timeline — scrub every action with timestamp and actor",
         "everythingCarLine": "Everything in Car Line",
         "familyApp": "Parent & family viewer app",
         "onboarding": "Dedicated migration & onboarding support",
