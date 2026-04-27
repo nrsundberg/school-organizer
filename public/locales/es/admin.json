@@ -233,6 +233,14 @@
       "saving": "Guardando…",
       "startLive": "Iniciar simulacro en vivo",
       "templateName": "Nombre de la plantilla",
+      "defaultAudience": {
+        "heading": "Audiencia para simulacros en vivo",
+        "help": "Selección predeterminada cuando un administrador inicia un simulacro desde esta plantilla. Se puede cambiar al iniciar.",
+        "everyone": "Todos — personal e invitados con PIN",
+        "staffOnly": "Solo personal — los invitados con PIN ven el tablero normal",
+        "saveButton": "Guardar audiencia predeterminada",
+        "saved": "Audiencia predeterminada guardada."
+      },
       "toasts": {
         "layoutSaved": "Diseño guardado.",
         "nameSaved": "Nombre guardado."

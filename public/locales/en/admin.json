@@ -233,6 +233,14 @@
       "saving": "Saving…",
       "startLive": "Start live drill",
       "templateName": "Template name",
+      "defaultAudience": {
+        "heading": "Audience for live runs",
+        "help": "Default selection when an admin starts a live drill from this template. Admins can change it at start time.",
+        "everyone": "Everyone — staff and viewer-pin guests",
+        "staffOnly": "Staff only — viewer-pin guests see the normal board",
+        "saveButton": "Save audience default",
+        "saved": "Audience default saved."
+      },
       "toasts": {
         "layoutSaved": "Layout saved.",
         "nameSaved": "Name saved."
