@@ -72,6 +72,27 @@ interface FindUniqueArgs {
   where: { id: string };
 }
 
+interface FakeDrillRunEventRow {
+  id: string;
+  runId: string;
+  kind: string;
+  payload: unknown;
+  actorUserId: string | null;
+  onBehalfOfUserId: string | null;
+  occurredAt: Date;
+}
+
+interface DrillRunEventCreateArgs {
+  data: {
+    runId: string;
+    kind: string;
+    payload: unknown;
+    actorUserId?: string | null;
+    onBehalfOfUserId?: string | null;
+    occurredAt?: Date;
+  };
+}
+
 class P2002Error extends Error {
   code = "P2002";
   constructor() {
@@ -83,7 +104,42 @@ class P2002Error extends Error {
 
 class FakePrisma {
   private rows: FakeDrillRunRow[] = [];
+  private events: FakeDrillRunEventRow[] = [];
   private idCounter = 1;
+  private eventIdCounter = 1;
+
+  // Sequential pseudo-transaction. Real Prisma runs operations atomically;
+  // this just awaits in order, which is enough for unit tests since
+  // FakePrisma operations don't fail mid-flight.
+  $transaction = async <T,>(ops: Promise<T>[]): Promise<T[]> => {
+    const out: T[] = [];
+    for (const op of ops) out.push(await op);
+    return out;
+  };
+
+  drillRunEvent = {
+    create: async (
+      args: DrillRunEventCreateArgs,
+    ): Promise<FakeDrillRunEventRow> => {
+      const row: FakeDrillRunEventRow = {
+        id: `evt-${this.eventIdCounter++}`,
+        runId: args.data.runId,
+        kind: args.data.kind,
+        payload: args.data.payload,
+        actorUserId: args.data.actorUserId ?? null,
+        onBehalfOfUserId: args.data.onBehalfOfUserId ?? null,
+        occurredAt: args.data.occurredAt ?? new Date(),
+      };
+      this.events.push(row);
+      return row;
+    },
+  };
+
+  /** Test helper: peek at all events. */
+  _events(): FakeDrillRunEventRow[] {
+    return [...this.events];
+  }
+
 
   drillRun = {
     create: async (args: CreateArgs): Promise<FakeDrillRunRow> => {
@@ -451,6 +507,164 @@ if (!mod) {
         { actorUserId: "u_other_admin", onBehalfOfUserId: null },
       );
       assert.equal(paused.lastActorUserId, "u_other_admin");
+    });
+  });
+
+  describe("event emission (DrillRunEvent)", () => {
+    const ACTOR = { actorUserId: "u_admin", onBehalfOfUserId: null };
+
+    it("startDrillRun writes one `started` event with initialState", async () => {
+      const fake = new FakePrisma();
+      const initial: RunState = {
+        toggles: { "r:c": "positive" },
+        notes: "kickoff",
+        actionItems: [],
+      };
+      const run = await live.startDrillRun(
+        P(fake),
+        ORG,
+        TEMPLATE,
+        initial,
+        ACTOR,
+      );
+      const evs = fake._events().filter((e) => e.runId === run.id);
+      assert.equal(evs.length, 1);
+      assert.equal(evs[0].kind, "started");
+      assert.equal(evs[0].actorUserId, "u_admin");
+      const p = evs[0].payload as { kind: string; initialState: RunState };
+      assert.equal(p.kind, "started");
+      assert.deepEqual(p.initialState, initial);
+    });
+
+    it("pauseDrillRun writes one `paused` event", async () => {
+      const fake = new FakePrisma();
+      const run = await live.startDrillRun(P(fake), ORG, TEMPLATE, undefined, ACTOR);
+      await live.pauseDrillRun(P(fake), ORG, run.id, ACTOR);
+      const evs = fake._events().filter((e) => e.runId === run.id);
+      assert.equal(evs.length, 2);
+      assert.equal(evs[1].kind, "paused");
+      assert.equal(evs[1].actorUserId, "u_admin");
+    });
+
+    it("resumeDrillRun writes one `resumed` event", async () => {
+      const fake = new FakePrisma();
+      const run = await live.startDrillRun(P(fake), ORG, TEMPLATE, undefined, ACTOR);
+      await live.pauseDrillRun(P(fake), ORG, run.id, ACTOR);
+      await live.resumeDrillRun(P(fake), ORG, run.id, ACTOR);
+      const evs = fake._events().filter((e) => e.runId === run.id);
+      assert.equal(evs.length, 3);
+      assert.equal(evs[2].kind, "resumed");
+    });
+
+    it("endDrillRun writes one `ended` event", async () => {
+      const fake = new FakePrisma();
+      const run = await live.startDrillRun(P(fake), ORG, TEMPLATE, undefined, ACTOR);
+      await live.endDrillRun(P(fake), ORG, run.id, ACTOR);
+      const evs = fake._events().filter((e) => e.runId === run.id);
+      assert.equal(evs.at(-1)!.kind, "ended");
+    });
+
+    it("updateLiveRunState emits one cell_toggled per changed cell", async () => {
+      const fake = new FakePrisma();
+      const run = await live.startDrillRun(P(fake), ORG, TEMPLATE, undefined, ACTOR);
+      const next: RunState = {
+        toggles: { "r1:c1": "positive", "r2:c2": "negative" },
+        notes: "",
+        actionItems: [],
+      };
+      await live.updateLiveRunState(P(fake), ORG, run.id, next, ACTOR);
+      const evs = fake._events().filter(
+        (e) => e.runId === run.id && e.kind === "cell_toggled",
+      );
+      assert.equal(evs.length, 2);
+      const keys = evs.map((e) => (e.payload as { key: string }).key).sort();
+      assert.deepEqual(keys, ["r1:c1", "r2:c2"]);
+    });
+
+    it("updateLiveRunState emits notes_changed when notes change", async () => {
+      const fake = new FakePrisma();
+      const run = await live.startDrillRun(P(fake), ORG, TEMPLATE, undefined, ACTOR);
+      await live.updateLiveRunState(
+        P(fake),
+        ORG,
+        run.id,
+        { toggles: {}, notes: "first pass complete", actionItems: [] },
+        ACTOR,
+      );
+      const evs = fake
+        ._events()
+        .filter((e) => e.runId === run.id && e.kind === "notes_changed");
+      assert.equal(evs.length, 1);
+      const p = evs[0].payload as { kind: string; prev: string; next: string };
+      assert.equal(p.next, "first pass complete");
+      assert.equal(p.prev, "");
+    });
+
+    it("updateLiveRunState emits action_added when action items appear", async () => {
+      const fake = new FakePrisma();
+      const run = await live.startDrillRun(P(fake), ORG, TEMPLATE, undefined, ACTOR);
+      await live.updateLiveRunState(
+        P(fake),
+        ORG,
+        run.id,
+        {
+          toggles: {},
+          notes: "",
+          actionItems: [{ id: "a1", text: "follow up", done: false }],
+        },
+        ACTOR,
+      );
+      const evs = fake
+        ._events()
+        .filter((e) => e.runId === run.id && e.kind === "action_added");
+      assert.equal(evs.length, 1);
+      const p = evs[0].payload as {
+        kind: string;
+        item: { id: string; text: string };
+      };
+      assert.equal(p.item.id, "a1");
+      assert.equal(p.item.text, "follow up");
+    });
+
+    it("updateLiveRunState with no state delta still updates the run but writes zero events", async () => {
+      const fake = new FakePrisma();
+      const initial: RunState = {
+        toggles: { "r:c": "positive" },
+        notes: "n",
+        actionItems: [],
+      };
+      const run = await live.startDrillRun(
+        P(fake),
+        ORG,
+        TEMPLATE,
+        initial,
+        ACTOR,
+      );
+      const evCountBefore = fake._events().filter((e) => e.runId === run.id).length;
+      await live.updateLiveRunState(
+        P(fake),
+        ORG,
+        run.id,
+        initial,
+        { actorUserId: "u_other", onBehalfOfUserId: null },
+      );
+      const evCountAfter = fake._events().filter((e) => e.runId === run.id).length;
+      assert.equal(evCountAfter, evCountBefore, "no new events for no-op update");
+      // But the run row's lastActor should still have advanced.
+      const stored = fake._all().find((r) => r.id === run.id)!;
+      assert.equal(stored.lastActorUserId, "u_other");
+    });
+
+    it("impersonation: events stamp onBehalfOfUserId", async () => {
+      const fake = new FakePrisma();
+      const run = await live.startDrillRun(P(fake), ORG, TEMPLATE, undefined, ACTOR);
+      await live.pauseDrillRun(P(fake), ORG, run.id, {
+        actorUserId: "u_admin",
+        onBehalfOfUserId: "u_target",
+      });
+      const paused = fake._events().find((e) => e.kind === "paused")!;
+      assert.equal(paused.actorUserId, "u_admin");
+      assert.equal(paused.onBehalfOfUserId, "u_target");
     });
   });
 }

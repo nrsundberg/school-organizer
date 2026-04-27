@@ -8,12 +8,22 @@ import {
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
 import {
+  emptyRunState,
   isDrillRunStatus,
+  parseDrillEventPayload,
   parseRunState,
   parseTemplateDefinition,
   type DrillRunStatus,
+  type RunState,
 } from "~/domain/drills/types";
+import { synthesizeLifecycleEvents } from "~/domain/drills/replay";
 import { ChecklistTable } from "~/domain/drills/ChecklistTable";
+import { ReplayTimeline } from "~/domain/drills/ReplayTimeline";
+import { ReplayEventFeed } from "~/domain/drills/ReplayEventFeed";
+import {
+  useDrillReplay,
+  type ReplayEvent,
+} from "~/domain/drills/useDrillReplay";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
 import { formatDurationSeconds } from "./drills.history";
@@ -54,10 +64,7 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   const start = run.activatedAt ?? run.createdAt;
   const end = run.endedAt ?? null;
   const durationSeconds = end
-    ? Math.max(
-        0,
-        Math.round((end.getTime() - start.getTime()) / 1000),
-      )
+    ? Math.max(0, Math.round((end.getTime() - start.getTime()) / 1000))
     : null;
 
   // Latest-run check so we only show the "Print" link when the print page
@@ -69,6 +76,80 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
     select: { id: true },
   });
   const isLatestForTemplate = latest?.id === run.id;
+
+  // Pull every event for this run, plus the unique users who acted on it, so
+  // the replay feed can show names instead of raw IDs.
+  const rawEvents = await prisma.drillRunEvent.findMany({
+    where: { runId },
+    orderBy: { occurredAt: "asc" },
+  });
+
+  const actorIds = [
+    ...new Set(
+      rawEvents.flatMap((e) =>
+        [e.actorUserId, e.onBehalfOfUserId].filter(
+          (v): v is string => !!v,
+        ),
+      ),
+    ),
+  ];
+  if (run.lastActorUserId && !actorIds.includes(run.lastActorUserId)) {
+    actorIds.push(run.lastActorUserId);
+  }
+  const actorRows = actorIds.length
+    ? ((await prisma.user.findMany({
+        where: { id: { in: actorIds } },
+        select: { id: true, name: true },
+      })) as Array<{ id: string; name: string }>)
+    : [];
+  const actorById = new Map(actorRows.map((u) => [u.id, u]));
+
+  function resolveActor(id: string | null | undefined) {
+    if (!id) return null;
+    const row = actorById.get(id);
+    const name = row?.name && row.name.trim() !== "" ? row.name : id;
+    return { id, name };
+  }
+
+  const events: ReplayEvent[] = [];
+  for (const e of rawEvents) {
+    const payload = parseDrillEventPayload(e.kind, e.payload);
+    if (!payload) continue;
+    events.push({
+      id: e.id,
+      kind: payload.kind,
+      payload,
+      occurredAt: e.occurredAt.toISOString(),
+      actor: resolveActor(e.actorUserId),
+      onBehalfOf: resolveActor(e.onBehalfOfUserId),
+    });
+  }
+
+  // Initial state: prefer the started event's snapshot; otherwise fall back to
+  // synthesized lifecycle events keyed off run timestamps.
+  let initialState: RunState = emptyRunState();
+  const startedEvent = events.find((e) => e.kind === "started");
+  if (startedEvent && startedEvent.payload.kind === "started") {
+    initialState = startedEvent.payload.initialState;
+  } else if (events.length === 0) {
+    const synthesized = synthesizeLifecycleEvents({
+      activatedAt: run.activatedAt,
+      pausedAt: run.pausedAt,
+      endedAt: run.endedAt,
+    });
+    for (const s of synthesized) {
+      events.push({
+        id: `synth-${s.kind}-${s.occurredAt.getTime()}`,
+        kind: s.kind,
+        payload: s.payload,
+        occurredAt: s.occurredAt.toISOString(),
+        actor: null,
+        onBehalfOf: null,
+      });
+    }
+  }
+
+  const lastActor = resolveActor(run.lastActorUserId);
 
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
@@ -89,6 +170,9 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
       durationSeconds,
       lastActorUserId: run.lastActorUserId,
     },
+    events,
+    initialState,
+    lastActor,
     isLatestForTemplate,
   };
 }
@@ -121,17 +205,18 @@ function StatusChip({ status }: { status: DrillRunStatus }) {
 export default function AdminDrillsHistoryReplay({
   loaderData,
 }: Route.ComponentProps) {
-  const { template, run, isLatestForTemplate } = loaderData;
+  const { template, run, isLatestForTemplate, events, initialState, lastActor } =
+    loaderData;
   const { t, i18n } = useTranslation("admin");
 
   const definition = parseTemplateDefinition(template.definition);
-  const state = parseRunState(run.state);
+  const finalState = parseRunState(run.state);
 
   const startedFmt = new Date(run.startedIso).toLocaleString(i18n.language);
   const durationFmt = formatDurationSeconds(run.durationSeconds);
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-[min(100%,56rem)]">
+    <div className="flex flex-col gap-6 p-6 max-w-[min(100%,72rem)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           to="/admin/drills/history"
@@ -164,18 +249,164 @@ export default function AdminDrillsHistoryReplay({
             duration: durationFmt,
           })}
         </p>
-        {run.lastActorUserId && (
+        {lastActor && (
           <p className="text-white/40 text-xs mt-1">
-            {t("drillsHistory.replay.lastActor", {
-              actor: run.lastActorUserId,
-            })}
+            {t("drillsHistory.replay.lastActor", { actor: lastActor.name })}
           </p>
         )}
       </div>
 
-      {/* Reuse the run-screen ChecklistTable in readOnly mode. The presentational
-          component already supports that prop, so we don't need a duplicate
-          read-only view (and the edit page keeps its existing edit-write path). */}
+      {run.status === "ENDED" ? (
+        <ReplayLayout
+          definition={definition}
+          events={events}
+          initialState={initialState}
+          startedIso={run.startedIso}
+          endedIso={run.endedIso ?? run.startedIso}
+        />
+      ) : (
+        <>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/70">
+            {t("drillsHistory.replay.liveRunNotice")}
+          </div>
+          <StaticReplayBody definition={definition} state={finalState} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function ReplayLayout({
+  definition,
+  events,
+  initialState,
+  startedIso,
+  endedIso,
+}: {
+  definition: ReturnType<typeof parseTemplateDefinition>;
+  events: ReplayEvent[];
+  initialState: RunState;
+  startedIso: string;
+  endedIso: string;
+}) {
+  const { t } = useTranslation("admin");
+  const replay = useDrillReplay({
+    initialState,
+    events,
+    startedAtIso: startedIso,
+    endedAtIso: endedIso,
+  });
+
+  return (
+    <>
+      <ReplayTimeline
+        startedAtIso={startedIso}
+        endedAtIso={endedIso}
+        events={events}
+        currentTimeMs={replay.currentTimeMs}
+        totalDurationMs={replay.totalDurationMs}
+        isPlaying={replay.isPlaying}
+        speed={replay.speed}
+        onSeek={replay.seek}
+        onPlayToggle={() => (replay.isPlaying ? replay.pause() : replay.play())}
+        onSpeedChange={replay.setSpeed}
+      />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="flex flex-col gap-6 lg:col-span-2">
+          <ChecklistTable
+            definition={definition}
+            state={replay.replayState}
+            onToggle={() => {
+              /* read-only — no-op */
+            }}
+            readOnly
+          />
+
+          <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <h2 className="text-sm font-semibold text-white mb-2">
+              {t("drillsHistory.replay.notesHeading")}
+            </h2>
+            {replay.replayState.notes.trim() === "" ? (
+              <p className="text-white/40 text-sm">
+                {t("drillsHistory.replay.noNotes")}
+              </p>
+            ) : (
+              <p className="whitespace-pre-wrap text-sm text-white/90">
+                {replay.replayState.notes}
+              </p>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <h2 className="text-sm font-semibold text-white mb-3">
+              {t("drillsHistory.replay.followUpHeading")}
+            </h2>
+            {replay.replayState.actionItems.length === 0 ? (
+              <p className="text-white/40 text-sm">
+                {t("drillsHistory.replay.noItems")}
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {replay.replayState.actionItems.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex flex-wrap items-center gap-2 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={item.done}
+                      disabled
+                      aria-label={
+                        item.done
+                          ? t("drillsHistory.replay.actionDone")
+                          : t("drillsHistory.replay.actionPending")
+                      }
+                      className="h-4 w-4 rounded border-white/20 bg-white/5"
+                    />
+                    <span
+                      className={
+                        item.done
+                          ? "text-white/60 line-through"
+                          : "text-white"
+                      }
+                    >
+                      {item.text || (
+                        <span className="text-white/30 italic">
+                          {t("drillsHistory.replay.actionEmpty")}
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+
+        <div className="lg:col-span-1">
+          <ReplayEventFeed
+            events={events}
+            currentEventIndex={replay.currentEventIndex}
+            startedAtIso={startedIso}
+            onSeek={replay.seek}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
+
+function StaticReplayBody({
+  definition,
+  state,
+}: {
+  definition: ReturnType<typeof parseTemplateDefinition>;
+  state: RunState;
+}) {
+  const { t } = useTranslation("admin");
+  return (
+    <>
       <ChecklistTable
         definition={definition}
         state={state}
@@ -215,12 +446,6 @@ export default function AdminDrillsHistoryReplay({
                 key={item.id}
                 className="flex flex-wrap items-center gap-2 text-sm"
               >
-                {/*
-                  Read-only checklist: render as a disabled checkbox so the
-                  semantics ("done / not done") survive screen readers without
-                  any chance of accidental input. The label sits in plain text
-                  next to it for parity with the run screen's checked list.
-                */}
                 <input
                   type="checkbox"
                   checked={item.done}
@@ -234,9 +459,7 @@ export default function AdminDrillsHistoryReplay({
                 />
                 <span
                   className={
-                    item.done
-                      ? "text-white/60 line-through"
-                      : "text-white"
+                    item.done ? "text-white/60 line-through" : "text-white"
                   }
                 >
                   {item.text || (
@@ -250,6 +473,6 @@ export default function AdminDrillsHistoryReplay({
           </ul>
         )}
       </section>
-    </div>
+    </>
   );
 }

@@ -206,6 +206,69 @@ async function seed() {
                 endedIso,
               ],
             });
+
+            // Synthetic event log mirroring the run's final state so
+            // /admin/drills/history/<runId> renders a replay timeline
+            // immediately after seeding. We hand-craft these inserts
+            // (rather than calling applyEvent) so the seed has no
+            // dependency on the drill-domain reducer.
+            const insertEvent = async (
+              occurredAt: Date,
+              payload: Record<string, unknown>,
+            ) => {
+              await db.execute({
+                sql: `INSERT INTO "DrillRunEvent" (id, "runId", kind, payload, "actorUserId", "onBehalfOfUserId", "occurredAt")
+                      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                args: [
+                  generateId(),
+                  runId,
+                  payload.kind as string,
+                  JSON.stringify(payload),
+                  userId,
+                  null,
+                  occurredAt.toISOString(),
+                ],
+              });
+            };
+
+            // 1. started — replay engine bootstraps from initialState.
+            await insertEvent(startedAt, {
+              kind: "started",
+              initialState: { toggles: {}, notes: "", actionItems: [] },
+            });
+
+            // 2. cell_toggled — one per final toggle, spread linearly
+            // across the first 80% of the drill window. Object iteration
+            // preserves insertion order so replay reconstructs the
+            // final toggles map in the same order it was authored.
+            const toggleEntries = Object.entries(run.state.toggles);
+            const totalToggles = toggleEntries.length;
+            for (let t = 0; t < totalToggles; t++) {
+              const [toggleKey, nextVal] = toggleEntries[t]!;
+              const offsetMs =
+                totalToggles > 0 ? (t / totalToggles) * (runDurationMs * 0.8) : 0;
+              const occurredAt = new Date(startedAt.getTime() + offsetMs);
+              await insertEvent(occurredAt, {
+                kind: "cell_toggled",
+                key: toggleKey,
+                prev: null,
+                next: nextVal,
+              });
+            }
+
+            // 3. notes_changed — single event at 85% mark with the
+            // run's final notes string (matches `run.state.notes`).
+            const notesAt = new Date(
+              startedAt.getTime() + runDurationMs * 0.85,
+            );
+            await insertEvent(notesAt, {
+              kind: "notes_changed",
+              prev: "",
+              next: run.state.notes,
+            });
+
+            // 4. ended — terminal lifecycle event at endedAt.
+            await insertEvent(endedAt, { kind: "ended" });
           }
           console.log(
             `✓ Seeded ${runs.length} historical "Fire drill" runs for org ${orgId}`,
