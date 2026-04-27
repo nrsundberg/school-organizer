@@ -164,6 +164,7 @@
     "login": "Iniciar sesión",
     "logoAlt": "Logo de {{orgName}}",
     "logout": "Cerrar sesión",
+    "menu": "Menú",
     "tenantTitle": "{{orgName}} - Bingo de fila de autos",
     "wordmarkAlt": "PickupRoster"
   },
