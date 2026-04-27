@@ -1,4 +1,3 @@
-import type { User } from "~/db";
 import type { DrillAudience } from "./types";
 
 /**
@@ -93,16 +92,4 @@ export function liveDrillRedirectTarget(
   }
 
   return "/drills/live";
-}
-
-/**
- * @deprecated Temporary shim during the audience-visibility rollout — kept so
- * Tasks 5/6 can compile after this refactor and before they delete the
- * remaining call sites. Will be removed in Task 6.
- */
-export function userIsAdmin(
-  user: Pick<User, "role"> | null | undefined,
-): boolean {
-  if (!user) return false;
-  return user.role === "ADMIN" || user.role === "CONTROLLER";
 }
