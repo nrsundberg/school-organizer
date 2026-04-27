@@ -34,6 +34,11 @@ const KIND_TO_KEY: Record<string, string> = {
   action_edited: "actionEdited",
   action_toggled: "actionToggled",
   action_removed: "actionRemoved",
+  // Per-classroom attestation overlay (one row attested / un-attested).
+  // Replay falls back to `defaultValue: ev.kind` if the i18n key is missing,
+  // so adding the keys later is non-breaking.
+  row_attested: "rowAttested",
+  row_unattested: "rowUnattested",
 };
 
 export function ReplayEventFeed({

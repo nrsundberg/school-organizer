@@ -21,6 +21,17 @@
     "adminControls": "Admin controls",
     "adminHelper": "You're an admin — non-admins see the checklist only.",
     "adminLink": "Admin",
+    "attest": {
+      "attest": "Attest all-clear",
+      "attestedBy": "{{name}} @ {{time}}",
+      "columnHeader": "Attested",
+      "issue": "Issue?",
+      "issueNotePlaceholder": "What's wrong? (optional)",
+      "issueNoteSave": "Flag",
+      "summary": "{{attested}} of {{total}} rooms attested · {{issues}} issues",
+      "undo": "Undo attestation",
+      "viewerLabel": "Viewer"
+    },
     "audience": {
       "everyone": "Everyone",
       "staffOnly": "Staff only"

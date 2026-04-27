@@ -20,6 +20,7 @@ import {
   parseRunState,
   parseTemplateDefinition,
   toggleKey,
+  type ClassroomAttestation,
   type DrillAudience,
   type RunState,
 } from "~/domain/drills/types";
@@ -122,6 +123,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     isAdmin,
     paused,
     userName: user?.name || user?.email || "viewer",
+    me: {
+      // Null on viewer-pin / anonymous; real user.id when signed in.
+      userId: user?.id ?? null,
+      // Always populated so the attestation overlay never has to render
+      // "✓ undefined". Falls back to the viewer-pin label for guests.
+      label: (user?.name || "").trim() || user?.email || "viewer",
+    },
     metaTitle,
   };
 }
@@ -224,7 +232,7 @@ function formatElapsed(startIso: string | null): string {
 
 export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation("roster");
-  const { run, template, isAdmin, paused } = loaderData;
+  const { run, template, isAdmin, paused, me } = loaderData;
   const def = useMemo(() => parseTemplateDefinition(template.definition), [template.definition]);
   const [state, setState] = useState<RunState>(() => parseRunState(run.state));
   const fetcher = useFetcher();
@@ -371,6 +379,60 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
     [persist, readOnly],
   );
 
+  // --- attestation handlers ----------------------------------------------
+  // Each click immediately persists so other phones see the row turn green
+  // (or amber) within a single revalidation. byUserId / byLabel come from
+  // the loader so attribution survives reload.
+  const attestRow = useCallback(
+    (rowId: string, status: "all-clear" | "issue", note?: string) => {
+      if (readOnly) return;
+      setState((s) => {
+        const entry: ClassroomAttestation = {
+          byUserId: me.userId,
+          byLabel: me.label,
+          attestedAt: new Date().toISOString(),
+          status,
+        };
+        if (note && note.length > 0) entry.note = note;
+        const nextState: RunState = {
+          ...s,
+          classroomAttestations: { ...s.classroomAttestations, [rowId]: entry },
+        };
+        persist(nextState);
+        return nextState;
+      });
+    },
+    [me.label, me.userId, persist, readOnly],
+  );
+
+  const unattestRow = useCallback(
+    (rowId: string) => {
+      if (readOnly) return;
+      setState((s) => {
+        if (!(rowId in s.classroomAttestations)) return s;
+        const next = { ...s.classroomAttestations };
+        delete next[rowId];
+        const nextState: RunState = { ...s, classroomAttestations: next };
+        persist(nextState);
+        return nextState;
+      });
+    },
+    [persist, readOnly],
+  );
+
+  // Aggregate summary at top of run page.
+  // Heuristic: roomCount = template rows whose sectionId is "class-roll" if
+  // any rows use that section, else all rows. TODO: revisit once templates
+  // can mark which rows count as classrooms explicitly.
+  const totalRooms = useMemo(() => {
+    const classRollRows = def.rows.filter((r) => r.sectionId === "class-roll");
+    return classRollRows.length > 0 ? classRollRows.length : def.rows.length;
+  }, [def.rows]);
+  const attestedCount = Object.keys(state.classroomAttestations).length;
+  const issuesCount = Object.values(state.classroomAttestations).filter(
+    (a) => a.status === "issue",
+  ).length;
+
   const bannerClass = paused
     ? "bg-amber-500/15 border-amber-400/50 text-amber-100"
     : "bg-rose-600/15 border-rose-500/60 text-rose-100";
@@ -442,11 +504,36 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
             )}
           </div>
 
+          <p
+            className="-mt-3 inline-flex items-center gap-2 rounded-md bg-white/5 px-2.5 py-1 text-xs font-medium text-white/80 self-start"
+            aria-live="polite"
+          >
+            {t("drillsLive.attest.summary", {
+              attested: attestedCount,
+              total: totalRooms,
+              issues: issuesCount,
+            })}
+          </p>
+
           <ChecklistTable
             definition={def}
             state={state}
             onToggle={toggleCell}
             readOnly={readOnly}
+            attestation={{
+              attestations: state.classroomAttestations,
+              onAttest: attestRow,
+              onUnattest: unattestRow,
+              labels: {
+                columnHeader: t("drillsLive.attest.columnHeader"),
+                attest: t("drillsLive.attest.attest"),
+                issue: t("drillsLive.attest.issue"),
+                undo: t("drillsLive.attest.undo"),
+                issueNotePlaceholder: t("drillsLive.attest.issueNotePlaceholder"),
+                issueNoteSave: t("drillsLive.attest.issueNoteSave"),
+                attestedBy: t("drillsLive.attest.attestedBy"),
+              },
+            }}
           />
 
           <section className="rounded-xl border border-white/10 bg-white/5 p-4">

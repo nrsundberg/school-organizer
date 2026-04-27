@@ -11,6 +11,7 @@
 // without pulling in platform code.
 
 import type {
+  ClassroomAttestation,
   RunState,
   DrillEventPayload,
   DrillEventKind,
@@ -24,7 +25,38 @@ function cloneRunState(state: RunState): RunState {
     toggles: { ...state.toggles },
     notes: state.notes,
     actionItems: state.actionItems.map((a) => ({ ...a })),
+    classroomAttestations: cloneAttestations(state.classroomAttestations),
   };
+}
+
+function cloneAttestations(
+  src: Record<string, ClassroomAttestation>,
+): Record<string, ClassroomAttestation> {
+  const out: Record<string, ClassroomAttestation> = {};
+  for (const [k, v] of Object.entries(src)) {
+    out[k] = { ...v };
+  }
+  return out;
+}
+
+/**
+ * Structural equality check used by `diffRunStates` to know whether a
+ * row's attestation entry actually changed (avoid emitting a fresh
+ * row_attested event when only the surrounding state moved). Note key
+ * is treated as undefined === missing so existing entries don't
+ * misclassify as changed.
+ */
+function attestationsEqual(
+  a: ClassroomAttestation,
+  b: ClassroomAttestation,
+): boolean {
+  return (
+    a.byUserId === b.byUserId &&
+    a.byLabel === b.byLabel &&
+    a.attestedAt === b.attestedAt &&
+    a.status === b.status &&
+    (a.note ?? "") === (b.note ?? "")
+  );
 }
 
 /** Minimal ordered delta from `prev` → `next`. No-op pairs emit nothing. */
@@ -90,6 +122,33 @@ export function diffRunStates(
     }
   }
 
+  // Per-classroom attestations. Mirror the toggles loop: union of row ids,
+  // sorted for determinism so two equivalent diffs always emit the same
+  // event sequence (matters for replay tests). Three transitions:
+  //   - missing → present  : row_attested(prev=null, next)
+  //   - present → present' : row_attested(prev, next) when entry changed
+  //   - present → missing  : row_unattested(prev)
+  const attestKeys = new Set<string>([
+    ...Object.keys(prev.classroomAttestations),
+    ...Object.keys(next.classroomAttestations),
+  ]);
+  for (const rowId of [...attestKeys].sort()) {
+    const p = prev.classroomAttestations[rowId];
+    const n = next.classroomAttestations[rowId];
+    if (!p && n) {
+      events.push({ kind: "row_attested", rowId, prev: null, next: { ...n } });
+    } else if (p && !n) {
+      events.push({ kind: "row_unattested", rowId, prev: { ...p } });
+    } else if (p && n && !attestationsEqual(p, n)) {
+      events.push({
+        kind: "row_attested",
+        rowId,
+        prev: { ...p },
+        next: { ...n },
+      });
+    }
+  }
+
   return events;
 }
 
@@ -143,6 +202,18 @@ export function applyEvent(
         ...state,
         actionItems: state.actionItems.filter((a) => a.id !== event.id),
       };
+    case "row_attested": {
+      const classroomAttestations = {
+        ...state.classroomAttestations,
+        [event.rowId]: { ...event.next },
+      };
+      return { ...state, classroomAttestations };
+    }
+    case "row_unattested": {
+      const classroomAttestations = { ...state.classroomAttestations };
+      delete classroomAttestations[event.rowId];
+      return { ...state, classroomAttestations };
+    }
   }
 }
 

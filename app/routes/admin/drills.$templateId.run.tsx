@@ -7,10 +7,12 @@ import type { Route } from "./+types/drills.$templateId.run";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import {
   getActorIdsFromContext,
+  getOptionalUserFromContext,
   getOrgFromContext,
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
 import {
+  type ClassroomAttestation,
   type RunState,
   cycleToggle,
   emptyRunState,
@@ -77,10 +79,15 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
 
+  const me = getOptionalUserFromContext(context);
+  const myUserId = me?.id ?? null;
+  const myLabel = me?.name?.trim() || me?.email || "Admin";
+
   return {
     template,
     metaTitle: t("drills.metaRun", { name: template.name }),
     run: { ...run, updatedAtIso: run.updatedAt.toISOString() },
+    me: { userId: myUserId, label: myLabel },
   };
 }
 
@@ -185,7 +192,7 @@ function newId(): string {
 }
 
 export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
-  const { template, run } = loaderData;
+  const { template, run, me } = loaderData;
   const { t } = useTranslation("admin");
   const def = parseTemplateDefinition(template.definition);
   const [state, setState] = useState<RunState>(() => parseRunState(run.state));
@@ -257,6 +264,51 @@ export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
     }));
   }, []);
 
+  // --- attestation handlers ----------------------------------------------
+  // Single setter writes the attestation overlay; status + optional note
+  // come from the ChecklistTable callback. byUserId / byLabel come from the
+  // loader (`me`) so the row is always attributable to a real human.
+  const attestRow = useCallback(
+    (rowId: string, status: "all-clear" | "issue", note?: string) => {
+      setState((s) => {
+        const entry: ClassroomAttestation = {
+          byUserId: me.userId,
+          byLabel: me.label,
+          attestedAt: new Date().toISOString(),
+          status,
+        };
+        if (note && note.length > 0) entry.note = note;
+        return {
+          ...s,
+          classroomAttestations: { ...s.classroomAttestations, [rowId]: entry },
+        };
+      });
+    },
+    [me.label, me.userId],
+  );
+
+  const unattestRow = useCallback((rowId: string) => {
+    setState((s) => {
+      if (!(rowId in s.classroomAttestations)) return s;
+      const next = { ...s.classroomAttestations };
+      delete next[rowId];
+      return { ...s, classroomAttestations: next };
+    });
+  }, []);
+
+  // Summary tally for the header chip.
+  // Heuristic: roomCount = template rows whose sectionId is "class-roll" if
+  // any rows use that section, else all rows. TODO: revisit once templates
+  // can mark which rows count as classrooms explicitly.
+  const totalRooms = (() => {
+    const classRollRows = def.rows.filter((r) => r.sectionId === "class-roll");
+    return classRollRows.length > 0 ? classRollRows.length : def.rows.length;
+  })();
+  const attestedCount = Object.keys(state.classroomAttestations).length;
+  const issuesCount = Object.values(state.classroomAttestations).filter(
+    (a) => a.status === "issue",
+  ).length;
+
   const persist = () => {
     setConcurrencyError(null);
     const fd = new FormData();
@@ -312,6 +364,16 @@ export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
       <div>
         <h1 className="text-2xl font-bold text-white">{template.name}</h1>
         <p className="text-white/50 text-sm mt-1">{t("drills.run.tap")}</p>
+        <p
+          className="mt-2 inline-flex items-center gap-2 rounded-md bg-white/5 px-2.5 py-1 text-xs font-medium text-white/80"
+          aria-live="polite"
+        >
+          {t("drills.run.attest.summary", {
+            attested: attestedCount,
+            total: totalRooms,
+            issues: issuesCount,
+          })}
+        </p>
       </div>
 
       {concurrencyError && (
@@ -333,7 +395,25 @@ export default function DrillRunPage({ loaderData }: Route.ComponentProps) {
         </div>
       )}
 
-      <ChecklistTable definition={def} state={state} onToggle={toggleCell} />
+      <ChecklistTable
+        definition={def}
+        state={state}
+        onToggle={toggleCell}
+        attestation={{
+          attestations: state.classroomAttestations,
+          onAttest: attestRow,
+          onUnattest: unattestRow,
+          labels: {
+            columnHeader: t("drills.run.attest.columnHeader"),
+            attest: t("drills.run.attest.attest"),
+            issue: t("drills.run.attest.issue"),
+            undo: t("drills.run.attest.undo"),
+            issueNotePlaceholder: t("drills.run.attest.issueNotePlaceholder"),
+            issueNoteSave: t("drills.run.attest.issueNoteSave"),
+            attestedBy: t("drills.run.attest.attestedBy"),
+          },
+        }}
+      />
 
       <section className="rounded-xl border border-white/10 bg-white/5 p-4">
         <h2 className="text-sm font-semibold text-white mb-2">{t("drills.run.notesHeading")}</h2>
