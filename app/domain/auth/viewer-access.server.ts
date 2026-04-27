@@ -257,6 +257,11 @@ export async function setViewerPin(context: any, pin: string): Promise<void> {
 export async function revokeAllViewerSessions(context: any): Promise<number> {
   const prisma = getTenantPrisma(context);
   const now = new Date();
+  // Parameter-count bounded: this compiles to
+  // `UPDATE … SET revokedAt = ? WHERE orgId = ? AND revokedAt IS NULL`
+  // — two bound params regardless of how many sessions match. The IN-list
+  // chunking in ~/db/chunked-in does not apply here; row fan-out is fine
+  // because D1 streams writes for a single statement.
   const result = await prisma.viewerAccessSession.updateMany({
     where: { revokedAt: null },
     data: { revokedAt: now },
