@@ -267,9 +267,32 @@ model DrillRun {
   lastActorOnBehalfOfUserId String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+  events      DrillRunEvent[]
 
   @@index([orgId])
   @@index([templateId])
+}
+
+/// Per-action audit log for a DrillRun. One row per discrete user action
+/// (cell toggle, note edit, action item change, lifecycle transition). The
+/// drill replay UI on /admin/drills/history/:runId folds these forward from
+/// the run's initial state to reconstruct the board at any point in time.
+model DrillRunEvent {
+  id               String   @id @default(cuid())
+  runId            String
+  run              DrillRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  /// "started" | "paused" | "resumed" | "ended" |
+  /// "cell_toggled" | "notes_changed" |
+  /// "action_added" | "action_edited" | "action_toggled" | "action_removed"
+  kind             String
+  /// Delta payload, kind-specific. Stored as a delta (not snapshot) so long
+  /// drills don't bloat the table. See DrillEventPayload in app/domain/drills/types.ts.
+  payload          Json
+  actorUserId      String?
+  onBehalfOfUserId String?
+  occurredAt       DateTime @default(now())
+
+  @@index([runId, occurredAt])
 }
 
 model StripeWebhookEvent {
