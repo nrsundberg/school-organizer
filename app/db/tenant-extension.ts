@@ -70,7 +70,10 @@ export function tenantExtension(orgId: string) {
             }
 
             if (UPDATE_OPS.has(operation) && a.where) {
-              a.where = { AND: [a.where, { orgId }] };
+              // update/delete/upsert require a WhereUniqueInput, which must
+              // expose the unique field (id) at the top level — Prisma rejects
+              // it if wrapped in AND. Merge orgId as an extra filter instead.
+              a.where = { ...(a.where as object), orgId };
             }
 
             if (CREATE_OPS.has(operation)) {
