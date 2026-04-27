@@ -23,11 +23,6 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-    # Triage: the mobile-iphone shard surfaces a real iOS Safari i18n
-    # hydration bug (literal i18n keys in SSR HTML never resolve client-
-    # side on webkit). That bug needs its own fix; until then, don't
-    # block the workflow on it. chromium and pixel still fully gate.
-    continue-on-error: ${{ matrix.shard.name == 'mobile-iphone' }}
     strategy:
       fail-fast: false
       matrix:

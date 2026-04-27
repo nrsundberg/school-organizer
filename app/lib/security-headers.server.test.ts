@@ -68,12 +68,12 @@ test("ships enforcing CSP with the request nonce", () => {
   );
   assert.equal(
     res.headers.get("Content-Security-Policy"),
-    __INTERNAL__.buildEnforcingCsp(TEST_NONCE)
+    __INTERNAL__.buildEnforcingCsp(TEST_NONCE, false)
   );
 });
 
 test("enforcing CSP contains the critical directives", () => {
-  const csp = __INTERNAL__.buildEnforcingCsp(TEST_NONCE);
+  const csp = __INTERNAL__.buildEnforcingCsp(TEST_NONCE, false);
   assert.ok(csp.includes("default-src 'self'"), "default-src missing");
   assert.ok(csp.includes("script-src"), "script-src missing");
   assert.ok(
@@ -88,12 +88,44 @@ test("enforcing CSP contains the critical directives", () => {
   assert.ok(csp.includes("object-src 'none'"), "object-src missing");
   assert.ok(
     csp.includes("upgrade-insecure-requests"),
-    "upgrade-insecure-requests missing"
+    "upgrade-insecure-requests missing in production"
   );
   assert.ok(!csp.includes("'unsafe-eval'"), "unsafe-eval forbidden");
   assert.ok(
     !csp.includes("script-src 'self' 'unsafe-inline'"),
     "script-src must not allow unsafe-inline"
+  );
+});
+
+// `upgrade-insecure-requests` breaks WebKit on plain-HTTP localhost — it
+// upgrades subresource fetches to https://, the wrangler dev server has no
+// TLS, and the JS bundle silently fails with a TLS error. Hydration never
+// runs and i18n keys stay literal. Chrome quietly skips the upgrade because
+// it treats http://localhost as a secure context, so the bug only surfaces
+// on the WebKit Playwright shard.
+test("development CSP omits upgrade-insecure-requests", () => {
+  const csp = __INTERNAL__.buildEnforcingCsp(TEST_NONCE, true);
+  assert.ok(
+    !csp.includes("upgrade-insecure-requests"),
+    "upgrade-insecure-requests must not be present in dev CSP"
+  );
+  // Sanity-check the rest of the policy still ships in dev — we only want
+  // to drop the one directive that breaks WebKit on http://localhost.
+  assert.ok(csp.includes("default-src 'self'"));
+  assert.ok(csp.includes(`'nonce-${TEST_NONCE}'`));
+  assert.ok(csp.includes("frame-ancestors 'none'"));
+});
+
+test("development environment omits upgrade-insecure-requests on the response CSP", () => {
+  const res = applySecurityHeaders(
+    makeResponse(),
+    { ENVIRONMENT: "development" },
+    TEST_NONCE
+  );
+  const csp = res.headers.get("Content-Security-Policy") ?? "";
+  assert.ok(
+    !csp.includes("upgrade-insecure-requests"),
+    "dev response must not include upgrade-insecure-requests"
   );
 });
 

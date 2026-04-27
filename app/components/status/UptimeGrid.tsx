@@ -10,7 +10,13 @@ export function UptimeGrid({ days }: { days: UptimeDay[] }) {
   const { t } = useTranslation("common");
   return (
     <div
-      className="flex w-full items-end gap-[2px]"
+      // overflow-hidden prevents a webkit-only horizontal scroll: 90 cells of
+      // `flex-1 min-w-[2px]` plus 89 `gap-[2px]` exactly equals the inner
+      // viewport width on iPhone 13 (390px - 32px page padding = 358px), and
+      // WebKit's flex rounding pushes the last cell ~5px past the edge.
+      // Cells are unlabeled visual indicators (status/title come from the
+      // role="img" aria-label), so clipping is invisible to all users.
+      className="flex w-full items-end gap-[2px] overflow-hidden"
       role="img"
       aria-label={t("status.uptime.ariaLabel", { summary: summarize(days, t) })}
     >
