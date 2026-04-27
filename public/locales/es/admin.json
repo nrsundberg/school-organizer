@@ -326,6 +326,39 @@
       }
     }
   },
+  "drillsHistory": {
+    "replay": {
+      "events": {
+        "actionAdded": "Elemento de acción agregado",
+        "actionDoneState": "marcado",
+        "actionEdited": "Elemento de acción editado",
+        "actionPendingState": "sin marcar",
+        "actionRemoved": "Elemento de acción eliminado",
+        "actionToggled": "Elemento de acción {{state}}",
+        "byActor": "por {{name}}",
+        "cellToggleBlank": "—",
+        "cellToggleNegative": "✗",
+        "cellTogglePositive": "✓",
+        "cellToggled": "Marcado {{value}}",
+        "empty": "No se registraron acciones para este simulacro.",
+        "ended": "Simulacro finalizado",
+        "notesChanged": "Notas actualizadas",
+        "paused": "Simulacro pausado",
+        "resumed": "Simulacro reanudado",
+        "started": "Simulacro iniciado",
+        "unknownActor": "desconocido",
+        "viaImpersonator": "vía {{admin}}"
+      },
+      "liveRunNotice": "La reproducción estará disponible después de que finalice el simulacro.",
+      "timeline": {
+        "ariaLabel": "Línea de tiempo de la reproducción del simulacro",
+        "pause": "Pausar",
+        "play": "Reproducir",
+        "speed": "{{x}}x",
+        "trackAriaLabel": "Haga clic para buscar"
+      }
+    }
+  },
   "edit": {
     "homeroom": {
       "addStudents": "Agregar estudiantes",
