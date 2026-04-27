@@ -51,7 +51,7 @@ export default defineConfig({
       ]
     : "list",
   use: {
-    baseURL: "http://localhost:8787",
+    baseURL: "http://127.0.0.1:8787",
     // `retain-on-failure` instead of `on-first-retry` — slightly more
     // useful debugging signal, still cleaned up by `preserveOutput`.
     trace: "retain-on-failure",
@@ -78,7 +78,7 @@ export default defineConfig({
   ],
   webServer: {
     command: "npx wrangler dev --log-level=warn",
-    url: "http://localhost:8787",
+    url: "http://127.0.0.1:8787",
     timeout: 180000,
     reuseExistingServer: !process.env.CI,
   },
