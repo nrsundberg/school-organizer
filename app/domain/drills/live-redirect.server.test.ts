@@ -1,132 +1,134 @@
-// Unit tests for the "during a live drill, non-admins are corralled to
-// /drills/live" redirect logic in `app/domain/drills/live-redirect.server.ts`.
+// Unit tests for the live-drill audience-membership gate in
+// `app/domain/drills/live-redirect.server.ts`.
 //
-// The module exposes a pure function so we can exercise every branch without
-// touching Prisma or the request lifecycle.
+// The redirect is a pure function of:
+//   - membership: caller's category (STAFF | VIEWER_PIN | NONE)
+//   - audience:   the active run's audience (STAFF_ONLY | EVERYONE | null)
+//   - pathname:   request URL pathname (allow-list short-circuits)
 //
-// Public API under test:
-//   liveDrillRedirectTarget({ user, pathname, hasActiveDrill, isAdmin }) => string | null
-//   userIsAdmin(user) => boolean
+// Decision matrix:
+//   audience    | STAFF | VIEWER_PIN | NONE
+//   ------------+-------+------------+------
+//   null        |   ✗   |     ✗      |  ✗    (no active drill — never redirect)
+//   STAFF_ONLY  |   ✓   |     ✗      |  ✗
+//   EVERYONE    |   ✓   |     ✓      |  ✗
 //
-// Decision table covered:
-//   - Signed-out user                                → null
-//   - Admin / Controller                             → null
-//   - No active drill                                → null
-//   - Allow-listed path (/drills/live, /logout, /set-password)  → null
-//   - Allow-listed prefix (/api/, /assets/, /build/)            → null
-//   - Otherwise                                      → "/drills/live"
+// Allow-listed paths (/drills/live, /logout, /set-password, /admin/, /api/,
+// /assets/, /build/) ALWAYS short-circuit to null even if the caller is in
+// the audience.
 
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
   liveDrillRedirectTarget,
-  userIsAdmin,
   type LiveRedirectInput,
 } from "./live-redirect.server";
 
-// Minimal user shape — `liveDrillRedirectTarget` only reads { id, role }.
-type TestUser = NonNullable<LiveRedirectInput["user"]>;
-const NON_ADMIN: TestUser = { id: "u1", role: "USER" } as TestUser;
-const ADMIN: TestUser = { id: "u2", role: "ADMIN" } as TestUser;
-
 function call(overrides: Partial<LiveRedirectInput>): string | null {
   return liveDrillRedirectTarget({
-    user: NON_ADMIN,
+    membership: "STAFF",
+    audience: "EVERYONE",
     pathname: "/",
-    hasActiveDrill: true,
-    isAdmin: false,
     ...overrides,
   });
 }
 
-describe("liveDrillRedirectTarget", () => {
-  it("signed-out user + active drill → null (root loader handles auth)", () => {
+describe("liveDrillRedirectTarget — no active drill", () => {
+  it("audience=null + any membership → null", () => {
+    assert.equal(call({ membership: "STAFF", audience: null }), null);
+    assert.equal(call({ membership: "VIEWER_PIN", audience: null }), null);
+    assert.equal(call({ membership: "NONE", audience: null }), null);
+  });
+});
+
+describe("liveDrillRedirectTarget — STAFF_ONLY drill", () => {
+  it("STAFF in audience → /drills/live", () => {
     assert.equal(
-      call({ user: null, isAdmin: false, hasActiveDrill: true, pathname: "/" }),
+      call({ membership: "STAFF", audience: "STAFF_ONLY", pathname: "/" }),
+      "/drills/live",
+    );
+  });
+
+  it("VIEWER_PIN excluded → null", () => {
+    assert.equal(
+      call({ membership: "VIEWER_PIN", audience: "STAFF_ONLY", pathname: "/" }),
       null,
     );
   });
 
-  it("admin + active drill on /admin/drills → null (admin keeps admin access)", () => {
+  it("NONE excluded → null", () => {
     assert.equal(
-      call({ user: ADMIN, isAdmin: true, pathname: "/admin/drills" }),
+      call({ membership: "NONE", audience: "STAFF_ONLY", pathname: "/" }),
       null,
     );
   });
+});
 
-  it("admin + active drill on any tenant page → null", () => {
+describe("liveDrillRedirectTarget — EVERYONE drill", () => {
+  it("STAFF in audience → /drills/live", () => {
     assert.equal(
-      call({ user: ADMIN, isAdmin: true, pathname: "/homerooms" }),
-      null,
+      call({ membership: "STAFF", audience: "EVERYONE", pathname: "/" }),
+      "/drills/live",
     );
   });
 
-  it("non-admin + active drill on / → /drills/live", () => {
-    assert.equal(call({ pathname: "/" }), "/drills/live");
+  it("VIEWER_PIN in audience → /drills/live", () => {
+    assert.equal(
+      call({ membership: "VIEWER_PIN", audience: "EVERYONE", pathname: "/" }),
+      "/drills/live",
+    );
   });
 
-  it("non-admin + active drill on arbitrary tenant page → /drills/live", () => {
-    assert.equal(call({ pathname: "/homerooms" }), "/drills/live");
-    assert.equal(call({ pathname: "/admin/drills" }), "/drills/live");
+  it("NONE never redirected (anonymous handled by other auth flows)", () => {
+    assert.equal(
+      call({ membership: "NONE", audience: "EVERYONE", pathname: "/" }),
+      null,
+    );
   });
+});
 
-  it("any user + active drill on /drills/live → null (already there)", () => {
+describe("liveDrillRedirectTarget — allow-list", () => {
+  it("STAFF + EVERYONE drill on /drills/live → null (already there)", () => {
     assert.equal(call({ pathname: "/drills/live" }), null);
-    assert.equal(
-      call({ user: ADMIN, isAdmin: true, pathname: "/drills/live" }),
-      null,
-    );
   });
 
-  it("any user + active drill on /api/* → null (API is allowed)", () => {
+  it("STAFF + EVERYONE drill on /logout → null", () => {
+    assert.equal(call({ pathname: "/logout" }), null);
+  });
+
+  it("STAFF + EVERYONE drill on /set-password → null", () => {
+    assert.equal(call({ pathname: "/set-password" }), null);
+  });
+
+  it("STAFF + EVERYONE drill on /api/* → null", () => {
     assert.equal(call({ pathname: "/api/foo" }), null);
     assert.equal(call({ pathname: "/api/auth/session" }), null);
-    assert.equal(call({ pathname: "/api/healthz" }), null);
   });
 
-  it("any user + active drill on /assets/* or /build/* → null (static)", () => {
+  it("STAFF + EVERYONE drill on /assets/* or /build/* → null", () => {
     assert.equal(call({ pathname: "/assets/logo.svg" }), null);
     assert.equal(call({ pathname: "/build/index.js" }), null);
   });
 
-  it("any user + active drill on /logout or /set-password → null (auth flows)", () => {
-    assert.equal(call({ pathname: "/logout" }), null);
-    assert.equal(call({ pathname: "/set-password" }), null);
+  it("STAFF + EVERYONE drill on /admin/* → null (admins keep admin access)", () => {
+    assert.equal(call({ pathname: "/admin/drills" }), null);
+    assert.equal(call({ pathname: "/admin/billing" }), null);
   });
 
-  it("non-admin with NO active drill → null no matter the path", () => {
+  it("VIEWER_PIN + EVERYONE drill on /admin/* → null (admin paths never redirect)", () => {
     assert.equal(
-      call({ hasActiveDrill: false, pathname: "/" }),
+      call({ membership: "VIEWER_PIN", pathname: "/admin/drills" }),
       null,
     );
-    assert.equal(
-      call({ hasActiveDrill: false, pathname: "/homerooms" }),
-      null,
-    );
-  });
-
-  it("empty pathname is treated as '/' (still redirected for non-admins)", () => {
-    assert.equal(call({ pathname: "" }), "/drills/live");
   });
 });
 
-describe("userIsAdmin", () => {
-  it("returns false for null / undefined", () => {
-    assert.equal(userIsAdmin(null), false);
-    assert.equal(userIsAdmin(undefined), false);
-  });
-
-  it("returns true for ADMIN", () => {
-    assert.equal(userIsAdmin({ role: "ADMIN" } as TestUser), true);
-  });
-
-  it("returns true for CONTROLLER", () => {
-    assert.equal(userIsAdmin({ role: "CONTROLLER" } as TestUser), true);
-  });
-
-  it("returns false for non-admin roles", () => {
-    assert.equal(userIsAdmin({ role: "USER" } as TestUser), false);
-    assert.equal(userIsAdmin({ role: "VIEWER" } as TestUser), false);
+describe("liveDrillRedirectTarget — empty path", () => {
+  it("empty pathname is treated as '/'", () => {
+    assert.equal(
+      call({ membership: "STAFF", audience: "EVERYONE", pathname: "" }),
+      "/drills/live",
+    );
   });
 });
