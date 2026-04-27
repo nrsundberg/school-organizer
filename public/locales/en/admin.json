@@ -265,6 +265,13 @@
       "subtitle": "Pre-built templates aligned to NFPA, SRP v4.2, FEMA, NWS, and other safety standards. Clone one to make it editable in your org."
     },
     "list": {
+      "activeBanner": {
+        "confirmEnd": "End the live drill now?",
+        "endDrill": "End drill",
+        "endedToast": "Drill ended.",
+        "openLive": "Open live page",
+        "startedAt": "Started {{when}}"
+      },
       "confirmDelete": "Delete this template?",
       "createBlank": "Create blank",
       "delete": "Delete",
@@ -407,6 +414,7 @@
     "table": {
       "actor": "Actor",
       "ariaLabel": "Drill run history",
+      "audience": "Audience",
       "duration": "Duration",
       "ended": "Ended",
       "started": "Started",

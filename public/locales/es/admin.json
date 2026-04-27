@@ -265,6 +265,13 @@
       "subtitle": "Plantillas predefinidas alineadas con NFPA, SRP v4.2, FEMA, NWS y otros estándares de seguridad. Clona una para hacerla editable en tu organización."
     },
     "list": {
+      "activeBanner": {
+        "confirmEnd": "¿Terminar el simulacro en vivo ahora?",
+        "endDrill": "Terminar simulacro",
+        "endedToast": "Simulacro terminado.",
+        "openLive": "Abrir página en vivo",
+        "startedAt": "Iniciado {{when}}"
+      },
       "confirmDelete": "¿Eliminar esta plantilla?",
       "createBlank": "Crear en blanco",
       "delete": "Eliminar",

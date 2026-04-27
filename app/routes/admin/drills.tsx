@@ -1,5 +1,5 @@
 import { Form, Link, redirect } from "react-router";
-import { ClipboardList, History, Library } from "lucide-react";
+import { ClipboardList, History, Library, Radio, StopCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
@@ -8,9 +8,15 @@ import {
   getOrgFromContext,
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
-import { defaultTemplateDefinition, parseDrillAudience, type DrillAudience } from "~/domain/drills/types";
+import {
+  defaultTemplateDefinition,
+  parseDrillAudience,
+  isDrillRunStatus,
+  type DrillAudience,
+  type DrillRunStatus,
+} from "~/domain/drills/types";
 import { StartLivePopover } from "~/domain/drills/StartLivePopover";
-import { startDrillRun } from "~/domain/drills/live.server";
+import { endDrillRun, startDrillRun } from "~/domain/drills/live.server";
 import { dataWithError, dataWithSuccess } from "remix-toast";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
@@ -31,13 +37,41 @@ const btnGhostDanger =
 export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
-  const templates = await prisma.drillTemplate.findMany({
-    orderBy: { updatedAt: "desc" },
-    select: { id: true, name: true, updatedAt: true, defaultAudience: true },
-  });
+  const [templates, activeRunRow] = await Promise.all([
+    prisma.drillTemplate.findMany({
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, name: true, updatedAt: true, defaultAudience: true },
+    }),
+    prisma.drillRun.findFirst({
+      where: { status: { in: ["LIVE", "PAUSED"] } },
+      orderBy: { activatedAt: "desc" },
+      select: {
+        id: true,
+        status: true,
+        audience: true,
+        activatedAt: true,
+        createdAt: true,
+        template: { select: { id: true, name: true } },
+      },
+    }),
+  ]);
+  const activeRun = activeRunRow
+    ? {
+        id: activeRunRow.id,
+        status: (isDrillRunStatus(activeRunRow.status)
+          ? activeRunRow.status
+          : "LIVE") as DrillRunStatus,
+        audience: parseDrillAudience(activeRunRow.audience),
+        startedIso: (
+          activeRunRow.activatedAt ?? activeRunRow.createdAt
+        ).toISOString(),
+        templateId: activeRunRow.template?.id ?? null,
+        templateName: activeRunRow.template?.name ?? "(deleted template)",
+      }
+    : null;
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
-  return { templates, metaTitle: t("drills.metaList") };
+  return { templates, activeRun, metaTitle: t("drills.metaList") };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -98,12 +132,32 @@ export async function action({ request, context }: Route.ActionArgs) {
     throw redirect("/drills/live");
   }
 
+  if (intent === "end-active") {
+    const runId = String(formData.get("runId") ?? "");
+    if (!runId) {
+      return dataWithError(null, t("drills.list.errors.missingId"));
+    }
+    const orgId = getOrgFromContext(context).id;
+    const actor = getActorIdsFromContext(context);
+    try {
+      await endDrillRun(prisma, orgId, runId, actor);
+    } catch (err) {
+      if (err instanceof Response && (err.status === 404 || err.status === 409)) {
+        // Stale UI: someone else already ended it. Surface a soft success so
+        // the admin lands on a consistent "no active drill" state.
+        return dataWithSuccess(null, t("drills.list.activeBanner.endedToast"));
+      }
+      throw err;
+    }
+    return dataWithSuccess(null, t("drills.list.activeBanner.endedToast"));
+  }
+
   return dataWithError(null, t("drills.list.errors.unknown"));
 }
 
 
 export default function AdminDrillList({ loaderData }: Route.ComponentProps) {
-  const { templates } = loaderData;
+  const { templates, activeRun } = loaderData;
   const { t, i18n } = useTranslation("admin");
 
   return (
@@ -117,6 +171,84 @@ export default function AdminDrillList({ loaderData }: Route.ComponentProps) {
           </p>
         </div>
       </div>
+
+      {activeRun && (
+        <section
+          className={
+            activeRun.status === "PAUSED"
+              ? "rounded-xl border border-amber-500/40 bg-amber-500/10 p-4"
+              : "rounded-xl border border-rose-500/40 bg-rose-500/10 p-4"
+          }
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <Radio
+                className={
+                  activeRun.status === "PAUSED"
+                    ? "w-6 h-6 text-amber-300 flex-shrink-0 mt-0.5"
+                    : "w-6 h-6 text-rose-300 flex-shrink-0 mt-0.5 animate-pulse"
+                }
+              />
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={
+                      activeRun.status === "PAUSED"
+                        ? "inline-flex items-center rounded-full bg-amber-500/20 text-amber-200 border border-amber-500/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                        : "inline-flex items-center rounded-full bg-rose-600/20 text-rose-200 border border-rose-500/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                    }
+                  >
+                    {t(`drillsHistory.status.${activeRun.status}`)}
+                  </span>
+                  <span
+                    className={
+                      activeRun.audience === "STAFF_ONLY"
+                        ? "inline-flex items-center rounded-full bg-blue-500/20 text-blue-200 border border-blue-500/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                        : "inline-flex items-center rounded-full bg-white/10 text-white/70 border border-white/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                    }
+                  >
+                    {activeRun.audience === "STAFF_ONLY"
+                      ? t("drillsHistory.replay.audience.staffOnly")
+                      : t("drillsHistory.replay.audience.everyone")}
+                  </span>
+                  <h2 className="text-base font-semibold text-white">
+                    {activeRun.templateName}
+                  </h2>
+                </div>
+                <p className="text-xs text-white/60 mt-1">
+                  {t("drills.list.activeBanner.startedAt", {
+                    when: new Date(activeRun.startedIso).toLocaleString(
+                      i18n.language,
+                    ),
+                  })}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link to="/drills/live" className={btnSecondary}>
+                {t("drills.list.activeBanner.openLive")}
+              </Link>
+              <Form
+                method="post"
+                onSubmit={(e) =>
+                  !confirm(t("drills.list.activeBanner.confirmEnd")) &&
+                  e.preventDefault()
+                }
+              >
+                <input type="hidden" name="intent" value="end-active" />
+                <input type="hidden" name="runId" value={activeRun.id} />
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-rose-500 transition-colors disabled:opacity-50"
+                >
+                  <StopCircle className="w-3.5 h-3.5" />
+                  {t("drills.list.activeBanner.endDrill")}
+                </button>
+              </Form>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="rounded-xl border border-white/10 bg-white/5 p-4">
         <div className="flex items-center justify-between gap-3 mb-3">
