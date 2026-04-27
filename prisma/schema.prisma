@@ -237,6 +237,12 @@ model DrillTemplate {
   /// Default audience for new live runs from this template:
   /// "STAFF_ONLY" | "EVERYONE". Pre-selected on the start-live confirm.
   defaultAudience String     @default("EVERYONE")
+  /// Required runs per calendar year. NFPA 101 requires monthly K-12 fire
+  /// drills (12/yr); most state DOEs require ~4 lockdown drills/yr. Null
+  /// means "no cadence tracking" — admins see no overdue pill on the list
+  /// and no due-in countdown. Existing rows backfill to NULL so this is a
+  /// purely additive feature.
+  requiredPerYear Int?
   runs         DrillRun[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -261,6 +267,18 @@ model DrillRun {
   /// Audience this run was started with: "STAFF_ONLY" | "EVERYONE".
   /// Frozen at start time. See DrillTemplate.defaultAudience.
   audience    String        @default("EVERYONE")
+  /// Mode this run was recorded as: "DRILL" | "ACTUAL" | "FALSE_ALARM".
+  /// "DRILL" is a planned exercise (the default). "ACTUAL" marks a real
+  /// emergency captured in the same UI. "FALSE_ALARM" is a real alert that
+  /// turned out to be unfounded. Captured for compliance reporting; not
+  /// currently gating any destructive action (future: parent SMS, 911).
+  mode        String        @default("DRILL")
+  /// Userid of the responsible party (typically a principal) who attested
+  /// the drill record. Plain string — no FK to User — to avoid coupling
+  /// historical drill rows to user lifecycle / cross-tenant deletes.
+  /// Set together with `signedOffAt` by the sign-off action.
+  signedOffByUserId String?
+  signedOffAt       DateTime?
   activatedAt DateTime?
   pausedAt    DateTime?
   endedAt     DateTime?

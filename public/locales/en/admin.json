@@ -241,6 +241,14 @@
         "saveButton": "Save audience default",
         "saved": "Audience default saved."
       },
+      "cadence": {
+        "heading": "Required cadence",
+        "help": "How many runs per year are required (e.g. NFPA 101 monthly fire drills = 12). Leave empty to skip cadence tracking — no \"overdue\" pill will be shown on the list.",
+        "fieldLabel": "Runs per year",
+        "placeholder": "e.g. 12",
+        "saveButton": "Save cadence",
+        "saved": "Cadence saved."
+      },
       "toasts": {
         "layoutSaved": "Layout saved.",
         "nameSaved": "Name saved."
@@ -297,7 +305,13 @@
       "subtitle": "Templates for fire, lockdown, shelter-in-place, reunification, and more. Build your own or start from the global library.",
       "updated": "Updated {{when}}",
       "viewHistory": "View history",
-      "yourTemplates": "Your templates"
+      "yourTemplates": "Your templates",
+      "cadence": {
+        "overdue": "Overdue {{days}}d",
+        "overdueTitle": "Past the required cadence — schedule a run.",
+        "dueIn": "Due in {{days}}d",
+        "dueTitle": "Within the required cadence window."
+      }
     },
     "metaEdit": "Edit – {{name}}",
     "metaEditFallback": "Edit checklist",

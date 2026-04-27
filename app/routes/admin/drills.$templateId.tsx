@@ -1,5 +1,5 @@
 import { Form, Link, redirect, useFetcher } from "react-router";
-import { ArrowDown, ArrowLeft, ArrowUp, Eye, Plus, Trash2, Users } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, CalendarClock, Eye, Plus, Trash2, Users } from "lucide-react";
 import { StartLivePopover } from "~/domain/drills/StartLivePopover";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
@@ -47,11 +47,25 @@ const renameSchema = z.object({
 const startLiveWithAudienceSchema = z.object({
   intent: z.literal("start-live"),
   audience: z.enum(["STAFF_ONLY", "EVERYONE"]).default("EVERYONE"),
+  // Mode default mirrors the column default. ACTUAL/FALSE_ALARM are explicit
+  // per-event overrides; there is no template-level default.
+  mode: z.enum(["DRILL", "ACTUAL", "FALSE_ALARM"]).default("DRILL"),
 });
 
 const setDefaultAudienceSchema = z.object({
   intent: z.literal("setDefaultAudience"),
   audience: z.enum(["STAFF_ONLY", "EVERYONE"]),
+});
+
+// Cadence target. Empty input clears the column (no cadence tracking).
+// Hard-cap at 365 because once-a-day is the most aggressive pattern that
+// makes sense on a business-day-aware product; numbers above that are
+// almost certainly typos that would make the "next due" math useless.
+const setCadenceSchema = z.object({
+  intent: z.literal("setCadence"),
+  requiredPerYear: z
+    .union([z.literal(""), z.coerce.number().int().min(1).max(365)])
+    .transform((v) => (v === "" ? null : v)),
 });
 
 const saveDefinitionSchema = zfd.formData({
@@ -90,7 +104,14 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   }
   const template = await prisma.drillTemplate.findFirst({
     where: { id },
-    select: { id: true, name: true, definition: true, updatedAt: true, defaultAudience: true },
+    select: {
+      id: true,
+      name: true,
+      definition: true,
+      updatedAt: true,
+      defaultAudience: true,
+      requiredPerYear: true,
+    },
   });
   if (!template) {
     throw new Response("Not found", { status: 404 });
@@ -115,6 +136,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
     "start-live": startLiveWithAudienceSchema,
     setDefaultAudience: setDefaultAudienceSchema,
     saveDefinition: saveDefinitionSchema,
+    setCadence: setCadenceSchema,
   });
   if (!result.success) return result.response;
 
@@ -146,6 +168,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
           undefined,
           actor,
           result.data.audience,
+          result.data.mode,
         );
       } catch (err) {
         // startDrillRun throws a Response (409) when another drill is already
@@ -167,6 +190,14 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         data: { definition: result.data.definition as unknown as Prisma.InputJsonValue },
       });
       return dataWithSuccess(null, t("drills.edit.toasts.layoutSaved"));
+    }
+
+    if (result.intent === "setCadence") {
+      await prisma.drillTemplate.update({
+        where: { id },
+        data: { requiredPerYear: result.data.requiredPerYear },
+      });
+      return dataWithSuccess(null, t("drills.edit.cadence.saved"));
     }
   } catch (err) {
     // A redirect from start-live must propagate — React Router surfaces
@@ -434,6 +465,40 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
             className={`${formClasses.btnSecondary} self-start mt-2`}
           >
             {t("drills.edit.defaultAudience.saveButton")}
+          </button>
+        </Form>
+      </section>
+
+      <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <div className="flex items-start gap-3">
+          <CalendarClock className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h2 className="text-sm font-semibold text-white">
+              {t("drills.edit.cadence.heading")}
+            </h2>
+            <p className="text-white/50 text-xs mt-0.5">
+              {t("drills.edit.cadence.help")}
+            </p>
+          </div>
+        </div>
+        <Form method="post" className="flex flex-wrap items-end gap-3 mt-3">
+          <input type="hidden" name="intent" value="setCadence" />
+          <label className={`${formClasses.labelStack} flex-1 min-w-[12rem] max-w-xs`}>
+            {t("drills.edit.cadence.fieldLabel")}
+            <input
+              type="number"
+              name="requiredPerYear"
+              min={1}
+              max={365}
+              step={1}
+              key={`${template.id}-${template.updatedAt.toISOString()}-cadence`}
+              defaultValue={template.requiredPerYear ?? ""}
+              placeholder={t("drills.edit.cadence.placeholder")}
+              className={formClasses.input}
+            />
+          </label>
+          <button type="submit" className={formClasses.btnSecondary}>
+            {t("drills.edit.cadence.saveButton")}
           </button>
         </Form>
       </section>

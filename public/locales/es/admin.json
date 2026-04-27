@@ -241,6 +241,14 @@
         "saveButton": "Guardar audiencia predeterminada",
         "saved": "Audiencia predeterminada guardada."
       },
+      "cadence": {
+        "heading": "Cadencia requerida",
+        "help": "Cuántos simulacros se requieren al año (p. ej., NFPA 101 simulacros mensuales de incendio = 12). Déjalo vacío para no rastrear la cadencia — no se mostrará el indicador \"vencido\" en la lista.",
+        "fieldLabel": "Simulacros por año",
+        "placeholder": "p. ej., 12",
+        "saveButton": "Guardar cadencia",
+        "saved": "Cadencia guardada."
+      },
       "toasts": {
         "layoutSaved": "Diseño guardado.",
         "nameSaved": "Nombre guardado."
@@ -296,7 +304,13 @@
       "startLive": "Iniciar simulacro en vivo",
       "subtitle": "Plantillas para incendio, encierro, refugio en el lugar, reunificación y más. Crea las tuyas o empieza desde la biblioteca global.",
       "updated": "Actualizada {{when}}",
-      "yourTemplates": "Tus plantillas"
+      "yourTemplates": "Tus plantillas",
+      "cadence": {
+        "overdue": "Vencido {{days}}d",
+        "overdueTitle": "Pasó la cadencia requerida — programa un simulacro.",
+        "dueIn": "Vence en {{days}}d",
+        "dueTitle": "Dentro de la ventana de cadencia requerida."
+      }
     },
     "metaEdit": "Editar – {{name}}",
     "metaEditFallback": "Editar lista",
