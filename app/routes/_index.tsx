@@ -590,8 +590,10 @@ function ControllerTabView({
           maxSpaceNumber={maxSpaceNumber}
         />
       ) : (
-        <div className="w-full font-extrabold text-large text-center">
-          <ParkingRows data={spaces} cols={10} permitted={true} compact />
+        <div className="flex justify-center">
+          <div className="grid w-full md:w-5/6 font-extrabold text-large text-center">
+            <ParkingRows data={spaces} cols={10} permitted={true} />
+          </div>
         </div>
       )}
     </div>

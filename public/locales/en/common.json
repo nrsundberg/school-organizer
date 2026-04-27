@@ -164,6 +164,7 @@
     "login": "Login",
     "logoAlt": "{{orgName}} logo",
     "logout": "Logout",
+    "menu": "Menu",
     "tenantTitle": "{{orgName}} - Car Line Bingo",
     "wordmarkAlt": "PickupRoster"
   },
