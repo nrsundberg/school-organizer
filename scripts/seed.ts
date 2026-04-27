@@ -73,6 +73,43 @@ async function seed() {
   console.log(`\n  Temporary password: ${tempPassword}`);
   console.log(`  → They will be prompted to set a new password on first login.\n`);
 
+  // Ensure the seeded user is attached to an Org. On a virgin DB the User
+  // INSERT above doesn't set orgId — without an org the tenant-scoped
+  // routes (drills, history, dashboard) all bail, and the demo template +
+  // historical runs below would silently no-op. Use a stable "dev" slug
+  // so re-runs and other dev tooling can find the same org.
+  const devOrgSlug = "dev";
+  const devOrgName = "Dev School";
+  let userOrgId: string | undefined;
+  const userOrgRow = await db.execute({
+    sql: `SELECT "orgId" FROM "User" WHERE id = ?`,
+    args: [userId],
+  });
+  userOrgId = (userOrgRow.rows[0]?.orgId as string | null) ?? undefined;
+
+  if (!userOrgId) {
+    const existingOrg = await db.execute({
+      sql: `SELECT id FROM "Org" WHERE slug = ?`,
+      args: [devOrgSlug],
+    });
+    if (existingOrg.rows.length > 0) {
+      userOrgId = existingOrg.rows[0].id as string;
+    } else {
+      userOrgId = generateId();
+      await db.execute({
+        sql: `INSERT INTO "Org" (id, name, slug, status, billingPlan, createdAt, updatedAt)
+              VALUES (?, ?, ?, 'ACTIVE', 'FREE', ?, ?)`,
+        args: [userOrgId, devOrgName, devOrgSlug, now, now],
+      });
+      console.log(`✓ Created dev Org "${devOrgSlug}" (${userOrgId})`);
+    }
+    await db.execute({
+      sql: `UPDATE "User" SET "orgId" = ?, updatedAt = ? WHERE id = ?`,
+      args: [userOrgId, now, userId],
+    });
+    console.log(`✓ Attached ${email} to org "${devOrgSlug}"`);
+  }
+
   const demoDefinition = JSON.stringify({
     columns: [
       { id: "fdcol-grade", label: "Grade", kind: "text" },
@@ -87,11 +124,7 @@ async function seed() {
   });
 
   try {
-    const orgRow = await db.execute({
-      sql: `SELECT "orgId" FROM "User" WHERE email = ?`,
-      args: [email],
-    });
-    const orgId = orgRow.rows[0]?.orgId as string | undefined;
+    const orgId = userOrgId;
     if (orgId) {
       const exists = await db.execute({
         sql: `SELECT id FROM "DrillTemplate" WHERE "orgId" = ? AND name = ?`,
