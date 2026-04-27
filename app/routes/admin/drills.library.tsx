@@ -25,10 +25,13 @@ const btnSecondary =
 export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
-  const cloned = await prisma.drillTemplate.findMany({
-    where: { globalKey: { not: null } },
-    select: { globalKey: true, id: true },
-  });
+  const [cloned, teacherCount] = await Promise.all([
+    prisma.drillTemplate.findMany({
+      where: { globalKey: { not: null } },
+      select: { globalKey: true, id: true },
+    }),
+    prisma.teacher.count(),
+  ]);
   // Map of globalKey -> orgTemplateId so the UI can deep-link "Already cloned".
   const clonedByKey: Record<string, string> = {};
   for (const row of cloned) {
@@ -41,6 +44,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return {
     templates: GLOBAL_TEMPLATES,
     clonedByKey,
+    teacherCount,
     metaTitle: t("drills.metaLibrary"),
   };
 }
@@ -88,6 +92,8 @@ interface CardTemplate {
   rowCount: number;
   sectionCount: number;
   instructionsPeek: string;
+  /** True when this template's class-roll rows would be replaced with the org's teachers on clone. */
+  hasClassRoll: boolean;
 }
 
 function summarize(t: (typeof GLOBAL_TEMPLATES)[number]): CardTemplate {
@@ -100,6 +106,14 @@ function summarize(t: (typeof GLOBAL_TEMPLATES)[number]): CardTemplate {
       .map((s) => s.trim())
       .find((s) => s.length > 0) ?? "";
   const peek = firstPara.replace(/\*\*/g, "").replace(/\*/g, "");
+  // Class-roll detection mirrors clone.server.ts: a Teacher column AND
+  // either no sections at all or a section literally named "class-roll".
+  const hasTeacherCol = t.definition.columns.some(
+    (c) => c.id === "teacher" || c.label.trim().toLowerCase() === "teacher",
+  );
+  const hasClassRollSection =
+    !sections.length || sections.some((s) => s.id === "class-roll");
+  const hasClassRoll = hasTeacherCol && hasClassRollSection;
   return {
     globalKey: t.globalKey,
     name: t.name,
@@ -110,11 +124,12 @@ function summarize(t: (typeof GLOBAL_TEMPLATES)[number]): CardTemplate {
     rowCount: rows.length,
     sectionCount: sections.length,
     instructionsPeek: peek,
+    hasClassRoll,
   };
 }
 
 export default function AdminDrillLibrary({ loaderData }: Route.ComponentProps) {
-  const { templates, clonedByKey } = loaderData;
+  const { templates, clonedByKey, teacherCount } = loaderData;
   const { t } = useTranslation("admin");
 
   // Group by DrillType, preserving the canonical label-map order.
@@ -201,12 +216,19 @@ export default function AdminDrillLibrary({ loaderData }: Route.ComponentProps) 
                         </Link>
                       </div>
                     ) : (
-                      <Form method="post">
+                      <Form method="post" className="flex flex-col gap-1.5">
                         <input type="hidden" name="intent" value="clone" />
                         <input type="hidden" name="globalKey" value={tpl.globalKey} />
                         <button type="submit" className={`${btnPrimary} w-full`}>
                           {t("drills.library.clone")}
                         </button>
+                        {tpl.hasClassRoll && teacherCount > 0 ? (
+                          <p className="text-[11px] text-white/40 text-center">
+                            {t("drills.library.teacherFanoutHint", {
+                              count: teacherCount,
+                            })}
+                          </p>
+                        ) : null}
                       </Form>
                     )}
                   </div>

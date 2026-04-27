@@ -262,7 +262,9 @@
       "section_other": " · {{count}} secciones",
       "step_one": "{{count}} paso",
       "step_other": "{{count}} pasos",
-      "subtitle": "Plantillas predefinidas alineadas con NFPA, SRP v4.2, FEMA, NWS y otros estándares de seguridad. Clona una para hacerla editable en tu organización."
+      "subtitle": "Plantillas predefinidas alineadas con NFPA, SRP v4.2, FEMA, NWS y otros estándares de seguridad. Clona una para hacerla editable en tu organización.",
+      "teacherFanoutHint_one": "{{count}} docente se completará automáticamente",
+      "teacherFanoutHint_other": "{{count}} docentes se completarán automáticamente"
     },
     "list": {
       "confirmDelete": "¿Eliminar esta plantilla?",

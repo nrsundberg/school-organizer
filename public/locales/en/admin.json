@@ -262,7 +262,9 @@
       "section_other": " · {{count}} sections",
       "step_one": "{{count}} step",
       "step_other": "{{count}} steps",
-      "subtitle": "Pre-built templates aligned to NFPA, SRP v4.2, FEMA, NWS, and other safety standards. Clone one to make it editable in your org."
+      "subtitle": "Pre-built templates aligned to NFPA, SRP v4.2, FEMA, NWS, and other safety standards. Clone one to make it editable in your org.",
+      "teacherFanoutHint_one": "{{count}} teacher will be auto-filled",
+      "teacherFanoutHint_other": "{{count}} teachers will be auto-filled"
     },
     "list": {
       "confirmDelete": "Delete this template?",
