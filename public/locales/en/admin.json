@@ -278,6 +278,7 @@
       "startLive": "Start live drill",
       "subtitle": "Templates for fire, lockdown, shelter-in-place, reunification, and more. Build your own or start from the global library.",
       "updated": "Updated {{when}}",
+      "viewHistory": "View history",
       "yourTemplates": "Your templates"
     },
     "metaEdit": "Edit – {{name}}",
@@ -324,6 +325,45 @@
         "cleared": "Checklist cleared.",
         "saved": "Saved."
       }
+    }
+  },
+  "drillsHistory": {
+    "empty": {
+      "body": "No drills have been run yet. Start one from the Drill checklists page.",
+      "cta": "Go to drill checklists"
+    },
+    "heading": "Drill history",
+    "metaTitle": "Admin – Drill history",
+    "replay": {
+      "actionDone": "Done",
+      "actionEmpty": "(empty item)",
+      "actionPending": "Not done",
+      "back": "Back to drill history",
+      "followUpHeading": "Follow-up items",
+      "lastActor": "Last actor: {{actor}}",
+      "metaTitle": "Replay – {{name}}",
+      "noItems": "No follow-up items recorded.",
+      "noNotes": "No notes recorded.",
+      "notesHeading": "Notes",
+      "print": "Print",
+      "subhead": "Run on {{started}} · {{duration}}"
+    },
+    "status": {
+      "DRAFT": "Draft",
+      "ENDED": "Ended",
+      "LIVE": "Live",
+      "PAUSED": "Paused"
+    },
+    "subtitle": "Past drill runs are archived here. Click a row to replay the saved checklist, notes, and follow-up items.",
+    "table": {
+      "actor": "Actor",
+      "ariaLabel": "Drill run history",
+      "duration": "Duration",
+      "ended": "Ended",
+      "started": "Started",
+      "status": "Status",
+      "template": "Template",
+      "truncated": "Showing the most recent {{cap}} runs."
     }
   },
   "edit": {

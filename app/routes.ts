@@ -19,9 +19,13 @@ export default [
     route("branding", "routes/admin/branding.tsx"),
     route("history", "routes/admin/history.tsx"),
     route("drills", "routes/admin/drills.tsx"),
-    // /admin/drills/library — must come BEFORE the :templateId param route so
-    // it doesn't get swallowed by the dynamic segment.
+    // /admin/drills/library and /admin/drills/history — must come BEFORE the
+    // :templateId param route so they don't get swallowed by the dynamic
+    // segment. The history detail route uses a distinct first segment so it
+    // can't collide with templateId.
     route("drills/library", "routes/admin/drills.library.tsx"),
+    route("drills/history", "routes/admin/drills.history.tsx"),
+    route("drills/history/:runId", "routes/admin/drills.history.$runId.tsx"),
     route("drills/:templateId/run", "routes/admin/drills.$templateId.run.tsx"),
     route("drills/:templateId", "routes/admin/drills.$templateId.tsx"),
   ]),
