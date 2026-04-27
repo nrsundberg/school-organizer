@@ -207,6 +207,7 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
     pathname === "/pricing" ||
     pathname === "/faqs" ||
     pathname === "/status" ||
+    pathname === "/api/healthz" ||
     pathname === "/blog" ||
     pathname.startsWith("/blog/") ||
     pathname === "/guides" ||
