@@ -12,6 +12,8 @@ import {
   defaultTemplateDefinition,
   parseDrillAudience,
   parseDrillMode,
+  parseTemplateDefinition,
+  seedRunStateFromTemplate,
   type DrillAudience,
 } from "~/domain/drills/types";
 import { StartLivePopover } from "~/domain/drills/StartLivePopover";
@@ -126,8 +128,15 @@ export async function action({ request, context }: Route.ActionArgs) {
     const mode = parseDrillMode(formData.get("mode"));
     const orgId = getOrgFromContext(context).id;
     const actor = getActorIdsFromContext(context);
+    const tpl = await prisma.drillTemplate.findFirst({
+      where: { id },
+      select: { definition: true },
+    });
+    const initialState = tpl
+      ? seedRunStateFromTemplate(parseTemplateDefinition(tpl.definition))
+      : undefined;
     try {
-      await startDrillRun(prisma, orgId, id, undefined, actor, audience, mode);
+      await startDrillRun(prisma, orgId, id, initialState, actor, audience, mode);
     } catch (err) {
       if (err instanceof Response && err.status === 409) {
         return dataWithError(null, t("drills.list.errors.anotherLive"));

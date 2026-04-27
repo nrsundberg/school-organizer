@@ -26,6 +26,13 @@ export interface TemplateDefinition {
   rows: RowDef[];
   /** Optional row groupings — e.g. "During" vs "After" for earthquake drills */
   sections?: SectionDef[];
+  /**
+   * Optional follow-up tasks pre-populated on every fresh run started from
+   * this template (e.g. "Refill first-aid kit", "Notify district office").
+   * Items become unchecked `ActionItem`s in the new run's `RunState` so
+   * runners can tick them off during/after the drill.
+   */
+  defaultActionItems?: string[];
 }
 
 /**
@@ -343,11 +350,38 @@ export function parseTemplateDefinition(raw: Prisma.JsonValue): TemplateDefiniti
     }
   }
 
+  const defaultActionItems = Array.isArray(def.defaultActionItems)
+    ? def.defaultActionItems
+        .filter((s): s is string => typeof s === "string")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+    : undefined;
+
   const result: TemplateDefinition = { columns, rows };
   if (sections && sections.length > 0) {
     result.sections = sections;
   }
+  if (defaultActionItems && defaultActionItems.length > 0) {
+    result.defaultActionItems = defaultActionItems;
+  }
   return result;
+}
+
+/**
+ * Build a fresh `RunState` for a new run started from this template,
+ * pre-populating the follow-up checklist with the template's default items.
+ * Notes/toggles always start blank — only the action-item list is seeded.
+ */
+export function seedRunStateFromTemplate(def: TemplateDefinition): RunState {
+  const state = emptyRunState();
+  if (def.defaultActionItems && def.defaultActionItems.length > 0) {
+    state.actionItems = def.defaultActionItems.map((text) => ({
+      id: crypto.randomUUID(),
+      text,
+      done: false,
+    }));
+  }
+  return state;
 }
 
 /**

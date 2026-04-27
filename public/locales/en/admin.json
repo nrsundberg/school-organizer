@@ -260,7 +260,24 @@
       },
       "toasts": {
         "layoutSaved": "Layout saved.",
-        "nameSaved": "Name saved."
+        "nameSaved": "Name saved.",
+        "instructionsSaved": "Instructions saved."
+      },
+      "instructions": {
+        "heading": "Notes / Instructions (SOP)",
+        "help": "Markdown directive shown to runners before the drill starts (e.g. \"Locks, Lights, Out of Sight\"). Optional.",
+        "placeholder": "**Fire Evacuation** — sound the alarm, single-file to the assigned assembly point, take roll, report missing.",
+        "saveButton": "Save instructions"
+      },
+      "followUp": {
+        "heading": "Default follow-up tasks",
+        "help": "Pre-populated checklist items every new run starts with — e.g. \"Refill first-aid kit\" or \"Notify district\". Saved when you Save layout.",
+        "addItem": "Add follow-up item",
+        "removeItem": "Remove follow-up item",
+        "empty": "No default follow-up items yet.",
+        "itemPlaceholder": "e.g. Email district safety officer the drill log",
+        "itemLabel": "Default follow-up item {{n}}",
+        "savedWithLayout": "Saved when you click Save layout above."
       }
     },
     "library": {

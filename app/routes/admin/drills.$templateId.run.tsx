@@ -18,6 +18,7 @@ import {
   emptyRunState,
   parseRunState,
   parseTemplateDefinition,
+  seedRunStateFromTemplate,
   toggleKey,
 } from "~/domain/drills/types";
 import { ChecklistTable } from "~/domain/drills/ChecklistTable";
@@ -64,11 +65,12 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   });
   if (!run) {
     const orgId = getOrgFromContext(context).id;
+    const seeded = seedRunStateFromTemplate(parseTemplateDefinition(template.definition));
     run = await prisma.drillRun.create({
       data: {
         orgId,
         templateId,
-        state: emptyRunState() as object,
+        state: seeded as object,
         lastActorUserId: actor.actorUserId,
         lastActorOnBehalfOfUserId: actor.onBehalfOfUserId,
       },
@@ -156,6 +158,13 @@ export async function action({ request, context, params }: Route.ActionArgs) {
   }
 
   if (intent === "reset") {
+    const tpl = await prisma.drillTemplate.findFirst({
+      where: { id: templateId },
+      select: { definition: true },
+    });
+    const fresh = tpl
+      ? seedRunStateFromTemplate(parseTemplateDefinition(tpl.definition))
+      : emptyRunState();
     const existingRun = await prisma.drillRun.findFirst({
       where: { templateId },
       orderBy: { updatedAt: "desc" },
@@ -165,7 +174,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       await prisma.drillRun.update({
         where: { id: existingRun.id },
         data: {
-          state: emptyRunState() as object,
+          state: fresh as object,
           lastActorUserId: actor.actorUserId,
           lastActorOnBehalfOfUserId: actor.onBehalfOfUserId,
         },
@@ -175,7 +184,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         data: {
           orgId,
           templateId,
-          state: emptyRunState() as object,
+          state: fresh as object,
           lastActorUserId: actor.actorUserId,
           lastActorOnBehalfOfUserId: actor.onBehalfOfUserId,
         },

@@ -260,7 +260,24 @@
       },
       "toasts": {
         "layoutSaved": "Diseño guardado.",
-        "nameSaved": "Nombre guardado."
+        "nameSaved": "Nombre guardado.",
+        "instructionsSaved": "Instrucciones guardadas."
+      },
+      "instructions": {
+        "heading": "Notas / Instrucciones (POE)",
+        "help": "Directiva en Markdown mostrada a quienes ejecutan el simulacro antes de iniciarlo (p. ej. \"Cerraduras, Luces, Fuera de Vista\"). Opcional.",
+        "placeholder": "**Evacuación por incendio** — active la alarma, salga en fila única al punto de reunión, pase lista, reporte ausentes.",
+        "saveButton": "Guardar instrucciones"
+      },
+      "followUp": {
+        "heading": "Tareas de seguimiento por defecto",
+        "help": "Elementos de la lista que cada nuevo simulacro tendrá precargados — p. ej. \"Reponer botiquín\" o \"Notificar al distrito\". Se guarda al pulsar Guardar diseño.",
+        "addItem": "Añadir tarea",
+        "removeItem": "Eliminar tarea",
+        "empty": "Aún no hay tareas de seguimiento por defecto.",
+        "itemPlaceholder": "p. ej. Enviar al oficial de seguridad del distrito el registro del simulacro",
+        "itemLabel": "Tarea de seguimiento {{n}}",
+        "savedWithLayout": "Se guarda al pulsar Guardar diseño arriba."
       }
     },
     "library": {

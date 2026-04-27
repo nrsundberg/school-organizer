@@ -16,6 +16,7 @@ import {
   parseDrillMode,
   parseRunState,
   parseTemplateDefinition,
+  seedRunStateFromTemplate,
   toggleKey,
 } from "./types";
 import type { DrillAudience, DrillMode } from "./types";
@@ -106,6 +107,69 @@ describe("parseTemplateDefinition", () => {
   it("returns defaultTemplateDefinition() for number input", () => {
     const out = parseTemplateDefinition(42 as unknown as null);
     assert.equal(out.columns.length, defaultTemplateDefinition().columns.length);
+  });
+
+  it("parses defaultActionItems and trims/drops empty entries", () => {
+    const input = {
+      columns: [{ id: "c1", label: "Done", kind: "toggle" as const }],
+      rows: [{ id: "r1", cells: {} }],
+      defaultActionItems: ["  Refill first-aid kit  ", "", "Notify district", "   "],
+    };
+    const out = parseTemplateDefinition(input as object);
+    assert.deepEqual(out.defaultActionItems, ["Refill first-aid kit", "Notify district"]);
+  });
+
+  it("omits defaultActionItems when input is missing or empty", () => {
+    const noField = parseTemplateDefinition({
+      columns: [{ id: "c1", label: "Done", kind: "toggle" as const }],
+      rows: [{ id: "r1", cells: {} }],
+    } as object);
+    assert.equal(noField.defaultActionItems, undefined);
+
+    const allBlank = parseTemplateDefinition({
+      columns: [{ id: "c1", label: "Done", kind: "toggle" as const }],
+      rows: [{ id: "r1", cells: {} }],
+      defaultActionItems: ["", "  "],
+    } as object);
+    assert.equal(allBlank.defaultActionItems, undefined);
+  });
+
+  it("ignores non-string entries in defaultActionItems", () => {
+    const out = parseTemplateDefinition({
+      columns: [{ id: "c1", label: "Done", kind: "toggle" as const }],
+      rows: [{ id: "r1", cells: {} }],
+      defaultActionItems: ["Real task", 42, null, { x: 1 }, "Another"],
+    } as object);
+    assert.deepEqual(out.defaultActionItems, ["Real task", "Another"]);
+  });
+});
+
+describe("seedRunStateFromTemplate", () => {
+  it("returns empty state when the template has no defaults", () => {
+    const def = parseTemplateDefinition({
+      columns: [{ id: "c1", label: "Done", kind: "toggle" as const }],
+      rows: [{ id: "r1", cells: {} }],
+    } as object);
+    const seeded = seedRunStateFromTemplate(def);
+    assert.deepEqual(seeded.toggles, {});
+    assert.equal(seeded.notes, "");
+    assert.deepEqual(seeded.actionItems, []);
+  });
+
+  it("seeds actionItems from defaultActionItems with fresh ids and done=false", () => {
+    const def = parseTemplateDefinition({
+      columns: [{ id: "c1", label: "Done", kind: "toggle" as const }],
+      rows: [{ id: "r1", cells: {} }],
+      defaultActionItems: ["A", "B"],
+    } as object);
+    const seeded = seedRunStateFromTemplate(def);
+    assert.equal(seeded.actionItems.length, 2);
+    assert.equal(seeded.actionItems[0].text, "A");
+    assert.equal(seeded.actionItems[0].done, false);
+    assert.ok(typeof seeded.actionItems[0].id === "string" && seeded.actionItems[0].id.length > 0);
+    assert.notEqual(seeded.actionItems[0].id, seeded.actionItems[1].id);
+    assert.deepEqual(seeded.toggles, {});
+    assert.equal(seeded.notes, "");
   });
 });
 
