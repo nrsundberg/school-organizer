@@ -73,6 +73,12 @@ export default [
   route("api/onboarding", "routes/api/onboarding.ts"),
   route("api/webhooks/stripe", "routes/api/webhooks.stripe.ts"),
   route("api/healthz", "routes/api/healthz.ts"),
+  // Worker-to-worker: BingoBoardDO alarm POSTs presence snapshots here.
+  // HMAC-authenticated; not user-facing.
+  route(
+    "api/drill-runs/:runId/presence-sample",
+    "routes/api/drill-runs.$runId.presence-sample.ts",
+  ),
   route("api/billing/checkout", "routes/api/billing.checkout.ts"),
   route("api/billing/portal", "routes/api/billing.portal.ts"),
   route("billing/success", "routes/billing.success.tsx"),

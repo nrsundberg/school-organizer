@@ -27,6 +27,10 @@ import { ChecklistTable } from "~/domain/drills/ChecklistTable";
 import { ReplayTimeline } from "~/domain/drills/ReplayTimeline";
 import { ReplayEventFeed } from "~/domain/drills/ReplayEventFeed";
 import {
+  ReplayViewerTrack,
+  type ReplayViewerSample,
+} from "~/domain/drills/ReplayViewerTrack";
+import {
   useDrillReplay,
   type ReplayEvent,
 } from "~/domain/drills/useDrillReplay";
@@ -88,6 +92,14 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   // Pull every event for this run, plus the unique users who acted on it, so
   // the replay feed can show names instead of raw IDs.
   const rawEvents = await prisma.drillRunEvent.findMany({
+    where: { runId },
+    orderBy: { occurredAt: "asc" },
+  });
+
+  // Presence snapshots written every 30s by the BingoBoardDO alarm while
+  // the drill was LIVE. ~120 rows for an hour of drill regardless of
+  // viewer count, so an unbounded query is fine here.
+  const rawPresenceSamples = await prisma.drillRunPresenceSample.findMany({
     where: { runId },
     orderBy: { occurredAt: "asc" },
   });
@@ -184,6 +196,48 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
 
+  // Translate raw DrillRunPresenceSample rows into the relative-ms shape
+  // ReplayViewerTrack expects. The `viewers` column is `Json` in Prisma,
+  // so we coerce defensively in case a future migration changes the
+  // shape — a malformed row should hide rather than crash the page.
+  const startMs = start.getTime();
+  const presenceSamples: ReplayViewerSample[] = rawPresenceSamples
+    .map((row) => {
+      const offsetMs = Math.max(0, row.occurredAt.getTime() - startMs);
+      const rawViewers = Array.isArray(row.viewers) ? row.viewers : [];
+      type RawViewer = {
+        userId?: unknown;
+        label?: unknown;
+        onBehalfOfUserId?: unknown;
+        onBehalfOfLabel?: unknown;
+        color?: unknown;
+        isGuest?: unknown;
+      };
+      const viewers = (rawViewers as RawViewer[])
+        .filter((v) => {
+          if (!v || typeof v !== "object") return false;
+          // Drop guests if they ever leak into the array (today they never
+          // do — guests are aggregated into guestCount at the DO).
+          if (v.isGuest === true) return false;
+          return typeof v.userId === "string" && typeof v.label === "string";
+        })
+        .map((v) => ({
+          userId: v.userId as string,
+          label: v.label as string,
+          onBehalfOfUserId:
+            typeof v.onBehalfOfUserId === "string" ? v.onBehalfOfUserId : null,
+          onBehalfOfLabel:
+            typeof v.onBehalfOfLabel === "string" ? v.onBehalfOfLabel : null,
+          color: typeof v.color === "string" ? v.color : "",
+        }));
+      return {
+        occurredAtMs: offsetMs,
+        viewers,
+        guestCount: row.guestCount,
+      };
+    })
+    .sort((a, b) => a.occurredAtMs - b.occurredAtMs);
+
   return {
     metaTitle: t("drillsHistory.replay.metaTitle", { name: run.template.name }),
     template: {
@@ -209,6 +263,7 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
     lastActor,
     signedOffByActor,
     isLatestForTemplate,
+    presenceSamples,
   };
 }
 
@@ -347,6 +402,7 @@ export default function AdminDrillsHistoryReplay({
     initialState,
     lastActor,
     signedOffByActor,
+    presenceSamples,
   } = loaderData;
   const { t, i18n } = useTranslation("admin");
 
@@ -444,6 +500,7 @@ export default function AdminDrillsHistoryReplay({
           initialState={initialState}
           startedIso={run.startedIso}
           endedIso={run.endedIso ?? run.startedIso}
+          presenceSamples={presenceSamples}
         />
       ) : (
         <>
@@ -463,12 +520,14 @@ function ReplayLayout({
   initialState,
   startedIso,
   endedIso,
+  presenceSamples,
 }: {
   definition: ReturnType<typeof parseTemplateDefinition>;
   events: ReplayEvent[];
   initialState: RunState;
   startedIso: string;
   endedIso: string;
+  presenceSamples: ReplayViewerSample[];
 }) {
   const { t } = useTranslation("admin");
   const replay = useDrillReplay({
@@ -491,6 +550,12 @@ function ReplayLayout({
         onSeek={replay.seek}
         onPlayToggle={() => (replay.isPlaying ? replay.pause() : replay.play())}
         onSpeedChange={replay.setSpeed}
+      />
+
+      <ReplayViewerTrack
+        samples={presenceSamples}
+        currentTimeMs={replay.currentTimeMs}
+        totalDurationMs={replay.totalDurationMs}
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
