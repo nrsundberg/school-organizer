@@ -175,8 +175,25 @@ export class BingoBoardDO {
   }
 
   webSocketMessage(_ws: WebSocket, message: string | ArrayBuffer) {
-    if (typeof message === "string" && message === "ping") {
+    if (typeof message !== "string") return;
+    if (message === "ping") {
       _ws.send("pong");
+      return;
+    }
+    // Relay client-originated drill presence messages to all connected
+    // sockets in this org's DO. Presence is ephemeral ("X is editing
+    // notes") with no DB write — fanning it out through the DO avoids a
+    // round-trip to the worker action route per heartbeat. The DO is
+    // already keyed per-org so the relay scope is correct; we explicitly
+    // gate on `type === "drillPresence"` so this can't be used as a
+    // general client-to-client relay.
+    try {
+      const data = JSON.parse(message);
+      if (data && typeof data === "object" && data.type === "drillPresence") {
+        this.broadcast(message);
+      }
+    } catch {
+      // Ignore malformed payloads.
     }
   }
 
