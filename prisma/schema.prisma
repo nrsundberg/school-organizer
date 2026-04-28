@@ -490,10 +490,24 @@ model Teacher {
   /// Optional per-teacher locale override for the homeroom print view.
   /// Null means "use Org.defaultLocale". Most teachers will leave this unset.
   locale   String?
+  /// Grade level taught by this classroom. Null means "ungraded" — older rows
+  /// may not have a value yet; the children admin UI surfaces an inline
+  /// prompt to set it. We keep this as an enum (versus a free string) so
+  /// grouping and tab filters are deterministic.
+  gradeLevel GradeLevel?
+  /// Soft cap on students per classroom. Null means "use a sensible default"
+  /// (the UI assumes 22 when computing fill ratios). Capacity is advisory; we
+  /// do not currently enforce it on assignment.
+  capacity Int?
+  /// Display name of the teacher who runs this classroom. Optional so the
+  /// existing `homeRoom` label keeps working as a fallback. Stored verbatim
+  /// (no User row required) since teachers are not always staff users.
+  teacherName String?
   students Student[]
 
   @@unique([orgId, homeRoom])
   @@index([orgId])
+  @@index([orgId, gradeLevel])
 }
 
 model Student {
@@ -651,6 +665,29 @@ model CallEvent {
 enum Status {
   ACTIVE
   EMPTY
+}
+
+/// Grade level for a Teacher (classroom). PRE_K covers any preschool/transitional
+/// kindergarten. K is kindergarten. G1–G12 are first through twelfth grade.
+/// OTHER is an escape hatch for non-standard groupings (mixed-age studios,
+/// special-program rooms). Existing rows are left null until an admin sets
+/// the value from the children index.
+enum GradeLevel {
+  PRE_K
+  K
+  G1
+  G2
+  G3
+  G4
+  G5
+  G6
+  G7
+  G8
+  G9
+  G10
+  G11
+  G12
+  OTHER
 }
 
 enum BillingPlan {
