@@ -4,6 +4,7 @@ import { hydrateRoot } from "react-dom/client";
 import { HydratedRouter } from "react-router/dom";
 import { I18nextProvider } from "react-i18next";
 import i18next from "i18next";
+import type { Resource } from "i18next";
 import { initI18nClient } from "~/i18n";
 
 declare const __SENTRY_RELEASE__: string;
@@ -25,12 +26,45 @@ Sentry.init({
   tracesSampleRate: 0.1
 });
 
-// Initialize i18next *before* hydration so `useTranslation()` returns real
-// strings on the very first render (no flash of translation keys). The root
-// loader also passes the resolved locale + initial namespace bundle through
-// loaderData; `useChangeLanguage` in `root.tsx` keeps i18n in sync after.
+/**
+ * Pull the root loader's `{ locale, i18nResources }` out of the React
+ * Router hydration global so we can seed i18next with the same bundle the
+ * server used. SSR and CSR render with identical strings → no flash of
+ * translation keys, and React hydration sees matching markup.
+ *
+ * `window.__reactRouterContext.state.loaderData.root` is the canonical
+ * location — RR7 only emits root loader data into the initial hydration
+ * payload (other route data streams in afterwards), which is exactly what
+ * we need here.
+ */
+function readSsrI18n(): { lng?: string; resources?: Resource } {
+  if (typeof window === "undefined") return {};
+  const ctx = (
+    window as unknown as {
+      __reactRouterContext?: {
+        state?: {
+          loaderData?: Record<
+            string,
+            { locale?: unknown; i18nResources?: unknown } | undefined
+          >;
+        };
+      };
+    }
+  ).__reactRouterContext;
+  const rootData = ctx?.state?.loaderData?.root;
+  const lng =
+    typeof rootData?.locale === "string" ? rootData.locale : undefined;
+  const bundle = rootData?.i18nResources as Resource[string] | undefined;
+  if (!lng || !bundle) return { lng };
+  return { lng, resources: { [lng]: bundle } };
+}
+
+// Initialize i18next *before* hydration with the SSR-shipped bundle so
+// `useTranslation()` returns real strings on the very first render. The
+// root loader passes the resolved locale + bundle through loaderData, and
+// `useChangeLanguage` in `root.tsx` keeps i18n in sync after.
 async function hydrate() {
-  await initI18nClient();
+  await initI18nClient(readSsrI18n());
   startTransition(() => {
     hydrateRoot(
       document,
