@@ -81,3 +81,84 @@ export async function broadcastProgramCancellation(
     }),
   });
 }
+
+export async function broadcastDrillUpdate(
+  env: Env,
+  orgId: string,
+  run: {
+    id: string;
+    status: "LIVE" | "PAUSED" | "ENDED";
+    audience: string;
+    state: unknown;
+    updatedAtIso: string;
+  },
+) {
+  const id = env.BINGO_BOARD.idFromName(orgId);
+  const stub = env.BINGO_BOARD.get(id);
+  await stub.fetch("https://internal/broadcast", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "drillUpdate", run }),
+  });
+}
+
+export async function broadcastDrillActivity(
+  env: Env,
+  orgId: string,
+  runId: string,
+  events: Array<{
+    id: string;
+    runId: string;
+    kind: string;
+    payload: unknown;
+    actorUserId: string | null;
+    actorLabel: string | null;
+    occurredAtIso: string;
+  }>,
+) {
+  const id = env.BINGO_BOARD.idFromName(orgId);
+  const stub = env.BINGO_BOARD.get(id);
+  await stub.fetch("https://internal/broadcast", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "drillActivity", runId, events }),
+  });
+}
+
+export async function broadcastDrillPresence(
+  env: Env,
+  orgId: string,
+  payload: {
+    runId: string;
+    userId: string;
+    label: string;
+    color: string;
+    focus:
+      | { kind: "notes" }
+      | { kind: "item"; id: string }
+      | null;
+    at: string;
+  },
+) {
+  const id = env.BINGO_BOARD.idFromName(orgId);
+  const stub = env.BINGO_BOARD.get(id);
+  await stub.fetch("https://internal/broadcast", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "drillPresence", ...payload }),
+  });
+}
+
+export async function broadcastDrillEnded(
+  env: Env,
+  orgId: string,
+  runId: string,
+) {
+  const id = env.BINGO_BOARD.idFromName(orgId);
+  const stub = env.BINGO_BOARD.get(id);
+  await stub.fetch("https://internal/broadcast", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "drillEnded", runId }),
+  });
+}
