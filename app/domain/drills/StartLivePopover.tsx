@@ -3,7 +3,7 @@ import { useFetcher } from "react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Radio } from "lucide-react";
-import type { DrillAudience, DrillMode } from "~/domain/drills/types";
+import type { DrillAudience } from "~/domain/drills/types";
 
 export function StartLivePopover({
   templateId,
@@ -15,13 +15,13 @@ export function StartLivePopover({
   defaultAudience: DrillAudience;
 }) {
   const { t } = useTranslation("admin");
-  const [audience, setAudience] = useState<DrillAudience>(defaultAudience);
-  // Mode always defaults to "DRILL" — there is no per-template mode default
-  // because ACTUAL/FALSE_ALARM are deliberate per-event choices, not a
-  // standing preference. Admin must explicitly opt out of DRILL.
-  const [mode, setMode] = useState<DrillMode>("DRILL");
   const [open, setOpen] = useState(false);
   const fetcher = useFetcher();
+
+  const audienceText =
+    defaultAudience === "EVERYONE"
+      ? t("drills.list.startConfirm.audienceEveryone")
+      : t("drills.list.startConfirm.audienceStaffOnly");
 
   return (
     <Popover isOpen={open} onOpenChange={setOpen}>
@@ -38,6 +38,7 @@ export function StartLivePopover({
         <fetcher.Form method="post" className="flex flex-col gap-3 p-4 w-72">
           <input type="hidden" name="intent" value="start-live" />
           <input type="hidden" name="id" value={templateId} />
+          <input type="hidden" name="audience" value={defaultAudience} />
           <div>
             <h3 className="text-sm font-semibold">
               {t("drills.list.startConfirm.heading")}
@@ -46,66 +47,11 @@ export function StartLivePopover({
               {t("drills.list.startConfirm.subhead", { name: templateName })}
             </p>
           </div>
-          <fieldset className="flex flex-col gap-2">
-            <legend className="text-xs font-semibold uppercase tracking-wide text-white/50">
-              {t("drills.mode.label")}
-            </legend>
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="radio"
-                name="mode"
-                value="DRILL"
-                checked={mode === "DRILL"}
-                onChange={() => setMode("DRILL")}
-              />
-              <span>{t("drills.mode.drill")}</span>
-            </label>
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="radio"
-                name="mode"
-                value="ACTUAL"
-                checked={mode === "ACTUAL"}
-                onChange={() => setMode("ACTUAL")}
-              />
-              <span>{t("drills.mode.actual")}</span>
-            </label>
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="radio"
-                name="mode"
-                value="FALSE_ALARM"
-                checked={mode === "FALSE_ALARM"}
-                onChange={() => setMode("FALSE_ALARM")}
-              />
-              <span>{t("drills.mode.falseAlarm")}</span>
-            </label>
-          </fieldset>
-          <fieldset className="flex flex-col gap-2">
-            <legend className="text-xs font-semibold uppercase tracking-wide text-white/50">
-              {t("drills.list.startConfirm.audienceLabel")}
-            </legend>
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="radio"
-                name="audience"
-                value="EVERYONE"
-                checked={audience === "EVERYONE"}
-                onChange={() => setAudience("EVERYONE")}
-              />
-              <span>{t("drills.list.startConfirm.audienceEveryone")}</span>
-            </label>
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="radio"
-                name="audience"
-                value="STAFF_ONLY"
-                checked={audience === "STAFF_ONLY"}
-                onChange={() => setAudience("STAFF_ONLY")}
-              />
-              <span>{t("drills.list.startConfirm.audienceStaffOnly")}</span>
-            </label>
-          </fieldset>
+          <p className="text-xs text-white/60">
+            {t("drills.list.startConfirm.audienceReadout", {
+              audience: audienceText,
+            })}
+          </p>
           <div className="flex justify-end gap-2 pt-1">
             <button
               type="button"

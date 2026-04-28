@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { ReplayEvent } from "./useDrillReplay";
-import type { DrillEventPayload, ToggleValue } from "./types";
+import { formatDrillEvent } from "./replay";
 
 export type ReplayEventFeedProps = {
   events: ReplayEvent[];
@@ -16,30 +16,6 @@ function formatOffset(ms: number): string {
   const s = totalSeconds % 60;
   return `+${m}:${s.toString().padStart(2, "0")}`;
 }
-
-function toggleSymbol(v: ToggleValue | null | undefined): string {
-  if (v === "positive") return "✓";
-  if (v === "negative") return "✗";
-  return "—";
-}
-
-const KIND_TO_KEY: Record<string, string> = {
-  started: "started",
-  paused: "paused",
-  resumed: "resumed",
-  ended: "ended",
-  cell_toggled: "cellToggled",
-  notes_changed: "notesChanged",
-  action_added: "actionAdded",
-  action_edited: "actionEdited",
-  action_toggled: "actionToggled",
-  action_removed: "actionRemoved",
-  // Per-classroom attestation overlay (one row attested / un-attested).
-  // Replay falls back to `defaultValue: ev.kind` if the i18n key is missing,
-  // so adding the keys later is non-breaking.
-  row_attested: "rowAttested",
-  row_unattested: "rowUnattested",
-};
 
 export function ReplayEventFeed({
   events,
@@ -74,12 +50,7 @@ export function ReplayEventFeed({
       <ul className="flex flex-col gap-2">
         {events.map((ev, i) => {
           const offsetMs = Math.max(0, new Date(ev.occurredAt).getTime() - startMs);
-          const key = KIND_TO_KEY[ev.kind] ?? ev.kind;
-          const interp = buildInterpolation(ev.payload, t);
-          const label = t(`drillsHistory.replay.events.${key}`, {
-            defaultValue: ev.kind,
-            ...interp,
-          });
+          const label = formatDrillEvent(ev.payload, t);
           const actorName =
             ev.actor?.name ?? t("drillsHistory.replay.events.unknownActor");
           const viaLine = ev.onBehalfOf
@@ -121,22 +92,4 @@ export function ReplayEventFeed({
       </ul>
     </section>
   );
-}
-
-function buildInterpolation(
-  payload: DrillEventPayload,
-  t: (key: string) => string,
-): Record<string, string> {
-  switch (payload.kind) {
-    case "cell_toggled":
-      return { value: toggleSymbol(payload.next) };
-    case "action_toggled":
-      return {
-        state: payload.next
-          ? t("drillsHistory.replay.events.actionDoneState")
-          : t("drillsHistory.replay.events.actionPendingState"),
-      };
-    default:
-      return {};
-  }
 }

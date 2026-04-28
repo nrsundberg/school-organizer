@@ -404,7 +404,7 @@ if (!mod) {
     it("updates state on a LIVE run", async () => {
       const fake = new FakePrisma();
       const run = await live.startDrillRun(P(fake), ORG, TEMPLATE);
-      const updated = await live.updateLiveRunState(
+      const { run: updated } = await live.updateLiveRunState(
         P(fake),
         ORG,
         run.id,
@@ -490,7 +490,7 @@ if (!mod) {
         undefined,
         { actorUserId: "u_admin", onBehalfOfUserId: null },
       );
-      const updated = await live.updateLiveRunState(
+      const { run: updated } = await live.updateLiveRunState(
         P(prisma),
         "org_a",
         run.id,

@@ -193,7 +193,10 @@ export async function action({ request, context }: Route.ActionArgs) {
         return dataWithError(null, t("drillsLive.errors.invalidStateJson"));
       }
       const next = parseRunState(parsed as Prisma.JsonValue);
-      await updateLiveRunState(prisma, org.id, runId, next, actor);
+      // Destructure to keep this site compiling against the new return shape.
+      // The parent agent will wire `events` into the WS broadcaster next.
+      const { run: _updatedRun, events: _writtenEvents } =
+        await updateLiveRunState(prisma, org.id, runId, next, actor);
       // No toast — the page renders an inline "Saving…/Saved" indicator
       // instead. Returning a non-null body so fetcher.data signals
       // success to the client.

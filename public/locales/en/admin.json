@@ -330,6 +330,7 @@
         "audienceLabel": "Audience",
         "audienceEveryone": "Everyone — staff and viewer-pin guests see the takeover",
         "audienceStaffOnly": "Staff only — viewer-pin guests continue to see the normal board",
+        "audienceReadout": "Visible to: {{audience}}",
         "confirm": "Start live drill",
         "cancel": "Cancel"
       },
