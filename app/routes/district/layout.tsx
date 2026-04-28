@@ -59,6 +59,12 @@ export default function DistrictLayout({ loaderData }: Route.ComponentProps) {
           <NavLink to="/district/audit" className={navLinkClass}>
             Audit log
           </NavLink>
+          <NavLink
+            to="/district/profile"
+            className={(args) => `${navLinkClass(args)} ml-auto`}
+          >
+            Profile
+          </NavLink>
         </nav>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8">

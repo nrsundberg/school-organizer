@@ -13,7 +13,9 @@ export default [
     index("routes/admin/dashboard.tsx"),
     route("users", "routes/admin/users.tsx"),
     route("households", "routes/admin/households.tsx"),
+    route("households/:householdId", "routes/admin/households.$householdId.tsx"),
     route("children", "routes/admin/children.tsx"),
+    route("students/:studentId", "routes/admin/students.$studentId.tsx"),
     route("roster-import", "routes/admin/roster-import.tsx"),
     route("billing", "routes/admin/billing.tsx"),
     route("branding", "routes/admin/branding.tsx"),
@@ -28,6 +30,7 @@ export default [
     route("drills/history/:runId", "routes/admin/drills.history.$runId.tsx"),
     route("drills/:templateId/run", "routes/admin/drills.$templateId.run.tsx"),
     route("drills/:templateId", "routes/admin/drills.$templateId.tsx"),
+    route("profile", "routes/admin/profile.tsx"),
   ]),
 
   // Live drill takeover — every signed-in user gets redirected here when their
@@ -52,8 +55,7 @@ export default [
   ]),
 
   ...prefix("edit", [
-    route("homeroom/:homeroom", "routes/edit/edit.homeroom.$value.tsx"),
-    route("student/:student", "routes/edit/edit.student.$value.tsx")
+    route("homeroom/:homeroom", "routes/edit/edit.homeroom.$value.tsx")
   ]),
 
   route("data/students", "routes/data.students.tsx"),
@@ -119,6 +121,7 @@ export default [
     route("billing/portal", "routes/district/billing.portal.tsx"),
     route("audit", "routes/district/audit.tsx"),
     route("impersonate/end", "routes/district/impersonate.end.tsx"),
+    route("profile", "routes/district/profile.tsx"),
   ]),
 
   route("billing-required", "routes/billing-required.tsx"),

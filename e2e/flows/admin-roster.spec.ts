@@ -60,11 +60,15 @@ test.describe("@flow admin-roster — create student + see it on /admin/children
     await expect(homeroomRow).toBeVisible();
     await homeroomRow.click();
 
-    // The list renders "<lastName>, <firstName>" and the space number
-    // in its own cell. Use getByText with an exact fragment so the
-    // assertion doesn't trip on unrelated students on a dirty dev.db.
-    await expect(page.getByText(`${lastName}, ${firstName}`)).toBeVisible();
-    await expect(page.getByText(String(tenant.spaceNumber), { exact: true }).first()).toBeVisible();
+    // The expanded card renders "<lastName>, <firstName>" as the student
+    // link and the space as a "Space <n>" line in the metadata row. Both
+    // assertions must scope to the homeroom card so an unrelated row from
+    // a dirty dev.db can't satisfy them.
+    const card = page.getByRole("article").filter({
+      has: page.getByRole("heading", { name: tenant.homeroomName, exact: true }),
+    });
+    await expect(card.getByRole("link", { name: `${lastName}, ${firstName}` })).toBeVisible();
+    await expect(card.getByText(`Space ${tenant.spaceNumber}`, { exact: true })).toBeVisible();
   });
 
   test("create-student rejects unknown homeroom name", async ({ page, tenant }) => {
