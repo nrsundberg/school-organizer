@@ -321,7 +321,7 @@ export default function DataDeletePage({ loaderData }: Route.ComponentProps) {
 
         <Button
           type="submit"
-          color="danger"
+          variant="danger"
           isDisabled={!canSubmit}
           className="w-fit"
         >

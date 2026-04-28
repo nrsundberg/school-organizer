@@ -349,7 +349,13 @@ export async function action({ request, context }: Route.ActionArgs) {
     // (silently 500ing on a download click) is strictly worse.
   }
 
-  return new Response(archive, {
+  // Uint8Array is a valid BodyInit at runtime (Cloudflare Workers + browsers
+  // both accept it), but TS's lib.dom DOM-only BodyInit + BlobPart
+  // narrowings disagree. Cast to ArrayBuffer via .buffer to satisfy both —
+  // fflate's `zip` returns a Uint8Array view onto a fresh buffer, so this
+  // cast is a no-op at runtime.
+  const archiveBuffer = archive.buffer as ArrayBuffer;
+  return new Response(archiveBuffer, {
     status: 200,
     headers: {
       "Content-Type": "application/zip",
@@ -439,10 +445,10 @@ export default function DataExportPage({ loaderData }: Route.ComponentProps) {
         >
           <Button
             type="submit"
-            color="primary"
+            variant="primary"
             isDisabled={submitting}
-            startContent={<Download className="h-4 w-4" />}
           >
+            <Download className="h-4 w-4" />
             {submitting
               ? t("dataExport.downloadingButton")
               : t("dataExport.downloadButton")}
