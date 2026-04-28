@@ -11,14 +11,14 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/print.homeroom.$teacherId";
 import { getTenantPrisma } from "~/domain/utils/global-context.server";
-import { requireRole } from "~/sessions.server";
+import { protectRoute } from "~/sessions.server";
 import { getTeacherPrintLocale } from "~/i18n.server";
 import { usePrintLocale } from "~/hooks/usePrintLocale";
 
 export const handle = { i18n: ["admin"] };
 
 export async function loader({ request, context, params }: Route.LoaderArgs) {
-  await requireRole(context, "ADMIN");
+  await protectRoute(context);
   const prisma = getTenantPrisma(context);
   const teacherId = parseInt(params.teacherId ?? "", 10);
   if (isNaN(teacherId)) {

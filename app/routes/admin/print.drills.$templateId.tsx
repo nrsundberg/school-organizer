@@ -10,7 +10,7 @@ import { Link } from "react-router";
 import { Check, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/print.drills.$templateId";
-import { requireRole } from "~/sessions.server";
+import { protectRoute } from "~/sessions.server";
 import { getTenantPrisma } from "~/domain/utils/global-context.server";
 import {
   parseRunState,
@@ -24,7 +24,7 @@ import { usePrintLocale } from "~/hooks/usePrintLocale";
 export const handle = { i18n: ["admin"] };
 
 export async function loader({ context, params }: Route.LoaderArgs) {
-  await requireRole(context, "ADMIN");
+  await protectRoute(context);
   const prisma = getTenantPrisma(context);
   const templateId = params.templateId;
   if (!templateId) {
