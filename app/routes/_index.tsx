@@ -118,7 +118,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   ]);
 
   const role = user?.role ?? null;
-  const permitted = role === "ADMIN" || role === "CONTROLLER";
   const maxSpaceNumber =
     spaces.length > 0 ? Math.max(...spaces.map((s) => s.spaceNumber)) : 0;
   const viewerDrawingEnabled = appSettings?.viewerDrawingEnabled ?? false;
@@ -126,7 +125,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return {
     mode: "tenant" as const,
     orgName: org.name,
-    permitted,
     role,
     user: !!user,
     spaces,
@@ -162,7 +160,6 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
     homeRooms,
     recentCars: initialRecentCars,
     programCancellations: initialProgramCancellations,
-    permitted,
     role,
     user,
     controllerViewPreference,
@@ -266,7 +263,10 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
     });
   };
 
-  const cols = permitted ? 10 : 15;
+  // Non-controller render path (controllers return early below into
+  // ControllerTabView, which manages its own columns) — read-only board
+  // for admins, viewers, and logged-out users.
+  const cols = 15;
   const showViewerDrawing =
     viewerDrawingEnabled && (role === "VIEWER" || !user);
   const drawStorageKey = `tome-draw-${cols}-${spaces.map((s) => s.spaceNumber).join(",")}`;
@@ -397,101 +397,59 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
     );
   }
 
-  // Admins see the caller view on mobile, full grid on desktop
-  // Viewers (and logged-out users) see just the board
+  // Everyone else (admins, viewers, logged-out) gets the read-only board.
+  // Admins are intentionally not given click-to-mark — managing the roster
+  // ≠ running it; only CONTROLLERs (or platform-admin user-impersonation of
+  // a controller) can actually mark tiles, gated server-side in
+  // /update/:space and /empty/:space.
   return (
     <Page user={user}>
       {noticePanel}
-      {permitted ? (
-        <div className="flex justify-center">
-          {/* Admin mobile caller view */}
-          <div className="md:hidden w-full">
-            <MobileCallerView
-              spaces={spaces}
-              onSpaceChange={handleSpaceChange}
-              maxSpaceNumber={maxSpaceNumber}
-            />
-          </div>
-
-          {/* Grid — admins see on desktop only */}
-          <div
-            className="hidden w-full md:grid md:w-5/6 font-extrabold text-large text-center relative"
-            onPointerDown={showViewerDrawing ? onPointerDown : undefined}
-            onPointerMove={showViewerDrawing ? onPointerMove : undefined}
-            onPointerUp={showViewerDrawing ? onPointerEnd : undefined}
-            onPointerCancel={showViewerDrawing ? onPointerEnd : undefined}
-            onPointerLeave={showViewerDrawing ? onPointerEnd : undefined}
-            style={showViewerDrawing ? { touchAction: "none" } : undefined}
-          >
-            <ParkingRows
-              data={spaces}
-              cols={cols}
-              permitted={true}
-              onDrawingSpace={showViewerDrawing ? handleDrawingSpace : undefined}
-            />
-            {showViewerDrawing ? (
-              <>
-                <ViewerDrawingOverlay spaces={spaces} cols={cols} points={drawPoints} />
-                {drawPoints.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={clearDrawing}
-                    className="absolute bottom-2 right-2 z-20 text-xs bg-black/60 text-white px-2 py-1 rounded hover:bg-black/80"
-                  >
-                    {t("index.drawing.clear", { count: drawPoints.length })}
-                  </button>
-                )}
-              </>
-            ) : null}
-          </div>
+      <div className="flex flex-col gap-3 md:flex-row md:justify-center md:gap-0">
+        {/* Mobile controls: homeroom selector + recent queue above grid */}
+        <div className="w-full px-4 pt-3 text-center md:hidden">
+          {homeroomFilterControl}
+          {recentQueueContent}
         </div>
-      ) : (
-        <div className="flex flex-col gap-3 md:flex-row md:justify-center md:gap-0">
-          {/* Viewer mobile controls: homeroom selector + recent queue above grid */}
-          <div className="w-full px-4 pt-3 text-center md:hidden">
-            {homeroomFilterControl}
-            {recentQueueContent}
-          </div>
 
-          {/* Viewer board */}
-          <div
-            className="grid w-full font-extrabold text-large text-center relative md:w-5/6"
-            onPointerDown={showViewerDrawing ? onPointerDown : undefined}
-            onPointerMove={showViewerDrawing ? onPointerMove : undefined}
-            onPointerUp={showViewerDrawing ? onPointerEnd : undefined}
-            onPointerCancel={showViewerDrawing ? onPointerEnd : undefined}
-            onPointerLeave={showViewerDrawing ? onPointerEnd : undefined}
-            style={showViewerDrawing ? { touchAction: "none" } : undefined}
-          >
-            <ParkingRows
-              data={spaces}
-              cols={cols}
-              permitted={false}
-              onDrawingSpace={showViewerDrawing ? handleDrawingSpace : undefined}
-            />
-            {showViewerDrawing ? (
-              <>
-                <ViewerDrawingOverlay spaces={spaces} cols={cols} points={drawPoints} />
-                {drawPoints.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={clearDrawing}
-                    className="absolute bottom-2 right-2 z-20 text-xs bg-black/60 text-white px-2 py-1 rounded hover:bg-black/80"
-                  >
-                    {t("index.drawing.clear", { count: drawPoints.length })}
-                  </button>
-                )}
-              </>
-            ) : null}
-          </div>
-
-          {/* Viewer desktop sidebar */}
-          <div className="hidden h-[80vh] gap-3 py-2 text-center md:block">
-            <div className="max-w-xs px-4 pt-4">{homeroomFilterControl}</div>
-            {recentQueueContent}
-          </div>
+        {/* Read-only board */}
+        <div
+          className="grid w-full font-extrabold text-large text-center relative md:w-5/6"
+          onPointerDown={showViewerDrawing ? onPointerDown : undefined}
+          onPointerMove={showViewerDrawing ? onPointerMove : undefined}
+          onPointerUp={showViewerDrawing ? onPointerEnd : undefined}
+          onPointerCancel={showViewerDrawing ? onPointerEnd : undefined}
+          onPointerLeave={showViewerDrawing ? onPointerEnd : undefined}
+          style={showViewerDrawing ? { touchAction: "none" } : undefined}
+        >
+          <ParkingRows
+            data={spaces}
+            cols={cols}
+            permitted={false}
+            onDrawingSpace={showViewerDrawing ? handleDrawingSpace : undefined}
+          />
+          {showViewerDrawing ? (
+            <>
+              <ViewerDrawingOverlay spaces={spaces} cols={cols} points={drawPoints} />
+              {drawPoints.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearDrawing}
+                  className="absolute bottom-2 right-2 z-20 text-xs bg-black/60 text-white px-2 py-1 rounded hover:bg-black/80"
+                >
+                  {t("index.drawing.clear", { count: drawPoints.length })}
+                </button>
+              )}
+            </>
+          ) : null}
         </div>
-      )}
+
+        {/* Desktop sidebar */}
+        <div className="hidden h-[80vh] gap-3 py-2 text-center md:block">
+          <div className="max-w-xs px-4 pt-4">{homeroomFilterControl}</div>
+          {recentQueueContent}
+        </div>
+      </div>
     </Page>
   );
 }
