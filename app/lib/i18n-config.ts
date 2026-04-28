@@ -58,6 +58,7 @@ export const I18N_NAMESPACES = [
   "auth",
   "email",
   "errors",
+  "profile",
 ] as const;
 
 export type I18nNamespace = (typeof I18N_NAMESPACES)[number];

@@ -1,0 +1,34 @@
+{
+  "title": "Perfil",
+  "subtitle": "Administra los detalles de tu cuenta y tu contraseña.",
+  "accountSection": {
+    "title": "Cuenta",
+    "emailLabel": "Correo electrónico",
+    "emailHelp": "Contacta a un administrador para cambiar el correo de tu cuenta.",
+    "nameLabel": "Nombre",
+    "save": "Guardar nombre",
+    "success": "Nombre actualizado.",
+    "errorGeneric": "No se pudo actualizar el nombre. Intenta de nuevo."
+  },
+  "passwordSection": {
+    "title": "Cambiar contraseña",
+    "subtitle": "Ingresa tu contraseña actual y elige una nueva.",
+    "currentLabel": "Contraseña actual",
+    "newLabel": "Nueva contraseña",
+    "confirmLabel": "Confirmar nueva contraseña",
+    "save": "Actualizar contraseña",
+    "success": "Contraseña actualizada.",
+    "errors": {
+      "tooShort": "La nueva contraseña debe tener al menos 8 caracteres.",
+      "noMatch": "La nueva contraseña y la confirmación no coinciden.",
+      "sameAsCurrent": "La nueva contraseña debe ser diferente a la actual.",
+      "currentIncorrect": "La contraseña actual es incorrecta.",
+      "generic": "No se pudo actualizar la contraseña. Intenta de nuevo."
+    }
+  },
+  "logoutSection": {
+    "title": "Cerrar sesión",
+    "subtitle": "Termina tu sesión actual en este dispositivo.",
+    "button": "Cerrar sesión"
+  }
+}
