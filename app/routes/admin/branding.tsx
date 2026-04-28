@@ -7,7 +7,10 @@ import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/branding";
 import { getPrisma } from "~/db.server";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
-import { getOrgFromContext } from "~/domain/utils/global-context.server";
+import {
+  getActorIdsFromContext,
+  getOrgFromContext,
+} from "~/domain/utils/global-context.server";
 import { recordOrgAudit } from "~/domain/billing/comp.server";
 import {
   buildOrgLogoObjectKey,
@@ -61,6 +64,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
 export async function action({ request, context }: Route.ActionArgs) {
   const me = await protectToAdminAndGetPermissions(context);
+  const actor = getActorIdsFromContext(context);
   const org = getOrgFromContext(context);
   const db = getPrisma(context);
 
@@ -205,7 +209,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     await recordOrgAudit({
       context,
       orgId: org.id,
-      actorUserId: me.id,
+      actorUserId: actor.actorUserId ?? me.id,
+      onBehalfOfUserId: actor.onBehalfOfUserId,
       action: "branding.custom_domain",
       payload: { from: prevDomain, to: nextDomain },
     });

@@ -44,6 +44,14 @@ export type InviteUserInput = {
   role: string;
   /** Userid of the staff member issuing the invite. */
   invitedByUserId: string | null;
+  /**
+   * When the inviting staff member is acting via better-auth impersonation,
+   * this is the impersonated user's id. Threaded through onto the audit
+   * pair (`actorUserId`, `onBehalfOfUserId`) so the audit trail captures
+   * "real human + on-behalf target". Resolve from `getActorIdsFromContext`
+   * at the route boundary; null otherwise.
+   */
+  invitedByOnBehalfOfUserId?: string | null;
   /** Email of the staff member issuing the invite (for audit). */
   invitedByEmail?: string | null;
   /**
@@ -184,6 +192,7 @@ export async function inviteUser(
       context,
       orgId: input.scope.id,
       actorUserId: input.invitedByUserId,
+      onBehalfOfUserId: input.invitedByOnBehalfOfUserId ?? null,
       action: "user.invited",
       payload: { email, role: input.role, userId },
     });
@@ -191,6 +200,7 @@ export async function inviteUser(
     await writeDistrictAudit(context, {
       districtId: input.scope.id,
       actorUserId: input.invitedByUserId,
+      onBehalfOfUserId: input.invitedByOnBehalfOfUserId ?? null,
       actorEmail: input.invitedByEmail ?? null,
       action: "district.admin.invited",
       targetType: "User",

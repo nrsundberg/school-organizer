@@ -3,7 +3,10 @@ import { Form, redirect } from "react-router";
 import type { Route } from "./+types/admins";
 import { requireDistrictAdmin } from "~/domain/district/route-guard.server";
 import { getPrisma } from "~/db.server";
-import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
+import {
+  getActorIdsFromContext,
+  getOptionalUserFromContext,
+} from "~/domain/utils/global-context.server";
 import { inviteUser } from "~/domain/admin-users/invite-user.server";
 
 export async function loader({ context }: Route.LoaderArgs) {
@@ -96,8 +99,9 @@ export default function DistrictAdmins({
 
 export async function action({ request, context }: Route.ActionArgs) {
   const districtId = requireDistrictAdmin(context);
-  const actor = getOptionalUserFromContext(context);
-  if (!actor) throw new Response("Unauthorized", { status: 401 });
+  const me = getOptionalUserFromContext(context);
+  if (!me) throw new Response("Unauthorized", { status: 401 });
+  const actorIds = getActorIdsFromContext(context);
 
   const form = await request.formData();
   const name = String(form.get("name") ?? "").trim();
@@ -116,8 +120,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     email,
     role: "ADMIN",
     scope: { kind: "district", id: districtId },
-    invitedByUserId: actor.id,
-    invitedByEmail: (actor as { email?: string }).email ?? null,
+    invitedByUserId: actorIds.actorUserId ?? me.id,
+    invitedByOnBehalfOfUserId: actorIds.onBehalfOfUserId,
+    invitedByEmail: (me as { email?: string }).email ?? null,
     invitedToLabel: district?.name ?? null,
   });
   if (!result.ok) {

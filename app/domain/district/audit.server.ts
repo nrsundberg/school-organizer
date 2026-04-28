@@ -19,6 +19,14 @@ export type DistrictAuditAction = (typeof DISTRICT_AUDIT_ACTIONS)[number];
 export type WriteAuditInput = {
   districtId: string;
   actorUserId?: string | null;
+  /**
+   * The impersonated user's id when the action was performed via better-auth
+   * impersonation; null otherwise. Together with `actorUserId` this forms
+   * the canonical audit pair (real human + on-behalf target). Resolve from
+   * `getActorIdsFromContext(context)` at the route boundary so every writer
+   * captures both halves.
+   */
+  onBehalfOfUserId?: string | null;
   actorEmail?: string | null;
   action: DistrictAuditAction;
   targetType?: string;
@@ -35,6 +43,7 @@ export async function writeDistrictAudit(
     data: {
       districtId: input.districtId,
       actorUserId: input.actorUserId ?? null,
+      onBehalfOfUserId: input.onBehalfOfUserId ?? null,
       actorEmail: input.actorEmail ?? null,
       action: input.action,
       targetType: input.targetType ?? null,

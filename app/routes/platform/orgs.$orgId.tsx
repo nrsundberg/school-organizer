@@ -5,7 +5,11 @@ import { requirePlatformAdmin } from "~/domain/auth/platform-admin.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { buildUsageSnapshot, countOrgUsage } from "~/domain/billing/plan-usage.server";
 import { setOrgComp, clearOrgComp, recordOrgAudit } from "~/domain/billing/comp.server";
-import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
+import {
+  getActorIdsFromContext,
+  getOptionalUserFromContext,
+} from "~/domain/utils/global-context.server";
+import { formatActorLabel } from "~/domain/auth/format-actor";
 import { getPublicEnv } from "~/domain/utils/host.server";
 import { schoolBoardHostname, tenantBoardUrlFromRequest } from "~/lib/org-slug";
 import type { UsageSnapshot } from "~/lib/plan-usage-types";
@@ -40,9 +44,11 @@ export async function loader({ context, params }: Route.LoaderArgs) {
     id: string;
     action: string;
     actorUserId: string | null;
+    onBehalfOfUserId: string | null;
     payload: unknown;
     createdAt: Date | string;
     actorEmail?: string | null;
+    onBehalfOfEmail?: string | null;
   }> = [];
   try {
     const rawLogs = await (db as any).orgAuditLog.findMany({
@@ -50,19 +56,28 @@ export async function loader({ context, params }: Route.LoaderArgs) {
       orderBy: { createdAt: "desc" },
       take: 20,
     });
-    // Enrich with actor email
-    const actorIds = [...new Set(rawLogs.map((l: any) => l.actorUserId).filter(Boolean))] as string[];
-    let actorMap: Record<string, string> = {};
-    if (actorIds.length > 0) {
+    // Enrich with actor email — fetch the impersonated half too so the
+    // recent audit panel can render "Real via Impersonated" alongside.
+    const userIdSet = new Set<string>();
+    for (const l of rawLogs as any[]) {
+      if (l.actorUserId) userIdSet.add(l.actorUserId);
+      if (l.onBehalfOfUserId) userIdSet.add(l.onBehalfOfUserId);
+    }
+    let userMap: Record<string, string> = {};
+    if (userIdSet.size > 0) {
       const actors = await db.user.findMany({
-        where: { id: { in: actorIds } },
+        where: { id: { in: Array.from(userIdSet) } },
         select: { id: true, email: true },
       });
-      actorMap = Object.fromEntries(actors.map((a) => [a.id, a.email]));
+      userMap = Object.fromEntries(actors.map((a) => [a.id, a.email]));
     }
     auditLogs = rawLogs.map((l: any) => ({
       ...l,
-      actorEmail: l.actorUserId ? (actorMap[l.actorUserId] ?? null) : null,
+      onBehalfOfUserId: l.onBehalfOfUserId ?? null,
+      actorEmail: l.actorUserId ? (userMap[l.actorUserId] ?? null) : null,
+      onBehalfOfEmail: l.onBehalfOfUserId
+        ? (userMap[l.onBehalfOfUserId] ?? null)
+        : null,
     }));
   } catch {
     // OrgAuditLog table may not exist yet in this environment — safe to ignore
@@ -101,6 +116,10 @@ export async function loader({ context, params }: Route.LoaderArgs) {
 export async function action({ request, context, params }: Route.ActionArgs) {
   await requirePlatformAdmin(context);
   const me = getOptionalUserFromContext(context);
+  // Pull the (actor, onBehalfOf) pair once at the boundary so every audit
+  // write below carries the impersonator field if a platform admin is
+  // acting through better-auth impersonation.
+  const actor = getActorIdsFromContext(context);
   const db = getPrisma(context);
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
@@ -126,13 +145,19 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         orgId,
         compedUntil,
         billingNote,
-        actorUserId: me?.id ?? null,
+        actorUserId: actor.actorUserId ?? me?.id ?? null,
+        onBehalfOfUserId: actor.onBehalfOfUserId,
       });
       return data({ ok: true });
     }
 
     case "clear-comp": {
-      await clearOrgComp({ context, orgId, actorUserId: me?.id ?? null });
+      await clearOrgComp({
+        context,
+        orgId,
+        actorUserId: actor.actorUserId ?? me?.id ?? null,
+        onBehalfOfUserId: actor.onBehalfOfUserId,
+      });
       return data({ ok: true });
     }
 
@@ -158,7 +183,8 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       await recordOrgAudit({
         context,
         orgId,
-        actorUserId: me?.id ?? null,
+        actorUserId: actor.actorUserId ?? me?.id ?? null,
+        onBehalfOfUserId: actor.onBehalfOfUserId,
         action: "plan.manual_change",
         payload: { from: fromPlan, to: billingPlan },
       });
@@ -186,7 +212,8 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       await recordOrgAudit({
         context,
         orgId,
-        actorUserId: me?.id ?? null,
+        actorUserId: actor.actorUserId ?? me?.id ?? null,
+        onBehalfOfUserId: actor.onBehalfOfUserId,
         action: "trial.extend",
         payload: {
           days,
@@ -218,7 +245,8 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       await recordOrgAudit({
         context,
         orgId,
-        actorUserId: me?.id ?? null,
+        actorUserId: actor.actorUserId ?? me?.id ?? null,
+        onBehalfOfUserId: actor.onBehalfOfUserId,
         action: nextIsComped ? "comp.toggle_on" : "comp.toggle_off",
         payload: { statusAfter: patch.status ?? org.status },
       });
@@ -235,7 +263,8 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         name,
         scope: { kind: "org", id: orgId },
         role,
-        invitedByUserId: me?.id ?? null,
+        invitedByUserId: actor.actorUserId ?? me?.id ?? null,
+        invitedByOnBehalfOfUserId: actor.onBehalfOfUserId,
         invitedByEmail: (me as { email?: string } | null)?.email ?? null,
         invitedToLabel: org.name,
       });
@@ -256,7 +285,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       const result = await resendInvite(context, {
         request,
         userId,
-        invitedByUserId: me?.id ?? null,
+        invitedByUserId: actor.actorUserId ?? me?.id ?? null,
         invitedToLabel: org.name,
       });
       if (!result.ok) {
@@ -319,12 +348,17 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         return data({ ok: false, error: msg }, { status: 400 });
       }
 
-      // Write audit log
+      // Write audit log. We deliberately read `me?.id` here rather than
+      // `actor.actorUserId` — the impersonation hasn't started yet from
+      // the request's perspective, so the actor pair on this row should
+      // describe "platform admin starts impersonating <userId>", not the
+      // post-impersonation state.
       try {
         await recordOrgAudit({
           context,
           orgId,
-          actorUserId: me?.id ?? null,
+          actorUserId: actor.actorUserId ?? me?.id ?? null,
+          onBehalfOfUserId: actor.onBehalfOfUserId,
           action: "impersonate.start",
           payload: { targetUserId: userId },
         });
@@ -866,20 +900,40 @@ export default function PlatformOrgDetail({
                 </tr>
               </thead>
               <tbody>
-                {auditLogs.map((log) => (
-                  <tr key={log.id} className="border-t border-white/10">
-                    <td className="px-3 py-2 text-xs text-white/60 whitespace-nowrap">
-                      {formatDt(log.createdAt)}
-                    </td>
-                    <td className="px-3 py-2 text-xs text-white/70">
-                      {log.actorEmail ?? log.actorUserId ?? "system"}
-                    </td>
-                    <td className="px-3 py-2 font-mono text-xs">{log.action}</td>
-                    <td className="px-3 py-2 font-mono text-[10px] text-white/50 max-w-xs truncate">
-                      {log.payload ? JSON.stringify(log.payload) : "—"}
-                    </td>
-                  </tr>
-                ))}
+                {auditLogs.map((log) => {
+                  const actorLabel =
+                    log.actorEmail ?? log.actorUserId ?? null;
+                  const onBehalfLabel =
+                    log.onBehalfOfEmail ?? log.onBehalfOfUserId ?? null;
+                  const fullLabel = formatActorLabel(
+                    actorLabel,
+                    onBehalfLabel,
+                    "system",
+                  );
+                  return (
+                    <tr key={log.id} className="border-t border-white/10">
+                      <td className="px-3 py-2 text-xs text-white/60 whitespace-nowrap">
+                        {formatDt(log.createdAt)}
+                      </td>
+                      <td
+                        className="px-3 py-2 text-xs text-white/70"
+                        aria-label={fullLabel}
+                      >
+                        <span>{actorLabel ?? fullLabel}</span>
+                        {onBehalfLabel && actorLabel ? (
+                          <span className="ml-2 inline-flex items-center gap-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-200">
+                            <span className="uppercase tracking-wide">via</span>
+                            <span>{onBehalfLabel}</span>
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-xs">{log.action}</td>
+                      <td className="px-3 py-2 font-mono text-[10px] text-white/50 max-w-xs truncate">
+                        {log.payload ? JSON.stringify(log.payload) : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

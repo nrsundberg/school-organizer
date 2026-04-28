@@ -525,6 +525,7 @@
     },
     "table": {
       "actor": "Realizado por",
+      "actorMissingFallback": "(sin actor)",
       "anonymousActor": "Visitante (anónimo)",
       "ariaLabel": "Historial de llamadas",
       "homeroom": "Salón principal",
