@@ -51,34 +51,47 @@ export async function action({ params, request, context }: Route.ActionArgs) {
   const prisma = getTenantPrisma(context);
 
   // Space update + roster lookup are independent → run in parallel. The
-  // CallEvent insert depends on the student row, so it follows.
+  // CallEvent insert depends on the household row, so it follows.
   // Previously these three queries lived inside the BINGO_BOARD DO, which
   // serialized every tenant click behind a single-threaded queue and hit
   // the Cloudflare wall-clock under rapid clicking ("Worker's code had
   // hung" errors). Doing the writes here lets concurrent requests proceed
   // in parallel; D1 still serializes writes internally, but at the
   // storage layer rather than the DO layer.
-  const [, student] = await Promise.all([
+  const [, household] = await Promise.all([
     prisma.space.update({
       where: { orgId_spaceNumber: { orgId: org.id, spaceNumber } },
       data: { status: "ACTIVE", timestamp },
     }),
-    prisma.student.findFirst({
-      where: { household: { spaceNumber } },
-      select: { id: true, firstName: true, lastName: true, homeRoom: true },
+    prisma.household.findFirst({
+      where: { spaceNumber },
+      select: {
+        name: true,
+        students: {
+          select: { id: true, firstName: true, lastName: true, homeRoom: true },
+        },
+      },
     }),
   ]);
 
-  const studentName = student
-    ? `${student.firstName} ${student.lastName}`
-    : `Space ${spaceNumber}`;
+  // Sibling households share one space; CallEvent has a single studentId
+  // FK, so we only attribute to a specific student when the household has
+  // exactly one. Multi-sibling households log the household name (siblings
+  // can also be in different homerooms → null the snapshot too).
+  const students = household?.students ?? [];
+  const sole = students.length === 1 ? students[0] : null;
+  const studentName = sole
+    ? `${sole.firstName} ${sole.lastName}`
+    : household && students.length > 1
+      ? household.name
+      : `Space ${spaceNumber}`;
 
   const event = await prisma.callEvent.create({
     data: {
       spaceNumber,
-      studentId: student?.id ?? null,
+      studentId: sole?.id ?? null,
       studentName,
-      homeRoomSnapshot: student?.homeRoom ?? null,
+      homeRoomSnapshot: sole?.homeRoom ?? null,
       actorUserId: actorUserId ?? null,
       onBehalfOfUserId: onBehalfOfUserId ?? null,
       ipAddress: ipAddress ?? null,
