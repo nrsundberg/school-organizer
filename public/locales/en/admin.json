@@ -511,30 +511,6 @@
         "updated": "Homeroom updated",
         "updatedSuccess": "Homeroom updated successfully"
       }
-    },
-    "student": {
-      "assignments": "Assignments",
-      "basicInfo": "Basic Information",
-      "delete": "Delete Student",
-      "deleted": "Student deleted successfully",
-      "deleting": "Deleting...",
-      "errors": {
-        "homeroomMustExist": "Please choose an existing homeroom from suggestions",
-        "invalidId": "Invalid student ID",
-        "namesRequired": "First name and last name are required",
-        "notFound": "Student not found",
-        "updateFailed": "Failed to update student"
-      },
-      "firstName": "First Name",
-      "heading": "Edit Student",
-      "homeroomLabel": "Homeroom",
-      "homeroomPlaceholder": "Select existing homeroom",
-      "lastName": "Last Name",
-      "leaveEmpty": "Leave empty if not assigned",
-      "spaceLabel": "Parking Space Number",
-      "submit": "Update Student",
-      "submitting": "Updating...",
-      "updated": "Student updated successfully"
     }
   },
   "history": {

@@ -54,8 +54,7 @@ export default [
   ]),
 
   ...prefix("edit", [
-    route("homeroom/:homeroom", "routes/edit/edit.homeroom.$value.tsx"),
-    route("student/:student", "routes/edit/edit.student.$value.tsx")
+    route("homeroom/:homeroom", "routes/edit/edit.homeroom.$value.tsx")
   ]),
 
   route("data/students", "routes/data.students.tsx"),

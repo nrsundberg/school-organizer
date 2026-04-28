@@ -476,30 +476,6 @@
         "updated": "Salón principal actualizado",
         "updatedSuccess": "Salón principal actualizado correctamente"
       }
-    },
-    "student": {
-      "assignments": "Asignaciones",
-      "basicInfo": "Información básica",
-      "delete": "Eliminar estudiante",
-      "deleted": "Estudiante eliminado correctamente",
-      "deleting": "Eliminando...",
-      "errors": {
-        "homeroomMustExist": "Por favor elige un salón principal existente de las sugerencias",
-        "invalidId": "ID de estudiante inválido",
-        "namesRequired": "El nombre y el apellido son obligatorios",
-        "notFound": "Estudiante no encontrado",
-        "updateFailed": "No se pudo actualizar el estudiante"
-      },
-      "firstName": "Nombre",
-      "heading": "Editar estudiante",
-      "homeroomLabel": "Salón principal",
-      "homeroomPlaceholder": "Selecciona un salón principal existente",
-      "lastName": "Apellido",
-      "leaveEmpty": "Déjalo vacío si no está asignado",
-      "spaceLabel": "Número de espacio de estacionamiento",
-      "submit": "Actualizar estudiante",
-      "submitting": "Actualizando...",
-      "updated": "Estudiante actualizado correctamente"
     }
   },
   "history": {

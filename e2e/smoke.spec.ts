@@ -37,7 +37,7 @@
  *
  * SKIPPED (dynamic-param routes that need real seeded data):
  *   - /update/:space, /empty/:space
- *   - /edit/homeroom/:homeroom, /edit/student/:student
+ *   - /edit/homeroom/:homeroom
  *   - /homerooms/:id
  *   - /admin/fire-drill/:templateId, /admin/fire-drill/:templateId/run
  *   - /admin/print/homeroom/:teacherId, /admin/print/fire-drill/:templateId
