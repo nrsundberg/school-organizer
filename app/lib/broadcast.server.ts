@@ -113,6 +113,8 @@ export async function broadcastDrillActivity(
     payload: unknown;
     actorUserId: string | null;
     actorLabel: string | null;
+    onBehalfOfUserId: string | null;
+    onBehalfOfLabel: string | null;
     occurredAtIso: string;
   }>,
 ) {
@@ -132,6 +134,8 @@ export async function broadcastDrillPresence(
     runId: string;
     userId: string;
     label: string;
+    onBehalfOfUserId: string | null;
+    onBehalfOfLabel: string | null;
     color: string;
     focus:
       | { kind: "notes" }

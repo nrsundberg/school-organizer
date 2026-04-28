@@ -22,6 +22,8 @@ type DrillActivityMsg = {
     payload: unknown;
     actorUserId: string | null;
     actorLabel: string | null;
+    onBehalfOfUserId: string | null;
+    onBehalfOfLabel: string | null;
     occurredAtIso: string;
   }>;
 };
@@ -31,6 +33,8 @@ type DrillPresenceMsg = {
   runId: string;
   userId: string;
   label: string;
+  onBehalfOfUserId: string | null;
+  onBehalfOfLabel: string | null;
   color: string;
   focus:
     | { kind: "notes" }

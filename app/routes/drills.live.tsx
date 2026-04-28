@@ -53,6 +53,21 @@ export const meta: Route.MetaFunction = ({ data }) => [
   },
 ];
 
+// Renders an actor's display name with optional impersonation suffix.
+// "Noah Sundberg as Admin Account" when impersonating; just the name (or
+// the fallback) otherwise. Shared by the loader (for the pre-composed
+// `me.label`) and the activity / presence renderers on the client.
+export function formatActorLabel(
+  actorLabel: string | null,
+  onBehalfOfLabel: string | null,
+  fallback: string,
+): string {
+  const a = actorLabel?.trim();
+  const o = onBehalfOfLabel?.trim();
+  if (a && o) return `${a} as ${o}`;
+  return a || o || fallback;
+}
+
 const btnPrimary =
   "inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 const btnSecondary =
@@ -115,43 +130,66 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     : t("drillsLive.metaLive", { name: run.template.name });
 
   // Recent activity for the right-rail feed. We pull the last ~50 events
-  // and join in actor display names so the panel can render without a
-  // second round-trip. New events for the current session arrive over
-  // the WebSocket; the loader only seeds the initial render.
+  // and join in actor + impersonator display names so the panel can render
+  // without a second round-trip. New events for the current session arrive
+  // over the WebSocket; the loader only seeds the initial render.
   const rawEvents = await prisma.drillRunEvent.findMany({
     where: { runId: run.id },
     orderBy: { occurredAt: "desc" },
     take: 50,
   });
-  const actorIds = Array.from(
-    new Set(
-      rawEvents
-        .map((e) => e.actorUserId)
-        .filter((v): v is string => typeof v === "string"),
-    ),
-  );
-  const actors = actorIds.length
+
+  // Resolve names for every actor and impersonator in the activity buffer,
+  // plus the current viewer's pair. One findMany covers them all so synth
+  // events on the client can use the same labels the loader will return
+  // after revalidation — without that, the activity feed flickers between
+  // the impersonated user's name and the real human's name.
+  const actor = getActorIdsFromContext(context);
+  const userIds = new Set<string>();
+  for (const e of rawEvents) {
+    if (e.actorUserId) userIds.add(e.actorUserId);
+    if (e.onBehalfOfUserId) userIds.add(e.onBehalfOfUserId);
+  }
+  if (actor.actorUserId) userIds.add(actor.actorUserId);
+  if (actor.onBehalfOfUserId) userIds.add(actor.onBehalfOfUserId);
+
+  type UserRow = { id: string; name: string; email: string };
+  const users: UserRow[] = userIds.size
     ? await prisma.user.findMany({
-        where: { id: { in: actorIds } },
+        where: { id: { in: Array.from(userIds) } },
         select: { id: true, name: true, email: true },
       })
     : [];
-  const actorById = new Map(actors.map((a) => [a.id, a]));
+  const userById = new Map<string, UserRow>(users.map((u) => [u.id, u]));
+  const labelOf = (id: string | null): string | null => {
+    if (!id) return null;
+    const u = userById.get(id);
+    if (!u) return null;
+    return u.name.trim() || u.email || null;
+  };
+
   const recentActivity = rawEvents
     .slice()
     .reverse() // chronological for display
-    .map((ev) => {
-      const a = ev.actorUserId ? actorById.get(ev.actorUserId) : null;
-      return {
-        id: ev.id,
-        runId: ev.runId,
-        kind: ev.kind,
-        payload: ev.payload,
-        actorUserId: ev.actorUserId,
-        actorLabel: a ? (a.name?.trim() || a.email || null) : null,
-        occurredAtIso: ev.occurredAt.toISOString(),
-      };
-    });
+    .map((ev) => ({
+      id: ev.id,
+      runId: ev.runId,
+      kind: ev.kind,
+      payload: ev.payload,
+      actorUserId: ev.actorUserId,
+      actorLabel: labelOf(ev.actorUserId),
+      onBehalfOfUserId: ev.onBehalfOfUserId,
+      onBehalfOfLabel: labelOf(ev.onBehalfOfUserId),
+      occurredAtIso: ev.occurredAt.toISOString(),
+    }));
+
+  const meActorLabel = labelOf(actor.actorUserId);
+  const meOnBehalfOfLabel = labelOf(actor.onBehalfOfUserId);
+  const meComposedLabel = formatActorLabel(
+    meActorLabel,
+    meOnBehalfOfLabel,
+    (user?.name || "").trim() || user?.email || "viewer",
+  );
 
   return {
     run: {
@@ -175,11 +213,21 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     paused,
     userName: user?.name || user?.email || "viewer",
     me: {
-      // Null on viewer-pin / anonymous; real user.id when signed in.
+      // Null on viewer-pin / anonymous; the impersonated user's id when
+      // impersonating, the real user's id otherwise. Used as the WS-presence
+      // self-identifier; clients dedupe self-broadcasts against this.
       userId: user?.id ?? null,
-      // Always populated so the attestation overlay never has to render
-      // "✓ undefined". Falls back to the viewer-pin label for guests.
-      label: (user?.name || "").trim() || user?.email || "viewer",
+      // Audit pair. actorUserId is the real human (impersonator's id when
+      // impersonating, else the signed-in user); onBehalfOfUserId is the
+      // impersonated user, or null.
+      actorUserId: actor.actorUserId,
+      actorLabel: meActorLabel,
+      onBehalfOfUserId: actor.onBehalfOfUserId,
+      onBehalfOfLabel: meOnBehalfOfLabel,
+      // Pre-composed display label ("Noah as Admin" when impersonating, just
+      // "Noah" otherwise). Falls back to the viewer-pin label for guests so
+      // attestations never render "✓ undefined".
+      label: meComposedLabel,
     },
     recentActivity,
     metaTitle,
@@ -214,7 +262,31 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
   };
 
-  const actorLabel = (user.name?.trim() || user.email || null) ?? null;
+  // Resolve display labels for the actor pair. Both DB rows and synth
+  // broadcasts use these so the activity feed renders identically before
+  // and after loader revalidation — without it, the panel briefly shows the
+  // impersonated user's name (from the optimistic synth) and then snaps to
+  // the real human's name (from the canonical DB row) on revalidate.
+  let actorLabel: string | null;
+  let onBehalfOfLabel: string | null;
+  if (actor.onBehalfOfUserId === null) {
+    // Not impersonating — actor.actorUserId === user.id.
+    actorLabel = (user.name?.trim() || user.email || null) ?? null;
+    onBehalfOfLabel = null;
+  } else {
+    // Impersonating — `user` here is the impersonated user; the real
+    // human's name lives on actor.actorUserId and needs a User lookup.
+    const impersonator = actor.actorUserId
+      ? await prisma.user.findUnique({
+          where: { id: actor.actorUserId },
+          select: { name: true, email: true },
+        })
+      : null;
+    actorLabel = impersonator
+      ? (impersonator.name?.trim() || impersonator.email || null)
+      : null;
+    onBehalfOfLabel = (user.name?.trim() || user.email || null) ?? null;
+  }
 
   // Synthesize an activity payload for lifecycle events (paused/resumed/ended).
   // The DB row is canonical; this synthesized broadcast just lets connected
@@ -226,8 +298,10 @@ export async function action({ request, context }: Route.ActionArgs) {
     runId,
     kind,
     payload: { kind },
-    actorUserId: user.id,
+    actorUserId: actor.actorUserId,
     actorLabel,
+    onBehalfOfUserId: actor.onBehalfOfUserId,
+    onBehalfOfLabel,
     occurredAtIso: new Date().toISOString(),
   });
 
@@ -326,6 +400,8 @@ export async function action({ request, context }: Route.ActionArgs) {
               payload: ev.payload,
               actorUserId: ev.actorUserId,
               actorLabel,
+              onBehalfOfUserId: ev.onBehalfOfUserId,
+              onBehalfOfLabel,
               occurredAtIso: ev.occurredAt.toISOString(),
             })),
           );
@@ -372,6 +448,8 @@ type PresenceFocus =
 type PresenceEntry = {
   userId: string;
   label: string;
+  onBehalfOfUserId: string | null;
+  onBehalfOfLabel: string | null;
   color: string;
   focus: PresenceFocus;
   at: number; // ms epoch
@@ -384,6 +462,8 @@ type ActivityEntry = {
   payload: unknown;
   actorUserId: string | null;
   actorLabel: string | null;
+  onBehalfOfUserId: string | null;
+  onBehalfOfLabel: string | null;
   occurredAtIso: string;
 };
 
@@ -605,6 +685,8 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
           next.set(msg.userId, {
             userId: msg.userId,
             label: msg.label,
+            onBehalfOfUserId: msg.onBehalfOfUserId ?? null,
+            onBehalfOfLabel: msg.onBehalfOfLabel ?? null,
             color: msg.color,
             focus: msg.focus,
             at: Date.now(),
@@ -627,13 +709,28 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
         type: "drillPresence",
         runId: run.id,
         userId: me.userId,
-        label: me.label,
+        // Send the RAW actor name plus the impersonated identity. Receivers
+        // compose via formatActorLabel — symmetric with activity events and
+        // avoids any "Noah as Admin as Admin" double-suffixing if a future
+        // caller pre-formats. Falls back to me.label so the (rare) deleted-
+        // user race doesn't render an empty pill.
+        label: me.actorLabel ?? me.label,
+        onBehalfOfUserId: me.onBehalfOfUserId,
+        onBehalfOfLabel: me.onBehalfOfLabel,
         color: userColor(me.userId),
         focus,
         at: new Date().toISOString(),
       });
     },
-    [me.userId, me.label, run.id, ws],
+    [
+      me.userId,
+      me.label,
+      me.actorLabel,
+      me.onBehalfOfUserId,
+      me.onBehalfOfLabel,
+      run.id,
+      ws,
+    ],
   );
 
   // Heartbeat: while a field is focused, re-broadcast presence every 3s so
@@ -1108,6 +1205,7 @@ function PresencePill({ people, t }: { people: PresenceEntry[]; t: Translator })
   const head = people[0];
   if (!head) return null;
   const extra = people.length - 1;
+  const headLabel = formatActorLabel(head.label, head.onBehalfOfLabel, head.label);
   return (
     <span
       className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[11px] text-white/80"
@@ -1120,13 +1218,13 @@ function PresencePill({ people, t }: { people: PresenceEntry[]; t: Translator })
       />
       {extra > 0
         ? t("drillsLive.presence.editingMany", {
-            label: head.label,
+            label: headLabel,
             count: extra,
-            defaultValue: `${head.label} + ${extra} editing`,
+            defaultValue: `${headLabel} + ${extra} editing`,
           })
         : t("drillsLive.presence.editing", {
-            label: head.label,
-            defaultValue: `${head.label} is editing…`,
+            label: headLabel,
+            defaultValue: `${headLabel} is editing…`,
           })}
     </span>
   );
@@ -1138,7 +1236,7 @@ function PresenceDots({ people }: { people: PresenceEntry[] }) {
       {people.slice(0, 3).map((p) => (
         <span
           key={p.userId}
-          title={p.label}
+          title={formatActorLabel(p.label, p.onBehalfOfLabel, p.label)}
           className="inline-block h-2 w-2 rounded-full"
           style={{ backgroundColor: p.color }}
         />
@@ -1187,13 +1285,14 @@ function ActivityPanel({
             // the raw kind string via its defaultValue path.
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const text = formatDrillEvent(ev.payload as any, tAdmin);
+            const actor = formatActorLabel(
+              ev.actorLabel,
+              ev.onBehalfOfLabel,
+              t("drillsLive.activityUnknownActor", { defaultValue: "Someone" }),
+            );
             return (
               <li key={ev.id} className="text-xs text-white/80 leading-snug">
-                <span className="font-medium text-white">
-                  {ev.actorLabel ?? t("drillsLive.activityUnknownActor", {
-                    defaultValue: "Someone",
-                  })}
-                </span>{" "}
+                <span className="font-medium text-white">{actor}</span>{" "}
                 <span className="text-white/70">{text}</span>{" "}
                 <span className="text-white/40 whitespace-nowrap">· {relativeTime(ev.occurredAtIso)}</span>
               </li>
