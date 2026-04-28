@@ -1,18 +1,30 @@
 import type { ReactNode } from "react";
 
 /**
- * Eyebrow-style group header used to break the children/students pages into
- * scannable sections (e.g. "Kindergarten · 2 classrooms · 41 students"). The
- * title is uppercase + tracked, with an optional inline count badge and a
- * thin horizontal rule that fills the remaining width.
+ * Group header used across the redesigned admin pages. Two visual modes:
+ *
+ * - "eyebrow" (default): uppercase + tracked title with a thin horizontal
+ *   rule filling the remaining width. Used to break list pages into
+ *   scannable sections (children grade groups, student-detail forms).
+ * - "heavy": normal-case h2 with optional icon and subtitle line. Used on
+ *   detail pages where each section needs more visual weight.
+ *
+ * The heavy mode kicks in automatically whenever `subtitle` or `icon` is
+ * passed, so call sites just supply props and don't pick a variant.
  */
 
 export type SectionHeaderProps = {
-  title: string;
+  title: ReactNode;
   /** Numeric badge rendered next to the title — typically "n classrooms". */
   count?: number | string;
-  /** Secondary inline caption ("· 41 students"). Optional. */
+  /** Secondary inline caption ("· 41 students"). Optional, eyebrow mode. */
   caption?: string;
+  /** Optional subtitle/explanation rendered below the title. Switches the
+   * header to the heavier h2 layout used on detail pages. */
+  subtitle?: ReactNode;
+  /** Optional icon rendered before the title. Switches the header to the
+   * heavier h2 layout used on detail pages. */
+  icon?: ReactNode;
   /** Right-aligned actions (buttons, dropdown, etc.). */
   actions?: ReactNode;
   /** Anchor id for in-page nav (deep links to grade groups). */
@@ -24,10 +36,48 @@ export function SectionHeader({
   title,
   count,
   caption,
+  subtitle,
+  icon,
   actions,
   id,
   className,
 }: SectionHeaderProps) {
+  const heavy = subtitle !== undefined || icon !== undefined;
+
+  if (heavy) {
+    return (
+      <div
+        id={id}
+        className={[
+          "flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between",
+          className ?? "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            {icon ? (
+              <span className="inline-flex shrink-0 text-white/70">{icon}</span>
+            ) : null}
+            <h2 className="text-base font-semibold text-white">{title}</h2>
+            {count !== undefined && count !== null ? (
+              <span className="rounded-full bg-white/[0.08] px-2 py-0.5 text-xs font-medium text-white/70">
+                {count}
+              </span>
+            ) : null}
+          </div>
+          {subtitle ? (
+            <p className="mt-1 text-sm text-white/55">{subtitle}</p>
+          ) : null}
+        </div>
+        {actions ? (
+          <div className="flex shrink-0 items-center gap-2">{actions}</div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div
       id={id}
@@ -58,3 +108,5 @@ export function SectionHeader({
     </div>
   );
 }
+
+export default SectionHeader;

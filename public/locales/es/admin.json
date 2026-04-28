@@ -589,7 +589,19 @@
       "contactPhoneLabel": "Teléfono de contacto",
       "nameLabel": "Nombre del hogar",
       "pickupNotesLabel": "Notas de recogida",
-      "primaryContactLabel": "Contacto principal"
+      "primaryContactLabel": "Contacto principal",
+      "students_one": "{{count}} student",
+      "students_other": "{{count}} students",
+      "contacts_one": "{{count}} contact",
+      "contacts_other": "{{count}} contacts",
+      "createdOn": "Created {{date}}",
+      "noPlan": "No default plan",
+      "open": "Open",
+      "viewDetail": "View household",
+      "studentsHeading": "Students",
+      "noStudents": "No students assigned",
+      "noContacts": "No contact on file",
+      "active": "Active"
     },
     "create": {
       "contactPhoneLabel": "Teléfono de contacto",
@@ -689,7 +701,8 @@
       "clear": "Limpiar",
       "label": "Buscar hogares",
       "placeholder": "Buscar por nombre",
-      "submit": "Buscar"
+      "submit": "Buscar",
+      "richPlaceholder": "Search by name, contact, or student"
     },
     "roi": {
       "assumptions": "Supuestos: {{minutes}} minutos por llamada de familia evitada, {{exceptions}} llamada evitada por cada ocurrencia de excepción y {{cancellations}} llamadas evitadas por cada cancelación de programa.",
@@ -732,6 +745,98 @@
       "thursday": "Jueves",
       "tuesday": "Martes",
       "wednesday": "Miércoles"
+    },
+    "stats": {
+      "totalHouseholds": "Total households",
+      "totalHouseholdsCaption": "Across the org",
+      "studentsAssigned": "Students assigned",
+      "studentsAssignedCaption": "Linked to a household",
+      "exceptionsToday": "Active exceptions today",
+      "exceptionsTodayCaption": "Households with at least one active exception",
+      "missingContact": "Missing contact info",
+      "missingContactCaption": "Households without primary contact name or phone"
+    },
+    "filters": {
+      "label": "Quick filters",
+      "all": "All households",
+      "exceptionToday": "Has exception today",
+      "missingContact": "Missing primary contact",
+      "singleParent": "Single-parent",
+      "multiStudent": "Multi-student",
+      "applied": "{{count}} active"
+    },
+    "detail": {
+      "metaTitle": "Admin – {{name}}",
+      "breadcrumbHouseholds": "Households",
+      "actions": {
+        "addException": "Add exception",
+        "message": "Message",
+        "edit": "Edit",
+        "save": "Save changes",
+        "cancel": "Cancel",
+        "delete": "Delete household"
+      },
+      "header": {
+        "studentsLabel_one": "{{count}} student",
+        "studentsLabel_other": "{{count}} students",
+        "contactsLabel_one": "{{count}} contact",
+        "contactsLabel_other": "{{count}} contacts",
+        "createdOn": "Created {{date}}",
+        "defaultPlan": "Default plan: {{plan}}",
+        "noDefaultPlan": "No default plan"
+      },
+      "students": {
+        "heading": "Students",
+        "empty": "No students assigned to this household yet.",
+        "viewStudent": "View student",
+        "detach": "Detach",
+        "noTeacher": "Unassigned classroom",
+        "noSpace": "No space"
+      },
+      "contacts": {
+        "heading": "Contacts",
+        "empty": "Add a primary pickup contact above so families can be reached during dismissal.",
+        "rolePrimary": "Primary",
+        "rolePickupApproved": "Pickup-approved",
+        "roleHasAccount": "Has app account",
+        "viewUser": "View user",
+        "noEmail": "No email on file",
+        "noPhone": "No phone on file"
+      },
+      "exceptions": {
+        "heading": "Upcoming dismissal exceptions",
+        "empty": "No active exceptions for this household.",
+        "addInline": "Add exception",
+        "newHeading": "New dismissal exception",
+        "cancelNew": "Cancel",
+        "saveNew": "Save exception",
+        "createdBy": "Saved {{date}}",
+        "recurringTile": "WK"
+      },
+      "rail": {
+        "defaultPlanHeading": "Default dismissal plan",
+        "defaultPlanBody": "Used when no exception is active. Update via the household's edit panel.",
+        "noDefaultPlan": "Set a default plan in the household's pickup notes.",
+        "pickupNotesHeading": "Pickup notes",
+        "pickupNotesEmpty": "Add notes families should remember (e.g. shared rides, after-school routines).",
+        "activityHeading": "Recent activity",
+        "activityEmpty": "No recent dismissal activity.",
+        "activityEvent": "Dismissed to space {{space}} · {{when}}",
+        "linkedUserHeading": "Linked admin user",
+        "linkedUserEmpty": "No app account is linked to this household yet.",
+        "linkedUserOpen": "Open user drawer"
+      },
+      "edit": {
+        "heading": "Edit household",
+        "subtitle": "Update the household name, primary contact, and shared pickup notes."
+      },
+      "notFound": "Household not found.",
+      "backToHouseholds": "Back to households"
+    },
+    "indexHeader": {
+      "createCta": "+ Create household",
+      "title": "Households",
+      "subtitle": "Group siblings, capture shared pickup context, and keep dismissal exceptions in sync."
     }
   },
   "layout": {

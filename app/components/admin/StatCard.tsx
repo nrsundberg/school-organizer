@@ -6,13 +6,14 @@ import type { ReactNode } from "react";
  * attention items like "unassigned students".
  */
 
-export type StatCardTone = "default" | "warning" | "info" | "success";
+export type StatCardTone = "default" | "warning" | "info" | "success" | "danger";
 
 const TONE_RING: Record<StatCardTone, string> = {
   default: "border-white/[0.08]",
   warning: "border-amber-400/30",
   info: "border-blue-400/30",
   success: "border-emerald-400/30",
+  danger: "border-rose-400/30",
 };
 
 const TONE_VALUE_COLOR: Record<StatCardTone, string> = {
@@ -20,6 +21,7 @@ const TONE_VALUE_COLOR: Record<StatCardTone, string> = {
   warning: "text-amber-200",
   info: "text-blue-200",
   success: "text-emerald-200",
+  danger: "text-rose-200",
 };
 
 const TONE_BG: Record<StatCardTone, string> = {
@@ -27,6 +29,7 @@ const TONE_BG: Record<StatCardTone, string> = {
   warning: "bg-amber-500/[0.06]",
   info: "bg-blue-500/[0.06]",
   success: "bg-emerald-500/[0.06]",
+  danger: "bg-rose-500/[0.06]",
 };
 
 export type StatCardProps = {
@@ -98,3 +101,5 @@ export function StatCard({
   }
   return <div className={cls}>{inner}</div>;
 }
+
+export default StatCard;

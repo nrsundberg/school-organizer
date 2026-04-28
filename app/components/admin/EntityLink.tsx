@@ -46,3 +46,5 @@ export function EntityLink({
     </Link>
   );
 }
+
+export default EntityLink;

@@ -13,6 +13,7 @@ export default [
     index("routes/admin/dashboard.tsx"),
     route("users", "routes/admin/users.tsx"),
     route("households", "routes/admin/households.tsx"),
+    route("households/:householdId", "routes/admin/households.$householdId.tsx"),
     route("children", "routes/admin/children.tsx"),
     route("students/:studentId", "routes/admin/students.$studentId.tsx"),
     route("roster-import", "routes/admin/roster-import.tsx"),

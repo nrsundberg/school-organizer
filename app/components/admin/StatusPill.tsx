@@ -15,6 +15,8 @@ export type StatusPillTone =
   | "cyan"
   | "purple";
 
+export type PillTone = StatusPillTone;
+
 const TONE_STYLES: Record<StatusPillTone, { bg: string; fg: string; ring: string }> = {
   info:    { bg: "rgba(59,130,246,0.14)",  fg: "#93c5fd", ring: "rgba(59,130,246,0.35)" },
   success: { bg: "rgba(16,185,129,0.14)",  fg: "#6ee7b7", ring: "rgba(16,185,129,0.35)" },
@@ -25,8 +27,12 @@ const TONE_STYLES: Record<StatusPillTone, { bg: string; fg: string; ring: string
   purple:  { bg: "rgba(124,58,237,0.18)",  fg: "#c4b5fd", ring: "rgba(124,58,237,0.40)" },
 };
 
+export type StatusPillSize = "xs" | "sm";
+
 export type StatusPillProps = {
   tone?: StatusPillTone;
+  /** Compact size — `xs` is the smaller variant for inline-with-text usage. */
+  size?: StatusPillSize;
   /** Optional leading icon — kept tiny so the pill stays compact. */
   icon?: ReactNode;
   /** Render as a simple dot pill (just a colored circle + label). */
@@ -37,14 +43,20 @@ export type StatusPillProps = {
 
 export function StatusPill({
   tone = "neutral",
+  size = "sm",
   icon,
   dot = false,
   className,
   children,
 }: StatusPillProps) {
   const style = TONE_STYLES[tone];
+  const sizeCls =
+    size === "xs"
+      ? "px-1.5 py-px text-[10px]"
+      : "px-2 py-0.5 text-[11px]";
   const cls = [
-    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium leading-none",
+    "inline-flex items-center gap-1 rounded-full font-medium leading-none",
+    sizeCls,
     "ring-1 ring-inset",
     className ?? "",
   ]
@@ -68,3 +80,5 @@ export function StatusPill({
     </span>
   );
 }
+
+export default StatusPill;

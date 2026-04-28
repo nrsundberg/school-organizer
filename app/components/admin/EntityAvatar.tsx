@@ -24,13 +24,22 @@ const PALETTE = [
   { bg: "rgba(20,184,166,0.22)", fg: "#5eead4" }, // teal
 ] as const;
 
-type Size = "sm" | "md" | "lg";
+export type EntityAvatarSize = "xs" | "sm" | "md" | "lg" | "xl";
 
-const SIZE_TOKENS: Record<Size, { box: string; text: string }> = {
+const SIZE_TOKENS: Record<EntityAvatarSize, { box: string; text: string }> = {
   // Tailwind v4 — keep these literal so the JIT picks them up.
+  // The `box` class includes the default rounding; pass `shape="circle"`
+  // to force pill-shaped avatars instead.
+  xs: { box: "h-6 w-6 rounded-md", text: "text-[10px]" },
   sm: { box: "h-7 w-7 rounded-lg", text: "text-[11px]" },
   md: { box: "h-10 w-10 rounded-xl", text: "text-sm" },
   lg: { box: "h-14 w-14 rounded-2xl", text: "text-lg" },
+  xl: { box: "h-20 w-20 rounded-2xl", text: "text-xl" },
+};
+
+const SHAPE_OVERRIDE: Record<"circle" | "square", string> = {
+  circle: "rounded-full",
+  square: "",
 };
 
 export function pickAvatarTone(seed: string): { bg: string; fg: string } {
@@ -48,9 +57,14 @@ export type EntityAvatarProps = {
   initials: string;
   /** Stable seed for color choice. Falls back to `initials` when omitted. */
   colorSeed?: string;
-  size?: Size;
+  size?: EntityAvatarSize;
+  /** Default rounded-square shape. Pass `circle` to force a pill. */
+  shape?: "circle" | "square";
   /** Optional ring (used on the student detail header to suggest selection). */
   ring?: boolean;
+  /** Render in a "pending" state (dashed ring, "?" placeholder). Used for
+   * invited-but-not-accepted users. */
+  pending?: boolean;
   /** Slot for status dot etc. — stacked over the bottom-right corner. */
   badge?: ReactNode;
   className?: string;
@@ -61,30 +75,40 @@ export function EntityAvatar({
   initials,
   colorSeed,
   size = "md",
+  shape = "square",
   ring = false,
+  pending = false,
   badge,
   className,
   ariaLabel,
 }: EntityAvatarProps) {
   const tokens = SIZE_TOKENS[size];
   const tone = pickAvatarTone(colorSeed ?? initials);
-  const display = initials.slice(0, 2).toUpperCase() || "?";
+  const display = pending ? "?" : initials.slice(0, 2).toUpperCase() || "?";
 
+  const shapeCls = SHAPE_OVERRIDE[shape];
   const ringCls = ring ? "ring-2 ring-white/20" : "";
+  const pendingCls = pending ? "border border-dashed border-white/40" : "";
   const cls = [
     "relative inline-flex select-none items-center justify-center font-semibold tracking-wide",
     tokens.box,
+    shapeCls,
     tokens.text,
     ringCls,
+    pendingCls,
     className ?? "",
   ]
     .filter(Boolean)
     .join(" ");
 
+  const pendingStyle = pending
+    ? { backgroundColor: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.55)" }
+    : { backgroundColor: tone.bg, color: tone.fg };
+
   return (
     <span
       className={cls}
-      style={{ backgroundColor: tone.bg, color: tone.fg }}
+      style={pendingStyle}
       aria-label={ariaLabel}
       role={ariaLabel ? "img" : undefined}
     >
@@ -113,3 +137,15 @@ export function initialsFromName(name: string | null | undefined): string {
   }
   return ((tokens[0]![0] ?? "") + (tokens[tokens.length - 1]![0] ?? "")).toUpperCase();
 }
+
+/** Variant of {@link initialsFromName} that lets the caller pick the fallback
+ * character (e.g. "?" or "•"). Used by the users-branch routes. */
+export function deriveInitials(
+  name: string | null | undefined,
+  fallback = "?",
+): string {
+  const out = initialsFromName(name);
+  return out === "?" ? fallback : out;
+}
+
+export default EntityAvatar;
