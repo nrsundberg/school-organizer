@@ -220,12 +220,33 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
     throw redirect("/set-password");
   }
 
-  const skipTenantOrgBinding = isStatic || isAuthApi || isStripeWebhook;
+  const skipTenantOrgBinding =
+    isStatic || isAuthApi || isStripeWebhook || isLogout;
   // District admins are allowed onto a tenant org's pages while impersonating.
   // Without this carve-out, the sameOrg check below would bounce them since
   // `User.orgId` is null for district-scoped users.
   const isImpersonatingThisOrg =
     impersonatedOrgId != null && impersonatedOrgId === org?.id;
+
+  // Platform and district staff don't operate on tenant data unless they've
+  // explicitly impersonated this org. Without this, they hit a tenant
+  // subdomain and either get a confusing 403 (platform admin) or a wrong
+  // /signup redirect (district admin). Send them back to their console.
+  if (
+    !onMarketingHost &&
+    user &&
+    org &&
+    !skipTenantOrgBinding &&
+    !isImpersonatingThisOrg
+  ) {
+    if (isPlatformAdmin(user, context) && user.orgId !== org.id) {
+      throw redirect(`${marketingOriginFromRequest(request, context)}/platform`);
+    }
+    if (user.role === "ADMIN" && user.districtId && !user.orgId) {
+      throw redirect(`${marketingOriginFromRequest(request, context)}/district`);
+    }
+  }
+
   if (
     !onMarketingHost &&
     user &&

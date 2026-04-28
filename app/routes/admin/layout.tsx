@@ -64,6 +64,7 @@ export function ErrorBoundary() {
     isRouteErrorResponse(error) && error.status === 403;
 
   if (is401 || is403) {
+    const statusCode = isRouteErrorResponse(error) ? error.status : null;
     return (
       <div className="min-h-screen bg-[#212525] text-white flex flex-col">
         <div className="h-10 w-full bg-blue-300 flex items-center justify-center flex-shrink-0 relative">
@@ -86,6 +87,9 @@ export function ErrorBoundary() {
               <ShieldAlert className="w-10 h-10 text-blue-300" />
             )}
           </div>
+          {statusCode && (
+            <p className="text-blue-300 text-6xl font-bold">{statusCode}</p>
+          )}
           <h1 className="text-2xl font-semibold">
             {is401 ? t("layout.errors.loginRequired") : t("layout.errors.accessDenied")}
           </h1>
