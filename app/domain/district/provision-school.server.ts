@@ -33,13 +33,22 @@ export function validateSchoolProvisioningInput(
  * The school admin is created passwordless via the magic-link invite flow —
  * they get an email with a link to /accept-invite, set their password, and
  * are signed in for the first time.
+ *
+ * `actor.onBehalfOfUserId` is the impersonated user's id when the calling
+ * staff member is acting via better-auth impersonation (resolve from
+ * `getActorIdsFromContext` at the route boundary). It threads onto every
+ * audit row so the trail captures both halves of the actor pair.
  */
 export async function provisionSchoolForDistrict(
   context: any,
   args: {
     request: Request;
     district: District;
-    actor: { id: string; email: string | null };
+    actor: {
+      id: string;
+      email: string | null;
+      onBehalfOfUserId?: string | null;
+    };
     input: ProvisionInput;
   },
 ): Promise<{ org: Org; capExceeded: boolean }> {
@@ -73,6 +82,7 @@ export async function provisionSchoolForDistrict(
     role: "ADMIN",
     scope: { kind: "org", id: org.id },
     invitedByUserId: args.actor.id,
+    invitedByOnBehalfOfUserId: args.actor.onBehalfOfUserId ?? null,
     invitedByEmail: args.actor.email,
     invitedToLabel: org.name,
   });
@@ -91,6 +101,7 @@ export async function provisionSchoolForDistrict(
   await writeDistrictAudit(context, {
     districtId: args.district.id,
     actorUserId: args.actor.id,
+    onBehalfOfUserId: args.actor.onBehalfOfUserId ?? null,
     actorEmail: args.actor.email,
     action: "district.school.created",
     targetType: "Org",
@@ -103,6 +114,7 @@ export async function provisionSchoolForDistrict(
     await writeDistrictAudit(context, {
       districtId: args.district.id,
       actorUserId: args.actor.id,
+      onBehalfOfUserId: args.actor.onBehalfOfUserId ?? null,
       actorEmail: args.actor.email,
       action: "district.school.cap.exceeded",
       targetType: "District",

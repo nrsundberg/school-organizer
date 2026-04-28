@@ -17,6 +17,7 @@ import {
   getOrgFromContext,
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
+import { formatActorLabel } from "~/domain/auth/format-actor";
 import { planAllowsReports } from "~/lib/plan-limits";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
@@ -162,13 +163,17 @@ async function resolveActorNames(
   prisma: ReturnType<typeof getTenantPrisma>,
   rows: CallEventRow[],
 ): Promise<Map<string, string>> {
-  const actorIds = new Set<string>();
+  // Resolve both the actor (the human who clicked) and the impersonated
+  // user in a single batched query. The map is keyed by user id so the
+  // CSV + table renderer can look up either side.
+  const userIds = new Set<string>();
   for (const r of rows) {
-    if (r.actorUserId) actorIds.add(r.actorUserId);
+    if (r.actorUserId) userIds.add(r.actorUserId);
+    if (r.onBehalfOfUserId) userIds.add(r.onBehalfOfUserId);
   }
-  if (!actorIds.size) return new Map();
+  if (!userIds.size) return new Map();
   const users = await prisma.user.findMany({
-    where: { id: { in: Array.from(actorIds) } },
+    where: { id: { in: Array.from(userIds) } },
     select: { id: true, name: true },
   });
   const out = new Map<string, string>();
@@ -191,6 +196,7 @@ function buildCsv(
     "actorUserId",
     "actorUserName",
     "onBehalfOfUserId",
+    "actorOnBehalfOfUserName",
   ].join(",");
   const body = rows
     .map((r) =>
@@ -205,6 +211,11 @@ function buildCsv(
           r.actorUserId ? actorNameById.get(r.actorUserId) ?? "" : "",
         ),
         csvEscape(r.onBehalfOfUserId ?? ""),
+        csvEscape(
+          r.onBehalfOfUserId
+            ? actorNameById.get(r.onBehalfOfUserId) ?? ""
+            : "",
+        ),
       ].join(","),
     )
     .join("\n");
@@ -361,6 +372,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         ? actorNameById.get(r.actorUserId) ?? null
         : null,
       onBehalfOfUserId: r.onBehalfOfUserId,
+      onBehalfOfUserName: r.onBehalfOfUserId
+        ? actorNameById.get(r.onBehalfOfUserId) ?? null
+        : null,
     })),
     truncated,
     rowCap: ROW_CAP,
@@ -560,20 +574,45 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
                       </TableCell>
                       <TableCell>{row.spaceNumber}</TableCell>
                       <TableCell>
-                        {row.actorUserId ? (
-                          <span className="flex flex-wrap items-center gap-2">
-                            <span
-                              className="text-sm text-white/80"
-                              title={row.actorUserId}
-                            >
-                              {row.actorUserName ?? row.actorUserId}
-                            </span>
-                            {row.onBehalfOfUserId && (
-                              <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-200">
-                                {t("history.table.impersonatedBadge")}
+                        {row.actorUserId || row.onBehalfOfUserId ? (
+                          (() => {
+                            const actorPart =
+                              row.actorUserName ?? row.actorUserId ?? null;
+                            const onBehalfPart =
+                              row.onBehalfOfUserName ??
+                              row.onBehalfOfUserId ??
+                              null;
+                            // formatActorLabel keeps the audit display
+                            // canonical ("Real as Impersonated"); we split
+                            // the rendering here so the "via Y" portion can
+                            // get an amber accent for fast scanning, but
+                            // still expose the canonical label as the
+                            // accessible name for screen readers.
+                            const fullLabel = formatActorLabel(
+                              actorPart,
+                              onBehalfPart,
+                              t("history.table.actorMissingFallback"),
+                            );
+                            return (
+                              <span
+                                className="flex flex-wrap items-center gap-2"
+                                title={row.actorUserId ?? undefined}
+                                aria-label={fullLabel}
+                              >
+                                <span className="text-sm text-white/80">
+                                  {actorPart ?? fullLabel}
+                                </span>
+                                {onBehalfPart && actorPart && (
+                                  <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-200">
+                                    <span className="uppercase tracking-wide">
+                                      via
+                                    </span>
+                                    <span>{onBehalfPart}</span>
+                                  </span>
+                                )}
                               </span>
-                            )}
-                          </span>
+                            );
+                          })()
                         ) : (
                           <span className="text-white/40">
                             {t("history.table.anonymousActor")}

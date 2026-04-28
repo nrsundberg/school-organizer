@@ -560,6 +560,7 @@
     },
     "table": {
       "actor": "Acted by",
+      "actorMissingFallback": "(no actor)",
       "anonymousActor": "Viewer (anonymous)",
       "ariaLabel": "Call history",
       "homeroom": "Homeroom",

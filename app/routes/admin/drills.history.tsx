@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills.history";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getTenantPrisma } from "~/domain/utils/global-context.server";
+import { formatActorLabel } from "~/domain/auth/format-actor";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
 import {
@@ -51,6 +52,9 @@ type HistoryRow = {
   /** Server-computed; null when both endpoints are missing. */
   durationSeconds: number | null;
   lastActorUserId: string | null;
+  lastActorUserName: string | null;
+  lastActorOnBehalfOfUserId: string | null;
+  lastActorOnBehalfOfUserName: string | null;
   /** True when a responsible party has signed off the drill record. */
   isSignedOff: boolean;
 };
@@ -83,6 +87,26 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const truncated = fetched.length > ROW_CAP;
   const slice = truncated ? fetched.slice(0, ROW_CAP) : fetched;
 
+  // Resolve display names for both halves of the actor pair (the human who
+  // clicked + the impersonated user, when present) in one batched query.
+  const userIdsForLookup = new Set<string>();
+  for (const r of slice as any[]) {
+    if (r.lastActorUserId) userIdsForLookup.add(r.lastActorUserId);
+    if (r.lastActorOnBehalfOfUserId) {
+      userIdsForLookup.add(r.lastActorOnBehalfOfUserId);
+    }
+  }
+  const userNameById = new Map<string, string>();
+  if (userIdsForLookup.size) {
+    const users = await prisma.user.findMany({
+      where: { id: { in: Array.from(userIdsForLookup) } },
+      select: { id: true, name: true },
+    });
+    for (const u of users) {
+      if (u.name && u.name.trim() !== "") userNameById.set(u.id, u.name);
+    }
+  }
+
   const rows: HistoryRow[] = slice.map((r: any) => {
     const status: DrillRunStatus = isDrillRunStatus(r.status)
       ? r.status
@@ -105,6 +129,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         r.endedAt,
       ),
       lastActorUserId: r.lastActorUserId,
+      lastActorUserName: r.lastActorUserId
+        ? userNameById.get(r.lastActorUserId) ?? null
+        : null,
+      lastActorOnBehalfOfUserId: r.lastActorOnBehalfOfUserId ?? null,
+      lastActorOnBehalfOfUserName: r.lastActorOnBehalfOfUserId
+        ? userNameById.get(r.lastActorOnBehalfOfUserId) ?? null
+        : null,
       isSignedOff: !!r.signedOffAt,
     };
   });
@@ -302,10 +333,41 @@ export default function AdminDrillsHistory({
                       <AudienceChip audience={row.audience} />
                     </TableCell>
                     <TableCell>
-                      {row.lastActorUserId ? (
-                        <span className="font-mono text-xs text-white/80">
-                          {row.lastActorUserId}
-                        </span>
+                      {row.lastActorUserId || row.lastActorOnBehalfOfUserId ? (
+                        (() => {
+                          const actorPart =
+                            row.lastActorUserName ??
+                            row.lastActorUserId ??
+                            null;
+                          const onBehalfPart =
+                            row.lastActorOnBehalfOfUserName ??
+                            row.lastActorOnBehalfOfUserId ??
+                            null;
+                          const fullLabel = formatActorLabel(
+                            actorPart,
+                            onBehalfPart,
+                            "—",
+                          );
+                          return (
+                            <span
+                              className="flex flex-wrap items-center gap-2"
+                              title={row.lastActorUserId ?? undefined}
+                              aria-label={fullLabel}
+                            >
+                              <span className="text-xs text-white/80">
+                                {actorPart ?? fullLabel}
+                              </span>
+                              {onBehalfPart && actorPart && (
+                                <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-200">
+                                  <span className="uppercase tracking-wide">
+                                    via
+                                  </span>
+                                  <span>{onBehalfPart}</span>
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })()
                       ) : (
                         <span className="text-white/40">—</span>
                       )}
