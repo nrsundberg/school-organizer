@@ -24,6 +24,7 @@ import enBilling from "../../public/locales/en/billing.json";
 import enAuth from "../../public/locales/en/auth.json";
 import enEmail from "../../public/locales/en/email.json";
 import enErrors from "../../public/locales/en/errors.json";
+import enProfile from "../../public/locales/en/profile.json";
 import esCommon from "../../public/locales/es/common.json";
 import esRoster from "../../public/locales/es/roster.json";
 import esAdmin from "../../public/locales/es/admin.json";
@@ -31,6 +32,7 @@ import esBilling from "../../public/locales/es/billing.json";
 import esAuth from "../../public/locales/es/auth.json";
 import esEmail from "../../public/locales/es/email.json";
 import esErrors from "../../public/locales/es/errors.json";
+import esProfile from "../../public/locales/es/profile.json";
 
 import {
   DEFAULT_LANGUAGE,
@@ -48,6 +50,7 @@ export const i18nBundles = {
     auth: enAuth as Record<string, unknown>,
     email: enEmail as Record<string, unknown>,
     errors: enErrors as Record<string, unknown>,
+    profile: enProfile as Record<string, unknown>,
   },
   es: {
     common: esCommon as Record<string, unknown>,
@@ -57,6 +60,7 @@ export const i18nBundles = {
     auth: esAuth as Record<string, unknown>,
     email: esEmail as Record<string, unknown>,
     errors: esErrors as Record<string, unknown>,
+    profile: esProfile as Record<string, unknown>,
   },
 } as const satisfies Record<SupportedLanguage, NamespaceBundle>;
 

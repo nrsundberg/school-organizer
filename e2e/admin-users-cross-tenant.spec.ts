@@ -24,6 +24,10 @@ import {
   shortSlug,
 } from "./fixtures/seed-helpers";
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 type SecondTenant = {
   orgId: string;
   slug: string;
@@ -120,17 +124,20 @@ test.describe("/admin/users tenant isolation", () => {
       await page.goto(tenant.tenantUrl("/admin/users"));
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
+      // The redesigned page renders each user as a row-button (no
+      // <td> cells). We assert on the accessible row text directly so
+      // the security check survives further chrome changes — what
+      // matters is the email/name strings appearing (or not) anywhere
+      // in the rendered listing.
+
       // Tenant A's admin appears in the listing.
       await expect(
-        page.locator("td", { hasText: tenant.adminEmail }),
+        page.getByRole("button", { name: new RegExp(escapeRegex(tenant.adminEmail)) }),
       ).toBeVisible();
-      // Tenant B's user must NOT appear.
-      await expect(
-        page.locator("td", { hasText: other.userEmail }),
-      ).toHaveCount(0);
-      await expect(
-        page.locator("td", { hasText: other.userName }),
-      ).toHaveCount(0);
+
+      // Tenant B's email and name must NOT appear anywhere on the page.
+      await expect(page.getByText(other.userEmail, { exact: false })).toHaveCount(0);
+      await expect(page.getByText(other.userName, { exact: false })).toHaveCount(0);
     } finally {
       await teardownSecondTenant(db, other);
       db.close();

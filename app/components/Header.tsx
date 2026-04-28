@@ -82,9 +82,9 @@ export default function ({
         </Link>
         <Link
           className="border-1 border-black p-1 rounded-lg text-black"
-          to="/logout"
+          to="/admin/profile"
         >
-          {t("header.logout")}
+          {t("header.profile")}
         </Link>
       </div>
       <div className="md:hidden absolute right-2 inset-y-0 flex items-center">
@@ -118,10 +118,10 @@ export default function ({
             </Link>
             <Link
               className="border-1 border-black p-1 rounded-lg text-black text-center"
-              to="/logout"
+              to="/admin/profile"
               onClick={closeMenu}
             >
-              {t("header.logout")}
+              {t("header.profile")}
             </Link>
           </div>
         ) : null}
