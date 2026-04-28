@@ -330,6 +330,7 @@
         "audienceLabel": "Audiencia",
         "audienceEveryone": "Todos — el personal y los invitados con PIN ven el simulacro",
         "audienceStaffOnly": "Solo personal — los invitados con PIN siguen viendo el tablero normal",
+        "audienceReadout": "Visible para: {{audience}}",
         "confirm": "Iniciar simulacro",
         "cancel": "Cancelar"
       },
