@@ -6,9 +6,18 @@ collide and broken work never lands on `master`.
 
 ## The rule
 
-**Never commit directly to `master`. Always work in a worktree on a
-topic branch. Gate every auto-merge behind typecheck + tests + a
-staging smoke check.**
+**Agents never push to `master`.** Work happens on a topic branch in
+a worktree, and changes reach `master` only via a pull request that a
+human reviews and merges. This is true even after typecheck + tests +
+staging smoke pass — those gates decide whether the PR is ready for
+review, not whether the work is allowed to bypass review.
+
+No `git push origin master`, no `git merge` into a local `master`
+followed by a push, no force-push to `master`, no `wip:` commits
+landing on `master`. If a fix is so urgent that PR review feels too
+slow, escalate to a human instead of routing around the rule —
+shipped fixes have already been reverted on `master` by half-finished
+agent commits, and that's exactly what this rule exists to prevent.
 
 ## Why worktrees
 
@@ -135,13 +144,15 @@ bounded result — if they hang, the parent gets the failure and can move
 on; if they succeed, the parent keeps going. Without this, a single stuck
 sub-step takes the whole session with it.
 
-## Gating auto-merge
+## Pre-PR gate
 
-Before merging the agent's branch back to `master`, **all three** must
-pass. Skip any one and you're shipping a regression.
+Before opening the PR, **all three** must pass. The gate decides
+whether the PR is ready for review — not whether the work can skip
+review. Skip any one and you've shipped a regression candidate to a
+human's inbox with green checkmarks it doesn't deserve.
 
 ```bash
-# --- Pre-merge gate ---
+# --- Pre-PR gate ---
 cd "$WT"
 
 npm ci --prefer-offline
@@ -162,41 +173,47 @@ like `https://demo.staging.pickuproster.com`). Both URLs resolve to the
 same staging Worker — the apex is the primary because it exercises the
 same Custom Domain + wildcard routing prod uses.
 
-## Merging
+## Opening the PR
 
-Only after the gate passes:
+Push the branch and open a PR — never merge to `master` directly,
+never `git push origin master`. A human (or the configured PR
+auto-merge bot, if one is enabled) merges after review.
 
 ```bash
-# --- Merge back to master ---
-cd "$REPO"  # main checkout, NOT the worktree
+# --- Push the topic branch and open the PR ---
+cd "$WT"
+git push -u origin "$BRANCH"
 
-# Clear stale locks on the main checkout too (it may be idle but
-# hold leftover state from earlier runs).
-for lock in .git/index.lock .git/HEAD.lock .git/refs/heads/*.lock; do
-  [ -e "$lock" ] && mv "$lock" "$lock.dead-$(date +%s%N)" 2>/dev/null || true
-done
-
-git fetch origin --prune
-git checkout master
-git pull --ff-only origin master
-
-# Fast-forward if possible; fall back to merge commit for history.
-if git merge-base --is-ancestor "origin/master" "$BRANCH"; then
-  git merge --ff-only "$BRANCH"
-else
-  git merge --no-ff "$BRANCH" -m "merge: $BRANCH (auto-merged by agent)"
-fi
-
-git push origin master
+gh pr create \
+  --base master \
+  --head "$BRANCH" \
+  --title "$PR_TITLE" \
+  --body  "$PR_BODY"
 ```
 
-**If any of typecheck / unit tests / staging smoke fail**, push the
-branch anyway so a human can look at it:
+If the gate failed, push the branch anyway and open the PR as a draft
+so a human can take over:
 
 ```bash
 git push -u origin "$BRANCH"
-echo "BLOCKED: branch pushed for review, NOT merged."
+gh pr create --draft --base master --head "$BRANCH" \
+  --title "BLOCKED: $PR_TITLE" \
+  --body "$PR_BODY
+
+## Gate failures
+- <list which step failed and any error output>"
+echo "BLOCKED: draft PR opened for human review, NOT merged."
 ```
+
+### Forbidden shortcuts
+
+- `git push origin master` — never, in any flow.
+- `git push origin HEAD:master` — same thing, still forbidden.
+- `gh pr merge --admin` from an agent — the human is the admin.
+- Self-merging a PR you opened — even if the diff is "obviously fine."
+- Pushing a `wip:` / `wip(...)` commit to a branch that already has
+  an open PR (it lands in the merge if the human isn't paying close
+  attention). Use a separate branch for WIP exploration.
 
 ## Cleanup
 
@@ -260,13 +277,15 @@ do not spawn a non-isolated subagent.
 
 ## Main sessions (interactive Claude)
 
-A Cowork session that's doing interactive work directly with a human
-should commit to `master` only for small fixes (< 30 lines, or
-well-understood bug fixes already discussed). Anything larger —
-feature work, cross-file refactors, schema changes — should
-branch-and-merge via the same pattern, either by the human running
-`git checkout -b feature/X` up front, or by spawning a worktree
-subagent.
+A Cowork session doing interactive work directly with a human follows
+the same rule: changes go to `master` via a PR, not via a direct push.
+The human can self-review and merge their own PR for trivial fixes —
+the point of the rule is that nothing reaches `master` without
+*someone* looking at the diff in the PR view.
+
+For larger work — feature work, cross-file refactors, schema changes —
+branch up front (`git checkout -b feature/X`) or spawn a worktree
+subagent so multiple PRs can move in parallel without colliding.
 
 ## Known gotchas
 
