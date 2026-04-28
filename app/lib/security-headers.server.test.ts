@@ -187,3 +187,29 @@ test("returns a new Response instance (no mutation of input headers)", () => {
   applySecurityHeaders(input, { ENVIRONMENT: "production" }, TEST_NONCE);
   assert.deepEqual([...input.headers.entries()], snapshot);
 });
+
+// Regression: marketing home renders <iframe src="https://www.youtube-nocookie.com/embed/...">
+// in `MarketingLanding.tsx`. Without the YouTube hosts in `frame-src`, the
+// browser refuses to frame the explainer video and logs a CSP violation.
+// Both the privacy-enhanced host and the canonical `www.youtube.com` host
+// are allowed because YouTube's player can fall back / redirect between them.
+test("frame-src allows YouTube embed hosts for the marketing explainer", () => {
+  const csp = __INTERNAL__.buildEnforcingCsp(TEST_NONCE, false);
+  const frameSrc = csp
+    .split(";")
+    .map((d) => d.trim())
+    .find((d) => d.startsWith("frame-src "));
+  assert.ok(frameSrc, "frame-src directive missing entirely");
+  assert.ok(
+    frameSrc!.includes("https://www.youtube-nocookie.com"),
+    `frame-src must include youtube-nocookie.com — got: ${frameSrc}`
+  );
+  assert.ok(
+    frameSrc!.includes("https://www.youtube.com"),
+    `frame-src must include youtube.com — got: ${frameSrc}`
+  );
+  // Stripe entries must still be present — fix should be additive, not a swap.
+  assert.ok(frameSrc!.includes("https://js.stripe.com"));
+  assert.ok(frameSrc!.includes("https://checkout.stripe.com"));
+  assert.ok(frameSrc!.includes("https://billing.stripe.com"));
+});

@@ -41,7 +41,9 @@
  *   currently keep `'unsafe-inline'` there for compatibility with runtime
  *   library behavior; see the file-level comment above.
  * - `frame-src` whitelists Stripe Checkout and Billing so the customer
- *   portal iframes mount.
+ *   portal iframes mount, plus YouTube's privacy-enhanced + canonical
+ *   embed hosts (`www.youtube-nocookie.com`, `www.youtube.com`) for the
+ *   marketing-home explainer videos rendered by `MarketingLanding.tsx`.
  * - `frame-ancestors 'none'` is the CSP-level counterpart to
  *   `X-Frame-Options: DENY` and is honored by modern browsers in
  *   preference to the legacy header.
@@ -54,7 +56,7 @@ function buildEnforcingCsp(cspNonce: string, isDev: boolean): string {
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
     "connect-src 'self' https://*.sentry.io https://*.ingest.sentry.io https://api.stripe.com",
-    "frame-src https://js.stripe.com https://checkout.stripe.com https://billing.stripe.com",
+    "frame-src https://js.stripe.com https://checkout.stripe.com https://billing.stripe.com https://www.youtube-nocookie.com https://www.youtube.com",
     "base-uri 'self'",
     "form-action 'self' https://checkout.stripe.com https://billing.stripe.com",
     "frame-ancestors 'none'",
