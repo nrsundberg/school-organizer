@@ -1,4 +1,4 @@
-import { Link, redirect, useFetcher } from "react-router";
+import { Link, redirect, useFetcher, type ShouldRevalidateFunctionArgs } from "react-router";
 import { useTranslation } from "react-i18next";
 import { Popover, PopoverContent, PopoverTrigger } from "@heroui/react";
 import { AlertTriangle, ArrowLeft, Check, Pause, Play, Plus, Square, Trash2 } from "lucide-react";
@@ -52,6 +52,18 @@ export const meta: Route.MetaFunction = ({ data }) => [
     title: data?.metaTitle ?? "Live drill",
   },
 ];
+
+export function shouldRevalidate(
+  _args: ShouldRevalidateFunctionArgs,
+): boolean {
+  // The WebSocket fan-out (drillUpdate / drillActivity / drillEnded) is an
+  // authoritative resync path for everything this loader produces, and the
+  // WS reconnect path already calls revalidator.revalidate() on disconnect
+  // to catch up missed messages. So the default post-action loader rerun
+  // is pure overhead on this route — skip it. Loader still runs on initial
+  // page load and on explicit revalidation calls.
+  return false;
+}
 
 // Renders an actor's display name with optional impersonation suffix.
 // "Noah Sundberg as Admin Account" when impersonating; just the name (or
@@ -244,6 +256,27 @@ export async function action({ request, context }: Route.ActionArgs) {
   const isAdmin = user.role === "ADMIN" || user.role === "CONTROLLER";
   const actor = getActorIdsFromContext(context);
   const env = (context as { cloudflare?: { env: Env } }).cloudflare?.env;
+  const cfCtx = (context as { cloudflare?: { ctx?: ExecutionContext } })
+    .cloudflare?.ctx;
+
+  // Fire-and-forget broadcast dispatch. A broadcast failure must not 500 a
+  // click whose DB write already succeeded — loader revalidation + WS
+  // reconnect resync any client that missed the message.
+  const fanOut = (label: string, task: () => Promise<unknown>) => {
+    const safe = (async () => {
+      try {
+        await task();
+      } catch (err) {
+        console.warn(`[drills.live] broadcast ${label} failed`, err);
+      }
+    })();
+    if (cfCtx && typeof cfCtx.waitUntil === "function") {
+      cfCtx.waitUntil(safe);
+    } else {
+      // Test / non-Workers path: keep the await so tests can observe.
+      return safe;
+    }
+  };
 
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "roster");
@@ -313,14 +346,18 @@ export async function action({ request, context }: Route.ActionArgs) {
       requireAdmin();
       const updated = await pauseDrillRun(prisma, org.id, runId, actor);
       if (env) {
-        await broadcastDrillUpdate(env, org.id, {
-          id: updated.id,
-          status: "PAUSED",
-          audience: updated.audience,
-          state: updated.state,
-          updatedAtIso: updated.updatedAt.toISOString(),
-        });
-        await broadcastDrillActivity(env, org.id, runId, [synthEvent("paused")]);
+        fanOut("drillUpdate", () =>
+          broadcastDrillUpdate(env, org.id, {
+            id: updated.id,
+            status: "PAUSED",
+            audience: updated.audience,
+            state: updated.state,
+            updatedAtIso: updated.updatedAt.toISOString(),
+          }),
+        );
+        fanOut("drillActivity", () =>
+          broadcastDrillActivity(env, org.id, runId, [synthEvent("paused")]),
+        );
       }
       return dataWithSuccess(null, t("drillsLive.toasts.paused"));
     }
@@ -329,14 +366,18 @@ export async function action({ request, context }: Route.ActionArgs) {
       requireAdmin();
       const updated = await resumeDrillRun(prisma, org.id, runId, actor);
       if (env) {
-        await broadcastDrillUpdate(env, org.id, {
-          id: updated.id,
-          status: "LIVE",
-          audience: updated.audience,
-          state: updated.state,
-          updatedAtIso: updated.updatedAt.toISOString(),
-        });
-        await broadcastDrillActivity(env, org.id, runId, [synthEvent("resumed")]);
+        fanOut("drillUpdate", () =>
+          broadcastDrillUpdate(env, org.id, {
+            id: updated.id,
+            status: "LIVE",
+            audience: updated.audience,
+            state: updated.state,
+            updatedAtIso: updated.updatedAt.toISOString(),
+          }),
+        );
+        fanOut("drillActivity", () =>
+          broadcastDrillActivity(env, org.id, runId, [synthEvent("resumed")]),
+        );
       }
       return dataWithSuccess(null, t("drillsLive.toasts.resumed"));
     }
@@ -357,8 +398,10 @@ export async function action({ request, context }: Route.ActionArgs) {
       }
       await endDrillRun(prisma, org.id, runId, actor);
       if (env) {
-        await broadcastDrillActivity(env, org.id, runId, [synthEvent("ended")]);
-        await broadcastDrillEnded(env, org.id, runId);
+        fanOut("drillActivity", () =>
+          broadcastDrillActivity(env, org.id, runId, [synthEvent("ended")]),
+        );
+        fanOut("drillEnded", () => broadcastDrillEnded(env, org.id, runId));
       }
       // After ending, the user no longer needs the takeover. Send them home.
       throw redirect("/");
@@ -381,29 +424,33 @@ export async function action({ request, context }: Route.ActionArgs) {
         actor,
       );
       if (env) {
-        await broadcastDrillUpdate(env, org.id, {
-          id: updated.id,
-          status: updated.status as "LIVE" | "PAUSED" | "ENDED",
-          audience: updated.audience,
-          state: updated.state,
-          updatedAtIso: updated.updatedAt.toISOString(),
-        });
+        fanOut("drillUpdate", () =>
+          broadcastDrillUpdate(env, org.id, {
+            id: updated.id,
+            status: updated.status as "LIVE" | "PAUSED" | "ENDED",
+            audience: updated.audience,
+            state: updated.state,
+            updatedAtIso: updated.updatedAt.toISOString(),
+          }),
+        );
         if (events.length > 0) {
-          await broadcastDrillActivity(
-            env,
-            org.id,
-            runId,
-            events.map((ev) => ({
-              id: ev.id,
-              runId: ev.runId,
-              kind: ev.kind,
-              payload: ev.payload,
-              actorUserId: ev.actorUserId,
-              actorLabel,
-              onBehalfOfUserId: ev.onBehalfOfUserId,
-              onBehalfOfLabel,
-              occurredAtIso: ev.occurredAt.toISOString(),
-            })),
+          fanOut("drillActivity", () =>
+            broadcastDrillActivity(
+              env,
+              org.id,
+              runId,
+              events.map((ev) => ({
+                id: ev.id,
+                runId: ev.runId,
+                kind: ev.kind,
+                payload: ev.payload,
+                actorUserId: ev.actorUserId,
+                actorLabel,
+                onBehalfOfUserId: ev.onBehalfOfUserId,
+                onBehalfOfLabel,
+                occurredAtIso: ev.occurredAt.toISOString(),
+              })),
+            ),
           );
         }
       }
@@ -488,7 +535,7 @@ function formatElapsed(startIso: string | null): string {
 export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation("roster");
   const { t: tAdmin } = useTranslation("admin");
-  const { run, template, isAdmin, paused, me, recentActivity } = loaderData;
+  const { run, template, isAdmin, me, recentActivity } = loaderData;
   const def = useMemo(() => parseTemplateDefinition(template.definition), [template.definition]);
   const [state, setState] = useState<RunState>(() => parseRunState(run.state));
   const fetcher = useFetcher();
@@ -498,6 +545,18 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
     () => recentActivity as ActivityEntry[],
   );
   const [presence, setPresence] = useState<Map<string, PresenceEntry>>(new Map());
+  // Status + updatedAt are mirrored from the WS so pause/resume from another
+  // controller flips the local UI without a loader rerun (we skip
+  // post-action revalidation entirely — see shouldRevalidate above).
+  const [liveStatus, setLiveStatus] = useState<"LIVE" | "PAUSED" | "ENDED">(
+    run.status,
+  );
+  const [liveUpdatedAtIso, setLiveUpdatedAtIso] = useState(run.updatedAtIso);
+  const liveUpdatedAtIsoRef = useRef(liveUpdatedAtIso);
+  useEffect(() => {
+    liveUpdatedAtIsoRef.current = liveUpdatedAtIso;
+  }, [liveUpdatedAtIso]);
+  const paused = liveStatus === "PAUSED";
 
   // Refs that the WS-driven smart-merge consults so it doesn't clobber
   // text the user is currently typing. Last-write-wins on persist, but the
@@ -657,11 +716,15 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
   const ws = useDrillWebSocket({
     runId: run.id,
     onUpdate: (msg) => {
-      const incomingState = parseRunState(msg.run.state as Prisma.JsonValue);
       // Skip if the server's view is older than what we already have (can
-      // happen when our own save's broadcast races our fetcher revalidation).
-      if (msg.run.updatedAtIso < run.updatedAtIso) return;
+      // happen when our own save's broadcast races concurrent updates).
+      // Compare against the ref so async deliveries past initial render
+      // see the latest known timestamp.
+      if (msg.run.updatedAtIso < liveUpdatedAtIsoRef.current) return;
+      const incomingState = parseRunState(msg.run.state as Prisma.JsonValue);
       setState((local) => smartMerge(local, incomingState));
+      setLiveStatus(msg.run.status);
+      setLiveUpdatedAtIso(msg.run.updatedAtIso);
       setLastSavedAt(Date.now());
     },
     onActivity: (msg) => {
