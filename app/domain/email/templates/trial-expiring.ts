@@ -18,11 +18,16 @@ function pickVariantKey(daysLeft: number): VariantKey {
 
 export async function renderTrialExpiring(
   msg: TrialExpiringMessage,
+  publicRoot?: string,
 ): Promise<RenderedEmail> {
   const t = await getFixedT(msg.locale ?? "en", "email");
   const variantKey = pickVariantKey(msg.daysLeft);
   const firstName = firstNameOrFallback(msg.userName, t("common.greetingFallback"));
-  const appLink = `https://${msg.orgSlug}.pickuproster.com/admin/billing`;
+  // Anchor the billing CTA on whatever apex the consumer is running under
+  // (`pickuproster.com` in prod, `staging.pickuproster.com` in staging) so
+  // emails enqueued from the staging cron don't link recipients into prod.
+  const root = (publicRoot ?? "").trim().toLowerCase() || "pickuproster.com";
+  const appLink = `https://${msg.orgSlug}.${root}/admin/billing`;
   const interp = {
     firstName,
     orgName: msg.orgName,

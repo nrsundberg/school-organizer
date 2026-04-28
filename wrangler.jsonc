@@ -149,8 +149,11 @@
 	//   wrangler queues create pickup-roster-email-staging-dlq
 	// Then paste the printed database_id below in place of the TODO.
 	//
-	// Staging URL: school-organizer-staging.<your-subdomain>.workers.dev
-	// (defined in MARKETING_HOSTS so marketing renders on the staging host).
+	// Staging URL: https://staging.pickuproster.com (apex + wildcard
+	// *.staging.pickuproster.com mirrors prod's layout — see env.staging.routes
+	// below). The workers.dev URL school-organizer-staging.<your-subdomain>.workers.dev
+	// still resolves to the same Worker as a fallback (workers_dev: true) and
+	// is included in MARKETING_HOSTS so marketing renders on either host.
 	"env": {
 		"production": {
 			// Apex + www use Custom Domains; tenant subdomains use a zone route

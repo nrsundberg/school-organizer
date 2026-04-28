@@ -13,17 +13,27 @@ import { renderUserInvite } from "./user-invite";
  * locale is read off `msg.locale` by each renderer; when omitted, templates
  * fall back to English.
  *
+ * `publicRoot` (optional) is the consumer's `PUBLIC_ROOT_DOMAIN` —
+ * `pickuproster.com` in prod, `staging.pickuproster.com` in staging.
+ * Templates that embed a tenant-board URL (trial-expiring, mid-trial-checkin)
+ * use it to anchor those URLs on the right environment so staging emails
+ * don't link recipients into prod tenants. Templates that don't render a URL
+ * ignore it.
+ *
  * Exhaustive switch — TypeScript will error on the `never` if a new `kind`
  * is added to EmailMessage without a matching renderer here.
  */
-export async function renderEmail(msg: EmailMessage): Promise<RenderedEmail> {
+export async function renderEmail(
+  msg: EmailMessage,
+  publicRoot?: string,
+): Promise<RenderedEmail> {
   switch (msg.kind) {
     case "welcome":
       return renderWelcome(msg);
     case "trial_expiring":
-      return renderTrialExpiring(msg);
+      return renderTrialExpiring(msg, publicRoot);
     case "mid_trial_checkin":
-      return renderMidTrialCheckin(msg);
+      return renderMidTrialCheckin(msg, publicRoot);
     case "password_reset":
       return renderPasswordReset(msg);
     case "user_invite":

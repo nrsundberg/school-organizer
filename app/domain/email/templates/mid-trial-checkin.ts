@@ -8,10 +8,14 @@ import { getFixedT } from "~/lib/t.server";
  */
 export async function renderMidTrialCheckin(
   msg: MidTrialCheckinMessage,
+  publicRoot?: string,
 ): Promise<RenderedEmail> {
   const t = await getFixedT(msg.locale ?? "en", "email");
   const firstName = firstNameOrFallback(msg.userName, t("common.greetingFallback"));
-  const appLink = `https://${msg.orgSlug}.pickuproster.com`;
+  // Anchor on the consumer's PUBLIC_ROOT_DOMAIN so the staging cron doesn't
+  // link recipients into prod tenants.
+  const root = (publicRoot ?? "").trim().toLowerCase() || "pickuproster.com";
+  const appLink = `https://${msg.orgSlug}.${root}`;
 
   const subject = t("midTrialCheckin.subject", { firstName });
   const preview = t("midTrialCheckin.preview");

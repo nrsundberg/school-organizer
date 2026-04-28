@@ -404,8 +404,19 @@ async function tenantsAggregateProbe(
     };
   }
 
+  // Anchor the probe URL on the deploy's PUBLIC_ROOT_DOMAIN so the staging
+  // cron probes `*.staging.pickuproster.com`, not prod tenants. Falls back
+  // to `pickuproster.com` if the env var is unset (older deploys).
+  const publicRoot =
+    (
+      (env as unknown as Record<string, string | undefined>).PUBLIC_ROOT_DOMAIN ??
+      ""
+    )
+      .trim()
+      .toLowerCase() || "pickuproster.com";
+
   const results = await Promise.allSettled(
-    slugs.map((slug) => probeTenantSubdomain(slug)),
+    slugs.map((slug) => probeTenantSubdomain(slug, publicRoot)),
   );
   const total = results.length;
   const fails = results.filter(
@@ -428,11 +439,14 @@ async function tenantsAggregateProbe(
   };
 }
 
-async function probeTenantSubdomain(slug: string): Promise<boolean> {
+async function probeTenantSubdomain(
+  slug: string,
+  publicRoot: string,
+): Promise<boolean> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS);
   try {
-    const res = await fetch(`https://${slug}.pickuproster.com/`, {
+    const res = await fetch(`https://${slug}.${publicRoot}/`, {
       method: "GET",
       redirect: "manual",
       signal: ctrl.signal,

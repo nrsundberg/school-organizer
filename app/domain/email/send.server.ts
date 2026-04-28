@@ -18,7 +18,14 @@ export async function sendEmail(env: Env, msg: SendableEmailMessage): Promise<vo
     );
   }
 
-  const rendered = await renderEmail(msg);
+  // Plumb PUBLIC_ROOT_DOMAIN through so templates that embed a tenant URL
+  // (trial-expiring, mid-trial-checkin) anchor it on the staging apex when
+  // rendered by the staging Worker, not the prod apex. Other templates ignore
+  // this arg.
+  const publicRoot = (
+    (env as any).PUBLIC_ROOT_DOMAIN as string | undefined
+  )?.trim().toLowerCase();
+  const rendered = await renderEmail(msg, publicRoot);
   const resend = new Resend(apiKey);
 
   const { error } = await resend.emails.send({

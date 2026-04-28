@@ -155,10 +155,12 @@ npx playwright test e2e/smoke.spec.ts \
     || { echo "FAIL: staging smoke"; exit 1; }
 ```
 
-`playwright.staging.config.ts` points at
-`https://school-organizer-staging.<subdomain>.workers.dev` via
-`PLAYWRIGHT_BASE_URL` — create it alongside `playwright.config.ts`
-with `use: { baseURL: process.env.PLAYWRIGHT_BASE_URL }`.
+`playwright.staging.config.ts` defaults to
+`https://staging.pickuproster.com` and accepts a `PLAYWRIGHT_BASE_URL`
+override (e.g. the workers.dev fallback URL, or a per-tenant subdomain
+like `https://demo.staging.pickuproster.com`). Both URLs resolve to the
+same staging Worker — the apex is the primary because it exercises the
+same Custom Domain + wildcard routing prod uses.
 
 ## Merging
 
@@ -211,9 +213,16 @@ into it and finish the work.
 
 ## Staging infrastructure
 
-Staging runs at `school-organizer-staging.<your-subdomain>.workers.dev`
-and has its own D1 database, R2 bucket, rate limiter, and queue
-(separate namespace IDs from production — see `wrangler.jsonc > env.staging`).
+Staging runs at `https://staging.pickuproster.com` (apex + wildcard
+`*.staging.pickuproster.com` for tenant subdomains, mirroring prod's
+layout). The workers.dev URL `school-organizer-staging.<subdomain>.workers.dev`
+also resolves to the same Worker as a fallback. Staging has its own D1
+database, R2 bucket, rate limiter, and queue (separate namespace IDs
+from production — see `wrangler.jsonc > env.staging`).
+
+Before first deploy, the `staging` and `*.staging` DNS records in the
+`pickuproster.com` Cloudflare zone must exist (proxied), or tenant
+subdomain routing 404s.
 
 Before the first staging deploy, run (from a human shell with
 wrangler auth):
