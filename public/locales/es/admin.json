@@ -132,7 +132,8 @@
     },
     "danger": {
       "deleteAll": "Eliminar todos los registros de estudiantes",
-      "heading": "Zona de peligro"
+      "heading": "Zona de peligro",
+      "subtitle": "Permanently delete every student record in this org. Households and classrooms are kept."
     },
     "grid": {
       "addSpaces": "Agregar espacios",
@@ -155,7 +156,9 @@
     "heading": "Panel",
     "import": {
       "createRecords": "Crear registros",
-      "heading": "Importar estudiantes"
+      "heading": "Importar estudiantes",
+      "subtitle": "Quickly add students from a simple CSV. For full control (preview, household linking, classroom mapping) use the full roster import.",
+      "openFullImport": "Open full roster import →"
     },
     "metaTitle": "Panel de administración",
     "planUsage": {
@@ -182,7 +185,20 @@
     },
     "stats": {
       "gridSpaces": "Espacios de la cuadrícula",
-      "students": "Estudiantes"
+      "students": "Estudiantes",
+      "boardState": "Board state",
+      "boardStateReady": "Ready",
+      "boardStateStale": "Not reset",
+      "pickupsToday": "Pickups today",
+      "pickupsTodayCaption_one": "{{count}} student currently called",
+      "pickupsTodayCaption_other": "{{count}} students currently called",
+      "pickupsTodayCaption": "{{count}} students currently called",
+      "exceptionsToday": "Exceptions today",
+      "exceptionsTodayCaption": "Different dismissal plan today",
+      "roster": "Roster",
+      "rosterCaption_one": "{{households}} household",
+      "rosterCaption_other": "{{households}} households",
+      "rosterCaption": "{{households}} households"
     },
     "viewerDrawing": {
       "body": "Cuando se habilita, los observadores pueden dibujar líneas suaves en el tablero público (almacenadas solo en su dispositivo).",
@@ -193,6 +209,47 @@
       "heading": "Dibujo del observador en el tablero",
       "nonAdmin": "Solo los administradores pueden cambiar este ajuste. Pídele a un administrador que habilite o deshabilite el dibujo del observador.",
       "subtle": "Esto afecta el tablero que ven las cuentas de observador y los visitantes sin sesión iniciada en la página principal."
+    },
+    "subtitle": "Today's pickup operations at a glance.",
+    "header": {
+      "resetForToday": "Reset board for today",
+      "resetAgain": "Reset again"
+    },
+    "overview": {
+      "heading": "Today's snapshot"
+    },
+    "boardReset": {
+      "never": "The board has never been reset.",
+      "todayAt": "Reset {{time}} today",
+      "staleSince": "Last reset {{date}}"
+    },
+    "activity": {
+      "heading": "Recent activity",
+      "empty": "No recent activity yet. Drills and admin changes will appear here.",
+      "systemActor": "System",
+      "justNow": "just now",
+      "minutesAgo_one": "{{count}} minute ago",
+      "minutesAgo_other": "{{count}} minutes ago",
+      "minutesAgo": "{{count}} minutes ago",
+      "hoursAgo_one": "{{count}} hour ago",
+      "hoursAgo_other": "{{count}} hours ago",
+      "hoursAgo": "{{count}} hours ago",
+      "daysAgo_one": "{{count}} day ago",
+      "daysAgo_other": "{{count}} days ago",
+      "daysAgo": "{{count}} days ago",
+      "viewAll": "All pickup history",
+      "viewDrills": "All drill history"
+    },
+    "setup": {
+      "heading": "Setup & maintenance",
+      "subtitle": "Less-frequent admin tasks: configure the pickup board, viewer drawing, imports, and printable backups."
+    },
+    "printables": {
+      "heading": "Printables",
+      "subtitle_one": "PDF backups for the board, master roster, and {{homerooms}} homeroom. Open the print page to see all options.",
+      "subtitle_other": "PDF backups for the board, master roster, and {{homerooms}} homerooms. Open the print page to see all options.",
+      "subtitle": "PDF backups for the board, master roster, and {{homerooms}} homerooms. Open the print page to see all options.",
+      "open": "Open print page"
     }
   },
   "drills": {
@@ -343,7 +400,8 @@
         "overdueTitle": "Pasó la cadencia requerida — programa un simulacro.",
         "dueIn": "Vence en {{days}}d",
         "dueTitle": "Dentro de la ventana de cadencia requerida."
-      }
+      },
+      "viewHistory": "View history"
     },
     "metaEdit": "Editar – {{name}}",
     "metaEditFallback": "Editar lista",
@@ -427,11 +485,32 @@
         "play": "Reproducir",
         "speed": "{{x}}x",
         "trackAriaLabel": "Haga clic para buscar"
-      }
+      },
+      "actionDone": "Done",
+      "actionEmpty": "(empty item)",
+      "actionPending": "Not done",
+      "back": "Back to drill history",
+      "followUpHeading": "Follow-up items",
+      "lastActor": "Last actor: {{actor}}",
+      "metaTitle": "Replay – {{name}}",
+      "noItems": "No follow-up items recorded.",
+      "noNotes": "No notes recorded.",
+      "notesHeading": "Notes",
+      "print": "Print",
+      "subhead": "Run on {{started}} · {{duration}}"
     },
     "table": {
       "mode": "Modo",
-      "signoff": "Firma"
+      "signoff": "Firma",
+      "actor": "Actor",
+      "ariaLabel": "Drill run history",
+      "audience": "Audience",
+      "duration": "Duration",
+      "ended": "Ended",
+      "started": "Started",
+      "status": "Status",
+      "template": "Template",
+      "truncated": "Showing the most recent {{cap}} runs."
     },
     "signoff": {
       "button": "Firmar",
@@ -449,7 +528,20 @@
       "toasts": {
         "signed": "Simulacro firmado."
       }
-    }
+    },
+    "empty": {
+      "body": "No drills have been run yet. Start one from the Drill checklists page.",
+      "cta": "Go to drill checklists"
+    },
+    "heading": "Drill history",
+    "metaTitle": "Admin – Drill history",
+    "status": {
+      "DRAFT": "Draft",
+      "ENDED": "Ended",
+      "LIVE": "Live",
+      "PAUSED": "Paused"
+    },
+    "subtitle": "Past drill runs are archived here. Click a row to replay the saved checklist, notes, and follow-up items."
   },
   "edit": {
     "homeroom": {
@@ -950,7 +1042,8 @@
     "households": "Hogares",
     "panelTitle": "Panel de administración",
     "rosterImport": "Importar lista",
-    "users": "Usuarios"
+    "users": "Usuarios",
+    "print": "Print backups"
   },
   "usageBanner": {
     "classrooms": "Aulas",
@@ -1049,6 +1142,27 @@
       "revokeSessions": "Revocar todas las sesiones actuales de observador después de restablecer el PIN",
       "savePin": "Guardar PIN",
       "unknownNetwork": "Red desconocida"
+    }
+  },
+  "printables": {
+    "metaTitle": "Admin – Printables",
+    "heading": "Print backups",
+    "subtitle": "Browser-based PDFs you can print on demand for board backups, roster lists, and drill checklists.",
+    "backToDashboard": "Back to dashboard",
+    "board": {
+      "heading": "Pickup board",
+      "subtitle": "A printable copy of the current board, in case the screen goes down or you need a paper handoff.",
+      "fitPageHint": "one page",
+      "naturalSizeHint": "may span multiple pages"
+    },
+    "roster": {
+      "heading": "Roster lists",
+      "subtitle": "Master list of all students plus per-homeroom breakdowns sorted by name or car-space number.",
+      "emptyHomerooms": "No homerooms on file yet — once a roster is imported, per-homeroom prints will appear here."
+    },
+    "drills": {
+      "heading": "Drill checklists",
+      "subtitle": "Printable drill plan for use during practice and actual events."
     }
   }
 }

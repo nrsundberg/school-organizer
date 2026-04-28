@@ -7,6 +7,7 @@ import {
   Home,
   LayoutDashboard,
   Palette,
+  Printer,
   Users,
 } from "lucide-react";
 import { NavLink } from "react-router";
@@ -27,6 +28,7 @@ const baseNavItems: NavItem[] = [
   { to: "/admin/roster-import", labelKey: "sidebar.rosterImport", icon: FileSpreadsheet },
   { to: "/admin/drills", labelKey: "sidebar.drills", icon: ClipboardList },
   { to: "/admin/history", labelKey: "sidebar.history", icon: History },
+  { to: "/admin/print", labelKey: "sidebar.print", icon: Printer },
   { to: "/admin/branding", labelKey: "sidebar.branding", icon: Palette },
 ];
 

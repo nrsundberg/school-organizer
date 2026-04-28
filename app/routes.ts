@@ -30,6 +30,7 @@ export default [
     route("drills/history/:runId", "routes/admin/drills.history.$runId.tsx"),
     route("drills/:templateId/run", "routes/admin/drills.$templateId.run.tsx"),
     route("drills/:templateId", "routes/admin/drills.$templateId.tsx"),
+    route("print", "routes/admin/print.index.tsx"),
     route("profile", "routes/admin/profile.tsx"),
   ]),
 

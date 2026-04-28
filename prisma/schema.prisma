@@ -408,6 +408,12 @@ model AppSettings {
   org                    Org     @relation(fields: [orgId], references: [id])
   viewerDrawingEnabled   Boolean @default(false)
   viewerPinHash          String?
+  /// Set whenever an admin clears/resets the board for the day. Used by
+  /// the admin dashboard to surface "Reset 7:32am" vs "Not yet reset
+  /// today" so admins can tell at a glance whether yesterday's state has
+  /// been wiped before the morning bell. Nullable for orgs that have
+  /// never reset (or are on a fresh install).
+  lastBoardResetAt       DateTime?
 }
 
 model ViewerAccessAttempt {
