@@ -252,6 +252,45 @@ export function getAuth(context: any) {
           },
         },
       },
+      session: {
+        create: {
+          // Capture the client's IP and user-agent at session creation so
+          // every authenticated request has a forensic trail back to its
+          // originating device. The columns already exist on Session; this
+          // hook is the only thing that was missing.
+          //
+          // Priority for IP:
+          //   1. `cf-connecting-ip` — set by Cloudflare's edge for every
+          //      proxied request. Authoritative in prod.
+          //   2. First hop of `x-forwarded-for` — fallback for non-CF dev
+          //      stacks (e.g. wrangler-less unit tests behind a proxy).
+          //   3. Whatever better-auth already populated (typically null).
+          //
+          // Stored verbatim — no masking. D1's at-rest encryption is the
+          // privacy bar for forensic-grade audit data.
+          before: async (session, ctx) => {
+            if (!ctx) return { data: session };
+            const cfIp = ctx.getHeader?.("cf-connecting-ip") ?? null;
+            const xff = ctx.getHeader?.("x-forwarded-for") ?? null;
+            const ipAddress =
+              cfIp?.trim() ||
+              xff?.split(",")[0]?.trim() ||
+              (session as { ipAddress?: string | null }).ipAddress ||
+              null;
+            const userAgent =
+              ctx.getHeader?.("user-agent") ??
+              (session as { userAgent?: string | null }).userAgent ??
+              null;
+            return {
+              data: {
+                ...session,
+                ipAddress,
+                userAgent,
+              },
+            };
+          },
+        },
+      },
     },
     plugins: [
       admin({

@@ -55,6 +55,14 @@ export class BingoBoardDO {
          */
         actorUserId?: string | null;
         onBehalfOfUserId?: string | null;
+        /**
+         * Forensic network context captured at the route boundary via
+         * `getAuditContextFromRequest`. Stored verbatim on the CallEvent row;
+         * D1's at-rest encryption is the privacy bar. Both nullable for
+         * legacy callers / unreachable headers.
+         */
+        ipAddress?: string | null;
+        userAgent?: string | null;
       };
       const {
         type,
@@ -63,6 +71,8 @@ export class BingoBoardDO {
         orgId,
         actorUserId,
         onBehalfOfUserId,
+        ipAddress,
+        userAgent,
       } = body;
       const db = this.env.D1_DATABASE;
 
@@ -103,7 +113,7 @@ export class BingoBoardDO {
         const result = orgId
           ? await db
               .prepare(
-                `INSERT INTO "CallEvent" (orgId, spaceNumber, studentId, studentName, homeRoomSnapshot, actorUserId, onBehalfOfUserId, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now')) RETURNING id, orgId, spaceNumber, studentId, studentName, homeRoomSnapshot, actorUserId, onBehalfOfUserId, createdAt`
+                `INSERT INTO "CallEvent" (orgId, spaceNumber, studentId, studentName, homeRoomSnapshot, actorUserId, onBehalfOfUserId, ipAddress, userAgent, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) RETURNING id, orgId, spaceNumber, studentId, studentName, homeRoomSnapshot, actorUserId, onBehalfOfUserId, ipAddress, userAgent, createdAt`
               )
               .bind(
                 orgId,
@@ -113,6 +123,8 @@ export class BingoBoardDO {
                 student?.homeRoom ?? null,
                 actorUserId ?? null,
                 onBehalfOfUserId ?? null,
+                ipAddress ?? null,
+                userAgent ?? null,
               )
               .first<{
                 id: number;
@@ -123,11 +135,13 @@ export class BingoBoardDO {
                 homeRoomSnapshot: string | null;
                 actorUserId: string | null;
                 onBehalfOfUserId: string | null;
+                ipAddress: string | null;
+                userAgent: string | null;
                 createdAt: string;
               }>()
           : await db
               .prepare(
-                `INSERT INTO "CallEvent" (spaceNumber, studentId, studentName, homeRoomSnapshot, actorUserId, onBehalfOfUserId, createdAt) VALUES (?, ?, ?, ?, ?, ?, datetime('now')) RETURNING id, orgId, spaceNumber, studentId, studentName, homeRoomSnapshot, actorUserId, onBehalfOfUserId, createdAt`
+                `INSERT INTO "CallEvent" (spaceNumber, studentId, studentName, homeRoomSnapshot, actorUserId, onBehalfOfUserId, ipAddress, userAgent, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) RETURNING id, orgId, spaceNumber, studentId, studentName, homeRoomSnapshot, actorUserId, onBehalfOfUserId, ipAddress, userAgent, createdAt`
               )
               .bind(
                 spaceNumber,
@@ -136,6 +150,8 @@ export class BingoBoardDO {
                 student?.homeRoom ?? null,
                 actorUserId ?? null,
                 onBehalfOfUserId ?? null,
+                ipAddress ?? null,
+                userAgent ?? null,
               )
               .first<{
                 id: number;
@@ -146,6 +162,8 @@ export class BingoBoardDO {
                 homeRoomSnapshot: string | null;
                 actorUserId: string | null;
                 onBehalfOfUserId: string | null;
+                ipAddress: string | null;
+                userAgent: string | null;
                 createdAt: string;
               }>();
 

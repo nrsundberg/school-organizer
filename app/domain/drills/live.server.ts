@@ -69,12 +69,20 @@ function activeDrillConflictResponse(): Response {
 /**
  * Build a `drillRunEvent.create.data` object from a payload + actor + runId.
  * Centralized so every mutation tags events identically.
+ *
+ * `ipAddress` / `userAgent` are forensic-grade network context. Both default
+ * to `null` so the (rare) caller without an inbound Request — e.g. tests or
+ * future server-driven lifecycle transitions — can still write events.
+ * Production callers thread the values through from the route boundary via
+ * `getAuditContextFromRequest`.
  */
 function eventCreateData(
   runId: string,
   payload: DrillEventPayload,
   actor: ActorIds,
   occurredAt: Date,
+  ipAddress: string | null = null,
+  userAgent: string | null = null,
 ): Prisma.DrillRunEventUncheckedCreateInput {
   return {
     runId,
@@ -82,6 +90,8 @@ function eventCreateData(
     payload: payload as unknown as Prisma.InputJsonValue,
     actorUserId: actor.actorUserId,
     onBehalfOfUserId: actor.onBehalfOfUserId,
+    ipAddress,
+    userAgent,
     occurredAt,
   };
 }
@@ -140,6 +150,8 @@ export async function startDrillRun(
   actor: ActorIds = { actorUserId: null, onBehalfOfUserId: null },
   audience: DrillAudience = "EVERYONE",
   mode: DrillMode = "DRILL",
+  ipAddress: string | null = null,
+  userAgent: string | null = null,
 ) {
   const now = new Date();
   try {
@@ -167,6 +179,8 @@ export async function startDrillRun(
         { kind: "started", initialState },
         actor,
         now,
+        ipAddress,
+        userAgent,
       ),
     });
     return run;
@@ -193,6 +207,8 @@ export async function pauseDrillRun(
   orgId: string,
   runId: string,
   actor: ActorIds = { actorUserId: null, onBehalfOfUserId: null },
+  ipAddress: string | null = null,
+  userAgent: string | null = null,
 ) {
   const run = await prisma.drillRun.findFirst({
     where: { id: runId, orgId },
@@ -218,7 +234,14 @@ export async function pauseDrillRun(
       },
     }),
     prisma.drillRunEvent.create({
-      data: eventCreateData(runId, { kind: "paused" }, actor, now),
+      data: eventCreateData(
+        runId,
+        { kind: "paused" },
+        actor,
+        now,
+        ipAddress,
+        userAgent,
+      ),
     }),
   ]);
   return updated;
@@ -238,6 +261,8 @@ export async function resumeDrillRun(
   orgId: string,
   runId: string,
   actor: ActorIds = { actorUserId: null, onBehalfOfUserId: null },
+  ipAddress: string | null = null,
+  userAgent: string | null = null,
 ) {
   const run = await prisma.drillRun.findFirst({
     where: { id: runId, orgId },
@@ -263,7 +288,14 @@ export async function resumeDrillRun(
       },
     }),
     prisma.drillRunEvent.create({
-      data: eventCreateData(runId, { kind: "resumed" }, actor, now),
+      data: eventCreateData(
+        runId,
+        { kind: "resumed" },
+        actor,
+        now,
+        ipAddress,
+        userAgent,
+      ),
     }),
   ]);
   return updated;
@@ -283,6 +315,8 @@ export async function endDrillRun(
   orgId: string,
   runId: string,
   actor: ActorIds = { actorUserId: null, onBehalfOfUserId: null },
+  ipAddress: string | null = null,
+  userAgent: string | null = null,
 ) {
   const run = await prisma.drillRun.findFirst({
     where: { id: runId, orgId },
@@ -308,7 +342,14 @@ export async function endDrillRun(
       },
     }),
     prisma.drillRunEvent.create({
-      data: eventCreateData(runId, { kind: "ended" }, actor, now),
+      data: eventCreateData(
+        runId,
+        { kind: "ended" },
+        actor,
+        now,
+        ipAddress,
+        userAgent,
+      ),
     }),
   ]);
   return updated;
@@ -347,6 +388,8 @@ export async function updateLiveRunState(
   runId: string,
   state: RunState,
   actor: ActorIds = { actorUserId: null, onBehalfOfUserId: null },
+  ipAddress: string | null = null,
+  userAgent: string | null = null,
 ): Promise<UpdateLiveRunStateResult> {
   const run = await prisma.drillRun.findFirst({
     where: { id: runId, orgId },
@@ -387,7 +430,14 @@ export async function updateLiveRunState(
     updateOp,
     ...deltas.map((payload) =>
       prisma.drillRunEvent.create({
-        data: eventCreateData(runId, payload, actor, now),
+        data: eventCreateData(
+          runId,
+          payload,
+          actor,
+          now,
+          ipAddress,
+          userAgent,
+        ),
       }),
     ),
   ])) as [DrillRun, ...DrillRunEvent[]];

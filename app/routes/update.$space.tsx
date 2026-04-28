@@ -1,9 +1,10 @@
 import type { Route } from "./+types/update.$space";
 import { redirect } from "react-router";
 import { assertTrialAllowsNewPickup } from "~/domain/billing/trial-enforcement.server";
-import { getActorIdsFromContext, getOptionalUserFromContext, getOrgFromContext } from "~/domain/utils/global-context.server";
+import { getOptionalUserFromContext, getOrgFromContext } from "~/domain/utils/global-context.server";
+import { getAuditContextFromRequest } from "~/domain/auth/audit-context.server";
 
-export async function action({ params, context }: Route.ActionArgs) {
+export async function action({ params, request, context }: Route.ActionArgs) {
   const { space } = params;
   if (space === undefined) {
     throw redirect("/");
@@ -32,7 +33,14 @@ export async function action({ params, context }: Route.ActionArgs) {
   const timestamp = new Date().toISOString();
   const env = (context as any).cloudflare.env;
 
-  const { actorUserId, onBehalfOfUserId } = getActorIdsFromContext(context);
+  // Forensic context: actor pair plus IP + user-agent. The DO writes the
+  // CallEvent row from raw SQL and embeds these columns directly so the
+  // audit trail is complete without a follow-up update.
+  const { actor, ipAddress, userAgent } = getAuditContextFromRequest(
+    request,
+    context,
+  );
+  const { actorUserId, onBehalfOfUserId } = actor;
 
   // Per-tenant Durable Object: each org gets its own isolate keyed by orgId,
   // so WebSocket broadcasts and hibernated sessions stay scoped to that
@@ -55,6 +63,8 @@ export async function action({ params, context }: Route.ActionArgs) {
       orgId: org.id,
       actorUserId,
       onBehalfOfUserId,
+      ipAddress,
+      userAgent,
     }),
   });
 
