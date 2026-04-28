@@ -44,29 +44,19 @@ import {
   broadcastDrillUpdate,
 } from "~/lib/broadcast.server";
 import { hasValidViewerAccess } from "~/domain/auth/viewer-access.server";
+import { formatActorLabel } from "~/domain/auth/format-actor";
 import { useDrillWebSocket } from "~/hooks/useDrillWebSocket";
 import type { Prisma } from "~/db";
+
+// Re-export for any existing importers that pulled `formatActorLabel` from
+// this route module before it moved to `~/domain/auth/format-actor`.
+export { formatActorLabel };
 
 export const meta: Route.MetaFunction = ({ data }) => [
   {
     title: data?.metaTitle ?? "Live drill",
   },
 ];
-
-// Renders an actor's display name with optional impersonation suffix.
-// "Noah Sundberg as Admin Account" when impersonating; just the name (or
-// the fallback) otherwise. Shared by the loader (for the pre-composed
-// `me.label`) and the activity / presence renderers on the client.
-export function formatActorLabel(
-  actorLabel: string | null,
-  onBehalfOfLabel: string | null,
-  fallback: string,
-): string {
-  const a = actorLabel?.trim();
-  const o = onBehalfOfLabel?.trim();
-  if (a && o) return `${a} as ${o}`;
-  return a || o || fallback;
-}
 
 const btnPrimary =
   "inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
