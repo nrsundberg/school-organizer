@@ -1,8 +1,7 @@
 import type { Route } from "./+types/update.$space";
 import { redirect } from "react-router";
 import { assertTrialAllowsNewPickup } from "~/domain/billing/trial-enforcement.server";
-import { getActorIdsFromContext, getOrgFromContext } from "~/domain/utils/global-context.server";
-import { protectToAdminAndGetPermissions } from "~/sessions.server";
+import { getActorIdsFromContext, getOptionalUserFromContext, getOrgFromContext } from "~/domain/utils/global-context.server";
 
 export async function action({ params, context }: Route.ActionArgs) {
   const { space } = params;
@@ -10,12 +9,14 @@ export async function action({ params, context }: Route.ActionArgs) {
     throw redirect("/");
   }
 
-  // Spot-call is privileged: only signed-in ADMIN/CONTROLLER users may
-  // record dismissals. The home-page UI hides the buttons from anyone
-  // else, but this server-side gate is what actually enforces it —
-  // throws 401/403 (Response, not redirect) so the fetcher submission
+  // Spot-call is privileged: only signed-in CONTROLLER users (or someone
+  // impersonating a controller via better-auth) may record dismissals.
+  // ADMINs are intentionally excluded — managing the roster ≠ running it.
+  // Throws 401/403 (Response, not redirect) so the fetcher submission
   // surfaces a real failure rather than a silent UI bounce.
-  await protectToAdminAndGetPermissions(context);
+  const user = getOptionalUserFromContext(context);
+  if (!user) throw new Response("Not authenticated", { status: 401 });
+  if (user.role !== "CONTROLLER") throw new Response("Forbidden", { status: 403 });
 
   // Tenant routes always have an org (set by globalStorageMiddleware via
   // host resolution). Required strictly here because we route to a

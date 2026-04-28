@@ -4,6 +4,7 @@ import { endImpersonation } from "~/domain/district/impersonation.server";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { requireDistrictAdmin } from "~/domain/district/route-guard.server";
+import { marketingOriginFromRequest } from "~/domain/utils/host.server";
 
 export function loader() {
   return new Response("Method Not Allowed", { status: 405 });
@@ -29,5 +30,5 @@ export async function action({ request, context }: Route.ActionArgs) {
     },
     sessionId: session.session.id,
   });
-  throw redirect("/district");
+  throw redirect(`${marketingOriginFromRequest(request, context)}/district`);
 }

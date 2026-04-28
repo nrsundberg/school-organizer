@@ -1,7 +1,6 @@
 import type { Route } from "./+types/empty.$space";
 import { redirect } from "react-router";
-import { protectToAdminAndGetPermissions } from "~/sessions.server";
-import { getOrgFromContext } from "~/domain/utils/global-context.server";
+import { getOptionalUserFromContext, getOrgFromContext } from "~/domain/utils/global-context.server";
 
 export async function action({ params, context }: Route.ActionArgs) {
   const { space } = params;
@@ -10,10 +9,12 @@ export async function action({ params, context }: Route.ActionArgs) {
   }
 
   // Mirror the gate on /update/:space — clearing a space is the same kind
-  // of dismissal-state mutation as calling one, so it requires the same
-  // ADMIN/CONTROLLER role. Throws Response 401/403 (not a UI redirect) so
+  // of dismissal-state mutation as calling one, so it requires CONTROLLER
+  // (admins are excluded). Throws Response 401/403 (not a UI redirect) so
   // the fetcher submission surfaces a real failure to the caller.
-  await protectToAdminAndGetPermissions(context);
+  const user = getOptionalUserFromContext(context);
+  if (!user) throw new Response("Not authenticated", { status: 401 });
+  if (user.role !== "CONTROLLER") throw new Response("Forbidden", { status: 403 });
 
   const spaceNumber = parseInt(space);
   const env = (context as any).cloudflare.env;
