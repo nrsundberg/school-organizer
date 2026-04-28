@@ -862,12 +862,73 @@
     "branding": "Branding",
     "children": "Niños y clases",
     "dashboard": "Panel",
+    "dataExport": "Exportar datos",
     "drills": "Simulacros",
     "history": "Historial",
     "households": "Hogares",
     "panelTitle": "Panel de administración",
     "rosterImport": "Importar lista",
     "users": "Usuarios"
+  },
+  "dataExport": {
+    "metaTitle": "Admin – Exportar datos",
+    "heading": "Exporta los datos de tu escuela",
+    "description": "Descarga un archivo zip con cada lista, evento de llamada, hogar y registro de configuración almacenado en esta organización. Quitamos hashes de credenciales y otros campos de transporte; todo lo demás es tuyo.",
+    "preview": {
+      "title": "Lo que incluye tu exportación",
+      "studentsCount_one": "{{count}} estudiante",
+      "studentsCount_other": "{{count}} estudiantes",
+      "teachersCount_one": "{{count}} maestro/a",
+      "teachersCount_other": "{{count}} maestros/as",
+      "callEventsCount_one": "{{count}} evento de llamada",
+      "callEventsCount_other": "{{count}} eventos de llamada",
+      "householdsCount_one": "{{count}} hogar",
+      "householdsCount_other": "{{count}} hogares",
+      "exceptionsCount_one": "{{count}} excepción de salida",
+      "exceptionsCount_other": "{{count}} excepciones de salida"
+    },
+    "downloadButton": "Descargar exportación",
+    "downloadingButton": "Generando archivo…",
+    "lastExportedAt": "Última exportación {{time}}",
+    "upgrade": {
+      "title": "La exportación de datos es una función Campus",
+      "body": "Mejora a Campus para exportar todos los registros que esta organización tiene almacenados.",
+      "cta": "Mejorar a Campus",
+      "zipForbidden": "La exportación de datos requiere el plan Campus."
+    },
+    "dangerZone": {
+      "title": "Zona de peligro",
+      "body": "Elimina permanentemente toda la lista, salidas y datos de hogares. Tu registro de facturación y registro de auditoría se conservan.",
+      "cta": "Eliminar todos los datos"
+    }
+  },
+  "dataDelete": {
+    "metaTitle": "Admin – Eliminar todos los datos",
+    "heading": "Eliminar permanentemente todos los datos de la organización",
+    "warningParagraph1": "Esto eliminará a cada estudiante, maestro/a, espacio, evento de llamada, hogar, simulacro y usuario no administrador perteneciente a {{orgName}}.",
+    "warningParagraph2": "Tu registro de facturación, historial de auditoría e inicio de sesión de administrador se conservan para que puedas volver a configurar la organización más tarde.",
+    "warningParagraph3Prefix": "Esta acción no se puede deshacer. Recomendamos encarecidamente ",
+    "warningParagraph3LinkText": "exportar tus datos",
+    "warningParagraph3Suffix": " antes de continuar.",
+    "preview": {
+      "title": "A punto de eliminarse",
+      "studentsCount_one": "{{count}} estudiante",
+      "studentsCount_other": "{{count}} estudiantes",
+      "teachersCount_one": "{{count}} maestro/a",
+      "teachersCount_other": "{{count}} maestros/as",
+      "callEventsCount_one": "{{count}} evento de llamada",
+      "callEventsCount_other": "{{count}} eventos de llamada",
+      "householdsCount_one": "{{count}} hogar",
+      "householdsCount_other": "{{count}} hogares"
+    },
+    "confirmInputLabel": "Escribe el slug de tu organización ({{slug}}) para confirmar",
+    "acknowledgeLabel": "Entiendo que esta acción es irreversible.",
+    "deleteButton": "Eliminar permanentemente todos los datos",
+    "deletingButton": "Eliminando…",
+    "errors": {
+      "slugMismatch": "El slug no coincide. Escribe {{slug}} exactamente.",
+      "ackRequired": "Por favor confirma antes de eliminar."
+    }
   },
   "usageBanner": {
     "classrooms": "Aulas",

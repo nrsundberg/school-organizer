@@ -156,6 +156,13 @@ export const tenantAuthedRoutes: RouteSpec[] = [
   { path: "/admin/children", expect: "either", landmark: { role: "heading" } },
   { path: "/admin/billing", expect: "either", landmark: { role: "heading" } },
   { path: "/admin/branding", expect: "either", landmark: { role: "heading" } },
+  // Plan-gated CAMPUS+ feature; unauthenticated visitors land on the admin
+  // ErrorBoundary "Login required" page (still 2xx + heading), so "either"
+  // is the right expect for a smoke that doesn't seed a session. The
+  // destructive companion `/admin/data-delete` is intentionally NOT in the
+  // sweep — a smoke run should never touch a destructive POST and the
+  // GET-side render is functionally identical to the export page.
+  { path: "/admin/data-export", expect: "either", landmark: { role: "heading" } },
   // /admin/history is listed in the nightly spec but not registered in
   // app/routes.ts on master. The nightly queue was drafted alongside the
   // in-progress drills rename (which adds history). Once that lands we can

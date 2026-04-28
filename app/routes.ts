@@ -18,6 +18,8 @@ export default [
     route("billing", "routes/admin/billing.tsx"),
     route("branding", "routes/admin/branding.tsx"),
     route("history", "routes/admin/history.tsx"),
+    route("data-export", "routes/admin/data-export.tsx"),
+    route("data-delete", "routes/admin/data-delete.tsx"),
     route("drills", "routes/admin/drills.tsx"),
     // /admin/drills/library and /admin/drills/history — must come BEFORE the
     // :templateId param route so they don't get swallowed by the dynamic

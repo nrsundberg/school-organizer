@@ -1,6 +1,7 @@
 import {
   ClipboardList,
   CreditCard,
+  Download,
   FileSpreadsheet,
   GraduationCap,
   History,
@@ -27,6 +28,7 @@ const baseNavItems: NavItem[] = [
   { to: "/admin/roster-import", labelKey: "sidebar.rosterImport", icon: FileSpreadsheet },
   { to: "/admin/drills", labelKey: "sidebar.drills", icon: ClipboardList },
   { to: "/admin/history", labelKey: "sidebar.history", icon: History },
+  { to: "/admin/data-export", labelKey: "sidebar.dataExport", icon: Download },
   { to: "/admin/branding", labelKey: "sidebar.branding", icon: Palette },
 ];
 

@@ -897,12 +897,73 @@
     "branding": "Branding",
     "children": "Children & Classes",
     "dashboard": "Dashboard",
+    "dataExport": "Data export",
     "drills": "Drills",
     "history": "History",
     "households": "Households",
     "panelTitle": "Admin Panel",
     "rosterImport": "Roster Import",
     "users": "Users"
+  },
+  "dataExport": {
+    "metaTitle": "Admin – Data export",
+    "heading": "Export your school's data",
+    "description": "Download a zip archive containing every roster, call event, household, and configuration record this org has stored. We strip credential hashes and other transport-only fields; everything else is yours.",
+    "preview": {
+      "title": "What's in your export",
+      "studentsCount_one": "{{count}} student",
+      "studentsCount_other": "{{count}} students",
+      "teachersCount_one": "{{count}} teacher",
+      "teachersCount_other": "{{count}} teachers",
+      "callEventsCount_one": "{{count}} call event",
+      "callEventsCount_other": "{{count}} call events",
+      "householdsCount_one": "{{count}} household",
+      "householdsCount_other": "{{count}} households",
+      "exceptionsCount_one": "{{count}} dismissal exception",
+      "exceptionsCount_other": "{{count}} dismissal exceptions"
+    },
+    "downloadButton": "Download data export",
+    "downloadingButton": "Building archive…",
+    "lastExportedAt": "Last exported {{time}}",
+    "upgrade": {
+      "title": "Data export is a Campus feature",
+      "body": "Upgrade to Campus to export every record this org has stored.",
+      "cta": "Upgrade to Campus",
+      "zipForbidden": "Data export requires the Campus plan."
+    },
+    "dangerZone": {
+      "title": "Danger zone",
+      "body": "Permanently delete all roster, dismissal, and household data. Your billing record and audit log are preserved.",
+      "cta": "Delete all data"
+    }
+  },
+  "dataDelete": {
+    "metaTitle": "Admin – Delete all data",
+    "heading": "Permanently delete all org data",
+    "warningParagraph1": "This will delete every student, teacher, space, call event, household, drill, and non-admin user belonging to {{orgName}}.",
+    "warningParagraph2": "Your billing record, audit history, and admin login are preserved so you can re-onboard later.",
+    "warningParagraph3Prefix": "This action cannot be undone. We strongly recommend you ",
+    "warningParagraph3LinkText": "export your data",
+    "warningParagraph3Suffix": " before continuing.",
+    "preview": {
+      "title": "About to be deleted",
+      "studentsCount_one": "{{count}} student",
+      "studentsCount_other": "{{count}} students",
+      "teachersCount_one": "{{count}} teacher",
+      "teachersCount_other": "{{count}} teachers",
+      "callEventsCount_one": "{{count}} call event",
+      "callEventsCount_other": "{{count}} call events",
+      "householdsCount_one": "{{count}} household",
+      "householdsCount_other": "{{count}} households"
+    },
+    "confirmInputLabel": "Type your org slug ({{slug}}) to confirm",
+    "acknowledgeLabel": "I understand this is irreversible.",
+    "deleteButton": "Permanently delete all data",
+    "deletingButton": "Deleting…",
+    "errors": {
+      "slugMismatch": "Slug doesn't match. Type {{slug}} exactly.",
+      "ackRequired": "Please acknowledge before deleting."
+    }
   },
   "usageBanner": {
     "classrooms": "Classrooms",
