@@ -19,6 +19,8 @@ type CallEventUpdate = {
     homeRoomSnapshot: string | null;
     actorUserId: string | null;
     onBehalfOfUserId: string | null;
+    ipAddress: string | null;
+    userAgent: string | null;
     createdAt: string;
   };
 };
