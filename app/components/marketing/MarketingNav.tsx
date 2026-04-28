@@ -1,6 +1,7 @@
 import { Link, useRouteLoaderData } from "react-router";
 import { useTranslation } from "react-i18next";
 import wordmark from "/logo-wordmark.svg?url";
+import LanguageSwitcher from "~/components/LanguageSwitcher";
 
 /**
  * Marketing header. When the user is logged in and has an org, swap the
@@ -43,6 +44,7 @@ export function MarketingNav() {
           <Link to="/faqs" className="transition hover:text-white">
             {t("marketingNav.faqs")}
           </Link>
+          <LanguageSwitcher placement="compact" />
           {showDashboard ? (
             <a
               href={dashboardUrl!}
