@@ -17,16 +17,23 @@ export const handle = { i18n: ["admin"] };
 export async function loader({ context }: Route.LoaderArgs) {
   await requireRole(context, "ADMIN");
   const prisma = getTenantPrisma(context);
-  const students = await prisma.student.findMany({
-    orderBy: [{ spaceNumber: "asc" }, { lastName: "asc" }, { firstName: "asc" }],
+  const studentsRaw = await prisma.student.findMany({
+    orderBy: [{ household: { spaceNumber: "asc" } }, { lastName: "asc" }, { firstName: "asc" }],
     select: {
       id: true,
       firstName: true,
       lastName: true,
-      spaceNumber: true,
       homeRoom: true,
+      household: { select: { spaceNumber: true } },
     },
   });
+  const students = studentsRaw.map((s) => ({
+    id: s.id,
+    firstName: s.firstName,
+    lastName: s.lastName,
+    homeRoom: s.homeRoom,
+    spaceNumber: s.household?.spaceNumber ?? null,
+  }));
   const printLocale = getOrgDefaultLocale(context);
   return { students, printLocale };
 }

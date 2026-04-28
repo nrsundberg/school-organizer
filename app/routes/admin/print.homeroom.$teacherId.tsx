@@ -30,19 +30,25 @@ export async function loader({ request, context, params }: Route.LoaderArgs) {
   }
 
   const sort = new URL(request.url).searchParams.get("sort") === "space" ? "space" : "name";
-  const students = await prisma.student.findMany({
+  const studentsRaw = await prisma.student.findMany({
     where: { homeRoom: teacher.homeRoom },
     orderBy:
       sort === "space"
-        ? [{ spaceNumber: "asc" }, { lastName: "asc" }, { firstName: "asc" }]
+        ? [{ household: { spaceNumber: "asc" } }, { lastName: "asc" }, { firstName: "asc" }]
         : [{ lastName: "asc" }, { firstName: "asc" }],
     select: {
       id: true,
       firstName: true,
       lastName: true,
-      spaceNumber: true,
+      household: { select: { spaceNumber: true } },
     },
   });
+  const students = studentsRaw.map((s) => ({
+    id: s.id,
+    firstName: s.firstName,
+    lastName: s.lastName,
+    spaceNumber: s.household?.spaceNumber ?? null,
+  }));
 
   // Print locale rule: teacher.locale wins, else org.defaultLocale.
   const printLocale = await getTeacherPrintLocale(context, teacherId);

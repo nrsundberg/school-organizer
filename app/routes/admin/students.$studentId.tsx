@@ -58,7 +58,6 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     where: { id: studentId },
     include: {
       teacher: true,
-      space: true,
       household: {
         include: {
           students: {
@@ -67,7 +66,6 @@ export async function loader({ params, context }: Route.LoaderArgs) {
               firstName: true,
               lastName: true,
               homeRoom: true,
-              spaceNumber: true,
             },
           },
         },
@@ -120,7 +118,6 @@ export async function loader({ params, context }: Route.LoaderArgs) {
       firstName: student.firstName,
       lastName: student.lastName,
       homeRoom: student.homeRoom,
-      spaceNumber: student.spaceNumber,
       householdId: student.householdId,
     },
     classroom: student.teacher
@@ -137,6 +134,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
           name: student.household.name,
           primaryContactName: student.household.primaryContactName,
           primaryContactPhone: student.household.primaryContactPhone,
+          spaceNumber: student.household.spaceNumber,
           students: student.household.students,
         }
       : null,
@@ -181,8 +179,6 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       const firstName = String(formData.get("firstName") ?? "").trim();
       const lastName = String(formData.get("lastName") ?? "").trim();
       const homeRoom = String(formData.get("homeRoom") ?? "").trim();
-      const spaceRaw = String(formData.get("spaceNumber") ?? "").trim();
-      const spaceNumber = spaceRaw ? Number(spaceRaw) : null;
 
       if (!firstName || !lastName) {
         return dataWithError(null, "First and last name are required.");
@@ -201,7 +197,6 @@ export async function action({ request, context, params }: Route.ActionArgs) {
           firstName,
           lastName,
           homeRoom: homeRoom || null,
-          spaceNumber: spaceNumber && Number.isInteger(spaceNumber) ? spaceNumber : null,
         },
       });
       return dataWithSuccess(null, "Student saved.");
@@ -325,7 +320,7 @@ function Breadcrumb({
           </Link>
           <span className="text-white/25">/</span>
           <Link
-            to={`/admin/children#grade-${(classroom.gradeLevel ?? "ungraded").toString().toLowerCase()}`}
+            to={`/admin/children?grade=${classroom.gradeLevel ?? "ungraded"}#homeroom-${classroom.id}`}
             className="hover:text-white/80"
           >
             {classroom.homeRoom}
@@ -392,7 +387,7 @@ function HeaderCard({
           {classroom ? (
             <span className="inline-flex items-center gap-1.5">
               <span className="text-white/40">Classroom</span>
-              <EntityLink to={`/admin/children?grade=${classroom.gradeLevel ?? "ungraded"}#grade-${(classroom.gradeLevel ?? "ungraded").toString().toLowerCase()}`}>
+              <EntityLink to={`/admin/children?grade=${classroom.gradeLevel ?? "ungraded"}#homeroom-${classroom.id}`}>
                 {classroom.homeRoom}
               </EntityLink>
             </span>
@@ -406,13 +401,13 @@ function HeaderCard({
           <span className="inline-flex items-center gap-1.5">
             <span className="text-white/40">Space</span>
             <span className="text-white/80 tabular-nums">
-              {student.spaceNumber ?? "—"}
+              {household?.spaceNumber ?? "—"}
             </span>
           </span>
           {household ? (
             <span className="inline-flex items-center gap-1.5">
               <span className="text-white/40">Household</span>
-              <EntityLink to={`/admin/households#${household.id}`}>{household.name}</EntityLink>
+              <EntityLink to={`/admin/households/${household.id}`}>{household.name}</EntityLink>
             </span>
           ) : null}
         </div>
@@ -536,16 +531,10 @@ function ProfileTab({
           <Field label="Last name">
             <Input name="lastName" defaultValue={student.lastName} required />
           </Field>
-          <Field label="Preferred name (optional)">
-            <Input name="preferredName" placeholder="—" disabled />
-          </Field>
-          <Field label="Pronouns (optional)">
-            <Input name="pronouns" placeholder="—" disabled />
-          </Field>
         </div>
 
         <SectionHeader title="Placement" />
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Grade">
             <select
               name="grade"
@@ -576,15 +565,10 @@ function ProfileTab({
               ))}
             </select>
           </Field>
-          <Field label="Space #">
-            <Input
-              name="spaceNumber"
-              type="number"
-              min={1}
-              defaultValue={student.spaceNumber ?? ""}
-            />
-          </Field>
         </div>
+        <p className="-mt-1 text-xs text-white/45">
+          Space # is set on the family — edit it on the household detail page.
+        </p>
 
         <SectionHeader title="Health & safety" />
         <div className="grid gap-3 sm:grid-cols-2">
@@ -760,7 +744,7 @@ function HouseholdRail({
           colorSeed={household.id}
         />
         <div className="min-w-0 flex-1">
-          <EntityLink to={`/admin/households#${household.id}`}>
+          <EntityLink to={`/admin/households/${household.id}`}>
             {household.name}
           </EntityLink>
           {household.primaryContactName ? (
@@ -771,6 +755,9 @@ function HouseholdRail({
                 : ""}
             </p>
           ) : null}
+          <p className="text-[11px] text-white/45">
+            Space {household.spaceNumber ?? "—"}
+          </p>
         </div>
       </div>
 
@@ -800,7 +787,7 @@ function HouseholdRail({
                     {s.firstName} {s.lastName}
                   </Link>
                   <p className="truncate text-[11px] text-white/45">
-                    {s.homeRoom ?? "No classroom"} · Space {s.spaceNumber ?? "—"}
+                    {s.homeRoom ?? "No classroom"}
                   </p>
                 </div>
               </li>

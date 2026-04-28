@@ -122,7 +122,7 @@ export default function CreateHomeroom() {
 
   const [homeRoom, setHomeRoom] = useState("");
   const [selectedStudents, setSelectedStudents] = useState<
-    Array<{ id: number; firstName: string; lastName: string; spaceNumber?: number | null }>
+    Array<{ id: number; firstName: string; lastName: string }>
   >([]);
 
   const isSubmitting = fetcher.state === "submitting";
@@ -133,7 +133,7 @@ export default function CreateHomeroom() {
     if (student && !selectedStudents.find((s) => s.id === id)) {
       setSelectedStudents((prev) => [
         ...prev,
-        { id: student.id, firstName: student.firstName, lastName: student.lastName, spaceNumber: student.spaceNumber }
+        { id: student.id, firstName: student.firstName, lastName: student.lastName }
       ]);
     }
   };
@@ -195,9 +195,6 @@ export default function CreateHomeroom() {
                   {availableStudents.map((student) => (
                     <option key={student.id} value={student.id.toString()} className="bg-gray-900 text-gray-100">
                       {student.firstName} {student.lastName}
-                      {student.spaceNumber
-                        ? ` ${t("create.homeroom.studentSpace", { number: student.spaceNumber })}`
-                        : ""}
                     </option>
                   ))}
                 </select>
@@ -211,11 +208,6 @@ export default function CreateHomeroom() {
                 <div key={student.id} className="flex items-center justify-between p-2 bg-white/10 rounded border border-white/20">
                   <span className="font-medium">
                     {student.firstName} {student.lastName}
-                    {student.spaceNumber && (
-                      <span className="text-sm text-gray-400 ml-2">
-                        {t("create.homeroom.studentSpace", { number: student.spaceNumber })}
-                      </span>
-                    )}
                   </span>
                   <Button size="sm" variant="ghost" isIconOnly onPress={() => removeSelectedStudent(student.id)} isDisabled={isSubmitting}>
                     <XIcon size={14} />

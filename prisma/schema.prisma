@@ -245,6 +245,11 @@ model DrillTemplate {
   /// and no due-in countdown. Existing rows backfill to NULL so this is a
   /// purely additive feature.
   requiredPerYear Int?
+  /// Soft-delete marker. Templates are never hard-deleted because their
+  /// historical DrillRuns (and the audit/compliance trail those carry)
+  /// would go with them. UI hides rows where this is non-null; admin
+  /// queries that need to surface archived templates filter explicitly.
+  deletedAt    DateTime?
   runs         DrillRun[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -533,10 +538,9 @@ model Student {
   firstName   String
   lastName    String
   /// Siblings share one household; each distinct household (or unassigned student) counts toward family cap.
+  /// Space (car-line) number lives on Household — children inherit their household's space.
   householdId String?
   household   Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
-  space       Space?   @relation(fields: [orgId, spaceNumber], references: [orgId, spaceNumber])
-  spaceNumber Int?
   teacher     Teacher? @relation(fields: [orgId, homeRoom], references: [orgId, homeRoom])
   homeRoom    String?
   callEvents  CallEvent[]
@@ -545,9 +549,7 @@ model Student {
   @@index([orgId])
   @@index([householdId])
   @@index([orgId, householdId])
-  @@index([spaceNumber])
   @@index([homeRoom])
-  @@index([orgId, spaceNumber])
   @@index([orgId, homeRoom])
 }
 
@@ -559,6 +561,11 @@ model Household {
   pickupNotes         String?
   primaryContactName  String?
   primaryContactPhone String?
+  /// Car-line/pickup space number assigned to this family. All students in
+  /// the household share this space. FK to Space via (orgId, spaceNumber);
+  /// null = unassigned.
+  spaceNumber         Int?
+  space               Space?               @relation(fields: [orgId, spaceNumber], references: [orgId, spaceNumber])
   students            Student[]
   exceptions          DismissalException[]
   createdAt           DateTime             @default(now())
@@ -566,6 +573,8 @@ model Household {
 
   @@index([orgId])
   @@index([orgId, name])
+  @@index([spaceNumber])
+  @@index([orgId, spaceNumber])
 }
 
 model DismissalException {
@@ -636,7 +645,7 @@ model Space {
   orgId       String    @default("org_tome")
   org         Org       @relation(fields: [orgId], references: [id])
   spaceNumber Int
-  students    Student[]
+  households  Household[]
   status      Status    @default(EMPTY)
   timestamp   String?
   callEvents  CallEvent[]

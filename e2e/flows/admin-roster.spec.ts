@@ -2,10 +2,12 @@
  * admin-roster critical path.
  *
  * Covers: create student via `/create/student`, verify the student shows
- * up on `/admin/children` under the expected homeroom, with the assigned
- * space number. The fixture pre-seeds one homeroom + one space so the
- * test stays focused on the create-student action rather than the
- * homeroom create flow (that is its own short path at the end).
+ * up on `/admin/children` under the expected homeroom. The fixture
+ * pre-seeds one homeroom so the test stays focused on the create-student
+ * action rather than the homeroom create flow (that is its own short
+ * path at the end). Space numbers now live on Household, not Student, so
+ * this flow no longer exercises the space field — that's covered by
+ * household-edit specs.
  *
  * Auth: uses the `tenant` fixture, which inserts a Better Auth Session
  * row directly and hands the spec a pre-baked `adminCookie`. We add
@@ -25,7 +27,7 @@
 import { test, expect } from "../fixtures/seeded-tenant";
 
 test.describe("@flow admin-roster — create student + see it on /admin/children", () => {
-  test("admin seeds student and roster reflects homeroom + space", async ({ page, tenant }) => {
+  test("admin seeds student and roster reflects homeroom", async ({ page, tenant }) => {
     await page.context().addCookies([tenant.adminCookie]);
 
     const firstName = `E2E${Date.now()}`;
@@ -41,7 +43,6 @@ test.describe("@flow admin-roster — create student + see it on /admin/children
     // which the action asserts via `prisma.teacher.findUnique`.
     await page.getByLabel("First Name").fill(firstName);
     await page.getByLabel("Last Name").fill(lastName);
-    await page.getByLabel("Parking Space Number").fill(String(tenant.spaceNumber));
     await page.getByLabel("Homeroom").fill(tenant.homeroomName);
 
     // The submit button text flips to "Creating..." while pending, then
@@ -61,14 +62,12 @@ test.describe("@flow admin-roster — create student + see it on /admin/children
     await homeroomRow.click();
 
     // The expanded card renders "<lastName>, <firstName>" as the student
-    // link and the space as a "Space <n>" line in the metadata row. Both
-    // assertions must scope to the homeroom card so an unrelated row from
-    // a dirty dev.db can't satisfy them.
+    // link. Scope to the homeroom card so an unrelated row from a dirty
+    // dev.db can't satisfy this assertion.
     const card = page.getByRole("article").filter({
       has: page.getByRole("heading", { name: tenant.homeroomName, exact: true }),
     });
     await expect(card.getByRole("link", { name: `${lastName}, ${firstName}` })).toBeVisible();
-    await expect(card.getByText(`Space ${tenant.spaceNumber}`, { exact: true })).toBeVisible();
   });
 
   test("create-student rejects unknown homeroom name", async ({ page, tenant }) => {

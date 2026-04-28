@@ -112,8 +112,7 @@
       "lastNamePlaceholder": "Enter last name",
       "leaveEmpty": "Leave empty if not assigned",
       "metaTitle": "Create Student",
-      "spaceLabel": "Parking Space Number",
-      "spacePlaceholder": "Enter space number",
+      "spaceHint": "Pickup space # is set on the family — assign it from the household detail page once the student is grouped.",
       "submit": "Create Student",
       "submitting": "Creating..."
     }
@@ -602,6 +601,7 @@
       "nameLabel": "Household name",
       "pickupNotesLabel": "Pickup notes",
       "primaryContactLabel": "Primary contact",
+      "spaceNumberLabel": "Space # (optional)",
       "students_one": "{{count}} student",
       "students_other": "{{count}} students",
       "contacts_one": "{{count}} contact",
@@ -795,7 +795,8 @@
         "contactsLabel_other": "{{count}} contacts",
         "createdOn": "Created {{date}}",
         "defaultPlan": "Default plan: {{plan}}",
-        "noDefaultPlan": "No default plan"
+        "noDefaultPlan": "No default plan",
+        "spaceLabel": "Space #{{number}}"
       },
       "students": {
         "heading": "Students",

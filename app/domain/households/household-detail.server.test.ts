@@ -22,6 +22,7 @@ type Tables = {
     pickupNotes: string | null;
     primaryContactName: string | null;
     primaryContactPhone: string | null;
+    spaceNumber: number | null;
     createdAt: Date;
     updatedAt: Date;
   }>;
@@ -31,7 +32,6 @@ type Tables = {
     lastName: string;
     householdId: string | null;
     homeRoom: string | null;
-    spaceNumber: number | null;
   }>;
   exceptions: Array<{
     id: string;
@@ -139,6 +139,7 @@ const baseTables = (): Tables => ({
       pickupNotes: "siblings ride together",
       primaryContactName: "Maria Garcia",
       primaryContactPhone: "555-0100",
+      spaceNumber: 12,
       createdAt: new Date("2026-01-01T00:00:00Z"),
       updatedAt: new Date("2026-01-02T00:00:00Z"),
     },
@@ -148,6 +149,7 @@ const baseTables = (): Tables => ({
       pickupNotes: null,
       primaryContactName: null,
       primaryContactPhone: null,
+      spaceNumber: 4,
       createdAt: new Date("2026-02-01T00:00:00Z"),
       updatedAt: new Date("2026-02-02T00:00:00Z"),
     },
@@ -159,7 +161,6 @@ const baseTables = (): Tables => ({
       lastName: "Garcia",
       householdId: "hh_1",
       homeRoom: "K-1",
-      spaceNumber: 12,
     },
     {
       id: 2,
@@ -167,7 +168,6 @@ const baseTables = (): Tables => ({
       lastName: "Garcia",
       householdId: "hh_1",
       homeRoom: "2-3",
-      spaceNumber: null,
     },
     {
       id: 3,
@@ -175,7 +175,6 @@ const baseTables = (): Tables => ({
       lastName: "Lee",
       householdId: "hh_2",
       homeRoom: "1-1",
-      spaceNumber: 4,
     },
   ],
   exceptions: [

@@ -192,6 +192,12 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       if (!name) {
         return dataWithError(null, t("households.errors.nameRequired"));
       }
+      const spaceRaw = String(formData.get("spaceNumber") ?? "").trim();
+      const parsedSpace = spaceRaw ? Number(spaceRaw) : null;
+      const spaceNumber =
+        parsedSpace != null && Number.isInteger(parsedSpace) && parsedSpace > 0
+          ? parsedSpace
+          : null;
       await prisma.household.update({
         where: { id: householdId },
         data: {
@@ -201,6 +207,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
             String(formData.get("primaryContactName") ?? "").trim() || null,
           primaryContactPhone:
             String(formData.get("primaryContactPhone") ?? "").trim() || null,
+          spaceNumber,
         },
       });
       return dataWithSuccess(null, t("households.actions.pickupContextUpdated"));
@@ -377,6 +384,13 @@ export default function AdminHouseholdDetail({
               <StatusPill tone="success">
                 {t("households.card.active")}
               </StatusPill>
+              {household.spaceNumber ? (
+                <StatusPill tone="cyan">
+                  {t("households.detail.header.spaceLabel", {
+                    number: household.spaceNumber,
+                  })}
+                </StatusPill>
+              ) : null}
               {todayExceptions.length > 0 ? (
                 <StatusPill tone="info">
                   {t("households.list.exceptions", {
@@ -461,6 +475,14 @@ export default function AdminHouseholdDetail({
                   defaultValue={household.primaryContactPhone ?? ""}
                 />
               </Field>
+              <Field label={t("households.card.spaceNumberLabel")}>
+                <Input
+                  name="spaceNumber"
+                  type="number"
+                  min={1}
+                  defaultValue={household.spaceNumber ?? ""}
+                />
+              </Field>
             </div>
             <Field label={t("households.card.pickupNotesLabel")}>
               <TextArea
@@ -514,6 +536,7 @@ export default function AdminHouseholdDetail({
                     <StudentCard
                       key={student.id}
                       student={student}
+                      familySpaceNumber={household.spaceNumber}
                       hasExceptionToday={household.exceptions.some(
                         (e) =>
                           e.activeToday &&
@@ -789,9 +812,11 @@ export default function AdminHouseholdDetail({
 
 function StudentCard({
   student,
+  familySpaceNumber,
   hasExceptionToday,
 }: {
   student: HouseholdStudent;
+  familySpaceNumber: number | null;
   hasExceptionToday: boolean;
 }) {
   const { t } = useTranslation("admin");
@@ -817,9 +842,9 @@ function StudentCard({
                 {t("households.detail.students.noTeacher")}
               </StatusPill>
             )}
-            {student.spaceNumber ? (
+            {familySpaceNumber ? (
               <StatusPill tone="cyan" size="xs">
-                #{student.spaceNumber}
+                #{familySpaceNumber}
               </StatusPill>
             ) : null}
             {hasExceptionToday ? (

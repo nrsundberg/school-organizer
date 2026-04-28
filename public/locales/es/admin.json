@@ -112,8 +112,7 @@
       "lastNamePlaceholder": "Ingresa el apellido",
       "leaveEmpty": "Déjalo vacío si no está asignado",
       "metaTitle": "Crear estudiante",
-      "spaceLabel": "Número de espacio de estacionamiento",
-      "spacePlaceholder": "Ingresa el número de espacio",
+      "spaceHint": "El número de espacio se establece en la familia — asígnalo desde la página del hogar una vez que el estudiante esté agrupado.",
       "submit": "Crear estudiante",
       "submitting": "Creando..."
     }
@@ -567,6 +566,7 @@
       "nameLabel": "Nombre del hogar",
       "pickupNotesLabel": "Notas de recogida",
       "primaryContactLabel": "Contacto principal",
+      "spaceNumberLabel": "N° de espacio (opcional)",
       "students_one": "{{count}} student",
       "students_other": "{{count}} students",
       "contacts_one": "{{count}} contact",
@@ -760,7 +760,8 @@
         "contactsLabel_other": "{{count}} contacts",
         "createdOn": "Created {{date}}",
         "defaultPlan": "Default plan: {{plan}}",
-        "noDefaultPlan": "No default plan"
+        "noDefaultPlan": "No default plan",
+        "spaceLabel": "Espacio #{{number}}"
       },
       "students": {
         "heading": "Students",

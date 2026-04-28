@@ -27,7 +27,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const prisma = getTenantPrisma(context);
   const [cloned, teacherCount] = await Promise.all([
     prisma.drillTemplate.findMany({
-      where: { globalKey: { not: null } },
+      where: { globalKey: { not: null }, deletedAt: null },
       select: { globalKey: true, id: true },
     }),
     prisma.teacher.count(),
@@ -69,7 +69,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       throw new Response(t("drills.library.errors.notFound"), { status: 404 });
     }
     const existing = await prisma.drillTemplate.findFirst({
-      where: { globalKey },
+      where: { globalKey, deletedAt: null },
       select: { id: true },
     });
     if (existing) {
