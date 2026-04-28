@@ -85,11 +85,11 @@ function localizePlan(t: TFunction, plan: RosterImportPlan): LocalizedPlan {
 export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
-  const [studentCount, homeroomCount] = await Promise.all([
+  const [studentCount, homeroomCount, locale] = await Promise.all([
     prisma.student.count(),
     prisma.teacher.count(),
+    detectLocale(request, context),
   ]);
-  const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
 
   return {

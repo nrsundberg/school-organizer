@@ -28,11 +28,13 @@ export const meta: Route.MetaFunction = ({ data }) => {
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const prisma = getTenantPrisma(context);
-  const homerooms = await prisma.teacher.findMany({
-    select: { homeRoom: true },
-    orderBy: { homeRoom: "asc" }
-  });
-  const locale = await detectLocale(request, context);
+  const [homerooms, locale] = await Promise.all([
+    prisma.teacher.findMany({
+      select: { homeRoom: true },
+      orderBy: { homeRoom: "asc" }
+    }),
+    detectLocale(request, context),
+  ]);
   const t = await getFixedT(locale, "admin");
   return {
     success: true,

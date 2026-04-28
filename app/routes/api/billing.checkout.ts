@@ -71,14 +71,15 @@ export async function action({ request, context }: Route.ActionArgs) {
     const cancelUrl = `${origin}/billing/cancel`;
 
     const prisma = getPrisma(context);
-    const userRow = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { email: true },
-    });
-    const email = userRow?.email ?? "";
-
     // Forward the request locale so Stripe-hosted Checkout localizes its UI.
-    const locale = await detectLocale(request, context);
+    const [userRow, locale] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: user.id },
+        select: { email: true },
+      }),
+      detectLocale(request, context),
+    ]);
+    const email = userRow?.email ?? "";
 
     const { url } = await createCheckoutSessionForOrg({
       context,
