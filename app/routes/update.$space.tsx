@@ -64,7 +64,7 @@ export async function action({ params, request, context }: Route.ActionArgs) {
       data: { status: "ACTIVE", timestamp },
     }),
     prisma.student.findFirst({
-      where: { spaceNumber },
+      where: { household: { spaceNumber } },
       select: { id: true, firstName: true, lastName: true, homeRoom: true },
     }),
   ]);
