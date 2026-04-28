@@ -25,12 +25,13 @@ const btnSecondary =
 export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
-  const [cloned, teacherCount] = await Promise.all([
+  const [cloned, teacherCount, locale] = await Promise.all([
     prisma.drillTemplate.findMany({
       where: { globalKey: { not: null } },
       select: { globalKey: true, id: true },
     }),
     prisma.teacher.count(),
+    detectLocale(request, context),
   ]);
   // Map of globalKey -> orgTemplateId so the UI can deep-link "Already cloned".
   const clonedByKey: Record<string, string> = {};
@@ -39,7 +40,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       clonedByKey[row.globalKey] = row.id;
     }
   }
-  const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
   return {
     templates: GLOBAL_TEMPLATES,

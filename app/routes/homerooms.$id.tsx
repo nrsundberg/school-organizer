@@ -16,29 +16,31 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     select: { firstName: true, lastName: true, spaceNumber: true }
   });
 
-  interface Student {
-    firstName: string;
-    lastName: string;
-    spaceNumber: number | null;
-    status: Status;
-  }
+  type StudentRow = { firstName: string; lastName: string; spaceNumber: number | null };
+  type SpaceRow = { spaceNumber: number; status: Status };
 
-  const studentReturn: Student[] = [];
+  // Match the old per-student lookup contract: null spaceNumber falls
+  // back to space 0, so a row with spaceNumber=0 (if any) is consulted
+  // for unassigned students just like before.
+  const spaceNumbers = Array.from(
+    new Set((students as StudentRow[]).map((s) => s.spaceNumber ?? 0)),
+  );
+  const spaces = spaceNumbers.length
+    ? await prisma.space.findMany({
+        where: { spaceNumber: { in: spaceNumbers } },
+        select: { spaceNumber: true, status: true },
+      })
+    : [];
+  const statusBySpaceNumber = new Map<number, Status>(
+    (spaces as SpaceRow[]).map((s) => [s.spaceNumber, s.status]),
+  );
 
-  for (let student of students) {
-    let spaceStatus = await prisma.space.findFirst({
-      where: { spaceNumber: student.spaceNumber ?? 0 },
-      select: { status: true }
-    });
-    studentReturn.push({
-      firstName: student.firstName,
-      lastName: student.lastName,
-      spaceNumber: student.spaceNumber,
-      status: spaceStatus ? spaceStatus.status : Status.EMPTY
-    });
-  }
-
-  return studentReturn;
+  return (students as StudentRow[]).map((student) => ({
+    firstName: student.firstName,
+    lastName: student.lastName,
+    spaceNumber: student.spaceNumber,
+    status: statusBySpaceNumber.get(student.spaceNumber ?? 0) ?? Status.EMPTY,
+  }));
 }
 
 export default function StudentList({ loaderData }: Route.ComponentProps) {

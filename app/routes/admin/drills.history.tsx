@@ -74,11 +74,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const prisma = getTenantPrisma(context);
 
   // Fetch ROW_CAP + 1 to detect truncation without a second count query.
-  const fetched = await prisma.drillRun.findMany({
-    orderBy: { createdAt: "desc" },
-    take: ROW_CAP + 1,
-    include: { template: { select: { id: true, name: true } } },
-  });
+  const [fetched, locale] = await Promise.all([
+    prisma.drillRun.findMany({
+      orderBy: { createdAt: "desc" },
+      take: ROW_CAP + 1,
+      include: { template: { select: { id: true, name: true } } },
+    }),
+    detectLocale(request, context),
+  ]);
 
   const truncated = fetched.length > ROW_CAP;
   const slice = truncated ? fetched.slice(0, ROW_CAP) : fetched;
@@ -109,7 +112,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     };
   });
 
-  const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
 
   return {

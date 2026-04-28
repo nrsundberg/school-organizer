@@ -18,15 +18,17 @@ export const meta: Route.MetaFunction = ({ data }) => [
 export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
-  const classes = await prisma.teacher.findMany({
-    orderBy: { homeRoom: "asc" },
-    include: {
-      students: {
-        orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+  const [classes, locale] = await Promise.all([
+    prisma.teacher.findMany({
+      orderBy: { homeRoom: "asc" },
+      include: {
+        students: {
+          orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+        },
       },
-    },
-  });
-  const locale = await detectLocale(request, context);
+    }),
+    detectLocale(request, context),
+  ]);
   const t = await getFixedT(locale, "admin");
   return { classes, metaTitle: t("children.metaTitle") };
 }

@@ -37,13 +37,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const prisma = getPrisma(context);
   const tenantPrisma = getTenantPrisma(context);
   const org = getOrgFromContext(context);
-  const data = await loadAdminUsersData({
-    prisma,
-    tenantPrisma,
-    org,
-    currentUserId: me.id,
-  });
-  const locale = await detectLocale(request, context);
+  const [data, locale] = await Promise.all([
+    loadAdminUsersData({
+      prisma,
+      tenantPrisma,
+      org,
+      currentUserId: me.id,
+    }),
+    detectLocale(request, context),
+  ]);
   const t = await getFixedT(locale, "admin");
   return { ...data, metaTitle: t("users.metaTitle") };
 }
