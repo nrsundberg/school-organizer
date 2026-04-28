@@ -23,7 +23,7 @@
  * a handful of times per email send / form action.
  */
 
-import i18next, { type TFunction } from "i18next";
+import i18next, { type TFunction, type Resource } from "i18next";
 import {
   DEFAULT_LANGUAGE,
   DEFAULT_NAMESPACE,
@@ -32,7 +32,49 @@ import {
   pickSupportedLanguage,
   type I18nNamespace,
 } from "~/lib/i18n-config";
-import { i18nResources as resources } from "~/lib/i18n-bundles";
+
+// Static imports — bundled into the worker. Adding a new language means
+// adding entries here as well as a new tree under `public/locales/`. The
+// "How to add a new language" checklist in the contract doc lists this step.
+import enCommon from "../../public/locales/en/common.json";
+import enRoster from "../../public/locales/en/roster.json";
+import enAdmin from "../../public/locales/en/admin.json";
+import enBilling from "../../public/locales/en/billing.json";
+import enAuth from "../../public/locales/en/auth.json";
+import enEmail from "../../public/locales/en/email.json";
+import enErrors from "../../public/locales/en/errors.json";
+import enProfile from "../../public/locales/en/profile.json";
+import esCommon from "../../public/locales/es/common.json";
+import esRoster from "../../public/locales/es/roster.json";
+import esAdmin from "../../public/locales/es/admin.json";
+import esBilling from "../../public/locales/es/billing.json";
+import esAuth from "../../public/locales/es/auth.json";
+import esEmail from "../../public/locales/es/email.json";
+import esErrors from "../../public/locales/es/errors.json";
+import esProfile from "../../public/locales/es/profile.json";
+
+const resources: Resource = {
+  en: {
+    common: enCommon as Record<string, unknown>,
+    roster: enRoster as Record<string, unknown>,
+    admin: enAdmin as Record<string, unknown>,
+    billing: enBilling as Record<string, unknown>,
+    auth: enAuth as Record<string, unknown>,
+    email: enEmail as Record<string, unknown>,
+    errors: enErrors as Record<string, unknown>,
+    profile: enProfile as Record<string, unknown>,
+  },
+  es: {
+    common: esCommon as Record<string, unknown>,
+    roster: esRoster as Record<string, unknown>,
+    admin: esAdmin as Record<string, unknown>,
+    billing: esBilling as Record<string, unknown>,
+    auth: esAuth as Record<string, unknown>,
+    email: esEmail as Record<string, unknown>,
+    errors: esErrors as Record<string, unknown>,
+    profile: esProfile as Record<string, unknown>,
+  },
+};
 
 /**
  * Get a `t` function pinned to a specific language and namespace(s).

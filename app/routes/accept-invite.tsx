@@ -112,32 +112,27 @@ export async function action({ request, context }: Route.ActionArgs) {
   // created by inviteUser via better-auth signUpEmail with a random
   // password we never told anyone — overwriting it now makes the
   // account usable for the first time.
-  const [hashed, account] = await Promise.all([
-    hashPassword(password),
-    db.account.findFirst({
-      where: { userId: user.id, providerId: "credential" },
-    }),
-  ]);
+  const hashed = await hashPassword(password);
+  const account = await db.account.findFirst({
+    where: { userId: user.id, providerId: "credential" },
+  });
   if (!account) {
     return data(
       { error: "Could not finish setup — no credential account on file. Ask staff to re-invite you." },
       { status: 400 },
     );
   }
-  // Three independent writes against three different tables — fan out.
-  // The session deleteMany is defense in depth: the random password
-  // shouldn't have produced any sessions, but belt-and-suspenders.
-  await Promise.all([
-    db.account.update({
-      where: { id: account.id },
-      data: { password: hashed },
-    }),
-    db.user.update({
-      where: { id: user.id },
-      data: { mustChangePassword: false },
-    }),
-    db.session.deleteMany({ where: { userId: user.id } }),
-  ]);
+  await db.account.update({
+    where: { id: account.id },
+    data: { password: hashed },
+  });
+  await db.user.update({
+    where: { id: user.id },
+    data: { mustChangePassword: false },
+  });
+  // Drop any sessions the random password may have produced (defense in
+  // depth — there shouldn't be any, but belt-and-suspenders).
+  await db.session.deleteMany({ where: { userId: user.id } });
 
   // Sign the user in. `returnHeaders: true` gives us Set-Cookie headers
   // we forward on the redirect so the browser ends up logged in.

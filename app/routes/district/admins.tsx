@@ -12,23 +12,21 @@ import { inviteUser } from "~/domain/admin-users/invite-user.server";
 export async function loader({ context }: Route.LoaderArgs) {
   const districtId = requireDistrictAdmin(context);
   const db = getPrisma(context);
-  const [admins, district] = await Promise.all([
-    db.user.findMany({
-      where: { districtId },
-      orderBy: { createdAt: "asc" },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        mustChangePassword: true,
-        createdAt: true,
-      },
-    }),
-    db.district.findUnique({
-      where: { id: districtId },
-      select: { name: true },
-    }),
-  ]);
+  const admins = await db.user.findMany({
+    where: { districtId },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      mustChangePassword: true,
+      createdAt: true,
+    },
+  });
+  const district = await db.district.findUnique({
+    where: { id: districtId },
+    select: { name: true },
+  });
   return { admins, districtName: district?.name ?? "" };
 }
 

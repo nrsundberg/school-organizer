@@ -93,7 +93,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     currentUserId: me.id,
   });
   const userIds = data.users.map((u) => u.id);
-  const [lastActiveMap, pendingInviteIds, householdsForCurrentUser, locale] = await Promise.all([
+  const [lastActiveMap, pendingInviteIds, householdsForCurrentUser] = await Promise.all([
     loadLastActiveByUser(prisma, userIds),
     loadPendingInviteIdsForOrg(prisma, userIds),
     // Pre-load household options once (for invite drawer).
@@ -102,7 +102,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
-    detectLocale(request, context),
   ]);
 
   const usersWithMeta = data.users.map((user) => {
@@ -135,6 +134,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         ? String(lock.lockedUntil)
         : null,
   }));
+
+  const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
   return {
     users: usersWithMeta,

@@ -28,13 +28,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 
   const stripe = requireStripeConfig(context);
+  const session = await stripe.client.checkout.sessions.retrieve(sessionId, {
+    expand: ["subscription", "customer"],
+  });
+
   const db = getPrisma(context);
-  const [session, org] = await Promise.all([
-    stripe.client.checkout.sessions.retrieve(sessionId, {
-      expand: ["subscription", "customer"],
-    }),
-    db.org.findUnique({ where: { id: user.orgId } }),
-  ]);
+  const org = await db.org.findUnique({ where: { id: user.orgId } });
   if (!org) {
     throw new Response("Org not found.", { status: 404 });
   }
@@ -65,10 +64,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     await applySubscriptionToOrg(context, expanded);
   }
 
-  const [refreshed, locale] = await Promise.all([
-    db.org.findUnique({ where: { id: user.orgId } }),
-    detectLocale(request, context),
-  ]);
+  const refreshed = await db.org.findUnique({ where: { id: user.orgId } });
+
+  const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "common");
 
   return {

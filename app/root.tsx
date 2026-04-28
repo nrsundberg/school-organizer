@@ -17,14 +17,18 @@ import toastStyles from "react-toastify/ReactToastify.css?url";
 import styles from "./app.css?url";
 import type { Route } from "./+types/root";
 import { useChangeLanguage } from "remix-i18next/react";
-import { useTranslation } from "react-i18next";
 import { detectLocale } from "~/i18n.server";
-// Full translation bundle for the resolved language is shipped inline with
-// the SSR payload (see `i18nResources` in the loader below). Inlining the
-// whole bundle, not just `common`, lets every route's `useTranslation()`
-// resolve synchronously on the first render and avoids the flash of raw
-// translation keys we used to see between hydration and the namespace fetch.
-import { getBundleForLanguage } from "~/lib/i18n-bundles";
+import { DEFAULT_LANGUAGE } from "~/lib/i18n-config";
+// Initial common-namespace bundle shipped with the SSR response. The full
+// JSON for other namespaces is fetched lazily by the http backend (see
+// app/i18n.ts) once a route declares them via `handle = { i18n: [...] }`.
+import enCommon from "../public/locales/en/common.json";
+import esCommon from "../public/locales/es/common.json";
+
+const COMMON_BUNDLES: Record<string, unknown> = {
+  en: enCommon,
+  es: esCommon,
+};
 import {
   globalStorageMiddleware,
   userContext,
@@ -209,12 +213,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 
   // Run the i18n detector chain once per request so every loader downstream
-  // can read the locale from the matched root route. Ship the full bundle
-  // for the resolved language inline with the SSR payload — `entry.server`
-  // uses it to render translated HTML, and `entry.client` re-uses it to
-  // hydrate without an extra `/locales/{lng}/{ns}.json` round-trip.
+  // can read the locale from the matched root route. We also ship the
+  // initial `common` namespace bundle inline so the very first render has
+  // strings available without an extra fetch round-trip.
   const locale = await detectLocale(request, context);
-  const i18nResources = getBundleForLanguage(locale);
+  const i18nResources = {
+    common: COMMON_BUNDLES[locale] ?? COMMON_BUNDLES[DEFAULT_LANGUAGE],
+  };
 
   return data(
     {
@@ -322,27 +327,12 @@ export default function App({ loaderData }: Route.ComponentProps) {
     sentryDsn,
     marketing,
     cspNonce,
-    locale,
-    i18nResources
+    locale
   } = loaderData;
 
-  // Pre-warm i18next with the bundle the loader just shipped so that when
-  // `useChangeLanguage` flips the active language a moment later, the new
-  // language's strings are already in i18next's store and the http backend
-  // doesn't have to round-trip for them. Without this, switching language
-  // mid-session shows a brief flash of raw translation keys while
-  // `/locales/{lng}/{ns}.json` fetches resolve.
-  const { i18n } = useTranslation();
-  useEffect(() => {
-    if (!i18nResources) return;
-    for (const [ns, bundle] of Object.entries(i18nResources)) {
-      i18n.addResourceBundle(locale, ns, bundle, true, true);
-    }
-  }, [locale, i18nResources, i18n]);
-
   // Keep i18next in lock-step with the loader-resolved locale. Triggers
-  // `i18n.changeLanguage(locale)`, falling back to the http backend only
-  // when the loader hasn't pre-warmed the new language above.
+  // `i18n.changeLanguage(locale)`, which the http backend then uses to
+  // load any missing namespace JSON for that language.
   useChangeLanguage(locale);
 
   useEffect(() => {

@@ -23,16 +23,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const me = await protectToAdminAndGetPermissions(context);
   const org = getOrgFromContext(context);
   const prisma = getTenantPrisma(context);
-  const [studentCount, spaceCount, appSettings, maxSpace, teachers, counts, locale] = await Promise.all([
+  const [studentCount, spaceCount, appSettings, maxSpace, teachers, counts] = await Promise.all([
     prisma.student.count(),
     prisma.space.count(),
     prisma.appSettings.findFirst(),
     prisma.space.aggregate({ _max: { spaceNumber: true } }),
     prisma.teacher.findMany({ orderBy: { homeRoom: "asc" } }),
     countOrgUsage(prisma, org.id),
-    detectLocale(request, context),
   ]);
   const usage = buildUsageSnapshot(org, counts, new Date());
+  const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
   return {
     metaTitle: t("dashboard.metaTitle"),
