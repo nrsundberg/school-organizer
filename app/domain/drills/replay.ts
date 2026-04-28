@@ -19,6 +19,16 @@ import type {
 } from "./types";
 import { emptyRunState } from "./types";
 
+/**
+ * i18next-compatible translator. We type just the surface we use so the
+ * pure layer doesn't have to take a hard dependency on `react-i18next`
+ * (which would drag platform code into this file).
+ */
+export type DrillEventTranslator = (
+  key: string,
+  options?: { defaultValue?: string } & Record<string, unknown>,
+) => string;
+
 /** Deep-clone a RunState so callers can mutate freely without leaking refs. */
 function cloneRunState(state: RunState): RunState {
   return {
@@ -215,6 +225,74 @@ export function applyEvent(
       return { ...state, classroomAttestations };
     }
   }
+}
+
+/**
+ * Per-event-kind translation key used in `drillsHistory.replay.events.*`.
+ * Exported for the (future) live activity panel which renders the same
+ * prose under different parent keys but with identical event suffixes.
+ */
+const KIND_TO_KEY: Record<DrillEventKind, string> = {
+  started: "started",
+  paused: "paused",
+  resumed: "resumed",
+  ended: "ended",
+  cell_toggled: "cellToggled",
+  notes_changed: "notesChanged",
+  action_added: "actionAdded",
+  action_edited: "actionEdited",
+  action_toggled: "actionToggled",
+  action_removed: "actionRemoved",
+  row_attested: "rowAttested",
+  row_unattested: "rowUnattested",
+};
+
+function toggleSymbol(v: ToggleValue | null | undefined): string {
+  if (v === "positive") return "✓";
+  if (v === "negative") return "✗";
+  return "—";
+}
+
+/**
+ * Per-event-kind interpolation values. Pulled out so the formatter can
+ * pass them through `t()` and so callers that want to render their own
+ * markup can read the same shape directly.
+ */
+function interpolationFor(
+  payload: DrillEventPayload,
+  t: DrillEventTranslator,
+): Record<string, string> {
+  switch (payload.kind) {
+    case "cell_toggled":
+      return { value: toggleSymbol(payload.next) };
+    case "action_toggled":
+      return {
+        state: payload.next
+          ? t("drillsHistory.replay.events.actionDoneState")
+          : t("drillsHistory.replay.events.actionPendingState"),
+      };
+    default:
+      return {};
+  }
+}
+
+/**
+ * Reused by the live activity panel — turns a single `DrillRunEvent`
+ * payload into the same prose the history-detail timeline renders.
+ *
+ * `t` should be an i18next translator scoped to the `admin` namespace
+ * (or a wrapper that lands there), since the keys live under
+ * `drillsHistory.replay.events.*`.
+ */
+export function formatDrillEvent(
+  payload: DrillEventPayload,
+  t: DrillEventTranslator,
+): string {
+  const key = KIND_TO_KEY[payload.kind] ?? payload.kind;
+  return t(`drillsHistory.replay.events.${key}`, {
+    defaultValue: payload.kind,
+    ...interpolationFor(payload, t),
+  });
 }
 
 /** Defensive fallback for runs with no stored events — keeps history page sane. */

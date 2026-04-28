@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "~/db";
+import type { DrillRun, DrillRunEvent, Prisma, PrismaClient } from "~/db";
 import type { ActorIds } from "~/domain/auth/impersonate-gate.server";
 import {
   emptyRunState,
@@ -315,6 +315,20 @@ export async function endDrillRun(
 }
 
 /**
+ * Result of an `updateLiveRunState` call: the updated run row plus the
+ * DrillRunEvent rows just inserted for this delta. `events` is `[]` for
+ * no-op saves (e.g., a teacher blurs notes without changing them) — the
+ * run row is still touched so `lastActor*` / `updatedAt` advance.
+ *
+ * Callers (currently the live-drill action; soon the WS broadcaster) can
+ * fan the events out to subscribers without a follow-up DB read.
+ */
+export interface UpdateLiveRunStateResult {
+  run: DrillRun;
+  events: DrillRunEvent[];
+}
+
+/**
  * Atomic state update for a LIVE drill. Rejects if status is PAUSED or
  * ENDED — paused drills are read-only by design, and ended drills are
  * immutable history.
@@ -323,8 +337,9 @@ export async function endDrillRun(
  *   - run.orgId === orgId
  *   - run.status === "LIVE"
  *
- * Returns the updated run. Throws 404 (missing/cross-org) or 409 (wrong
- * status).
+ * Returns `{ run, events }`: the updated run row plus any DrillRunEvent
+ * rows written for this delta (empty array for no-op saves). Throws 404
+ * (missing/cross-org) or 409 (wrong status).
  */
 export async function updateLiveRunState(
   prisma: PrismaClient,
@@ -332,7 +347,7 @@ export async function updateLiveRunState(
   runId: string,
   state: RunState,
   actor: ActorIds = { actorUserId: null, onBehalfOfUserId: null },
-) {
+): Promise<UpdateLiveRunStateResult> {
   const run = await prisma.drillRun.findFirst({
     where: { id: runId, orgId },
     select: { id: true, status: true, state: true },
@@ -362,15 +377,20 @@ export async function updateLiveRunState(
   if (deltas.length === 0) {
     // No-op state save (e.g., teacher blurs notes without changes). Still
     // refresh `lastActor*` / `updatedAt`, but skip the event insert.
-    return updateOp;
+    return { run: await updateOp, events: [] };
   }
-  const [updated] = await prisma.$transaction([
+  // Prisma's `$transaction([...])` returns results in the same order as the
+  // ops, so the first slot is the updated run and the remaining slots are
+  // the inserted DrillRunEvent rows — one per delta payload, in order.
+  // Heterogeneous-array $transaction widens to a union; cast by position.
+  const results = (await prisma.$transaction([
     updateOp,
     ...deltas.map((payload) =>
       prisma.drillRunEvent.create({
         data: eventCreateData(runId, payload, actor, now),
       }),
     ),
-  ]);
-  return updated;
+  ])) as [DrillRun, ...DrillRunEvent[]];
+  const [updatedRun, ...createdEvents] = results;
+  return { run: updatedRun, events: createdEvents };
 }
