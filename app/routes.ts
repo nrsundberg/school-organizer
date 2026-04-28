@@ -28,6 +28,7 @@ export default [
     route("drills/history/:runId", "routes/admin/drills.history.$runId.tsx"),
     route("drills/:templateId/run", "routes/admin/drills.$templateId.run.tsx"),
     route("drills/:templateId", "routes/admin/drills.$templateId.tsx"),
+    route("profile", "routes/admin/profile.tsx"),
   ]),
 
   // Live drill takeover — every signed-in user gets redirected here when their
@@ -119,6 +120,7 @@ export default [
     route("billing/portal", "routes/district/billing.portal.tsx"),
     route("audit", "routes/district/audit.tsx"),
     route("impersonate/end", "routes/district/impersonate.end.tsx"),
+    route("profile", "routes/district/profile.tsx"),
   ]),
 
   route("billing-required", "routes/billing-required.tsx"),
