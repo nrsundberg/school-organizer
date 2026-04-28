@@ -31,6 +31,8 @@ import {
   type RunState,
 } from "~/domain/drills/types";
 import { ChecklistTable } from "~/domain/drills/ChecklistTable";
+import { LiveViewerRoster } from "~/routes/_components/LiveViewerRoster";
+import { splitPresenceRoster } from "~/domain/drills/presence-roster";
 import {
   endDrillRun,
   getActiveDrillRun,
@@ -471,8 +473,13 @@ type PresenceFocus =
   | null;
 
 type PresenceEntry = {
+  // Real `User.id` for signed-in users; an opaque per-WS-connection nonce
+  // (UUID) for viewer-pin guests. Guests are deduped/expired by nonce so
+  // we can show a count without ever attaching a real identity to them.
   userId: string;
-  label: string;
+  // `null` for viewer-pin guests (they collapse into the anonymous-viewers
+  // count); a human-readable label for signed-in users.
+  label: string | null;
   onBehalfOfUserId: string | null;
   onBehalfOfLabel: string | null;
   color: string;
@@ -700,12 +707,35 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
       });
     },
     onPresence: (msg) => {
-      // Don't render self in the pill list.
+      // Don't render self in the roster / pill list. For signed-in users we
+      // dedupe on `User.id`; for guests we dedupe on the per-tab guest
+      // nonce so a single guest isn't rendered as both "self" and a roster
+      // entry. (`me.userId` is null for guests, so the userId compare alone
+      // wouldn't catch the guest-self case.)
       if (me.userId && msg.userId === me.userId) return;
+      if (!me.userId && guestClientIdRef.current === msg.userId) return;
       setPresence((m) => {
         const next = new Map(m);
-        if (msg.focus === null) {
-          next.delete(msg.userId);
+        // Drop the entry only when an authed user actively blurs (focus null
+        // AND label present) — that means "I'm no longer editing", and the
+        // notes/action-item pills should disappear immediately. For guests
+        // (label === null) and for authed users sending a presence-only
+        // heartbeat with focus null, we keep the entry so the roster still
+        // shows them as connected; the 8s TTL sweep handles disconnects.
+        if (msg.focus === null && msg.label !== null) {
+          // Authed user with focus null → an explicit blur. Remove the
+          // existing entry so the focus-keyed pills (notes / action items)
+          // disappear, but re-add a focus-null entry so the roster keeps
+          // showing them as a viewer.
+          next.set(msg.userId, {
+            userId: msg.userId,
+            label: msg.label,
+            onBehalfOfUserId: msg.onBehalfOfUserId ?? null,
+            onBehalfOfLabel: msg.onBehalfOfLabel ?? null,
+            color: msg.color,
+            focus: null,
+            at: Date.now(),
+          });
         } else {
           next.set(msg.userId, {
             userId: msg.userId,
@@ -726,26 +756,57 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
     },
   });
 
+  // Per-tab nonce for viewer-pin guests so they can announce presence
+  // without ever attaching a real `User.id` to a broadcast. Generated once
+  // per mount; reset on remount (a new tab is a new viewer). Authed users
+  // ignore this and broadcast with their real `me.userId`.
+  const guestClientIdRef = useRef<string | null>(null);
+  if (guestClientIdRef.current === null && !me.userId) {
+    guestClientIdRef.current =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `g-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+  }
+
   // ---- presence broadcasting ----------------------------------------------
   const sendPresence = useCallback(
     (focus: PresenceFocus) => {
-      if (!me.userId) return; // viewer-pin guests don't broadcast
-      ws.send({
-        type: "drillPresence",
-        runId: run.id,
-        userId: me.userId,
-        // Send the RAW actor name plus the impersonated identity. Receivers
-        // compose via formatActorLabel — symmetric with activity events and
-        // avoids any "Noah as Admin as Admin" double-suffixing if a future
-        // caller pre-formats. Falls back to me.label so the (rare) deleted-
-        // user race doesn't render an empty pill.
-        label: me.actorLabel ?? me.label,
-        onBehalfOfUserId: me.onBehalfOfUserId,
-        onBehalfOfLabel: me.onBehalfOfLabel,
-        color: userColor(me.userId),
-        focus,
-        at: new Date().toISOString(),
-      });
+      // For authed users, broadcast their real id + label. For viewer-pin
+      // guests, broadcast a minimal payload using the per-tab nonce as the
+      // userId and `label: null` so the roster collapses them into the
+      // anonymous-viewer count.
+      if (me.userId) {
+        ws.send({
+          type: "drillPresence",
+          runId: run.id,
+          userId: me.userId,
+          // Send the RAW actor name plus the impersonated identity. Receivers
+          // compose via formatActorLabel — symmetric with activity events and
+          // avoids any "Noah as Admin as Admin" double-suffixing if a future
+          // caller pre-formats. Falls back to me.label so the (rare) deleted-
+          // user race doesn't render an empty pill.
+          label: me.actorLabel ?? me.label,
+          onBehalfOfUserId: me.onBehalfOfUserId,
+          onBehalfOfLabel: me.onBehalfOfLabel,
+          color: userColor(me.userId),
+          focus,
+          at: new Date().toISOString(),
+        });
+      } else {
+        const guestId = guestClientIdRef.current;
+        if (!guestId) return;
+        ws.send({
+          type: "drillPresence",
+          runId: run.id,
+          userId: guestId,
+          label: null,
+          onBehalfOfUserId: null,
+          onBehalfOfLabel: null,
+          color: userColor(guestId),
+          focus,
+          at: new Date().toISOString(),
+        });
+      }
     },
     [
       me.userId,
@@ -758,15 +819,18 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
     ],
   );
 
-  // Heartbeat: while a field is focused, re-broadcast presence every 3s so
-  // it doesn't expire on watchers. The current focus is held in a ref-style
-  // state so the timer always sees the latest value.
+  // Heartbeat: re-broadcast presence every 3s regardless of focus so the
+  // top-right viewer roster keeps everyone visible, not just users currently
+  // editing a field. Watchers' 8s TTL sweep cleans up disconnected sessions.
+  // The current focus is held in a ref so the timer always sees the latest
+  // value (and the heartbeat keeps the focus-keyed pills alive too).
   const currentFocusRef = useRef<PresenceFocus>(null);
   useEffect(() => {
+    // Send one immediately on mount so the roster doesn't take a full
+    // heartbeat interval to populate after a navigation/reload.
+    sendPresence(currentFocusRef.current);
     const i = setInterval(() => {
-      if (currentFocusRef.current !== null) {
-        sendPresence(currentFocusRef.current);
-      }
+      sendPresence(currentFocusRef.current);
     }, PRESENCE_HEARTBEAT_MS);
     return () => clearInterval(i);
   }, [sendPresence]);
@@ -956,6 +1020,15 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
     return { notes, itemMap };
   }, [presence]);
 
+  // Full roster for the top-right viewer chip stack — includes entries with
+  // focus === null (which `presenceByFocus` filters out), splits anonymous
+  // viewer-pin guests (label === null) into a separate count, and sorts the
+  // authed roster by recency so the most-recently-active appears first.
+  const rosterSplit = useMemo(
+    () => splitPresenceRoster(presence.values()),
+    [presence],
+  );
+
   // Aggregate summary at top of run page.
   // Heuristic: roomCount = template rows whose sectionId is "class-roll" if
   // any rows use that section, else all rows. TODO: revisit once templates
@@ -1002,6 +1075,13 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
                 : t("drillsLive.audience.everyone"),
           })}
         </span>
+        <div className="ml-auto flex items-center">
+          <LiveViewerRoster
+            roster={rosterSplit.authedRoster}
+            selfUserId={me.userId}
+            guestCount={rosterSplit.guestCount}
+          />
+        </div>
       </div>
 
       <div className="flex-1 flex flex-col xl:flex-row gap-6 p-6 max-w-[1400px] w-full mx-auto">
@@ -1230,7 +1310,14 @@ function PresencePill({ people, t }: { people: PresenceEntry[]; t: Translator })
   const head = people[0];
   if (!head) return null;
   const extra = people.length - 1;
-  const headLabel = formatActorLabel(head.label, head.onBehalfOfLabel, head.label);
+  // Defensive fallback — guests (label === null) shouldn't reach this pill
+  // because they never broadcast focus="notes", but if they ever do we'd
+  // render an empty string rather than the literal "null".
+  const headLabel = formatActorLabel(
+    head.label,
+    head.onBehalfOfLabel,
+    head.label ?? "",
+  );
   return (
     <span
       className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[11px] text-white/80"
@@ -1261,7 +1348,7 @@ function PresenceDots({ people }: { people: PresenceEntry[] }) {
       {people.slice(0, 3).map((p) => (
         <span
           key={p.userId}
-          title={formatActorLabel(p.label, p.onBehalfOfLabel, p.label)}
+          title={formatActorLabel(p.label, p.onBehalfOfLabel, p.label ?? "")}
           className="inline-block h-2 w-2 rounded-full"
           style={{ backgroundColor: p.color }}
         />

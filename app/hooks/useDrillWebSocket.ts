@@ -31,8 +31,14 @@ type DrillActivityMsg = {
 type DrillPresenceMsg = {
   type: "drillPresence";
   runId: string;
+  // Stable identifier for the broadcasting socket. For signed-in users this is
+  // their real `User.id`. For viewer-pin guests, it's a per-WS-connection
+  // nonce (UUID) so guests can be deduped/expired in the roster without ever
+  // attaching a real user identity to their broadcasts.
   userId: string;
-  label: string;
+  // `null` for viewer-pin guests (they have no identity to display); a
+  // human-readable label for signed-in users.
+  label: string | null;
   onBehalfOfUserId: string | null;
   onBehalfOfLabel: string | null;
   color: string;
