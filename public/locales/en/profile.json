@@ -1,0 +1,34 @@
+{
+  "title": "Profile",
+  "subtitle": "Manage your account details and password.",
+  "accountSection": {
+    "title": "Account",
+    "emailLabel": "Email",
+    "emailHelp": "Contact an administrator to change the email on your account.",
+    "nameLabel": "Display name",
+    "save": "Save name",
+    "success": "Name updated.",
+    "errorGeneric": "Couldn't update your name. Try again."
+  },
+  "passwordSection": {
+    "title": "Change password",
+    "subtitle": "Enter your current password and choose a new one.",
+    "currentLabel": "Current password",
+    "newLabel": "New password",
+    "confirmLabel": "Confirm new password",
+    "save": "Update password",
+    "success": "Password updated.",
+    "errors": {
+      "tooShort": "New password must be at least 8 characters.",
+      "noMatch": "New password and confirmation don't match.",
+      "sameAsCurrent": "New password must be different from your current password.",
+      "currentIncorrect": "Current password is incorrect.",
+      "generic": "Couldn't update your password. Try again."
+    }
+  },
+  "logoutSection": {
+    "title": "Sign out",
+    "subtitle": "End your current session on this device.",
+    "button": "Log out"
+  }
+}

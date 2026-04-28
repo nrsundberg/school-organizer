@@ -46,11 +46,12 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   const prisma = getPrisma(context);
-  const hashed = await hashPassword(newPassword);
-
-  const account = await prisma.account.findFirst({
-    where: { userId: user.id, providerId: "credential" },
-  });
+  const [hashed, account] = await Promise.all([
+    hashPassword(newPassword),
+    prisma.account.findFirst({
+      where: { userId: user.id, providerId: "credential" },
+    }),
+  ]);
   if (!account) return { error: t("setPasswordRequired.errors.noCredentialAccount") };
 
   await prisma.account.update({
