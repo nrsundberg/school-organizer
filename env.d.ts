@@ -44,6 +44,16 @@ declare global {
      * point at a fixture. Defaults to https://www.stripe-status.com/api/v2/status.json.
      */
     STRIPE_STATUS_URL?: string;
+    /**
+     * Worker secret used to sign the BingoBoardDO presence-snapshot
+     * loopback POST to `/api/drill-runs/:runId/presence-sample`. Both the
+     * DO and the route share this secret; the route rejects requests
+     * whose HMAC doesn't verify (or whose `timestamp` is more than 60s
+     * skewed). Set with `wrangler secret put PRESENCE_SAMPLE_HMAC_SECRET`
+     * for prod and staging. Without it, the alarm silently no-ops (so
+     * the relay path keeps working in dev / local-only setups).
+     */
+    PRESENCE_SAMPLE_HMAC_SECRET?: string;
   }
 }
 
