@@ -1,7 +1,17 @@
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { Form, Link } from "react-router";
 import { Button, Input, TextArea } from "@heroui/react";
-import { CalendarClock, Home, Megaphone, TrendingUp, UserMinus, Users } from "lucide-react";
+import {
+  CalendarClock,
+  Home,
+  Megaphone,
+  Plus,
+  Search,
+  TrendingUp,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { dataWithError, dataWithSuccess, dataWithWarning } from "remix-toast";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
@@ -13,7 +23,6 @@ import {
 } from "~/domain/households/households";
 import {
   DISMISSAL_PLANS,
-  WEEKDAYS,
   dateRangeFromSearchParams,
   parseDateOnly,
   parseOptionalDateOnly,
@@ -26,6 +35,11 @@ import { broadcastProgramCancellation } from "~/lib/broadcast.server";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { detectLocale } from "~/i18n.server";
 import { getFixedT } from "~/lib/t.server";
+import EntityAvatar from "~/components/admin/EntityAvatar";
+import StatusPill from "~/components/admin/StatusPill";
+import EntityLink from "~/components/admin/EntityLink";
+import StatCard from "~/components/admin/StatCard";
+import SectionHeader from "~/components/admin/SectionHeader";
 
 export const handle = { i18n: ["admin", "errors", "common"] };
 
@@ -64,6 +78,77 @@ function weekdayLabel(t: TFunction, index: number): string {
 
 const HOUSEHOLDS_PAGE_SIZE = 50;
 
+/**
+ * Active filter pill values. Encoded into the URL as `?filter=…` so admins
+ * can deep-link a saved view (e.g. "show only households missing a primary
+ * contact") and so server-side counts stay consistent across reloads.
+ */
+const FILTER_VALUES = [
+  "all",
+  "exceptionToday",
+  "missingContact",
+  "singleParent",
+  "multiStudent",
+] as const;
+type FilterValue = (typeof FILTER_VALUES)[number];
+
+function parseFilter(raw: string | null): FilterValue {
+  if (!raw) return "all";
+  return (FILTER_VALUES as readonly string[]).includes(raw)
+    ? (raw as FilterValue)
+    : "all";
+}
+
+function initialsFromHouseholdName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2);
+  return `${parts[0][0]}${parts[1][0]}`;
+}
+
+function initialsFromPersonName(first: string, last: string): string {
+  const a = (first || "").trim().slice(0, 1);
+  const b = (last || "").trim().slice(0, 1);
+  return `${a}${b}` || "?";
+}
+
+function startOfUtcDay(date: Date): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
+}
+
+/**
+ * Returns true if the given exception is "active today" — either a DATE row
+ * matching today's UTC day or a WEEKLY row whose `dayOfWeek` matches today
+ * and whose optional starts/ends window contains today.
+ */
+function exceptionActiveOn(
+  exception: {
+    scheduleKind: string;
+    exceptionDate: Date | null;
+    dayOfWeek: number | null;
+    startsOn: Date | null;
+    endsOn: Date | null;
+  },
+  today: Date,
+): boolean {
+  const dayStart = startOfUtcDay(today);
+  if (exception.scheduleKind === "DATE") {
+    if (!exception.exceptionDate) return false;
+    return startOfUtcDay(exception.exceptionDate).getTime() === dayStart.getTime();
+  }
+  if (exception.dayOfWeek == null) return false;
+  if (today.getUTCDay() !== exception.dayOfWeek) return false;
+  if (exception.startsOn && dayStart.getTime() < startOfUtcDay(exception.startsOn).getTime()) {
+    return false;
+  }
+  if (exception.endsOn && dayStart.getTime() > startOfUtcDay(exception.endsOn).getTime()) {
+    return false;
+  }
+  return true;
+}
+
 export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
@@ -75,6 +160,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // Pagination + name search. Schools can grow into the hundreds of
   // households; loading them all on one page is both slow and unusable.
   const searchQuery = (url.searchParams.get("q") ?? "").trim();
+  const filter = parseFilter(url.searchParams.get("filter"));
   const requestedPage = Number(url.searchParams.get("page") ?? "1");
   const page =
     Number.isFinite(requestedPage) && requestedPage >= 1
@@ -99,6 +185,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     activeExceptionsRaw,
     programs,
     recentCancellations,
+    studentsAssignedCount,
+    allActiveExceptions,
   ] = await Promise.all([
     prisma.household.findMany({
       where: householdSearchWhere,
@@ -160,6 +248,20 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         program: { select: { name: true } },
       },
     }),
+    prisma.student.count({ where: { householdId: { not: null } } }),
+    // Org-wide active exceptions; used to compute "households with active
+    // exceptions today" for the stats row regardless of pagination.
+    prisma.dismissalException.findMany({
+      where: { isActive: true },
+      select: {
+        scheduleKind: true,
+        exceptionDate: true,
+        dayOfWeek: true,
+        startsOn: true,
+        endsOn: true,
+        householdId: true,
+      },
+    }),
   ]);
 
   type HouseholdStudentRow = {
@@ -174,6 +276,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     id: string;
     dismissalPlan: string;
     scheduleKind: string;
+    exceptionDate: Date | null;
+    dayOfWeek: number | null;
+    startsOn: Date | null;
+    endsOn: Date | null;
     householdId: string | null;
   };
   type HouseholdRefRow = { id: string; name: string };
@@ -220,6 +326,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
             id: true,
             dismissalPlan: true,
             scheduleKind: true,
+            exceptionDate: true,
+            dayOfWeek: true,
+            startsOn: true,
+            endsOn: true,
             householdId: true,
           },
         }) as Promise<HouseholdExceptionRow[]>,
@@ -244,15 +354,56 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     exceptionHouseholds.map((household) => [household.id, household] as const),
   );
 
-  const householdsWithChildren = households.map((household) => ({
-    ...household,
-    students: (studentsByHousehold.get(household.id) ?? []).map(
+  const today = new Date();
+  const householdsWithExceptionsTodaySet = new Set(
+    allActiveExceptions
+      .filter((e) => e.householdId && exceptionActiveOn(e, today))
+      .map((e) => e.householdId as string),
+  );
+
+  // Map only the trimmed shapes the index needs; we keep the full
+  // exception fields available so the card can render "exception today"
+  // pills accurately.
+  const householdsWithChildren = households.map((household) => {
+    const students = (studentsByHousehold.get(household.id) ?? []).map(
       ({ householdId: _ignored, ...student }) => student,
-    ),
-    exceptions: (exceptionsByHousehold.get(household.id) ?? []).map(
-      ({ householdId: _ignored, ...exception }) => exception,
-    ),
-  }));
+    );
+    const exceptions = (exceptionsByHousehold.get(household.id) ?? []).map(
+      ({ householdId: _ignored, ...exception }) => ({
+        ...exception,
+        exceptionDate: toDateInputValue(exception.exceptionDate),
+        startsOn: toDateInputValue(exception.startsOn),
+        endsOn: toDateInputValue(exception.endsOn),
+      }),
+    );
+    const exceptionTodayCount = (exceptionsByHousehold.get(household.id) ?? [])
+      .filter((e) => exceptionActiveOn(e, today)).length;
+    return {
+      ...household,
+      createdAt:
+        household.createdAt instanceof Date
+          ? household.createdAt.toISOString()
+          : (household.createdAt as unknown as string),
+      students,
+      exceptions,
+      exceptionTodayCount,
+    };
+  });
+
+  // Apply client-readable filter pills server-side so deep-linked URLs
+  // reflect the same dataset the user sees.
+  const filteredHouseholds = householdsWithChildren.filter((household) => {
+    if (filter === "exceptionToday") return household.exceptionTodayCount > 0;
+    if (filter === "missingContact")
+      return !household.primaryContactName?.trim() || !household.primaryContactPhone?.trim();
+    if (filter === "singleParent") {
+      // Best-effort heuristic — we only store a single primary contact
+      // today, so "single-parent" reduces to "exactly one named contact".
+      return !!household.primaryContactName?.trim();
+    }
+    if (filter === "multiStudent") return household.students.length >= 2;
+    return true;
+  });
 
   const activeExceptions = activeExceptionsRaw.map(
     ({ householdId, ...exception }: ActiveExceptionRaw) => ({
@@ -261,10 +412,27 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }),
   );
 
-  const totalPages = Math.max(1, Math.ceil(totalHouseholds / HOUSEHOLDS_PAGE_SIZE));
+  // Stats row aggregates — totals are org-wide (not paginated).
+  const householdsMissingContactCount = await prisma.household.count({
+    where: {
+      OR: [
+        { primaryContactName: null },
+        { primaryContactName: "" },
+        { primaryContactPhone: null },
+        { primaryContactPhone: "" },
+      ],
+    },
+  });
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredHouseholds.length === householdsWithChildren.length
+      ? totalHouseholds / HOUSEHOLDS_PAGE_SIZE
+      : filteredHouseholds.length / HOUSEHOLDS_PAGE_SIZE),
+  );
   return {
     metaTitle: t("households.metaTitle"),
-    households: householdsWithChildren,
+    households: filteredHouseholds,
     householdOptions,
     pagination: {
       page,
@@ -272,6 +440,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       totalHouseholds,
       totalPages,
       searchQuery,
+      filter,
+    },
+    stats: {
+      totalHouseholds,
+      studentsAssigned: studentsAssignedCount,
+      householdsWithExceptionsToday: householdsWithExceptionsTodaySet.size,
+      householdsMissingContact: householdsMissingContactCount,
     },
     unassignedStudents,
     allStudents,
@@ -432,87 +607,6 @@ export async function action({ request, context }: Route.ActionArgs) {
       );
     }
 
-    if (intent === "createException") {
-      const householdId = String(formData.get("householdId") ?? "").trim();
-      const scheduleKind =
-        String(formData.get("scheduleKind") ?? "DATE").toUpperCase() ===
-        "WEEKLY"
-          ? "WEEKLY"
-          : "DATE";
-      const dismissalPlan = String(formData.get("dismissalPlan") ?? "").trim();
-
-      if (!householdId || !dismissalPlan) {
-        return dataWithError(
-          null,
-          t("households.errors.chooseHouseholdAndPlan"),
-        );
-      }
-
-      let exceptionDate: Date | null = null;
-      let dayOfWeek: number | null = null;
-      let startsOn: Date | null = null;
-      let endsOn: Date | null = null;
-
-      if (scheduleKind === "DATE") {
-        exceptionDate = parseDateOnly(
-          String(formData.get("exceptionDate") ?? ""),
-          "Exception date",
-        );
-      } else {
-        dayOfWeek = Number(formData.get("dayOfWeek"));
-        if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
-          return dataWithError(null, t("households.errors.chooseWeekday"));
-        }
-        startsOn = parseOptionalDateOnly(
-          String(formData.get("startsOn") ?? ""),
-          "Starts on",
-        );
-        endsOn = parseOptionalDateOnly(
-          String(formData.get("endsOn") ?? ""),
-          "Ends on",
-        );
-        if (
-          startsOn &&
-          endsOn &&
-          startsOn.getTime() > endsOn.getTime()
-        ) {
-          return dataWithError(null, t("households.errors.endsBeforeStart"));
-        }
-      }
-
-      await prisma.dismissalException.create({
-        data: {
-          orgId: org.id,
-          householdId,
-          scheduleKind,
-          exceptionDate,
-          dayOfWeek,
-          startsOn,
-          endsOn,
-          dismissalPlan,
-          pickupContactName:
-            String(formData.get("pickupContactName") ?? "").trim() || null,
-          notes: String(formData.get("notes") ?? "").trim() || null,
-          isActive: true,
-        },
-      });
-
-      return dataWithSuccess(null, t("households.actions.exceptionSaved"));
-    }
-
-    if (intent === "deactivateException") {
-      const exceptionId = String(formData.get("exceptionId") ?? "").trim();
-      if (!exceptionId) {
-        return dataWithError(null, t("households.errors.invalidException"));
-      }
-
-      await prisma.dismissalException.update({
-        where: { id: exceptionId },
-        data: { isActive: false },
-      });
-      return dataWithWarning(null, t("households.actions.exceptionArchived"));
-    }
-
     if (intent === "createCancellation") {
       const programId = String(formData.get("programId") ?? "").trim();
       const programNameInput = String(formData.get("programName") ?? "").trim();
@@ -627,53 +721,91 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
     activeExceptions,
     programs,
     recentCancellations,
+    stats,
   } = loaderData;
-  const { t } = useTranslation("admin");
+  const { t, i18n } = useTranslation("admin");
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const dateFmt = new Intl.DateTimeFormat(i18n.language, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      {/* Header */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">
-            {t("households.heading")}
+            {t("households.indexHeader.title")}
           </h1>
           <p className="max-w-3xl text-sm text-white/60">
-            {t("households.intro")}
+            {t("households.indexHeader.subtitle")}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 text-sm">
-          <a
-            href="#roi"
-            className="rounded-full border border-white/15 px-3 py-1 text-white/70 hover:border-white/30 hover:text-white"
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="primary"
+            onPress={() => setCreateOpen((v) => !v)}
           >
-            {t("households.anchors.roi")}
-          </a>
-          <a
-            href="#exceptions"
-            className="rounded-full border border-white/15 px-3 py-1 text-white/70 hover:border-white/30 hover:text-white"
-          >
-            {t("households.anchors.exceptions")}
-          </a>
-          <a
-            href="#cancellations"
-            className="rounded-full border border-white/15 px-3 py-1 text-white/70 hover:border-white/30 hover:text-white"
-          >
-            {t("households.anchors.cancellations")}
-          </a>
+            <Plus className="h-4 w-4" />
+            {t("households.indexHeader.createCta")}
+          </Button>
         </div>
       </div>
 
+      {/* Stats row */}
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label={t("households.stats.totalHouseholds")}
+          value={stats.totalHouseholds}
+          caption={t("households.stats.totalHouseholdsCaption")}
+          icon={<Home className="h-4 w-4 text-blue-300" />}
+        />
+        <StatCard
+          label={t("households.stats.studentsAssigned")}
+          value={stats.studentsAssigned}
+          caption={t("households.stats.studentsAssignedCaption")}
+          icon={<Users className="h-4 w-4 text-cyan-300" />}
+        />
+        <StatCard
+          label={t("households.stats.exceptionsToday")}
+          value={stats.householdsWithExceptionsToday}
+          caption={t("households.stats.exceptionsTodayCaption")}
+          icon={<CalendarClock className="h-4 w-4 text-purple-300" />}
+          tone={stats.householdsWithExceptionsToday > 0 ? "info" : "default"}
+        />
+        <StatCard
+          label={t("households.stats.missingContact")}
+          value={stats.householdsMissingContact}
+          caption={t("households.stats.missingContactCaption")}
+          icon={<UserPlus className="h-4 w-4 text-amber-300" />}
+          tone={stats.householdsMissingContact > 0 ? "warning" : "default"}
+        />
+      </section>
+
       <RoiPanel roi={roi} />
 
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-        <div className="rounded-xl border border-white/10 bg-white/5 p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Users className="h-5 w-5 text-blue-300" />
-            <h2 className="font-semibold text-white">
-              {t("households.create.heading")}
-            </h2>
-          </div>
-          <Form method="post" className="flex flex-col gap-4">
+      {/* Create household drawer (collapsible) */}
+      {createOpen ? (
+        <section className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
+          <SectionHeader
+            title={t("households.create.heading")}
+            icon={<Users className="h-5 w-5 text-blue-300" />}
+            actions={
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onPress={() => setCreateOpen(false)}
+              >
+                {t("households.detail.actions.cancel")}
+              </Button>
+            }
+          />
+          <Form method="post" className="mt-4 flex flex-col gap-4">
             <input type="hidden" name="intent" value="create" />
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label={t("households.create.nameLabel")}>
@@ -710,15 +842,17 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
               {t("households.create.submit")}
             </Button>
           </Form>
-        </div>
+        </section>
+      ) : null}
 
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-          <h2 className="font-semibold text-white">
-            {t("households.assign.heading")}
-          </h2>
-          <p className="mt-1 text-sm text-white/50">
-            {t("households.assign.subtitle")}
-          </p>
+      {/* Quick assign + program cancellation broadcaster row */}
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
+          <SectionHeader
+            title={t("households.assign.heading")}
+            subtitle={t("households.assign.subtitle")}
+            icon={<UserPlus className="h-5 w-5 text-emerald-300" />}
+          />
           <Form method="post" className="mt-4 flex flex-col gap-3">
             <input type="hidden" name="intent" value="assign" />
             <Field label={t("households.assign.householdLabel")}>
@@ -742,207 +876,22 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
               emptyText={t("households.assign.noStudents")}
               compact
             />
-            <Button type="submit" variant="secondary">
+            <Button type="submit" variant="secondary" className="self-start">
               {t("households.assign.submit")}
             </Button>
           </Form>
         </div>
-      </section>
 
-      <section
-        id="exceptions"
-        className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]"
-      >
-        <div className="rounded-xl border border-white/10 bg-white/5 p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <CalendarClock className="h-5 w-5 text-cyan-300" />
-            <h2 className="font-semibold text-white">
-              {t("households.exceptions.addHeading")}
-            </h2>
-          </div>
-          <p className="mb-4 text-sm text-white/50">
-            {t("households.exceptions.addIntro")}
-          </p>
-          <Form method="post" className="grid gap-3">
-            <input type="hidden" name="intent" value="createException" />
-            <Field label={t("households.exceptions.householdLabel")}>
-              <select
-                name="householdId"
-                className="app-field"
-                defaultValue=""
-                required
-              >
-                <option value="">
-                  {t("households.exceptions.householdPlaceholder")}
-                </option>
-                {householdOptions.map((household: { id: string; name: string }) => (
-                  <option key={household.id} value={household.id}>
-                    {household.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label={t("households.exceptions.scheduleLabel")}>
-                <select
-                  name="scheduleKind"
-                  className="app-field"
-                  defaultValue="DATE"
-                >
-                  <option value="DATE">
-                    {t("households.exceptions.scheduleDate")}
-                  </option>
-                  <option value="WEEKLY">
-                    {t("households.exceptions.scheduleWeekly")}
-                  </option>
-                </select>
-              </Field>
-              <Field label={t("households.exceptions.dismissalPlanLabel")}>
-                <select
-                  name="dismissalPlan"
-                  className="app-field"
-                  defaultValue={DISMISSAL_PLANS[0]}
-                >
-                  {DISMISSAL_PLANS.map((plan) => (
-                    <option key={plan} value={plan}>
-                      {dismissalPlanLabel(t, plan)}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label={t("households.exceptions.specificDateLabel")}>
-                <input
-                  type="date"
-                  name="exceptionDate"
-                  className="app-field"
-                />
-              </Field>
-              <Field label={t("households.exceptions.weeklyDayLabel")}>
-                <select
-                  name="dayOfWeek"
-                  className="app-field"
-                  defaultValue="1"
-                >
-                  {WEEKDAYS.map((_weekday, index) => (
-                    <option key={index} value={index}>
-                      {weekdayLabel(t, index)}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label={t("households.exceptions.startsOnLabel")}>
-                <input
-                  type="date"
-                  name="startsOn"
-                  className="app-field"
-                />
-              </Field>
-              <Field label={t("households.exceptions.endsOnLabel")}>
-                <input
-                  type="date"
-                  name="endsOn"
-                  className="app-field"
-                />
-              </Field>
-              <Field label={t("households.exceptions.pickupContactLabel")}>
-                <Input
-                  name="pickupContactName"
-                  placeholder={t("households.exceptions.pickupContactPlaceholder")}
-                />
-              </Field>
-            </div>
-
-            <Field label={t("households.exceptions.notesLabel")}>
-              <TextArea
-                name="notes"
-                rows={3}
-                placeholder={t("households.exceptions.notesPlaceholder")}
-              />
-            </Field>
-            <Button type="submit" variant="secondary" className="self-start">
-              {t("households.exceptions.saveException")}
-            </Button>
-          </Form>
-        </div>
-
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-          <h2 className="font-semibold text-white">
-            {t("households.exceptions.activeHeading")}
-          </h2>
-          <p className="mt-1 text-sm text-white/50">
-            {t("households.exceptions.activeSubtitle")}
-          </p>
-          <div className="mt-4 flex flex-col gap-3">
-            {activeExceptions.length === 0 ? (
-              <p className="rounded-lg bg-black/20 p-4 text-sm text-white/45">
-                {t("households.exceptions.noneActive")}
-              </p>
-            ) : (
-              activeExceptions.map((exception: ExceptionRecord) => (
-                <div
-                  key={exception.id}
-                  className="rounded-xl border border-white/10 bg-black/20 p-4"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="font-semibold text-white">
-                        {exception.household?.name ??
-                          t("households.exceptions.deletedHousehold")}
-                      </p>
-                      <p className="text-sm text-cyan-200">
-                        {formatExceptionSchedule(t, exception)}
-                      </p>
-                      <p className="mt-1 text-sm text-white/70">
-                        {dismissalPlanLabel(t, exception.dismissalPlan)}
-                        {exception.pickupContactName
-                          ? ` · ${exception.pickupContactName}`
-                          : ""}
-                      </p>
-                      {exception.notes ? (
-                        <p className="mt-1 text-sm text-white/55">
-                          {exception.notes}
-                        </p>
-                      ) : null}
-                    </div>
-                    <Form method="post">
-                      <input
-                        type="hidden"
-                        name="intent"
-                        value="deactivateException"
-                      />
-                      <input
-                        type="hidden"
-                        name="exceptionId"
-                        value={exception.id}
-                      />
-                      <Button type="submit" variant="ghost" size="sm">
-                        {t("households.exceptions.archive")}
-                      </Button>
-                    </Form>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="cancellations"
-        className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]"
-      >
-        <div className="rounded-xl border border-white/10 bg-white/5 p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Megaphone className="h-5 w-5 text-amber-300" />
-            <h2 className="font-semibold text-white">
-              {t("households.cancellations.broadcastHeading")}
-            </h2>
-          </div>
-          <p className="mb-4 text-sm text-white/50">
-            {t("households.cancellations.broadcastIntro")}
-          </p>
-          <Form method="post" className="grid gap-3">
+        <div
+          id="cancellations"
+          className="rounded-xl border border-white/10 bg-white/[0.04] p-5"
+        >
+          <SectionHeader
+            title={t("households.cancellations.broadcastHeading")}
+            subtitle={t("households.cancellations.broadcastIntro")}
+            icon={<Megaphone className="h-5 w-5 text-amber-300" />}
+          />
+          <Form method="post" className="mt-4 grid gap-3">
             <input type="hidden" name="intent" value="createCancellation" />
             <Field label={t("households.cancellations.existingProgramLabel")}>
               <select
@@ -994,59 +943,106 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
               {t("households.cancellations.submit")}
             </Button>
           </Form>
-        </div>
-
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
-          <h2 className="font-semibold text-white">
-            {t("households.cancellations.recentHeading")}
-          </h2>
-          <p className="mt-1 text-sm text-white/50">
-            {t("households.cancellations.recentSubtitle")}
-          </p>
-          <div className="mt-4 flex flex-col gap-3">
-            {recentCancellations.length === 0 ? (
-              <p className="rounded-lg bg-black/20 p-4 text-sm text-white/45">
-                {t("households.cancellations.noneRecent")}
+          {recentCancellations.length > 0 ? (
+            <div className="mt-4 grid gap-2">
+              <p className="text-xs uppercase tracking-wide text-white/45">
+                {t("households.cancellations.recentHeading")}
               </p>
-            ) : (
-              recentCancellations.map((notice: CancellationRecord) => (
+              {recentCancellations.slice(0, 3).map((notice: CancellationRecord) => (
                 <div
                   key={notice.id}
-                  className="rounded-xl border border-white/10 bg-black/20 p-4"
+                  className="rounded-lg border border-amber-300/20 bg-amber-300/5 p-3"
                 >
-                  <p className="font-semibold text-white">{notice.title}</p>
-                  <p className="text-sm text-amber-200">
+                  <p className="text-sm font-semibold text-white">{notice.title}</p>
+                  <p className="text-xs text-amber-200">
                     {notice.programName} · {notice.cancellationDate}
                   </p>
-                  <p className="mt-1 text-sm text-white/70">{notice.message}</p>
                 </div>
-              ))
-            )}
-          </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       </section>
 
+      {/* Active exception broadcaster (read-only org-wide list) */}
+      <section
+        id="exceptions"
+        className="rounded-xl border border-white/10 bg-white/[0.04] p-5"
+      >
+        <SectionHeader
+          title={t("households.exceptions.activeHeading")}
+          subtitle={t("households.exceptions.activeSubtitle")}
+          icon={<CalendarClock className="h-5 w-5 text-cyan-300" />}
+          count={activeExceptions.length}
+        />
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {activeExceptions.length === 0 ? (
+            <p className="rounded-lg bg-black/20 p-4 text-sm text-white/45 md:col-span-2">
+              {t("households.exceptions.noneActive")}
+            </p>
+          ) : (
+            activeExceptions.slice(0, 6).map((exception: ExceptionRecord) => (
+              <div
+                key={exception.id}
+                className="rounded-xl border border-white/10 bg-black/20 p-4"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-white truncate">
+                      {exception.household?.name ??
+                        t("households.exceptions.deletedHousehold")}
+                    </p>
+                    <p className="text-sm text-cyan-200">
+                      {formatExceptionSchedule(t, exception)}
+                    </p>
+                    <p className="mt-1 text-sm text-white/70">
+                      {dismissalPlanLabel(t, exception.dismissalPlan)}
+                      {exception.pickupContactName
+                        ? ` · ${exception.pickupContactName}`
+                        : ""}
+                    </p>
+                    {exception.notes ? (
+                      <p className="mt-1 text-sm text-white/55">
+                        {exception.notes}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* Search + filter row */}
       <section className="flex flex-col gap-4">
         <Form
           method="get"
-          className="flex flex-wrap items-end gap-2"
+          className="flex flex-wrap items-end gap-3"
           role="search"
         >
           <Field label={t("households.search.label")}>
-            <Input
-              name="q"
-              type="search"
-              defaultValue={pagination.searchQuery}
-              placeholder={t("households.search.placeholder")}
-              className="min-w-64"
-            />
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+              <Input
+                name="q"
+                type="search"
+                defaultValue={pagination.searchQuery}
+                placeholder={t("households.search.richPlaceholder")}
+                className="min-w-72 pl-9"
+              />
+            </div>
           </Field>
+          {/* Preserve active filter through search submissions. */}
+          {pagination.filter !== "all" ? (
+            <input type="hidden" name="filter" value={pagination.filter} />
+          ) : null}
           <Button type="submit" variant="secondary">
             {t("households.search.submit")}
           </Button>
           {pagination.searchQuery ? (
             <Link
-              to="?"
+              to={pagination.filter !== "all" ? `?filter=${pagination.filter}` : "?"}
               className="rounded-full border border-white/15 px-3 py-2 text-sm text-white/70 hover:border-white/30 hover:text-white"
             >
               {t("households.search.clear")}
@@ -1059,6 +1055,42 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
           </p>
         </Form>
 
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs uppercase tracking-wide text-white/40">
+            {t("households.filters.label")}
+          </span>
+          <FilterPill
+            value="all"
+            current={pagination.filter}
+            searchQuery={pagination.searchQuery}
+            label={t("households.filters.all")}
+          />
+          <FilterPill
+            value="exceptionToday"
+            current={pagination.filter}
+            searchQuery={pagination.searchQuery}
+            label={t("households.filters.exceptionToday")}
+          />
+          <FilterPill
+            value="missingContact"
+            current={pagination.filter}
+            searchQuery={pagination.searchQuery}
+            label={t("households.filters.missingContact")}
+          />
+          <FilterPill
+            value="singleParent"
+            current={pagination.filter}
+            searchQuery={pagination.searchQuery}
+            label={t("households.filters.singleParent")}
+          />
+          <FilterPill
+            value="multiStudent"
+            current={pagination.filter}
+            searchQuery={pagination.searchQuery}
+            label={t("households.filters.multiStudent")}
+          />
+        </div>
+
         <div className="grid gap-4 xl:grid-cols-2">
           {households.length === 0 ? (
             <div className="rounded-xl border border-white/10 bg-white/5 p-8 text-center text-white/50 xl:col-span-2">
@@ -1070,7 +1102,11 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
             </div>
           ) : (
             households.map((household: HouseholdRecord) => (
-              <HouseholdCard key={household.id} household={household} />
+              <HouseholdCard
+                key={household.id}
+                household={household}
+                dateFmt={dateFmt}
+              />
             ))
           )}
         </div>
@@ -1083,6 +1119,38 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
   );
 }
 
+function FilterPill({
+  value,
+  current,
+  searchQuery,
+  label,
+}: {
+  value: FilterValue;
+  current: FilterValue;
+  searchQuery: string;
+  label: string;
+}) {
+  const params = new URLSearchParams();
+  if (value !== "all") params.set("filter", value);
+  if (searchQuery) params.set("q", searchQuery);
+  const qs = params.toString();
+  const href = qs ? `?${qs}` : "?";
+  const active = current === value;
+  return (
+    <Link
+      to={href}
+      className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+        active
+          ? "border-blue-400/40 bg-blue-400/15 text-blue-100"
+          : "border-white/10 bg-white/5 text-white/65 hover:border-white/25 hover:text-white"
+      }`}
+      aria-pressed={active}
+    >
+      {label}
+    </Link>
+  );
+}
+
 function HouseholdsPaginationControls({
   pagination,
   t,
@@ -1090,11 +1158,12 @@ function HouseholdsPaginationControls({
   pagination: LoaderData["pagination"];
   t: TFunction;
 }) {
-  const { page, totalPages, searchQuery } = pagination;
+  const { page, totalPages, searchQuery, filter } = pagination;
   const buildHref = (targetPage: number) => {
     const params = new URLSearchParams();
     if (targetPage > 1) params.set("page", String(targetPage));
     if (searchQuery) params.set("q", searchQuery);
+    if (filter && filter !== "all") params.set("filter", filter);
     const qs = params.toString();
     return qs ? `?${qs}` : "?";
   };
@@ -1139,15 +1208,15 @@ function RoiPanel({ roi }: { roi: LoaderData["roi"] }) {
   return (
     <section
       id="roi"
-      className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-5"
+      className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.07] p-5"
     >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-emerald-200">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-200">
             <TrendingUp className="h-4 w-4" />
             {t("households.roi.eyebrow")}
           </div>
-          <h2 className="mt-2 text-xl font-semibold text-white">
+          <h2 className="mt-2 text-lg font-semibold text-white">
             {t("households.roi.summary", {
               calls: roi.avoidedCalls.total,
               minutes: roi.minutesSaved,
@@ -1214,7 +1283,7 @@ function RoiPanel({ roi }: { roi: LoaderData["roi"] }) {
         />
       </div>
 
-      <p className="mt-4 text-xs text-white/60">
+      <p className="mt-4 text-xs text-white/55">
         {t("households.roi.assumptions", {
           minutes: roi.assumptions.minutesPerAvoidedCall,
           exceptions: roi.assumptions.callsAvoidedPerExceptionOccurrence,
@@ -1312,106 +1381,147 @@ function StudentCheckboxList({
   );
 }
 
-function HouseholdCard({ household }: { household: HouseholdRecord }) {
+function HouseholdCard({
+  household,
+  dateFmt,
+}: {
+  household: HouseholdRecord;
+  dateFmt: Intl.DateTimeFormat;
+}) {
   const { t } = useTranslation("admin");
   const studentCount = household.students.length;
-  const exceptionCount = household.exceptions.length;
+  const exceptionTodayCount = household.exceptionTodayCount ?? 0;
+  const contactCount =
+    (household.primaryContactName?.trim() ? 1 : 0) +
+    (household.primaryContactPhone?.trim() ? 1 : 0);
+  const missingContact =
+    !household.primaryContactName?.trim() ||
+    !household.primaryContactPhone?.trim();
+  const created = (() => {
+    try {
+      return dateFmt.format(new Date(household.createdAt));
+    } catch {
+      return "";
+    }
+  })();
+
   return (
-    <article className="rounded-xl border border-white/10 bg-white/5 p-5">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <Home className="h-5 w-5 text-blue-300" />
-            <h2 className="text-lg font-semibold text-white">{household.name}</h2>
+    <article className="group relative rounded-xl border border-white/8 bg-white/[0.04] p-5 transition-colors hover:border-white/20">
+      <Link
+        to={`/admin/households/${household.id}`}
+        className="absolute inset-0 rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400"
+        aria-label={t("households.card.viewDetail")}
+      />
+      <div className="relative flex items-start gap-4">
+        <EntityAvatar
+          initials={initialsFromHouseholdName(household.name)}
+          colorSeed={household.id}
+          size="lg"
+          shape="square"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold text-white truncate">
+              {household.name}
+            </h2>
+            <StatusPill tone="success" size="xs">
+              {t("households.card.active")}
+            </StatusPill>
+            {exceptionTodayCount > 0 ? (
+              <StatusPill tone="info" size="xs">
+                {t("households.list.exceptions", { count: exceptionTodayCount }).replace(/^[\s·]+/, "")}
+              </StatusPill>
+            ) : null}
+            {missingContact ? (
+              <StatusPill tone="warning" size="xs">
+                {t("households.stats.missingContact")}
+              </StatusPill>
+            ) : null}
           </div>
-          <p className="mt-1 text-sm text-white/50">
-            {t("households.list.students", { count: studentCount })}
-            {exceptionCount > 0
-              ? t("households.list.exceptions", { count: exceptionCount })
-              : ""}
+          <p className="mt-1 text-xs text-white/55">
+            {t("households.card.students", { count: studentCount })}
+            {" · "}
+            {t("households.card.contacts", { count: contactCount })}
+            {created ? ` · ${t("households.card.createdOn", { date: created })}` : ""}
           </p>
-        </div>
-        <Form method="post">
-          <input type="hidden" name="intent" value="delete" />
-          <input type="hidden" name="householdId" value={household.id} />
-          <Button type="submit" variant="danger" size="sm">
-            {t("households.list.delete")}
-          </Button>
-        </Form>
-      </div>
 
-      <Form method="post" className="mb-5 grid gap-3">
-        <input type="hidden" name="intent" value="update" />
-        <input type="hidden" name="householdId" value={household.id} />
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label={t("households.card.nameLabel")}>
-            <Input name="name" defaultValue={household.name} required />
-          </Field>
-          <Field label={t("households.card.primaryContactLabel")}>
-            <Input
-              name="primaryContactName"
-              defaultValue={household.primaryContactName ?? ""}
-            />
-          </Field>
-          <Field label={t("households.card.contactPhoneLabel")}>
-            <Input
-              name="primaryContactPhone"
-              defaultValue={household.primaryContactPhone ?? ""}
-            />
-          </Field>
-        </div>
-        <Field label={t("households.card.pickupNotesLabel")}>
-          <TextArea
-            name="pickupNotes"
-            rows={3}
-            defaultValue={household.pickupNotes ?? ""}
-          />
-        </Field>
-        <Button
-          type="submit"
-          variant="secondary"
-          size="sm"
-          className="justify-self-start"
-        >
-          {t("households.list.savePickupContext")}
-        </Button>
-      </Form>
-
-      <div className="overflow-hidden rounded-lg border border-white/10">
-        {household.students.length === 0 ? (
-          <p className="p-4 text-sm text-white/45">
-            {t("households.list.noStudentsAssigned")}
-          </p>
-        ) : (
-          household.students.map((student) => (
-            <div
-              key={student.id}
-              className="flex items-center justify-between gap-3 border-t border-white/5 px-4 py-3 first:border-t-0"
-            >
-              <div>
-                <p className="font-medium text-white">
-                  {studentDisplayName(student)}
-                </p>
-                <p className="text-xs text-white/45">
-                  {student.homeRoom ?? t("households.list.noHomeroom")} ·{" "}
-                  {student.spaceNumber
-                    ? t("households.list.spaceLabel", {
-                        number: student.spaceNumber,
-                      })
-                    : t("households.list.noSpace")}
-                </p>
+          {/* Mini avatar stack of contacts (today: just primary contact) */}
+          <div className="mt-3 flex items-center gap-2">
+            {household.primaryContactName ? (
+              <div className="flex items-center gap-2">
+                <EntityAvatar
+                  initials={
+                    initialsFromPersonName(
+                      household.primaryContactName.split(/\s+/)[0] ?? "",
+                      household.primaryContactName.split(/\s+/).slice(-1)[0] ?? "",
+                    )
+                  }
+                  colorSeed={`${household.id}:${household.primaryContactName}`}
+                  size="sm"
+                />
+                <span className="text-xs text-white/65">
+                  {household.primaryContactName}
+                </span>
+                {household.primaryContactPhone ? (
+                  <span className="text-xs text-white/40">
+                    · {household.primaryContactPhone}
+                  </span>
+                ) : null}
               </div>
-              <Form method="post">
-                <input type="hidden" name="intent" value="detach" />
-                <input type="hidden" name="studentId" value={student.id} />
-                <Button type="submit" variant="ghost" size="sm">
-                  <UserMinus className="h-4 w-4" />
-                  {t("households.list.detach")}
-                </Button>
-              </Form>
-            </div>
-          ))
-        )}
+            ) : (
+              <span className="text-xs text-white/40">
+                {t("households.card.noContacts")}
+              </span>
+            )}
+          </div>
+
+          {/* Mini list of students with classroom badges */}
+          <div className="mt-3">
+            {household.students.length === 0 ? (
+              <p className="text-xs text-white/40">
+                {t("households.card.noStudents")}
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {household.students.slice(0, 4).map((student) => (
+                  <li
+                    key={student.id}
+                    className="flex items-center gap-2 text-sm text-white/85"
+                  >
+                    <EntityAvatar
+                      initials={initialsFromPersonName(student.firstName, student.lastName)}
+                      colorSeed={`student:${student.id}`}
+                      size="xs"
+                    />
+                    <span className="truncate">
+                      {studentDisplayName(student)}
+                    </span>
+                    {student.homeRoom ? (
+                      <StatusPill tone="neutral" size="xs">
+                        {student.homeRoom}
+                      </StatusPill>
+                    ) : null}
+                    {student.spaceNumber ? (
+                      <StatusPill tone="cyan" size="xs">
+                        #{student.spaceNumber}
+                      </StatusPill>
+                    ) : null}
+                  </li>
+                ))}
+                {household.students.length > 4 ? (
+                  <li className="text-xs text-white/40">
+                    +{household.students.length - 4}
+                  </li>
+                ) : null}
+              </ul>
+            )}
+          </div>
+        </div>
+        <div className="relative flex shrink-0 flex-col gap-2">
+          <EntityLink to={`/admin/households/${household.id}`} arrow>
+            {t("households.card.open")}
+          </EntityLink>
+        </div>
       </div>
     </article>
   );
