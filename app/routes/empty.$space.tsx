@@ -1,6 +1,11 @@
 import type { Route } from "./+types/empty.$space";
 import { redirect } from "react-router";
-import { getOptionalUserFromContext, getOrgFromContext } from "~/domain/utils/global-context.server";
+import {
+  getOptionalUserFromContext,
+  getOrgFromContext,
+  getTenantPrisma,
+} from "~/domain/utils/global-context.server";
+import { broadcastSpaceUpdate } from "~/lib/broadcast.server";
 
 export async function action({ params, context }: Route.ActionArgs) {
   const { space } = params;
@@ -17,19 +22,43 @@ export async function action({ params, context }: Route.ActionArgs) {
   if (user.role !== "CONTROLLER") throw new Response("Forbidden", { status: 403 });
 
   const spaceNumber = parseInt(space);
-  const env = (context as any).cloudflare.env;
+  const env = (context as { cloudflare?: { env: Env } }).cloudflare?.env;
+  const cfCtx = (context as { cloudflare?: { ctx?: ExecutionContext } })
+    .cloudflare?.ctx;
 
-  // Tenant routes always have an org. Required strictly here because we
-  // route to a per-tenant DO below; pairs with /update/:space.
   const org = getOrgFromContext(context);
 
-  const id = env.BINGO_BOARD.idFromName(org.id);
-  const stub = env.BINGO_BOARD.get(id);
-  await stub.fetch("https://internal/space-update", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ type: "EMPTY", spaceNumber, orgId: org.id }),
+  // Tenant-scoped Prisma — auto-injects orgId via the tenant extension.
+  const prisma = getTenantPrisma(context);
+
+  // Previously this lived inside the BINGO_BOARD DO and serialized behind
+  // every other tenant click. Doing it directly via Prisma drops the
+  // single-threaded DO from the critical write path.
+  await prisma.space.update({
+    where: { orgId_spaceNumber: { orgId: org.id, spaceNumber } },
+    data: { status: "EMPTY", timestamp: null },
   });
+
+  const fanOut = (label: string, task: () => Promise<unknown>) => {
+    const safe = (async () => {
+      try {
+        await task();
+      } catch (err) {
+        console.warn(`[empty.$space] broadcast ${label} failed`, err);
+      }
+    })();
+    if (cfCtx && typeof cfCtx.waitUntil === "function") {
+      cfCtx.waitUntil(safe);
+    } else {
+      return safe;
+    }
+  };
+
+  if (env) {
+    fanOut("spaceUpdate", () =>
+      broadcastSpaceUpdate(env, org.id, spaceNumber, "EMPTY", null),
+    );
+  }
 
   return new Response("OK");
 }
