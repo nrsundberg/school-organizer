@@ -17,6 +17,9 @@
     "skipNote_other": " (skipped {{count}} blank rows)"
   },
   "drillsLive": {
+    "activityEmpty": "No activity yet.",
+    "activityHeading": "Activity",
+    "activityUnknownActor": "Someone",
     "addFollowUp": "Add",
     "adminControls": "Admin controls",
     "adminHelper": "You're an admin — non-admins see the checklist only.",
@@ -43,6 +46,12 @@
     "elapsedRunning": "elapsed",
     "end": "End drill",
     "endConfirm": "End this drill? Everyone signed in will return to the normal app. The run will be archived as history.",
+    "endPopover": {
+      "cancel": "Cancel",
+      "confirm": "End drill",
+      "heading": "End drill",
+      "subhead": "How should this be recorded in the history?"
+    },
     "errors": {
       "invalidStateJson": "Invalid state JSON.",
       "missingRunId": "Missing run id.",
@@ -61,6 +70,10 @@
     "notesHeading": "Notes",
     "notesPlaceholder": "Incidents, headcount issues, etc.",
     "pause": "Pause drill",
+    "presence": {
+      "editing": "{{label}} is editing…",
+      "editingMany": "{{label}} + {{count}} editing"
+    },
     "removeItem": "Remove item",
     "resume": "Resume drill",
     "savedIndicator": {

@@ -20,6 +20,10 @@ import {
 } from "~/domain/drills/types";
 import { StartLivePopover } from "~/domain/drills/StartLivePopover";
 import { endDrillRun, startDrillRun } from "~/domain/drills/live.server";
+import {
+  broadcastDrillEnded,
+  broadcastDrillUpdate,
+} from "~/lib/broadcast.server";
 import { computeCadenceStatus, type CadenceStatus } from "~/domain/drills/cadence";
 import { dataWithError, dataWithSuccess } from "remix-toast";
 import { getFixedT } from "~/lib/t.server";
@@ -159,9 +163,13 @@ export async function action({ request, context }: Route.ActionArgs) {
       return dataWithError(null, t("drills.list.errors.missingId"));
     }
     const audience = parseDrillAudience(formData.get("audience"));
+    // Mode is no longer asked at start time — the admin picks it when ending
+    // the drill, so the historical record reflects what actually happened.
+    // parseDrillMode falls back to "DRILL" when the form field is missing.
     const mode = parseDrillMode(formData.get("mode"));
     const orgId = getOrgFromContext(context).id;
     const actor = getActorIdsFromContext(context);
+    const env = (context as { cloudflare?: { env: Env } }).cloudflare?.env;
     const tpl = await prisma.drillTemplate.findFirst({
       where: { id },
       select: { definition: true },
@@ -170,7 +178,24 @@ export async function action({ request, context }: Route.ActionArgs) {
       ? seedRunStateFromTemplate(parseTemplateDefinition(tpl.definition))
       : undefined;
     try {
-      await startDrillRun(prisma, orgId, id, initialState, actor, audience, mode);
+      const created = await startDrillRun(
+        prisma,
+        orgId,
+        id,
+        initialState,
+        actor,
+        audience,
+        mode,
+      );
+      if (env) {
+        await broadcastDrillUpdate(env, orgId, {
+          id: created.id,
+          status: "LIVE",
+          audience: created.audience,
+          state: created.state,
+          updatedAtIso: created.updatedAt.toISOString(),
+        });
+      }
     } catch (err) {
       if (err instanceof Response && err.status === 409) {
         return dataWithError(null, t("drills.list.errors.anotherLive"));
@@ -188,8 +213,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
     const orgId = getOrgFromContext(context).id;
     const actor = getActorIdsFromContext(context);
+    const env = (context as { cloudflare?: { env: Env } }).cloudflare?.env;
     try {
       await endDrillRun(prisma, orgId, runId, actor);
+      if (env) {
+        await broadcastDrillEnded(env, orgId, runId);
+      }
     } catch (err) {
       if (err instanceof Response && (err.status === 404 || err.status === 409)) {
         // Stale UI: someone else already ended it. Surface a soft success so

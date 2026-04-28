@@ -17,6 +17,9 @@
     "skipNote_other": " (se omitieron {{count}} filas en blanco)"
   },
   "drillsLive": {
+    "activityEmpty": "Aún no hay actividad.",
+    "activityHeading": "Actividad",
+    "activityUnknownActor": "Alguien",
     "addFollowUp": "Agregar",
     "adminControls": "Controles de administrador",
     "adminHelper": "Eres administrador — los demás solo ven la lista de verificación.",
@@ -43,6 +46,12 @@
     "elapsedRunning": "transcurrido",
     "end": "Terminar simulacro",
     "endConfirm": "¿Terminar este simulacro? Todos los que iniciaron sesión volverán a la app normal. La ejecución se archivará en el historial.",
+    "endPopover": {
+      "cancel": "Cancelar",
+      "confirm": "Terminar simulacro",
+      "heading": "Terminar simulacro",
+      "subhead": "¿Cómo se debe registrar en el historial?"
+    },
     "errors": {
       "invalidStateJson": "JSON de estado inválido.",
       "missingRunId": "Falta el ID de la ejecución.",
@@ -61,6 +70,10 @@
     "notesHeading": "Notas",
     "notesPlaceholder": "Incidentes, problemas con el conteo, etc.",
     "pause": "Pausar simulacro",
+    "presence": {
+      "editing": "{{label}} está editando…",
+      "editingMany": "{{label}} + {{count}} editando"
+    },
     "removeItem": "Eliminar tarea",
     "resume": "Reanudar simulacro",
     "savedIndicator": {
