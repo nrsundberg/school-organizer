@@ -86,6 +86,13 @@
     "toasts": {
       "paused": "Simulacro pausado.",
       "resumed": "Simulacro reanudado."
+    },
+    "viewerRoster": {
+      "guestsLabel_one": "{{count}} observador",
+      "guestsLabel_other": "{{count}} observadores",
+      "guestsTooltip": "Observadores anónimos",
+      "impersonatingYou": "(suplantándote)",
+      "overflowLabel": "+{{count}} más"
     }
   },
   "homerooms": {

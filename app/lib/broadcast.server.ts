@@ -42,6 +42,9 @@ export async function broadcastCallEvent(
     homeRoomSnapshot: string | null;
     actorUserId: string | null;
     onBehalfOfUserId: string | null;
+    /** Forensic network context. Both nullable; legacy rows / unset header. */
+    ipAddress: string | null;
+    userAgent: string | null;
     createdAt: Date;
   },
 ) {

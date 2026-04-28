@@ -8,13 +8,40 @@ import {
   writeDistrictAudit,
   type DistrictAuditAction,
 } from "~/domain/district/audit.server";
+import { getActorIdsFromContext } from "~/domain/utils/global-context.server";
+import { formatActorLabel } from "~/domain/auth/format-actor";
 
 export async function loader({ context, params }: Route.LoaderArgs) {
   await requirePlatformAdmin(context);
   const district = await getDistrictBySlug(context, params.slug);
   if (!district) throw new Response("Not found", { status: 404 });
   const audit = await listDistrictAudit(context, district.id, 50);
-  return { district, audit };
+
+  // Resolve display labels for the impersonated half of the audit pair.
+  // `actorEmail` is already snapshotted on the row; for `onBehalfOfUserId`
+  // we look up the email at render time.
+  const db = getPrisma(context);
+  const onBehalfIds = new Set<string>();
+  for (const e of audit as Array<{ onBehalfOfUserId?: string | null }>) {
+    if (e.onBehalfOfUserId) onBehalfIds.add(e.onBehalfOfUserId);
+  }
+  let onBehalfEmailById = new Map<string, string>();
+  if (onBehalfIds.size) {
+    const users = await db.user.findMany({
+      where: { id: { in: Array.from(onBehalfIds) } },
+      select: { id: true, email: true },
+    });
+    onBehalfEmailById = new Map(users.map((u) => [u.id, u.email]));
+  }
+  const auditWithImpersonator = audit.map((e: any) => ({
+    ...e,
+    onBehalfOfUserId: e.onBehalfOfUserId ?? null,
+    onBehalfOfEmail: e.onBehalfOfUserId
+      ? onBehalfEmailById.get(e.onBehalfOfUserId) ?? null
+      : null,
+  }));
+
+  return { district, audit: auditWithImpersonator } as const;
 }
 
 export default function PlatformDistrictDetail({
@@ -109,15 +136,26 @@ export default function PlatformDistrictDetail({
           {audit.length === 0 ? (
             <li className="text-white/50">No events.</li>
           ) : null}
-          {audit.map((e) => (
-            <li key={e.id} className="text-white/70">
-              <span className="text-white/40">
-                {new Date(e.createdAt).toISOString()}
-              </span>{" "}
-              · <span className="font-mono">{e.action}</span> ·{" "}
-              {e.actorEmail ?? "—"}
-            </li>
-          ))}
+          {audit.map((e) => {
+            const actorLabel = e.actorEmail ?? null;
+            const onBehalfLabel = e.onBehalfOfEmail ?? e.onBehalfOfUserId ?? null;
+            const fullLabel = formatActorLabel(actorLabel, onBehalfLabel, "—");
+            return (
+              <li key={e.id} className="text-white/70" aria-label={fullLabel}>
+                <span className="text-white/40">
+                  {new Date(e.createdAt).toISOString()}
+                </span>{" "}
+                · <span className="font-mono">{e.action}</span> ·{" "}
+                <span>{actorLabel ?? fullLabel}</span>
+                {onBehalfLabel && actorLabel ? (
+                  <span className="ml-1 inline-flex items-center gap-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-200">
+                    <span className="uppercase tracking-wide">via</span>
+                    <span>{onBehalfLabel}</span>
+                  </span>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       </div>
     </section>
@@ -133,6 +171,7 @@ function parseDateOrNull(raw: string): Date | null {
 
 export async function action({ context, params, request }: Route.ActionArgs) {
   const actor = await requirePlatformAdmin(context);
+  const actorIds = getActorIdsFromContext(context);
   const district = await getDistrictBySlug(context, params.slug);
   if (!district) throw new Response("Not found", { status: 404 });
   const form = await request.formData();
@@ -209,7 +248,8 @@ export async function action({ context, params, request }: Route.ActionArgs) {
   for (const a of audits) {
     await writeDistrictAudit(context, {
       districtId: district.id,
-      actorUserId: actor.id,
+      actorUserId: actorIds.actorUserId ?? actor.id,
+      onBehalfOfUserId: actorIds.onBehalfOfUserId,
       actorEmail: (actor as { email?: string }).email ?? null,
       action: a.action,
       details: a.details,

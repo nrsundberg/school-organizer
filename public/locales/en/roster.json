@@ -86,6 +86,13 @@
     "toasts": {
       "paused": "Drill paused.",
       "resumed": "Drill resumed."
+    },
+    "viewerRoster": {
+      "guestsLabel_one": "{{count}} viewer",
+      "guestsLabel_other": "{{count}} viewers",
+      "guestsTooltip": "Anonymous viewers",
+      "impersonatingYou": "(impersonating you)",
+      "overflowLabel": "+{{count}} more"
     }
   },
   "homerooms": {

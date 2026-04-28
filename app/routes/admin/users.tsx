@@ -30,6 +30,7 @@ import {
   setViewerPin,
 } from "~/domain/auth/viewer-access.server";
 import {
+  getActorIdsFromContext,
   getOrgFromContext,
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
@@ -154,6 +155,7 @@ function dataWithToast(outcome: AdminUsersActionOutcome, t: TFunction) {
 
 export async function action({ request, context }: Route.ActionArgs) {
   const me = await protectToAdminAndGetPermissions(context);
+  const actor = getActorIdsFromContext(context);
   const prisma = getPrisma(context);
   const auth = getAuth(context);
   const formData = await request.formData();
@@ -178,7 +180,8 @@ export async function action({ request, context }: Route.ActionArgs) {
       name,
       role,
       scope: { kind: "org", id: org.id },
-      invitedByUserId: me.id,
+      invitedByUserId: actor.actorUserId ?? me.id,
+      invitedByOnBehalfOfUserId: actor.onBehalfOfUserId,
       invitedByEmail: (me as { email?: string }).email ?? null,
       invitedToLabel: org.name,
     });

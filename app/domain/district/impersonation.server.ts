@@ -6,6 +6,13 @@ type Caller = {
   districtId: string | null;
   orgId: string | null;
   isPlatformAdmin: boolean;
+  /**
+   * Better-auth impersonator's id when the caller is acting via platform-admin
+   * impersonation. Distinct from district→org impersonation (the start/end
+   * actions audited below). Resolve from `getActorIdsFromContext` at the
+   * route boundary; null otherwise.
+   */
+  onBehalfOfUserId?: string | null;
 };
 type Target = { id: string; districtId: string | null };
 
@@ -51,6 +58,7 @@ export async function startImpersonation(
   await writeDistrictAudit(context, {
     districtId: args.caller.districtId!,
     actorUserId: args.caller.id,
+    onBehalfOfUserId: args.caller.onBehalfOfUserId ?? null,
     actorEmail: args.caller.email ?? null,
     action: "district.impersonate.start",
     targetType: "Org",
@@ -83,6 +91,7 @@ export async function endImpersonation(
     await writeDistrictAudit(context, {
       districtId: args.caller.districtId,
       actorUserId: args.caller.id,
+      onBehalfOfUserId: args.caller.onBehalfOfUserId ?? null,
       actorEmail: args.caller.email ?? null,
       action: "district.impersonate.end",
       targetType: "Org",

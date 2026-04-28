@@ -8,7 +8,10 @@ import {
   getDistrictSchoolCount,
 } from "~/domain/district/district.server";
 import { provisionSchoolForDistrict } from "~/domain/district/provision-school.server";
-import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
+import {
+  getActorIdsFromContext,
+  getOptionalUserFromContext,
+} from "~/domain/utils/global-context.server";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const districtId = requireDistrictAdmin(context);
@@ -95,6 +98,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (!district) throw new Response("District not found", { status: 404 });
   const user = getOptionalUserFromContext(context);
   if (!user) throw new Response("Unauthorized", { status: 401 });
+  const actorIds = getActorIdsFromContext(context);
 
   const form = await request.formData();
   try {
@@ -102,8 +106,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       request,
       district,
       actor: {
-        id: user.id,
+        id: actorIds.actorUserId ?? user.id,
         email: (user as { email?: string }).email ?? null,
+        onBehalfOfUserId: actorIds.onBehalfOfUserId,
       },
       input: {
         schoolName: String(form.get("schoolName") ?? ""),

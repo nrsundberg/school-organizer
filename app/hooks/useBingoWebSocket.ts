@@ -19,6 +19,13 @@ type CallEventUpdate = {
     homeRoomSnapshot: string | null;
     actorUserId: string | null;
     onBehalfOfUserId: string | null;
+    /**
+     * Forensic network context, present on rows written after the
+     * `add-audit-network-context` migration. Nullable for legacy rows /
+     * cases where the header was unset.
+     */
+    ipAddress: string | null;
+    userAgent: string | null;
     createdAt: string;
   };
 };

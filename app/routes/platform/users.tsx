@@ -2,7 +2,10 @@ import { data, Form, redirect } from "react-router";
 import type { Route } from "./+types/users";
 import { requirePlatformAdmin } from "~/domain/auth/platform-admin.server";
 import { getPrisma } from "~/db.server";
-import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
+import {
+  getActorIdsFromContext,
+  getOptionalUserFromContext,
+} from "~/domain/utils/global-context.server";
 import {
   inviteUser,
   resendInvite,
@@ -75,6 +78,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   await requirePlatformAdmin(context);
   const me = getOptionalUserFromContext(context);
   if (!me) throw new Response("Unauthorized", { status: 401 });
+  const actor = getActorIdsFromContext(context);
 
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
@@ -88,7 +92,8 @@ export async function action({ request, context }: Route.ActionArgs) {
       name,
       scope: { kind: "platform" },
       role: "PLATFORM_ADMIN",
-      invitedByUserId: me.id,
+      invitedByUserId: actor.actorUserId ?? me.id,
+      invitedByOnBehalfOfUserId: actor.onBehalfOfUserId,
       invitedByEmail: (me as { email?: string }).email ?? null,
       invitedToLabel: null,
     });

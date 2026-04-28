@@ -3,7 +3,10 @@ import type { Route } from "./+types/orgs.new";
 import { getPrisma } from "~/db.server";
 import { requirePlatformAdmin } from "~/domain/auth/platform-admin.server";
 import { recordOrgAudit } from "~/domain/billing/comp.server";
-import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
+import {
+  getActorIdsFromContext,
+  getOptionalUserFromContext,
+} from "~/domain/utils/global-context.server";
 import { slugifyOrgName } from "~/lib/org-slug";
 
 const VALID_PLANS = [
@@ -27,6 +30,7 @@ export async function loader({ context }: Route.LoaderArgs) {
 export async function action({ request, context }: Route.ActionArgs) {
   await requirePlatformAdmin(context);
   const me = getOptionalUserFromContext(context);
+  const actor = getActorIdsFromContext(context);
   const db = getPrisma(context);
   const form = await request.formData();
 
@@ -108,7 +112,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     await recordOrgAudit({
       context,
       orgId: org.id,
-      actorUserId: me?.id ?? null,
+      actorUserId: actor.actorUserId ?? me?.id ?? null,
+      onBehalfOfUserId: actor.onBehalfOfUserId,
       action: "org.comp_created",
       payload: { plan, adminEmail },
     });

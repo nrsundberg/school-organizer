@@ -157,13 +157,14 @@ model Org {
 }
 
 model OrgAuditLog {
-  id           String   @id @default(cuid())
-  orgId        String
-  org          Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  actorUserId  String?
-  action       String
-  payload      Json?
-  createdAt    DateTime @default(now())
+  id               String   @id @default(cuid())
+  orgId            String
+  org              Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  actorUserId      String?
+  onBehalfOfUserId String?
+  action           String
+  payload          Json?
+  createdAt        DateTime @default(now())
 
   @@index([orgId])
   @@index([orgId, createdAt])
@@ -202,16 +203,17 @@ model District {
 }
 
 model DistrictAuditLog {
-  id           String   @id @default(cuid())
-  districtId   String
-  district     District @relation(fields: [districtId], references: [id], onDelete: Cascade)
-  actorUserId  String?
-  actorEmail   String?
-  action       String
-  targetType   String?
-  targetId     String?
-  details      String?  // JSON-encoded
-  createdAt    DateTime @default(now())
+  id               String   @id @default(cuid())
+  districtId       String
+  district         District @relation(fields: [districtId], references: [id], onDelete: Cascade)
+  actorUserId      String?
+  onBehalfOfUserId String?
+  actorEmail       String?
+  action           String
+  targetType       String?
+  targetId         String?
+  details          String?  // JSON-encoded
+  createdAt        DateTime @default(now())
 
   @@index([districtId, createdAt])
 }
@@ -292,6 +294,7 @@ model DrillRun {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   events      DrillRunEvent[]
+  presenceSamples DrillRunPresenceSample[]
 
   @@index([orgId])
   @@index([templateId])
@@ -314,7 +317,20 @@ model DrillRunEvent {
   payload          Json
   actorUserId      String?
   onBehalfOfUserId String?
+  ipAddress        String?
+  userAgent        String?
   occurredAt       DateTime @default(now())
+
+  @@index([runId, occurredAt])
+}
+
+model DrillRunPresenceSample {
+  id         String   @id @default(cuid())
+  runId      String
+  run        DrillRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  occurredAt DateTime @default(now())
+  viewers    Json     // Array<{ userId, label, onBehalfOfUserId, onBehalfOfLabel, isGuest, color }>
+  guestCount Int      @default(0)
 
   @@index([runId, occurredAt])
 }
@@ -650,6 +666,8 @@ model CallEvent {
   /// When non-null, the action was performed via impersonation and this
   /// is the impersonated user's id. Always null outside impersonation.
   onBehalfOfUserId  String?
+  ipAddress         String?
+  userAgent         String?
   createdAt        DateTime @default(now())
 
   @@index([orgId])
