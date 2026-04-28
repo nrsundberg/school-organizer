@@ -20,7 +20,7 @@
     "demo:seed:wipe:staging": "tsx scripts/seed-demo-tenants.ts --target=remote --env=staging --wipe-only --out=demo-wipe.staging.sql && wrangler d1 execute school-organizer-staging --remote --env=staging --file=demo-wipe.staging.sql",
     "demo:seed:wipe:prod:emit": "tsx scripts/seed-demo-tenants.ts --target=remote --env=production --wipe-only --out=demo-wipe.prod.sql",
     "typecheck": "react-router typegen && tsc",
-    "test": "tsx --test app/db/*.test.ts app/domain/billing/*.test.ts app/domain/utils/*.test.ts app/lib/*.test.ts app/domain/drills/*.test.ts app/domain/csv/*.test.ts app/domain/auth/*.test.ts app/domain/district/*.test.ts app/domain/admin-users/*.test.ts scripts/demo-data/*.test.ts",
+    "test": "tsx --test app/db/*.test.ts app/domain/billing/*.test.ts app/domain/utils/*.test.ts app/lib/*.test.ts app/domain/drills/*.test.ts app/domain/csv/*.test.ts app/domain/auth/*.test.ts app/domain/district/*.test.ts app/domain/admin-users/*.test.ts app/domain/children/*.test.ts scripts/demo-data/*.test.ts",
     "clean:e2e": "rm -rf test-results playwright-report blob-report .last-run.json",
     "clean:tmp": "rm -rf /tmp/playwright-* /tmp/pw-* /tmp/.X*-lock 2>/dev/null || true",
     "pretest:e2e": "npm run clean:e2e && npm run clean:tmp",
