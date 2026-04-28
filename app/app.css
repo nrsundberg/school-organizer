@@ -16,11 +16,15 @@
 /* Lift HeroUI form-field surfaces in dark mode so inputs visibly pop
  * against the app and auth backgrounds. Overrides documented HeroUI v3
  * tokens; --color-field-border-hover/focus auto-derive via color-mix
- * in @heroui/styles/themes/shared/theme.css. */
+ * in @heroui/styles/themes/shared/theme.css.
+ *
+ * The values were lifted from oklch(0.30/0.42) → oklch(0.38/0.55) on
+ * 2026-04-28 because the household + user forms still read flat against
+ * their `bg-white/[0.04]` cards. Brighter field surface, brighter border. */
 .dark,
 [data-theme="dark"] {
-  --field-background: oklch(0.30 0.005 286);   /* ~#3a3d40 */
-  --field-border:     oklch(0.42 0.005 286);   /* ~#5a5d62 */
+  --field-background: oklch(0.38 0.005 286);   /* ~#4d5054 */
+  --field-border:     oklch(0.55 0.005 286);   /* ~#7a7d82 */
 }
 
 /* Shared utility for hand-rolled <input>/<select>/<textarea> so they
@@ -30,8 +34,8 @@
  * win the cascade. Layout classes stay on the element. */
 @layer components {
   .app-field {
-    background-color: oklch(0.30 0.005 286);
-    border: 1px solid oklch(0.42 0.005 286);
+    background-color: oklch(0.38 0.005 286);
+    border: 1px solid oklch(0.55 0.005 286);
     color: #fff;
     border-radius: 0.5rem;
     padding: 0.5rem 0.75rem;
@@ -39,11 +43,11 @@
     outline: none;
     transition: background-color 150ms, border-color 150ms, box-shadow 150ms;
   }
-  .app-field::placeholder { color: rgb(255 255 255 / 0.45); }
-  .app-field:hover:not(:focus) { border-color: rgb(255 255 255 / 0.30); }
+  .app-field::placeholder { color: rgb(255 255 255 / 0.55); }
+  .app-field:hover:not(:focus) { border-color: rgb(255 255 255 / 0.45); }
   .app-field:focus,
   .app-field:focus-visible {
-    border-color: rgb(255 255 255 / 0.55);
-    box-shadow: 0 0 0 2px rgb(255 255 255 / 0.10);
+    border-color: rgb(255 255 255 / 0.70);
+    box-shadow: 0 0 0 2px rgb(255 255 255 / 0.15);
   }
 }

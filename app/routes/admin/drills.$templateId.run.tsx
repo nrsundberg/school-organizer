@@ -49,7 +49,7 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
     throw new Response("Not found", { status: 404 });
   }
   const template = await prisma.drillTemplate.findFirst({
-    where: { id: templateId },
+    where: { id: templateId, deletedAt: null },
     select: { id: true, name: true, definition: true, updatedAt: true },
   });
   if (!template) {
@@ -159,7 +159,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
 
   if (intent === "reset") {
     const tpl = await prisma.drillTemplate.findFirst({
-      where: { id: templateId },
+      where: { id: templateId, deletedAt: null },
       select: { definition: true },
     });
     const fresh = tpl

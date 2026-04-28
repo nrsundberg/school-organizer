@@ -207,7 +207,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         firstName: true,
         lastName: true,
         homeRoom: true,
-        spaceNumber: true,
       },
     }),
     prisma.student.findMany({
@@ -269,7 +268,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     firstName: string;
     lastName: string;
     homeRoom: string | null;
-    spaceNumber: number | null;
     householdId: string | null;
   };
   type HouseholdExceptionRow = {
@@ -309,7 +307,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
             firstName: true,
             lastName: true,
             homeRoom: true,
-            spaceNumber: true,
             householdId: true,
           },
         }) as Promise<HouseholdStudentRow[]>,
@@ -478,7 +475,6 @@ type StudentListRecord = {
   firstName: string;
   lastName: string;
   homeRoom?: string | null;
-  spaceNumber?: number | null;
   householdId?: string | null;
 };
 
@@ -1365,11 +1361,6 @@ function StudentCheckboxList({
                     homeRoom: student.homeRoom,
                   })
                 : ""}
-              {student.spaceNumber
-                ? t("households.studentList.spaceLabel", {
-                    number: student.spaceNumber,
-                  })
-                : t("households.studentList.noSpace")}
               {student.householdId
                 ? t("households.studentList.currentlyGrouped")
                 : ""}
@@ -1427,6 +1418,11 @@ function HouseholdCard({
             <StatusPill tone="success" size="xs">
               {t("households.card.active")}
             </StatusPill>
+            {household.spaceNumber ? (
+              <StatusPill tone="cyan" size="xs">
+                #{household.spaceNumber}
+              </StatusPill>
+            ) : null}
             {exceptionTodayCount > 0 ? (
               <StatusPill tone="info" size="xs">
                 {t("households.list.exceptions", { count: exceptionTodayCount }).replace(/^[\s·]+/, "")}
@@ -1499,11 +1495,6 @@ function HouseholdCard({
                     {student.homeRoom ? (
                       <StatusPill tone="neutral" size="xs">
                         {student.homeRoom}
-                      </StatusPill>
-                    ) : null}
-                    {student.spaceNumber ? (
-                      <StatusPill tone="cyan" size="xs">
-                        #{student.spaceNumber}
                       </StatusPill>
                     ) : null}
                   </li>

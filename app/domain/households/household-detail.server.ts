@@ -35,6 +35,7 @@ export type HouseholdDetailRecord = {
   pickupNotes: string | null;
   primaryContactName: string | null;
   primaryContactPhone: string | null;
+  spaceNumber: number | null;
   createdAt: Date;
   updatedAt: Date;
   students: Array<{
@@ -42,7 +43,6 @@ export type HouseholdDetailRecord = {
     firstName: string;
     lastName: string;
     homeRoom: string | null;
-    spaceNumber: number | null;
   }>;
   exceptions: Array<{
     id: string;
@@ -81,6 +81,7 @@ export async function loadHouseholdWithRelations(
       pickupNotes: true,
       primaryContactName: true,
       primaryContactPhone: true,
+      spaceNumber: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -96,7 +97,6 @@ export async function loadHouseholdWithRelations(
         firstName: true,
         lastName: true,
         homeRoom: true,
-        spaceNumber: true,
       },
     }),
     prisma.dismissalException.findMany({

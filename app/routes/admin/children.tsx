@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Form, Link, useSearchParams, useSubmit } from "react-router";
 import { Button } from "@heroui/react";
 import {
@@ -91,17 +91,25 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   // Pull every student (no pagination here — even a 600-student school is
   // <60kB on the wire). Search applies to first/last name OR homeRoom.
-  const allStudents = await prisma.student.findMany({
+  const allStudentsRaw = await prisma.student.findMany({
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     select: {
       id: true,
       firstName: true,
       lastName: true,
       homeRoom: true,
-      spaceNumber: true,
       householdId: true,
+      household: { select: { spaceNumber: true } },
     },
   });
+  const allStudents = allStudentsRaw.map((s) => ({
+    id: s.id,
+    firstName: s.firstName,
+    lastName: s.lastName,
+    homeRoom: s.homeRoom,
+    householdId: s.householdId,
+    spaceNumber: s.household?.spaceNumber ?? null,
+  }));
 
   // Pull active exceptions for "today" so we can flag students with an
   // override on the index. We use UTC date midnight to match how DATE rows
@@ -307,6 +315,28 @@ export default function AdminChildren({ loaderData }: Route.ComponentProps) {
       return next;
     });
   };
+
+  // When a child detail page links here with `#homeroom-<id>`, expand the
+  // matching card and scroll it into view.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const m = /^#homeroom-(\d+)$/.exec(window.location.hash);
+    if (!m) return;
+    const id = Number(m[1]);
+    if (!Number.isInteger(id)) return;
+    setExpanded((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    const tm = setTimeout(() => {
+      document
+        .getElementById(`homeroom-${id}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+    return () => clearTimeout(tm);
+  }, []);
 
   // Grade pill filter buckets — derived from the loader data. We ignore the
   // search filter here so the pills stay representative of the school as a
@@ -687,6 +717,7 @@ function ClassroomCard({
 
   return (
     <article
+      id={`homeroom-${classroom.id}`}
       className={`flex flex-col rounded-xl border bg-white/[0.04] transition-colors ${
         expanded ? "border-blue-400/40 ring-1 ring-blue-400/10" : "border-white/[0.08] hover:border-white/15"
       }`}
@@ -851,7 +882,7 @@ function ExpandedClassroom({
                 </Link>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-white/55">
                   {s.householdId ? (
-                    <EntityLink to={`/admin/households#${s.householdId}`} arrow={false}>
+                    <EntityLink to={`/admin/households/${s.householdId}`} arrow={false}>
                       {s.householdName ?? "Household"}
                     </EntityLink>
                   ) : (

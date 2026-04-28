@@ -84,10 +84,13 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
   }
 
+  // Note: row["Carline Number"] from the CSV is currently dropped — space
+  // numbers now live on Household, not Student. The roster importer will
+  // need a household-aware pass to set those; until then admins can edit
+  // each family's space # on the household detail page.
   const rows = allCsvData.map((row) => ({
     firstName: row.First,
     lastName: row["Last Name"],
-    spaceNumber: row["Carline Number"],
     homeRoom: row.Homeroom,
   }));
 

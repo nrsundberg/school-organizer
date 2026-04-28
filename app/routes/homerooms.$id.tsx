@@ -13,7 +13,11 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 
   const students = await prisma.student.findMany({
     where: { homeRoom: teacher?.homeRoom },
-    select: { firstName: true, lastName: true, spaceNumber: true }
+    select: {
+      firstName: true,
+      lastName: true,
+      household: { select: { spaceNumber: true } },
+    },
   });
 
   interface Student {
@@ -26,14 +30,15 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   const studentReturn: Student[] = [];
 
   for (let student of students) {
+    const spaceNumber = student.household?.spaceNumber ?? null;
     let spaceStatus = await prisma.space.findFirst({
-      where: { spaceNumber: student.spaceNumber ?? 0 },
+      where: { spaceNumber: spaceNumber ?? 0 },
       select: { status: true }
     });
     studentReturn.push({
       firstName: student.firstName,
       lastName: student.lastName,
-      spaceNumber: student.spaceNumber,
+      spaceNumber,
       status: spaceStatus ? spaceStatus.status : Status.EMPTY
     });
   }

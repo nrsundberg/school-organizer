@@ -49,7 +49,6 @@ export async function action({ request, context }: Route.ActionArgs) {
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
 
-  const spaceNum = formData.get("spaceNum") as string;
   const homeRoom = formData.get("homeRoom") as string;
   const firstName = formData.get("firstName") as string;
   const lastName = formData.get("lastName") as string;
@@ -57,16 +56,6 @@ export async function action({ request, context }: Route.ActionArgs) {
   try {
     if (!firstName?.trim() || !lastName?.trim()) {
       return { error: t("create.student.errors.namesRequired") };
-    }
-
-    const spaceNumber =
-      spaceNum && !isNaN(parseInt(spaceNum)) ? parseInt(spaceNum) : null;
-
-    if (spaceNumber) {
-      const existingSpace = await prisma.space.findFirst({ where: { spaceNumber } });
-      if (!existingSpace) {
-        await prisma.space.create({ data: { spaceNumber } });
-      }
     }
 
     const trimmedHomeRoom = homeRoom?.trim();
@@ -92,7 +81,6 @@ export async function action({ request, context }: Route.ActionArgs) {
       data: {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
-        spaceNumber,
         homeRoom: trimmedHomeRoom || null,
         householdId,
       }
@@ -128,7 +116,6 @@ export default function CreateStudent({ loaderData }: Route.ComponentProps) {
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [spaceNumber, setSpaceNumber] = useState("");
   const [homeRoom, setHomeRoom] = useState("");
 
   const isSubmitting = fetcher.state === "submitting";
@@ -160,12 +147,7 @@ export default function CreateStudent({ loaderData }: Route.ComponentProps) {
 
           <div className="space-y-4">
             <h2 className="text-lg font-semibold">{t("create.student.assignmentsOptional")}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1">
-                <label htmlFor="spaceNum" className="text-sm text-gray-400">{t("create.student.spaceLabel")}</label>
-                <Input id="spaceNum" type="number" name="spaceNum" placeholder={t("create.student.spacePlaceholder")} value={spaceNumber} onChange={(e) => setSpaceNumber(e.target.value)} disabled={isSubmitting} />
-                <p className="text-xs text-gray-400">{t("create.student.leaveEmpty")}</p>
-              </div>
+            <div className="grid grid-cols-1 gap-4">
               <div className="flex flex-col gap-1">
                 <label htmlFor="homeRoom" className="text-sm text-gray-400">{t("create.student.homeroomLabel")}</label>
                 <input
@@ -184,6 +166,7 @@ export default function CreateStudent({ loaderData }: Route.ComponentProps) {
                   ))}
                 </datalist>
                 <p className="text-xs text-gray-400">{t("create.student.leaveEmpty")}</p>
+                <p className="text-xs text-gray-400">{t("create.student.spaceHint")}</p>
               </div>
             </div>
           </div>
@@ -195,7 +178,7 @@ export default function CreateStudent({ loaderData }: Route.ComponentProps) {
           )}
 
           <div className="flex justify-between items-center pt-6 border-t">
-            <Button variant="ghost" onPress={() => { setFirstName(""); setLastName(""); setSpaceNumber(""); setHomeRoom(""); }} isDisabled={isSubmitting}>
+            <Button variant="ghost" onPress={() => { setFirstName(""); setLastName(""); setHomeRoom(""); }} isDisabled={isSubmitting}>
               <ArrowLeftIcon size={16} /> {tCommon("buttons.back")}
             </Button>
             <div className="flex gap-3">

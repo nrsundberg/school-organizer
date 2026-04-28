@@ -105,8 +105,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       return dataWithError(null, t("dashboard.actions.reduceError"));
     }
 
-    // Keep students, but detach them from spaces that are being removed.
-    await prisma.student.updateMany({
+    // Keep households, but detach them from spaces that are being removed.
+    // (Space # lives on Household — students inherit via household.)
+    await prisma.household.updateMany({
       where: { spaceNumber: { gt: target } },
       data: { spaceNumber: null },
     });

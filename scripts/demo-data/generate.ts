@@ -351,21 +351,26 @@ async function buildSeedForOrg(
     });
   }
 
-  // 6. Households.
+  // 6. Households. The first `spaceCount` households get sequential
+  // spaceNumbers 1..N — siblings share a single space, so the family is
+  // the natural owner of that field. Beyond `spaceCount` households are
+  // left unassigned.
   const householdIds: string[] = [];
   for (let h = 0; h < spec.householdCount; h++) {
     const familyLast = LAST_NAMES[(spec.randomSeed + h) % LAST_NAMES.length]!;
     const id = householdIdFor(spec.orgId, h);
     householdIds.push(id);
+    const spaceNumber = h < spaceCount ? h + 1 : null;
     out.push({
-      sql: `INSERT INTO "Household" (id, orgId, name, primaryContactName, primaryContactPhone, createdAt, updatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO "Household" (id, orgId, name, primaryContactName, primaryContactPhone, spaceNumber, createdAt, updatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         id,
         spec.orgId,
         `${familyLast} family`,
         `${rng.pick(FIRST_NAMES)} ${familyLast}`,
         `555-01${(h % 100).toString().padStart(2, "0")}`,
+        spaceNumber,
         nowIso,
         nowIso,
       ],
@@ -374,8 +379,8 @@ async function buildSeedForOrg(
 
   // 7. Students. Round-robin homerooms; assign to households such that
   // ~30% of households have 2 children (siblings) and the rest have 1.
-  // Assign every Nth student a spaceNumber (so the demo board has cars
-  // already on it when a viewer first hits /).
+  // The household's spaceNumber (above) is the source of truth for car-
+  // line position; students don't carry their own.
   if (spec.studentCount > 0 && householdIds.length === 0) {
     throw new Error(
       `Spec ${spec.slug}: studentCount > 0 requires at least one household`,
@@ -395,13 +400,10 @@ async function buildSeedForOrg(
     const first = rng.pick(FIRST_NAMES);
     const last = LAST_NAMES[(spec.randomSeed + nextHousehold) % LAST_NAMES.length]!;
     const homeRoom = homerooms[s % homerooms.length]!;
-    // Pre-position one student per active space (first `spaceCount`
-    // students get sequential spaces; the rest are unassigned).
-    const spaceNumber = s < spaceCount ? s + 1 : null;
     out.push({
-      sql: `INSERT INTO "Student" (firstName, lastName, orgId, homeRoom, householdId, spaceNumber)
-            VALUES (?, ?, ?, ?, ?, ?)`,
-      args: [first, last, spec.orgId, homeRoom, householdId, spaceNumber],
+      sql: `INSERT INTO "Student" (firstName, lastName, orgId, homeRoom, householdId)
+            VALUES (?, ?, ?, ?, ?)`,
+      args: [first, last, spec.orgId, homeRoom, householdId],
     });
   }
 

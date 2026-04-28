@@ -47,6 +47,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const prisma = getTenantPrisma(context);
   const [templates, activeRunRow] = await Promise.all([
     prisma.drillTemplate.findMany({
+      where: { deletedAt: null },
       orderBy: { updatedAt: "desc" },
       select: {
         id: true,
@@ -149,7 +150,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!id) {
       return dataWithError(null, t("drills.list.errors.missingId"));
     }
-    await prisma.drillTemplate.delete({ where: { id } });
+    // Soft-delete: hide from the picker but preserve historical DrillRuns
+    // and their event logs so the compliance trail stays intact.
+    await prisma.drillTemplate.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
     return dataWithSuccess(null, t("drills.list.errors.deleted"));
   }
 
@@ -171,7 +177,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const actor = getActorIdsFromContext(context);
     const env = (context as { cloudflare?: { env: Env } }).cloudflare?.env;
     const tpl = await prisma.drillTemplate.findFirst({
-      where: { id },
+      where: { id, deletedAt: null },
       select: { definition: true },
     });
     const initialState = tpl

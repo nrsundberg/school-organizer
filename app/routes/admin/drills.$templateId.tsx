@@ -125,7 +125,7 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
     throw new Response("Not found", { status: 404 });
   }
   const template = await prisma.drillTemplate.findFirst({
-    where: { id },
+    where: { id, deletedAt: null },
     select: {
       id: true,
       name: true,
@@ -185,7 +185,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       const orgId = getOrgFromContext(context).id;
       const actor = getActorIdsFromContext(context);
       const tpl = await prisma.drillTemplate.findFirst({
-        where: { id },
+        where: { id, deletedAt: null },
         select: { definition: true },
       });
       const initialState = tpl
