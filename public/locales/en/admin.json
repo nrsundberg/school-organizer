@@ -132,7 +132,8 @@
     },
     "danger": {
       "deleteAll": "Delete All Student Records",
-      "heading": "Danger Zone"
+      "heading": "Danger Zone",
+      "subtitle": "Permanently delete every student record in this org. Households and classrooms are kept."
     },
     "grid": {
       "addSpaces": "Add Spaces",
@@ -155,7 +156,9 @@
     "heading": "Dashboard",
     "import": {
       "createRecords": "Create Records",
-      "heading": "Import Students"
+      "heading": "Import Students",
+      "subtitle": "Quickly add students from a simple CSV. For full control (preview, household linking, classroom mapping) use the full roster import.",
+      "openFullImport": "Open full roster import →"
     },
     "metaTitle": "Admin Dashboard",
     "planUsage": {
@@ -182,7 +185,20 @@
     },
     "stats": {
       "gridSpaces": "Grid Spaces",
-      "students": "Students"
+      "students": "Students",
+      "boardState": "Board state",
+      "boardStateReady": "Ready",
+      "boardStateStale": "Not reset",
+      "pickupsToday": "Pickups today",
+      "pickupsTodayCaption_one": "{{count}} student currently called",
+      "pickupsTodayCaption_other": "{{count}} students currently called",
+      "pickupsTodayCaption": "{{count}} students currently called",
+      "exceptionsToday": "Exceptions today",
+      "exceptionsTodayCaption": "Different dismissal plan today",
+      "roster": "Roster",
+      "rosterCaption_one": "{{households}} household",
+      "rosterCaption_other": "{{households}} households",
+      "rosterCaption": "{{households}} households"
     },
     "viewerDrawing": {
       "body": "When enabled, viewers can draw light lines on the public board (stored on their device only).",
@@ -193,6 +209,47 @@
       "heading": "Viewer board drawing",
       "nonAdmin": "Only admins can change this setting. Ask an admin to enable or disable viewer drawing.",
       "subtle": "This affects the board seen by viewer accounts and logged-out visitors on the home page."
+    },
+    "subtitle": "Today's pickup operations at a glance.",
+    "header": {
+      "resetForToday": "Reset board for today",
+      "resetAgain": "Reset again"
+    },
+    "overview": {
+      "heading": "Today's snapshot"
+    },
+    "boardReset": {
+      "never": "The board has never been reset.",
+      "todayAt": "Reset {{time}} today",
+      "staleSince": "Last reset {{date}}"
+    },
+    "activity": {
+      "heading": "Recent activity",
+      "empty": "No recent activity yet. Drills and admin changes will appear here.",
+      "systemActor": "System",
+      "justNow": "just now",
+      "minutesAgo_one": "{{count}} minute ago",
+      "minutesAgo_other": "{{count}} minutes ago",
+      "minutesAgo": "{{count}} minutes ago",
+      "hoursAgo_one": "{{count}} hour ago",
+      "hoursAgo_other": "{{count}} hours ago",
+      "hoursAgo": "{{count}} hours ago",
+      "daysAgo_one": "{{count}} day ago",
+      "daysAgo_other": "{{count}} days ago",
+      "daysAgo": "{{count}} days ago",
+      "viewAll": "All pickup history",
+      "viewDrills": "All drill history"
+    },
+    "setup": {
+      "heading": "Setup & maintenance",
+      "subtitle": "Less-frequent admin tasks: configure the pickup board, viewer drawing, imports, and printable backups."
+    },
+    "printables": {
+      "heading": "Printables",
+      "subtitle_one": "PDF backups for the board, master roster, and {{homerooms}} homeroom. Open the print page to see all options.",
+      "subtitle_other": "PDF backups for the board, master roster, and {{homerooms}} homerooms. Open the print page to see all options.",
+      "subtitle": "PDF backups for the board, master roster, and {{homerooms}} homerooms. Open the print page to see all options.",
+      "open": "Open print page"
     }
   },
   "drills": {
@@ -985,7 +1042,8 @@
     "households": "Households",
     "panelTitle": "Admin Panel",
     "rosterImport": "Roster Import",
-    "users": "Users"
+    "users": "Users",
+    "print": "Print backups"
   },
   "usageBanner": {
     "classrooms": "Classrooms",
@@ -1084,6 +1142,27 @@
       "revokeSessions": "Revoke all current viewer sessions after resetting PIN",
       "savePin": "Save PIN",
       "unknownNetwork": "Unknown network"
+    }
+  },
+  "printables": {
+    "metaTitle": "Admin – Printables",
+    "heading": "Print backups",
+    "subtitle": "Browser-based PDFs you can print on demand for board backups, roster lists, and drill checklists.",
+    "backToDashboard": "Back to dashboard",
+    "board": {
+      "heading": "Pickup board",
+      "subtitle": "A printable copy of the current board, in case the screen goes down or you need a paper handoff.",
+      "fitPageHint": "one page",
+      "naturalSizeHint": "may span multiple pages"
+    },
+    "roster": {
+      "heading": "Roster lists",
+      "subtitle": "Master list of all students plus per-homeroom breakdowns sorted by name or car-space number.",
+      "emptyHomerooms": "No homerooms on file yet — once a roster is imported, per-homeroom prints will appear here."
+    },
+    "drills": {
+      "heading": "Drill checklists",
+      "subtitle": "Printable drill plan for use during practice and actual events."
     }
   }
 }
