@@ -1,14 +1,16 @@
 import { getPrisma } from "~/db.server";
 import {
-  listQualifyingPickupDates,
-  trialStillActive,
-  computeTrialEndsAtUtc,
-} from "~/domain/billing/trial.server";
+  evaluateTrialStatus,
+  applyTrialEvaluation,
+} from "~/domain/billing/trial-lifecycle.server";
 
 /**
- * Nightly job: refresh qualifying-day counts and end trials when the window closes.
+ * Nightly job: refresh qualifying-day counts and end trials when the
+ * window closes. Delegates the rule logic to `trial-lifecycle.server`.
  */
-export async function runTrialMaintenance(context: any): Promise<{ orgsChecked: number; ended: number }> {
+export async function runTrialMaintenance(
+  context: any,
+): Promise<{ orgsChecked: number; ended: number }> {
   const db = getPrisma(context);
   const now = new Date();
   const orgs = await db.org.findMany({
@@ -17,26 +19,9 @@ export async function runTrialMaintenance(context: any): Promise<{ orgsChecked: 
 
   let ended = 0;
   for (const org of orgs) {
-    const trialStartedAt = org.trialStartedAt!;
-    const dates = await listQualifyingPickupDates(db, org.id, trialStartedAt);
-    const trialEndsAt =
-      dates.length >= 25 ? computeTrialEndsAtUtc(trialStartedAt, dates) : null;
-
-    await db.org.update({
-      where: { id: org.id },
-      data: {
-        trialQualifyingPickupDays: dates.length,
-        ...(trialEndsAt ? { trialEndsAt } : {}),
-      },
-    });
-
-    if (!trialStillActive(org, dates, now)) {
-      await db.org.update({
-        where: { id: org.id },
-        data: { status: "INCOMPLETE", trialEndsAt: trialEndsAt ?? org.trialEndsAt },
-      });
-      ended += 1;
-    }
+    const evaluation = await evaluateTrialStatus(org, db, now);
+    await applyTrialEvaluation(db, org.id, evaluation);
+    if (evaluation.kind === "should_end") ended += 1;
   }
 
   return { orgsChecked: orgs.length, ended };
