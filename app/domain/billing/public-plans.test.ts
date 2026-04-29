@@ -4,16 +4,8 @@ import test from "node:test";
 import {
   normalizePublicPlanSelectionSource,
   pricingPathForPlan,
-  shouldStartCheckoutAfterSignup,
   signupPathForPlan
 } from "./public-plans";
-
-test("self-serve plans only start checkout after an explicit paid selection", () => {
-  assert.equal(shouldStartCheckoutAfterSignup("CAR_LINE", "explicit"), true);
-  assert.equal(shouldStartCheckoutAfterSignup("CAMPUS", "explicit"), true);
-  assert.equal(shouldStartCheckoutAfterSignup("DISTRICT", "explicit"), false);
-  assert.equal(shouldStartCheckoutAfterSignup("CAR_LINE", "default"), false);
-});
 
 test("plan selection source defaults safely", () => {
   assert.equal(normalizePublicPlanSelectionSource("explicit"), "explicit");

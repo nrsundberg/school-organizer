@@ -23,15 +23,9 @@ import { getAuth } from "~/domain/auth/better-auth.server";
 import { ensureOrgForUser } from "~/domain/billing/onboarding.server";
 import {
   billingPlanForSlug,
-  normalizePublicPlanSelectionSource,
   normalizePublicBillingCycle,
   normalizePublicPlan,
-  pricingPathForPlan,
-  PUBLIC_BILLING_CYCLES,
-  PUBLIC_PLAN_SELECTION_SOURCES,
-  shouldStartCheckoutAfterSignup,
-  type PublicBillingCycle,
-  type PublicPlanSelectionSource
+  type PublicBillingCycle
 } from "~/domain/billing/public-plans";
 import { getPrisma } from "~/db.server";
 import { signUp } from "~/lib/auth-client";
@@ -48,8 +42,6 @@ import {
   clientIpFromRequest,
   getRateLimiter
 } from "~/domain/utils/rate-limit.server";
-import { createCheckoutSessionForOrg } from "~/domain/billing/checkout.server";
-import { redirectWithError } from "remix-toast";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
 import { localizedErrorMap } from "~/lib/zod-error-map.server";
@@ -94,9 +86,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return {
     plan: plan ?? "car-line",
     billingCycle: normalizePublicBillingCycle(url.searchParams.get("cycle")),
-    planSelectionSource: normalizePublicPlanSelectionSource(
-      plan ? "explicit" : null
-    ),
     metaTitle: t("signup.metaTitle"),
     metaDescription: t("signup.metaDescription"),
   };
@@ -135,11 +124,7 @@ const step1Schema = z.object({
 const step3Schema = zfd.formData({
   orgName: zfd.text(z.string().min(2)),
   slug: zfd.text(z.string().min(1)),
-  plan: zfd.text(z.enum(VALID_PLANS)),
-  billingCycle: zfd.text(z.enum(PUBLIC_BILLING_CYCLES).optional()),
-  planSelectionSource: zfd.text(
-    z.enum(PUBLIC_PLAN_SELECTION_SOURCES).optional()
-  )
+  plan: zfd.text(z.enum(VALID_PLANS))
 });
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -211,16 +196,11 @@ export async function action({ request, context }: Route.ActionArgs) {
     );
   }
   const { orgName, slug, plan } = parsed.data;
-  const billingCycle = parsed.data.billingCycle ?? "monthly";
-  const planSelectionSource = parsed.data.planSelectionSource ?? "default";
-  const startsInCheckout = shouldStartCheckoutAfterSignup(
-    plan,
-    planSelectionSource
-  );
 
-  // 3. Create the org first so signup can either continue into checkout for
-  //    an explicitly-selected self-serve paid plan, or keep the existing
-  //    board redirect for district/default flows.
+  // 3. Create the org. New orgs always start in TRIALING with a 30-day local
+  //    trial — no Stripe Checkout at signup, regardless of plan. Users add
+  //    a payment method later from /admin/billing or via the trial-ending
+  //    banner.
   let orgId: string;
   try {
     const result = await ensureOrgForUser({
@@ -242,35 +222,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     );
   }
 
-  if (startsInCheckout) {
-    try {
-      const origin = new URL(request.url).origin;
-      const successUrl = `${origin}/billing/success?session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl = new URL(
-        pricingPathForPlan(plan, billingCycle),
-        origin
-      ).toString();
-      const { url } = await createCheckoutSessionForOrg({
-        context,
-        orgId,
-        plan,
-        billingCycle,
-        email,
-        successUrl,
-        cancelUrl
-      });
-      throw redirect(url);
-    } catch (error) {
-      if (error instanceof Response) throw error;
-      const message =
-        error instanceof Error
-          ? error.message
-          : t("signup.errors.couldNotStartCheckout");
-      return redirectWithError(pricingPathForPlan(plan, billingCycle), message);
-    }
-  }
-
-  // 4. District and default/fallback flows keep the current no-card trial path.
+  // 4. Land everyone on their tenant board.
   const db = getPrisma(context);
   const org = await db.org.findUnique({
     where: { id: orgId },
@@ -311,12 +263,6 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
   const selectedPlanSlug = loaderData.plan;
   const initialPlan: Plan = billingPlanForSlug(selectedPlanSlug);
   const selectedBillingCycle = loaderData.billingCycle as PublicBillingCycle;
-  const planSelectionSource =
-    loaderData.planSelectionSource as PublicPlanSelectionSource;
-  const startsInCheckout = shouldStartCheckoutAfterSignup(
-    initialPlan,
-    planSelectionSource
-  );
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -533,27 +479,15 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
       return t("signup.step3.planDescriptions.district");
     }
     if (plan === "CAMPUS") {
-      return startsInCheckout
-        ? t("signup.step3.planDescriptions.campusCheckout", { cycle: cycleLabel })
-        : t("signup.step3.planDescriptions.campus", { cycle: cycleLabel });
+      return t("signup.step3.planDescriptions.campus", { cycle: cycleLabel });
     }
-    return startsInCheckout
-      ? t("signup.step3.planDescriptions.carLineCheckout", { cycle: cycleLabel })
-      : t("signup.step3.planDescriptions.carLine", { cycle: cycleLabel });
+    return t("signup.step3.planDescriptions.carLine", { cycle: cycleLabel });
   })();
 
-  const step3Title = startsInCheckout
-    ? t("signup.step3.titleCheckout")
-    : t("signup.step3.title");
-  const step3Subtitle = startsInCheckout
-    ? t("signup.step3.subtitleCheckout")
-    : t("signup.step3.subtitle");
-  const step3Submit = startsInCheckout
-    ? t("signup.step3.submitCheckout")
-    : t("signup.step3.submit");
-  const step3Terms = startsInCheckout
-    ? t("signup.step3.termsCheckout")
-    : t("signup.step3.terms");
+  const step3Title = t("signup.step3.title");
+  const step3Subtitle = t("signup.step3.subtitle");
+  const step3Submit = t("signup.step3.submit");
+  const step3Terms = t("signup.step3.terms");
 
   return (
     <div className="min-h-screen bg-[#0f1414] text-white">
@@ -779,7 +713,7 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
               <h1 className="text-2xl font-bold">{step3Title}</h1>
               <p className="mt-2 text-sm text-white/65">
                 {step3Subtitle}
-                {!startsInCheckout && plan === "DISTRICT" && (
+                {plan === "DISTRICT" && (
                   <> {t("signup.step3.districtAddon")}</>
                 )}
               </p>
@@ -800,16 +734,6 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 <input type="hidden" name="orgName" value={orgName} />
                 <input type="hidden" name="slug" value={slugNormalized} />
                 <input type="hidden" name="plan" value={plan} />
-                <input
-                  type="hidden"
-                  name="billingCycle"
-                  value={selectedBillingCycle}
-                />
-                <input
-                  type="hidden"
-                  name="planSelectionSource"
-                  value={planSelectionSource}
-                />
                 {actionData?.error && (
                   <p className="text-center text-sm text-red-400">
                     {actionData.error}

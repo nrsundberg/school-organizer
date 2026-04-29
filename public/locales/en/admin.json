@@ -11,6 +11,7 @@
     "orgStatus": "Org status",
     "plan": "Plan",
     "redirecting": "Redirecting…",
+    "startSubscription": "Add payment method",
     "subscriptionStatus": "Subscription status",
     "trialDays_one": "{{count}} day",
     "trialDays_other": "{{count}} days",
@@ -979,6 +980,12 @@
     "headline": "Payment failed — your subscription is past due.",
     "suffix": " (14 days from the first past-due notice).",
     "updateBilling": "Update billing"
+  },
+  "trialEndingBanner": {
+    "addPaymentMethod": "Add payment method",
+    "body": "Add a payment method to keep using Pickup Roster after your trial ends.",
+    "headline_one": "Your trial ends in {{count}} day.",
+    "headline_other": "Your trial ends in {{count}} days."
   },
   "print": {
     "board": {
