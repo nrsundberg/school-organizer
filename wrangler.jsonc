@@ -29,7 +29,7 @@
 		"MARKETING_HOSTS": "localhost,127.0.0.1,school-organizer.sundbergne.workers.dev",
 		"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
 		"SUPPORT_EMAIL": "support@pickuproster.com",
-		"STRIPE_STATUS_URL": "https://www.stripe-status.com/api/v2/status.json",
+		"STRIPE_STATUS_URL": "https://www.stripestatus.com/api/v2/status.json",
 		// Browsers drop cookies whose Domain attribute (`pickuproster.com`)
 		// doesn't match the request host (`localhost` / `*.localhost`). In
 		// dev/CI we want host-only cookies so the same auth flow that works
@@ -193,7 +193,7 @@
 				"MARKETING_HOSTS": "localhost,127.0.0.1,school-organizer.sundbergne.workers.dev",
 				"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
 				"SUPPORT_EMAIL": "support@pickuproster.com",
-				"STRIPE_STATUS_URL": "https://www.stripe-status.com/api/v2/status.json"
+				"STRIPE_STATUS_URL": "https://www.stripestatus.com/api/v2/status.json"
 			},
 			"triggers": {
 				"crons": [
@@ -296,7 +296,7 @@
 				"MARKETING_HOSTS": "localhost,127.0.0.1,staging.pickuproster.com,www.staging.pickuproster.com,school-organizer-staging.sundbergne.workers.dev",
 				"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
 				"SUPPORT_EMAIL": "support@pickuproster.com",
-				"STRIPE_STATUS_URL": "https://www.stripe-status.com/api/v2/status.json"
+				"STRIPE_STATUS_URL": "https://www.stripestatus.com/api/v2/status.json"
 			},
 			"d1_databases": [
 				{
