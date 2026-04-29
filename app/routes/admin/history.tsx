@@ -605,7 +605,7 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
                                 {onBehalfPart && actorPart && (
                                   <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-200">
                                     <span className="uppercase tracking-wide">
-                                      via
+                                      {t("history.table.viaBadge")}
                                     </span>
                                     <span>{onBehalfPart}</span>
                                   </span>
