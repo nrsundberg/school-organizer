@@ -3,6 +3,11 @@ import { useRevalidator } from "react-router";
 
 type DrillUpdateMsg = {
   type: "drillUpdate";
+  // Stable per-tab id of the client that originated the underlying mutation.
+  // Present for `update-state` broadcasts; absent for status-change
+  // broadcasts (pause/resume/admin). The recipient uses this to skip
+  // re-applying its own echoed state after an optimistic local update.
+  senderClientId?: string;
   run: {
     id: string;
     status: "LIVE" | "PAUSED" | "ENDED";
