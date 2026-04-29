@@ -51,9 +51,9 @@ test("billing-related bypass paths exempt the billing gate", () => {
 });
 
 test("public marketing paths only count when on the marketing host", () => {
-  // Pricing on marketing host → public; on tenant host → not public.
+  // Pricing/faqs/status/blog/guides are host-agnostic; signup/root are marketing-only.
   assert.equal(marketing("/pricing").isPublicMarketingPath, true);
-  assert.equal(tenant("/pricing").isPublicMarketingPath, true); // pricing is host-agnostic
+  assert.equal(tenant("/pricing").isPublicMarketingPath, true);
   // Signup is public only on marketing host.
   assert.equal(marketing("/signup").isPublicMarketingPath, true);
   assert.equal(tenant("/signup").isPublicMarketingPath, false);

@@ -12,10 +12,16 @@
  *
  * Each rule that can deny access throws a `redirect(...)` Response. Callers
  * never have to know the rule strings — the resolver owns the policy.
+ *
+ * Dependency injection: every external collaborator (db, session loader,
+ * host helpers, viewer-access check, clock) is funneled through `ResolveDeps`.
+ * Production callers use `buildResolveDeps(context)`; tests pass fakes
+ * directly without needing a Cloudflare context shim.
  */
 
 import { redirect } from "react-router";
 import type { Org, User } from "~/db";
+import type { PrismaClient } from "~/db/generated/client";
 import { getPrisma } from "~/db.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { hasValidViewerAccess } from "~/domain/auth/viewer-access.server";
@@ -51,38 +57,76 @@ export type ResolvedRequestScope = {
   actor: ActorIds;
 };
 
+export type SessionFacts = {
+  user: User | null;
+  impersonatedOrgId: string | null;
+  impersonatedBy: string | null;
+};
+
+/**
+ * Everything the resolver needs from the outside world. Production wiring
+ * lives in `buildResolveDeps`; tests construct this directly with fakes.
+ */
+export type ResolveDeps = {
+  db: PrismaClient;
+  loadSession: (request: Request) => Promise<SessionFacts>;
+  hasViewerAccess: (request: Request) => Promise<boolean>;
+  isMarketingHost: (request: Request) => boolean;
+  isPlatformAdmin: (user: User) => boolean;
+  marketingOrigin: (request: Request) => string;
+  resolveTenantSlug: (request: Request) => string | null;
+  tenantBoardUrl: (request: Request, slug: string) => string;
+  now: () => Date;
+};
+
+export function buildResolveDeps(context: any): ResolveDeps {
+  const db = getPrisma(context);
+  return {
+    db,
+    loadSession: (request) => loadBetterAuthSession(db, request, context),
+    hasViewerAccess: (request) => hasValidViewerAccess({ request, context }),
+    isMarketingHost: (request) => isMarketingHost(request, context),
+    isPlatformAdmin: (user) => isPlatformAdmin(user, context),
+    marketingOrigin: (request) => marketingOriginFromRequest(request, context),
+    resolveTenantSlug: (request) => resolveTenantSlugFromHost(request, context),
+    tenantBoardUrl: (request, slug) => tenantBoardUrlFromRequest(request, slug),
+    now: () => new Date(),
+  };
+}
+
 export async function resolveRequestScope(
   request: Request,
   context: any,
+  deps: ResolveDeps = buildResolveDeps(context),
 ): Promise<ResolvedRequestScope> {
   const url = new URL(request.url);
-  const onMarketingHost = isMarketingHost(request, context);
+  const onMarketingHost = deps.isMarketingHost(request);
   const path = classifyRequestPath(url.pathname, onMarketingHost);
 
-  const db = getPrisma(context);
-
-  const hostOrg = await resolveOrgByHost(db, request, context).catch(() => null);
-  const session = await loadSession(db, request, context);
+  const hostOrg = await resolveOrgByHost(deps, request).catch(() => null);
+  const session = await deps.loadSession(request);
 
   // Apply impersonation overlay. Impersonation takes precedence over both
   // host-resolved and user.orgId.
   let org: Org | null = hostOrg;
   let realOrg: Org | null = null;
   if (!onMarketingHost && session.impersonatedOrgId) {
-    const impOrg = await db.org.findUnique({
+    const impOrg = await deps.db.org.findUnique({
       where: { id: session.impersonatedOrgId },
     });
     if (impOrg) {
       org = impOrg;
       // The user's "real" org is whatever they'd be on without the overlay.
       if (session.user?.orgId && session.user.orgId !== impOrg.id) {
-        realOrg = await db.org.findUnique({
+        realOrg = await deps.db.org.findUnique({
           where: { id: session.user.orgId },
         });
       }
     }
   } else if (!onMarketingHost && !org && session.user?.orgId) {
-    org = await db.org.findUnique({ where: { id: session.user.orgId } });
+    org = await deps.db.org.findUnique({
+      where: { id: session.user.orgId },
+    });
   }
   if (onMarketingHost) {
     org = null;
@@ -111,8 +155,8 @@ export async function resolveRequestScope(
   // Console redirects: platform/district staff hitting tenant subdomains
   // without an active impersonation get bounced back to their console.
   enforceConsoleRedirects({
+    deps,
     request,
-    context,
     path,
     user: session.user,
     org,
@@ -123,9 +167,8 @@ export async function resolveRequestScope(
   // Tenant ↔ org match: a regular user on the wrong tenant gets redirected
   // to their home org's URL (or to /signup if their account has no org).
   await enforceTenantOrgMatch({
-    db,
+    deps,
     request,
-    context,
     path,
     user: session.user,
     org,
@@ -136,8 +179,8 @@ export async function resolveRequestScope(
   // Anonymous-viewer access: no session, on a tenant org, must hold a valid
   // viewer-access cookie unless the path is anon-skippable.
   await enforceAnonymousAccess({
+    deps,
     request,
-    context,
     path,
     user: session.user,
     org,
@@ -146,7 +189,7 @@ export async function resolveRequestScope(
   // Billing gate: authed user + org → must pass `isOrgAccessAllowed`,
   // including district-deference when the org is part of a district.
   await enforceBillingGate({
-    db,
+    deps,
     path,
     user: session.user,
     org,
@@ -162,39 +205,37 @@ export async function resolveRequestScope(
 }
 
 // ---------------------------------------------------------------------------
-// Internals — each rule isolated for readability and (in principle) testing.
+// Internals — each rule isolated for readability and testability.
+// Exported so unit tests can target them without re-running the full pipe.
 // ---------------------------------------------------------------------------
 
-type SessionFacts = {
-  user: User | null;
-  impersonatedOrgId: string | null;
-  impersonatedBy: string | null;
-};
-
 async function resolveOrgByHost(
-  db: ReturnType<typeof getPrisma>,
+  deps: ResolveDeps,
   request: Request,
-  context: any,
 ): Promise<Org | null> {
   const host = new URL(request.url).host.toLowerCase().split(":")[0];
-  const byCustom = await db.org.findFirst({ where: { customDomain: host } });
+  const byCustom = await deps.db.org.findFirst({
+    where: { customDomain: host },
+  });
   if (byCustom) return byCustom;
 
-  if (isMarketingHost(request, context)) return null;
+  if (deps.isMarketingHost(request)) return null;
 
-  const slug = resolveTenantSlugFromHost(request, context);
+  const slug = deps.resolveTenantSlug(request);
   if (slug) {
-    const bySlug = await db.org.findUnique({ where: { slug } });
+    const bySlug = await deps.db.org.findUnique({ where: { slug } });
     if (bySlug) return bySlug;
   }
 
-  const defaultOrg = await db.org.findUnique({ where: { slug: "default" } });
+  const defaultOrg = await deps.db.org.findUnique({
+    where: { slug: "default" },
+  });
   if (defaultOrg) return defaultOrg;
-  return db.org.findFirst({ orderBy: { createdAt: "asc" } });
+  return deps.db.org.findFirst({ orderBy: { createdAt: "asc" } });
 }
 
-async function loadSession(
-  db: ReturnType<typeof getPrisma>,
+async function loadBetterAuthSession(
+  db: PrismaClient,
   request: Request,
   context: any,
 ): Promise<SessionFacts> {
@@ -226,16 +267,16 @@ async function loadSession(
   return { user, impersonatedOrgId, impersonatedBy };
 }
 
-function enforceConsoleRedirects(args: {
+export function enforceConsoleRedirects(args: {
+  deps: ResolveDeps;
   request: Request;
-  context: any;
   path: ReturnType<typeof classifyRequestPath>;
   user: User | null;
   org: Org | null;
   onMarketingHost: boolean;
   impersonation: ImpersonationState;
 }) {
-  const { request, context, path, user, org, onMarketingHost, impersonation } =
+  const { deps, request, path, user, org, onMarketingHost, impersonation } =
     args;
   if (
     onMarketingHost ||
@@ -246,32 +287,31 @@ function enforceConsoleRedirects(args: {
   ) {
     return;
   }
-  if (isPlatformAdmin(user, context) && user.orgId !== org.id) {
-    throw redirect(`${marketingOriginFromRequest(request, context)}/platform`);
+  if (deps.isPlatformAdmin(user) && user.orgId !== org.id) {
+    throw redirect(`${deps.marketingOrigin(request)}/platform`);
   }
   if (user.role === "ADMIN" && user.districtId && !user.orgId) {
-    throw redirect(`${marketingOriginFromRequest(request, context)}/district`);
+    throw redirect(`${deps.marketingOrigin(request)}/district`);
   }
 }
 
-async function enforceTenantOrgMatch(args: {
-  db: ReturnType<typeof getPrisma>;
+export async function enforceTenantOrgMatch(args: {
+  deps: ResolveDeps;
   request: Request;
-  context: any;
   path: ReturnType<typeof classifyRequestPath>;
   user: User | null;
   org: Org | null;
   onMarketingHost: boolean;
   impersonation: ImpersonationState;
 }) {
-  const { db, request, context, path, user, org, onMarketingHost, impersonation } =
+  const { deps, request, path, user, org, onMarketingHost, impersonation } =
     args;
   if (
     onMarketingHost ||
     !user ||
     !org ||
     path.skipTenantOrgBinding ||
-    isPlatformAdmin(user, context) ||
+    deps.isPlatformAdmin(user) ||
     impersonation.active
   ) {
     return;
@@ -280,25 +320,25 @@ async function enforceTenantOrgMatch(args: {
   if (sameOrg) return;
 
   if (user.orgId) {
-    const userOrgRow = await db.org.findUnique({
+    const userOrgRow = await deps.db.org.findUnique({
       where: { id: user.orgId },
       select: { slug: true },
     });
     if (userOrgRow?.slug) {
-      throw redirect(tenantBoardUrlFromRequest(request, userOrgRow.slug));
+      throw redirect(deps.tenantBoardUrl(request, userOrgRow.slug));
     }
   }
-  throw redirect(`${marketingOriginFromRequest(request, context)}/signup`);
+  throw redirect(`${deps.marketingOrigin(request)}/signup`);
 }
 
-async function enforceAnonymousAccess(args: {
+export async function enforceAnonymousAccess(args: {
+  deps: ResolveDeps;
   request: Request;
-  context: any;
   path: ReturnType<typeof classifyRequestPath>;
   user: User | null;
   org: Org | null;
 }) {
-  const { request, context, path, user, org } = args;
+  const { deps, request, path, user, org } = args;
   if (user || path.anonSkipsViewer) return;
 
   const url = new URL(request.url);
@@ -307,23 +347,23 @@ async function enforceAnonymousAccess(args: {
   if (path.isPlatform || !org) {
     throw redirect(`/login?next=${encodeURIComponent(nextPath)}`);
   }
-  const hasAccess = await hasValidViewerAccess({ request, context });
+  const hasAccess = await deps.hasViewerAccess(request);
   if (!hasAccess) {
     throw redirect(`/viewer-access?next=${encodeURIComponent(nextPath)}`);
   }
 }
 
-async function enforceBillingGate(args: {
-  db: ReturnType<typeof getPrisma>;
+export async function enforceBillingGate(args: {
+  deps: ResolveDeps;
   path: ReturnType<typeof classifyRequestPath>;
   user: User | null;
   org: Org | null;
 }) {
-  const { db, path, user, org } = args;
+  const { deps, path, user, org } = args;
   if (!user || !org || path.exemptFromBillingGate) return;
 
   const district = org.districtId
-    ? await db.district.findUnique({
+    ? await deps.db.district.findUnique({
         where: { id: org.districtId },
         select: { status: true, compedUntil: true, isComped: true },
       })
@@ -332,10 +372,7 @@ async function enforceBillingGate(args: {
     throw redirect("/billing-required");
   }
   if (
-    !isOrgAccessAllowed(
-      { org, district: district ?? undefined },
-      new Date(),
-    )
+    !isOrgAccessAllowed({ org, district: district ?? undefined }, deps.now())
   ) {
     throw redirect("/billing-required");
   }
