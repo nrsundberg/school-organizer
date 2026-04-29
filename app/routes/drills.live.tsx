@@ -391,6 +391,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
     if (intent === "update-state") {
       const raw = String(formData.get("state") ?? "");
+      const clientId = String(formData.get("clientId") ?? "") || undefined;
       let parsed: unknown;
       try {
         parsed = JSON.parse(raw);
@@ -408,13 +409,18 @@ export async function action({ request, context }: Route.ActionArgs) {
         audit.userAgent,
       );
       if (env) {
-        await broadcastDrillUpdate(env, org.id, {
-          id: updated.id,
-          status: updated.status as "LIVE" | "PAUSED" | "ENDED",
-          audience: updated.audience,
-          state: updated.state,
-          updatedAtIso: updated.updatedAt.toISOString(),
-        });
+        await broadcastDrillUpdate(
+          env,
+          org.id,
+          {
+            id: updated.id,
+            status: updated.status as "LIVE" | "PAUSED" | "ENDED",
+            audience: updated.audience,
+            state: updated.state,
+            updatedAtIso: updated.updatedAt.toISOString(),
+          },
+          clientId,
+        );
         if (events.length > 0) {
           await broadcastDrillActivity(
             env,
@@ -538,6 +544,13 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
   const notesDirtyRef = useRef(false);
   const focusedItemIdRef = useRef<string | null>(null);
   const dirtyItemTextRef = useRef<Set<string>>(new Set());
+
+  // Per-tab id sent with every `update-state` submission. The server tags
+  // its broadcast with this id; `onUpdate` ignores echoes whose
+  // senderClientId matches, so a rapid double-click can't be reverted by an
+  // older in-flight echo overwriting the user's newer optimistic state.
+  const clientIdRef = useRef<string | null>(null);
+  if (clientIdRef.current === null) clientIdRef.current = crypto.randomUUID();
 
   // Latest committed state — used by debounced auto-save callbacks so they
   // see fresh data without restarting the timer on every keystroke.
@@ -665,6 +678,7 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
       fd.set("intent", "update-state");
       fd.set("runId", run.id);
       fd.set("state", JSON.stringify(next));
+      fd.set("clientId", clientIdRef.current!);
       fetcher.submit(fd, { method: "post" });
     },
     [fetcher, readOnly, run.id],
@@ -689,12 +703,21 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
   const ws = useDrillWebSocket({
     runId: run.id,
     onUpdate: (msg) => {
-      const incomingState = parseRunState(msg.run.state as Prisma.JsonValue);
+      // Receiving any drillUpdate (including our own echo) is a save
+      // acknowledgement — flip the inline "Saved" indicator regardless.
+      setLastSavedAt(Date.now());
+      // Our own echo: local state is already at least as fresh as what we
+      // sent, and may be *newer* if the user clicked again before this
+      // echo arrived. Re-applying the echoed toggles would revert that
+      // newer click, producing a green→red→green→red flicker.
+      if (msg.senderClientId && msg.senderClientId === clientIdRef.current) {
+        return;
+      }
       // Skip if the server's view is older than what we already have (can
       // happen when our own save's broadcast races our fetcher revalidation).
       if (msg.run.updatedAtIso < run.updatedAtIso) return;
+      const incomingState = parseRunState(msg.run.state as Prisma.JsonValue);
       setState((local) => smartMerge(local, incomingState));
-      setLastSavedAt(Date.now());
     },
     onActivity: (msg) => {
       setActivity((prev) => {

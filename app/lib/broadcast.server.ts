@@ -95,13 +95,14 @@ export async function broadcastDrillUpdate(
     state: unknown;
     updatedAtIso: string;
   },
+  senderClientId?: string,
 ) {
   const id = env.BINGO_BOARD.idFromName(orgId);
   const stub = env.BINGO_BOARD.get(id);
   await stub.fetch("https://internal/broadcast", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ type: "drillUpdate", run }),
+    body: JSON.stringify({ type: "drillUpdate", senderClientId, run }),
   });
 }
 
