@@ -544,6 +544,12 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
   const notesDirtyRef = useRef(false);
   const focusedItemIdRef = useRef<string | null>(null);
   const dirtyItemTextRef = useRef<Set<string>>(new Set());
+  // Optimistic-add tracking: ids of locally-added items that haven't round-
+  // tripped yet. Lets smartMerge tell "I just added this, server doesn't
+  // know" apart from "another client deleted this, server is telling me
+  // it's gone." Without this, remote deletes silently re-appear because
+  // the merge re-adds any local item missing from the incoming state.
+  const pendingAddsRef = useRef<Set<string>>(new Set());
 
   // Per-tab id sent with every `update-state` submission. The server tags
   // its broadcast with this id; `onUpdate` ignores echoes whose
@@ -601,6 +607,8 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
     const seen = new Set<string>();
     const merged = incoming.actionItems.map((srv) => {
       seen.add(srv.id);
+      // Server has acknowledged this id — it's no longer a pending add.
+      pendingAddsRef.current.delete(srv.id);
       const lcl = localItemMap.get(srv.id);
       if (!lcl) return srv;
       const isFocused = focusedItemIdRef.current === srv.id;
@@ -611,7 +619,11 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
       };
     });
     for (const lcl of local.actionItems) {
-      if (!seen.has(lcl.id)) merged.push(lcl);
+      if (seen.has(lcl.id)) continue;
+      // Preserve only optimistic adds the server hasn't seen yet. A local
+      // item the server doesn't know about and that we never added must
+      // have been deleted by another client — drop it.
+      if (pendingAddsRef.current.has(lcl.id)) merged.push(lcl);
     }
     return {
       toggles: incoming.toggles,
@@ -914,9 +926,11 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
   const addActionItem = useCallback(() => {
     if (readOnly) return;
     setState((s) => {
+      const id = newId();
+      pendingAddsRef.current.add(id);
       const next: RunState = {
         ...s,
-        actionItems: [...s.actionItems, { id: newId(), text: "", done: false }],
+        actionItems: [...s.actionItems, { id, text: "", done: false }],
       };
       persist(next);
       return next;
@@ -974,6 +988,7 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
       if (readOnly) return;
       flushItemDebounce(id);
       dirtyItemTextRef.current.delete(id);
+      pendingAddsRef.current.delete(id);
       setState((s) => {
         const next: RunState = {
           ...s,
