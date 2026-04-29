@@ -47,10 +47,17 @@ export interface LanguageSwitcherProps {
    * inside a tight footer or mobile drawer. Phase 2 can extend this set.
    */
   placement?: "header" | "compact";
+  /**
+   * Foreground tone of the trigger. `"light"` (default) uses white text/border
+   * for dark backgrounds (marketing nav). `"dark"` uses black for light
+   * backgrounds (tenant header bar tinted with the org's primary color).
+   */
+  tone?: "light" | "dark";
 }
 
 export default function LanguageSwitcher({
   placement = "header",
+  tone = "light",
 }: LanguageSwitcherProps) {
   const { i18n, t } = useTranslation("common");
   const current: SupportedLanguage = pickSupportedLanguage(i18n.language);
@@ -96,9 +103,14 @@ export default function LanguageSwitcher({
 
   // Trigger sizing: HeroUI Button at default `md` is ~40px; we bump padding
   // so the hit area is >= 44px on touch devices (WCAG 2.5.5 Target Size AAA).
-  const triggerClass = compact
+  const sizeClass = compact
     ? "min-h-[40px] px-2 gap-1"
     : "min-h-[44px] px-3 gap-2";
+  const toneClass =
+    tone === "dark"
+      ? "text-black border-black hover:bg-black/10"
+      : "text-white border-white/40 hover:bg-white/10";
+  const triggerClass = `${sizeClass} ${toneClass}`;
 
   return (
     <Popover isOpen={open} onOpenChange={setOpen}>

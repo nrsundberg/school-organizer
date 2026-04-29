@@ -904,7 +904,7 @@
       "backToHouseholds": "Back to households"
     },
     "indexHeader": {
-      "createCta": "+ Create household",
+      "createCta": "Crear hogar",
       "title": "Households",
       "subtitle": "Group siblings, capture shared pickup context, and keep dismissal exceptions in sync."
     }

@@ -1380,16 +1380,16 @@ function ActivityPanel({
   // Reverse so newest is on top.
   const ordered = useMemo(() => events.slice().reverse(), [events]);
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-4 flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
-      <div className="text-xs uppercase tracking-wide text-white/50 font-semibold sticky top-0 bg-[#181c1c]/80 backdrop-blur -mx-1 px-1 py-1">
+    <div className="rounded-xl border border-white/10 bg-white/5 max-h-[60vh] overflow-y-auto">
+      <div className="text-xs uppercase tracking-wide text-white/50 font-semibold sticky top-0 bg-[#181c1c] px-4 py-2 z-10 border-b border-white/10">
         {t("drillsLive.activityHeading", { defaultValue: "Activity" })}
       </div>
       {ordered.length === 0 ? (
-        <p className="text-white/40 text-xs">
+        <p className="text-white/40 text-xs p-4">
           {t("drillsLive.activityEmpty", { defaultValue: "No activity yet." })}
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-2 p-4">
           {ordered.map((ev) => {
             // formatDrillEvent expects a typed payload but the wire shape is
             // unknown JSON. Cast to the formatter's expected shape; if a kind
