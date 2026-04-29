@@ -201,6 +201,7 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   const isCheckEmailApi = pathname === "/api/check-email";
   const isCheckOrgSlugApi = pathname === "/api/check-org-slug";
   const isBrandingLogoApi = pathname.startsWith("/api/branding/logo/");
+  const isHealthz = pathname === "/api/healthz";
   const isPlatform = pathname.startsWith("/platform");
 
   const publicMarketingPath =
@@ -281,6 +282,7 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
     isCheckEmailApi ||
     isCheckOrgSlugApi ||
     isBrandingLogoApi ||
+    isHealthz ||
     publicMarketingPath;
 
   if (!user && !anonSkipsViewer) {
