@@ -1,21 +1,12 @@
 import type { MiddlewareFunction } from "react-router";
-import { createContext, redirect } from "react-router";
+import { createContext } from "react-router";
 import type { Org, User } from "~/db";
 import { getPrisma } from "~/db.server";
-import { getAuth } from "~/domain/auth/better-auth.server";
-import { hasValidViewerAccess } from "~/domain/auth/viewer-access.server";
-import { isOrgAccessAllowed } from "~/domain/billing/org-status";
-import { tenantBoardUrlFromRequest } from "~/lib/org-slug";
-import {
-  isMarketingHost,
-  isPlatformAdmin,
-  marketingOriginFromRequest,
-  resolveTenantSlugFromHost
-} from "~/domain/utils/host.server";
 import {
   resolveActorIds,
-  type ActorIds
+  type ActorIds,
 } from "~/domain/auth/impersonate-gate.server";
+import { resolveRequestScope } from "~/domain/request-scope/resolve.server";
 
 export const userContext = createContext<User | null>(null);
 export const orgContext = createContext<Org | null>(null);
@@ -93,236 +84,26 @@ export const getTenantPrisma = (context: any) => {
   return getPrisma(context, org.id);
 };
 
-async function resolveOrgByHost(
-  db: ReturnType<typeof getPrisma>,
-  request: Request,
-  context: any
-): Promise<Org | null> {
-  const host = new URL(request.url).host.toLowerCase().split(":")[0];
-
-  const byCustom = await db.org.findFirst({ where: { customDomain: host } });
-  if (byCustom) return byCustom;
-
-  if (isMarketingHost(request, context)) {
-    return null;
-  }
-
-  const slug = resolveTenantSlugFromHost(request, context);
-  if (slug) {
-    const bySlug = await db.org.findUnique({ where: { slug } });
-    if (bySlug) return bySlug;
-  }
-
-  const defaultOrg = await db.org.findUnique({ where: { slug: "default" } });
-  if (defaultOrg) return defaultOrg;
-  return db.org.findFirst({ orderBy: { createdAt: "asc" } });
-}
-
+/**
+ * Thin coupling layer between the request lifecycle and `resolveRequestScope`.
+ *
+ * The resolver owns the full decision tree (host → org, session, console
+ * redirects, tenant-org match, viewer access, billing gate); this middleware
+ * just persists its output into the legacy contexts so existing route
+ * loaders that call `getOrgFromContext` / `getUserFromContext` keep working
+ * unchanged.
+ */
 export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   { request, context },
-  next
+  next,
 ) => {
-  const db = getPrisma(context);
-  let user: User | null = null;
-  let org: Org | null = null;
-
-  try {
-    org = await resolveOrgByHost(db, request, context);
-  } catch {
-    // Host-to-org resolution is best-effort during rollout.
-  }
-
-  let impersonatedOrgId: string | null = null;
-  let impersonatedBy: string | null = null;
-  try {
-    const auth = getAuth(context);
-    const session = await auth.api.getSession({
-      headers: request.headers
-    });
-    if (session?.user?.id) {
-      user = await db.user.findUnique({ where: { id: session.user.id } });
-      if (user?.role === "CALLER") {
-        user = await db.user.update({
-          where: { id: user.id },
-          data: { role: "CONTROLLER" }
-        });
-      }
-      impersonatedOrgId =
-        (session.session as { impersonatedOrgId?: string | null } | null)
-          ?.impersonatedOrgId ?? null;
-    }
-    impersonatedBy =
-      (session?.session as { impersonatedBy?: string | null } | undefined)
-        ?.impersonatedBy ?? null;
-  } catch {
-    // No session — that's fine, board is public
-  }
-
-  context.set(userContext, user);
-  context.set(impersonatedByContext, impersonatedBy);
-
-  const onMarketingHost = isMarketingHost(request, context);
-  // Impersonation takes precedence over both host-resolved and user.orgId.
-  // When a district admin (or platform admin) has an active impersonation,
-  // the request operates as that org and the existing tenant-extension
-  // scopes accordingly — no per-route changes required.
-  if (!onMarketingHost && impersonatedOrgId) {
-    const impOrg = await db.org.findUnique({ where: { id: impersonatedOrgId } });
-    if (impOrg) org = impOrg;
-  } else if (!onMarketingHost && !org && user?.orgId) {
-    org = await db.org.findUnique({ where: { id: user.orgId } });
-  }
-  if (onMarketingHost) {
-    org = null;
-  }
-  context.set(orgContext, org);
+  const scope = await resolveRequestScope(request, context);
+  context.set(userContext, scope.user);
+  context.set(orgContext, scope.org);
   context.set(impersonationContext, {
-    active: impersonatedOrgId != null && org?.id === impersonatedOrgId,
-    orgId: impersonatedOrgId,
+    active: scope.impersonation.active,
+    orgId: scope.impersonation.orgId,
   });
-
-  const url = new URL(request.url);
-  const pathname = url.pathname;
-  const isSetPassword = pathname === "/set-password";
-  const isApi = pathname.startsWith("/api/");
-  const isLogout = pathname === "/logout";
-  const isLogin = pathname === "/login";
-  const isForgotPassword = pathname === "/forgot-password";
-  const isResetPassword = pathname === "/reset-password";
-  const isViewerAccess = pathname === "/viewer-access";
-  const isBillingRequired = pathname === "/billing-required";
-  const isOnboardingApi = pathname === "/api/onboarding";
-  const isStripeWebhook = pathname === "/api/webhooks/stripe";
-  const isAuthApi = pathname.startsWith("/api/auth/");
-  const isStatic =
-    pathname.startsWith("/assets/") ||
-    pathname.startsWith("/build/") ||
-    pathname === "/favicon.ico";
-  const isCheckEmailApi = pathname === "/api/check-email";
-  const isCheckOrgSlugApi = pathname === "/api/check-org-slug";
-  const isBrandingLogoApi = pathname.startsWith("/api/branding/logo/");
-  const isHealthz = pathname === "/api/healthz";
-  const isPlatform = pathname.startsWith("/platform");
-
-  const publicMarketingPath =
-    pathname === "/pricing" ||
-    pathname === "/faqs" ||
-    pathname === "/status" ||
-    pathname === "/blog" ||
-    pathname.startsWith("/blog/") ||
-    pathname === "/guides" ||
-    pathname.startsWith("/guides/") ||
-    (pathname === "/signup" && onMarketingHost) ||
-    (pathname === "/district/signup" && onMarketingHost) ||
-    (pathname.startsWith("/api/onboarding") && onMarketingHost) ||
-    (pathname === "/" && onMarketingHost);
-
-  if (user?.mustChangePassword && !isSetPassword && !isApi && !isLogout) {
-    throw redirect("/set-password");
-  }
-
-  const skipTenantOrgBinding =
-    isStatic || isAuthApi || isStripeWebhook || isLogout;
-  // District admins are allowed onto a tenant org's pages while impersonating.
-  // Without this carve-out, the sameOrg check below would bounce them since
-  // `User.orgId` is null for district-scoped users.
-  const isImpersonatingThisOrg =
-    impersonatedOrgId != null && impersonatedOrgId === org?.id;
-
-  // Platform and district staff don't operate on tenant data unless they've
-  // explicitly impersonated this org. Without this, they hit a tenant
-  // subdomain and either get a confusing 403 (platform admin) or a wrong
-  // /signup redirect (district admin). Send them back to their console.
-  if (
-    !onMarketingHost &&
-    user &&
-    org &&
-    !skipTenantOrgBinding &&
-    !isImpersonatingThisOrg
-  ) {
-    if (isPlatformAdmin(user, context) && user.orgId !== org.id) {
-      throw redirect(`${marketingOriginFromRequest(request, context)}/platform`);
-    }
-    if (user.role === "ADMIN" && user.districtId && !user.orgId) {
-      throw redirect(`${marketingOriginFromRequest(request, context)}/district`);
-    }
-  }
-
-  if (
-    !onMarketingHost &&
-    user &&
-    org &&
-    !skipTenantOrgBinding &&
-    !isPlatformAdmin(user, context) &&
-    !isImpersonatingThisOrg
-  ) {
-    const sameOrg = !!user.orgId && user.orgId === org.id;
-    if (!sameOrg) {
-      if (user.orgId) {
-        const userOrgRow = await db.org.findUnique({
-          where: { id: user.orgId },
-          select: { slug: true }
-        });
-        if (userOrgRow?.slug) {
-          throw redirect(tenantBoardUrlFromRequest(request, userOrgRow.slug));
-        }
-      }
-      throw redirect(`${marketingOriginFromRequest(request, context)}/signup`);
-    }
-  }
-
-  const anonSkipsViewer =
-    isLogin ||
-    isLogout ||
-    isForgotPassword ||
-    isResetPassword ||
-    isViewerAccess ||
-    isAuthApi ||
-    isStatic ||
-    isCheckEmailApi ||
-    isCheckOrgSlugApi ||
-    isBrandingLogoApi ||
-    isHealthz ||
-    publicMarketingPath;
-
-  if (!user && !anonSkipsViewer) {
-    if (isPlatform) {
-      const nextPath = `${pathname}${url.search}`;
-      throw redirect(`/login?next=${encodeURIComponent(nextPath)}`);
-    }
-    if (!org) {
-      const nextPath = `${pathname}${url.search}`;
-      throw redirect(`/login?next=${encodeURIComponent(nextPath)}`);
-    }
-    const hasAccess = await hasValidViewerAccess({ request, context });
-    if (!hasAccess) {
-      const nextPath = `${pathname}${url.search}`;
-      throw redirect(`/viewer-access?next=${encodeURIComponent(nextPath)}`);
-    }
-  }
-
-  if (
-    user &&
-    org &&
-    !isBillingRequired &&
-    !isOnboardingApi &&
-    !isStripeWebhook &&
-    !isAuthApi &&
-    !isStatic
-  ) {
-    const district = org.districtId
-      ? await db.district.findUnique({
-          where: { id: org.districtId },
-          select: { status: true, compedUntil: true, isComped: true },
-        })
-      : undefined;
-    if (org.districtId && !district) {
-      throw redirect("/billing-required");
-    }
-    if (!isOrgAccessAllowed({ org, district: district ?? undefined }, new Date())) {
-      throw redirect("/billing-required");
-    }
-  }
-
+  context.set(impersonatedByContext, scope.impersonation.byUserId);
   return next();
 };
