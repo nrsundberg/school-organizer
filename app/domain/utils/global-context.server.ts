@@ -4,7 +4,7 @@ import type { Org, User } from "~/db";
 import { getPrisma } from "~/db.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { hasValidViewerAccess } from "~/domain/auth/viewer-access.server";
-import { isOrgStatusAllowedForApp } from "~/domain/billing/org-status";
+import { isOrgAccessAllowed } from "~/domain/billing/org-status";
 import { tenantBoardUrlFromRequest } from "~/lib/org-slug";
 import {
   isMarketingHost,
@@ -304,16 +304,24 @@ export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   if (
     user &&
     org &&
-    !isOrgStatusAllowedForApp(org.status, {
-      isComped: !!(org as any).isComped
-    }) &&
     !isBillingRequired &&
     !isOnboardingApi &&
     !isStripeWebhook &&
     !isAuthApi &&
     !isStatic
   ) {
-    throw redirect("/billing-required");
+    const district = org.districtId
+      ? await db.district.findUnique({
+          where: { id: org.districtId },
+          select: { status: true, compedUntil: true, isComped: true },
+        })
+      : undefined;
+    if (org.districtId && !district) {
+      throw redirect("/billing-required");
+    }
+    if (!isOrgAccessAllowed({ org, district: district ?? undefined }, new Date())) {
+      throw redirect("/billing-required");
+    }
   }
 
   return next();

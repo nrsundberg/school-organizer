@@ -119,7 +119,7 @@ model Org {
   /// When set, billing enforcement may treat the org as comped until this instant (UTC).
   compedUntil              DateTime?
   /// Hard-on comp flag set by staff from the platform admin panel. When true,
-  /// billing enforcement (isOrgStatusAllowedForApp, trial-expiry suspension)
+  /// billing enforcement (isOrgAccessAllowed, trial-expiry suspension)
   /// is bypassed entirely. Use `compedUntil` for time-bounded comps.
   isComped                 Boolean                  @default(false)
   /// Whether this org's users can reset their password via email. Orgs using
