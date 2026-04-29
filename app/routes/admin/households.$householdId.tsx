@@ -29,12 +29,8 @@ import {
   WEEKDAYS,
   parseDateOnly,
   parseOptionalDateOnly,
-  toDateInputValue,
 } from "~/domain/dismissal/schedule";
-import {
-  findLinkedAdminUser,
-  loadHouseholdWithRelations,
-} from "~/domain/households/household-detail.server";
+import { loadHouseholdForAdminDetail } from "~/domain/households/household-detail.server";
 import { studentDisplayName } from "~/domain/households/households";
 import { detectLocale } from "~/i18n.server";
 import { getFixedT } from "~/lib/t.server";
@@ -80,38 +76,6 @@ function weekdayLabel(t: TFunction, index: number): string {
     : t("households.exceptions.scheduleWeeklyFallback");
 }
 
-function startOfUtcDay(date: Date): Date {
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
-  );
-}
-
-function exceptionActiveOn(
-  exception: {
-    scheduleKind: string;
-    exceptionDate: Date | null;
-    dayOfWeek: number | null;
-    startsOn: Date | null;
-    endsOn: Date | null;
-  },
-  today: Date,
-): boolean {
-  const dayStart = startOfUtcDay(today);
-  if (exception.scheduleKind === "DATE") {
-    if (!exception.exceptionDate) return false;
-    return startOfUtcDay(exception.exceptionDate).getTime() === dayStart.getTime();
-  }
-  if (exception.dayOfWeek == null) return false;
-  if (today.getUTCDay() !== exception.dayOfWeek) return false;
-  if (exception.startsOn && dayStart.getTime() < startOfUtcDay(exception.startsOn).getTime()) {
-    return false;
-  }
-  if (exception.endsOn && dayStart.getTime() > startOfUtcDay(exception.endsOn).getTime()) {
-    return false;
-  }
-  return true;
-}
-
 function initialsFromHouseholdName(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
@@ -133,45 +97,25 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   if (!id) {
     throw new Response("Not found", { status: 404 });
   }
-  const household = await loadHouseholdWithRelations(prisma, id);
-  if (!household) {
+  const view = await loadHouseholdForAdminDetail(prisma, {
+    householdId: id,
+    orgId: org.id,
+  });
+  if (!view) {
     throw new Response("Not found", { status: 404 });
   }
-  const linkedUser = await findLinkedAdminUser(prisma, {
-    orgId: org.id,
-    contactName: household.primaryContactName,
-  });
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
   return {
-    metaTitle: t("households.detail.metaTitle", { name: household.name }),
-    household: {
-      ...household,
-      createdAt: household.createdAt.toISOString(),
-      updatedAt: household.updatedAt.toISOString(),
-      exceptions: household.exceptions.map((e) => ({
-        ...e,
-        activeToday: exceptionActiveOn(e, new Date()),
-        exceptionDate: toDateInputValue(e.exceptionDate),
-        startsOn: toDateInputValue(e.startsOn),
-        endsOn: toDateInputValue(e.endsOn),
-        createdAt: e.createdAt.toISOString(),
-        updatedAt: e.updatedAt.toISOString(),
-      })),
-      recentCallEvents: household.recentCallEvents.map((c) => ({
-        ...c,
-        createdAt: c.createdAt.toISOString(),
-      })),
-    },
-    linkedUser,
+    metaTitle: t("households.detail.metaTitle", { name: view.summary.name }),
+    view,
   };
 }
 
 type LoaderData = Route.ComponentProps["loaderData"];
-type HouseholdDetail = LoaderData["household"];
-type HouseholdException = HouseholdDetail["exceptions"][number];
-type HouseholdStudent = HouseholdDetail["students"][number];
-type CallEventRow = HouseholdDetail["recentCallEvents"][number];
+type ExceptionRow = LoaderData["view"]["sections"]["exceptions"][number];
+type StudentRow = LoaderData["view"]["sections"]["students"][number];
+type CallEventRow = LoaderData["view"]["sections"]["recentCalls"][number];
 
 export async function action({ request, context, params }: Route.ActionArgs) {
   await protectToAdminAndGetPermissions(context);
@@ -324,7 +268,9 @@ export async function action({ request, context, params }: Route.ActionArgs) {
 export default function AdminHouseholdDetail({
   loaderData,
 }: Route.ComponentProps) {
-  const { household, linkedUser } = loaderData;
+  const { view } = loaderData;
+  const { summary, sections } = view;
+  const linkedAdmin = sections.linkedAdmin;
   const { t, i18n } = useTranslation("admin");
   const [editing, setEditing] = useState(false);
   const [addingException, setAddingException] = useState(false);
@@ -341,14 +287,9 @@ export default function AdminHouseholdDetail({
     minute: "2-digit",
   });
 
-  const studentCount = household.students.length;
-  const contactCount =
-    (household.primaryContactName?.trim() ? 1 : 0) +
-    (household.primaryContactPhone?.trim() ? 1 : 0);
-  const todayExceptions = household.exceptions.filter((e) => e.activeToday);
   const created = (() => {
     try {
-      return dateFmt.format(new Date(household.createdAt));
+      return dateFmt.format(new Date(summary.createdAtIso));
     } catch {
       return "";
     }
@@ -366,40 +307,39 @@ export default function AdminHouseholdDetail({
           {t("households.detail.breadcrumbHouseholds")}
         </Link>
         <ChevronRight className="h-3.5 w-3.5" />
-        <span className="text-white/80">{household.name}</span>
+        <span className="text-white/80">{summary.name}</span>
       </nav>
 
       {/* Header */}
       <header className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.04] p-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-4">
           <EntityAvatar
-            initials={initialsFromHouseholdName(household.name)}
-            colorSeed={household.id}
+            initials={initialsFromHouseholdName(summary.name)}
+            colorSeed={summary.id}
             size="xl"
             shape="square"
           />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold text-white">{household.name}</h1>
+              <h1 className="text-2xl font-bold text-white">{summary.name}</h1>
               <StatusPill tone="success">
                 {t("households.card.active")}
               </StatusPill>
-              {household.spaceNumber ? (
+              {summary.spaceNumber ? (
                 <StatusPill tone="cyan">
                   {t("households.detail.header.spaceLabel", {
-                    number: household.spaceNumber,
+                    number: summary.spaceNumber,
                   })}
                 </StatusPill>
               ) : null}
-              {todayExceptions.length > 0 ? (
+              {summary.activeTodayCount > 0 ? (
                 <StatusPill tone="info">
                   {t("households.list.exceptions", {
-                    count: todayExceptions.length,
+                    count: summary.activeTodayCount,
                   }).replace(/^[\s·]+/, "")}
                 </StatusPill>
               ) : null}
-              {(!household.primaryContactName?.trim() ||
-                !household.primaryContactPhone?.trim()) ? (
+              {summary.hasMissingContact ? (
                 <StatusPill tone="warning">
                   {t("households.stats.missingContact")}
                 </StatusPill>
@@ -407,19 +347,19 @@ export default function AdminHouseholdDetail({
             </div>
             <p className="mt-1 text-sm text-white/55">
               {t("households.detail.header.studentsLabel", {
-                count: studentCount,
+                count: summary.studentCount,
               })}
               {" · "}
               {t("households.detail.header.contactsLabel", {
-                count: contactCount,
+                count: summary.contactCount,
               })}
               {created
                 ? ` · ${t("households.detail.header.createdOn", { date: created })}`
                 : ""}
             </p>
-            {household.pickupNotes ? (
+            {summary.pickupNotes ? (
               <p className="mt-2 text-sm text-white/70 max-w-2xl">
-                {household.pickupNotes}
+                {summary.pickupNotes}
               </p>
             ) : null}
           </div>
@@ -461,18 +401,18 @@ export default function AdminHouseholdDetail({
             <input type="hidden" name="intent" value="update" />
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label={t("households.card.nameLabel")}>
-                <Input name="name" defaultValue={household.name} required />
+                <Input name="name" defaultValue={summary.name} required />
               </Field>
               <Field label={t("households.card.primaryContactLabel")}>
                 <Input
                   name="primaryContactName"
-                  defaultValue={household.primaryContactName ?? ""}
+                  defaultValue={summary.primaryContactName ?? ""}
                 />
               </Field>
               <Field label={t("households.card.contactPhoneLabel")}>
                 <Input
                   name="primaryContactPhone"
-                  defaultValue={household.primaryContactPhone ?? ""}
+                  defaultValue={summary.primaryContactPhone ?? ""}
                 />
               </Field>
               <Field label={t("households.card.spaceNumberLabel")}>
@@ -480,7 +420,7 @@ export default function AdminHouseholdDetail({
                   name="spaceNumber"
                   type="number"
                   min={1}
-                  defaultValue={household.spaceNumber ?? ""}
+                  defaultValue={summary.spaceNumber ?? ""}
                 />
               </Field>
             </div>
@@ -488,7 +428,7 @@ export default function AdminHouseholdDetail({
               <TextArea
                 name="pickupNotes"
                 rows={3}
-                defaultValue={household.pickupNotes ?? ""}
+                defaultValue={summary.pickupNotes ?? ""}
               />
             </Field>
             <div className="flex flex-wrap items-center gap-2">
@@ -522,26 +462,22 @@ export default function AdminHouseholdDetail({
           <section className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
             <SectionHeader
               title={t("households.detail.students.heading")}
-              count={studentCount}
+              count={summary.studentCount}
               icon={<Users className="h-5 w-5 text-blue-300" />}
             />
             <div className="mt-4">
-              {household.students.length === 0 ? (
+              {sections.students.length === 0 ? (
                 <p className="rounded-lg bg-black/20 p-4 text-sm text-white/45">
                   {t("households.detail.students.empty")}
                 </p>
               ) : (
                 <ul className="grid gap-3 sm:grid-cols-2">
-                  {household.students.map((student) => (
+                  {sections.students.map((student) => (
                     <StudentCard
                       key={student.id}
                       student={student}
-                      familySpaceNumber={household.spaceNumber}
-                      hasExceptionToday={household.exceptions.some(
-                        (e) =>
-                          e.activeToday &&
-                          (e.studentId == null || e.studentId === student.id),
-                      )}
+                      familySpaceNumber={summary.spaceNumber}
+                      hasExceptionToday={student.hasExceptionToday}
                     />
                   ))}
                 </ul>
@@ -553,23 +489,23 @@ export default function AdminHouseholdDetail({
           <section className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
             <SectionHeader
               title={t("households.detail.contacts.heading")}
-              count={contactCount}
+              count={summary.contactCount}
             />
             <div className="mt-4">
-              {!household.primaryContactName && !household.primaryContactPhone ? (
+              {!summary.primaryContactName && !summary.primaryContactPhone ? (
                 <p className="rounded-lg bg-black/20 p-4 text-sm text-white/45">
                   {t("households.detail.contacts.empty")}
                 </p>
               ) : (
                 <ul className="flex flex-col divide-y divide-white/10 overflow-hidden rounded-lg border border-white/8 bg-black/15">
                   <ContactRow
-                    name={household.primaryContactName ?? ""}
-                    phone={household.primaryContactPhone}
+                    name={summary.primaryContactName ?? ""}
+                    phone={summary.primaryContactPhone}
                     email={null}
                     isPrimary
                     pickupApproved
-                    hasAccount={!!linkedUser}
-                    linkedUserId={linkedUser?.id ?? null}
+                    hasAccount={!!linkedAdmin}
+                    linkedAdminId={linkedAdmin?.id ?? null}
                   />
                 </ul>
               )}
@@ -580,7 +516,7 @@ export default function AdminHouseholdDetail({
           <section className="rounded-xl border border-white/10 bg-white/[0.04] p-5">
             <SectionHeader
               title={t("households.detail.exceptions.heading")}
-              count={household.exceptions.length}
+              count={sections.exceptions.length}
               icon={<CalendarClock className="h-5 w-5 text-cyan-300" />}
               actions={
                 <Button
@@ -690,16 +626,16 @@ export default function AdminHouseholdDetail({
             ) : null}
 
             <div className="mt-4 flex flex-col gap-3">
-              {household.exceptions.length === 0 ? (
+              {sections.exceptions.length === 0 ? (
                 <p className="rounded-lg bg-black/20 p-4 text-sm text-white/45">
                   {t("households.detail.exceptions.empty")}
                 </p>
               ) : (
-                household.exceptions.map((exception) => (
+                sections.exceptions.map((exception) => (
                   <ExceptionCard
                     key={exception.id}
                     exception={exception}
-                    students={household.students}
+                    students={sections.students}
                     dateFmt={dateFmt}
                   />
                 ))
@@ -724,8 +660,8 @@ export default function AdminHouseholdDetail({
               {t("households.detail.rail.pickupNotesHeading")}
             </p>
             <p className="mt-2 text-sm text-white/85 whitespace-pre-wrap">
-              {household.pickupNotes
-                ? household.pickupNotes
+              {summary.pickupNotes
+                ? summary.pickupNotes
                 : t("households.detail.rail.pickupNotesEmpty")}
             </p>
           </div>
@@ -734,13 +670,13 @@ export default function AdminHouseholdDetail({
             <p className="text-xs uppercase tracking-wide text-white/50">
               {t("households.detail.rail.activityHeading")}
             </p>
-            {household.recentCallEvents.length === 0 ? (
+            {sections.recentCalls.length === 0 ? (
               <p className="mt-2 text-sm text-white/55">
                 {t("households.detail.rail.activityEmpty")}
               </p>
             ) : (
               <ul className="mt-2 flex flex-col gap-2">
-                {household.recentCallEvents.map((event: CallEventRow) => (
+                {sections.recentCalls.map((event: CallEventRow) => (
                   <li
                     key={event.id}
                     className="flex items-center gap-2 text-sm text-white/80"
@@ -759,7 +695,7 @@ export default function AdminHouseholdDetail({
                       <p className="text-xs text-white/45">
                         {t("households.detail.rail.activityEvent", {
                           space: event.spaceNumber,
-                          when: dateTimeFmt.format(new Date(event.createdAt)),
+                          when: dateTimeFmt.format(new Date(event.createdAtIso)),
                         })}
                       </p>
                     </div>
@@ -771,36 +707,36 @@ export default function AdminHouseholdDetail({
 
           <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
             <p className="text-xs uppercase tracking-wide text-white/50">
-              {t("households.detail.rail.linkedUserHeading")}
+              {t("households.detail.rail.linkedAdminHeading")}
             </p>
-            {linkedUser ? (
+            {linkedAdmin ? (
               <div className="mt-3 flex items-center gap-3">
                 <EntityAvatar
                   initials={initialsFromPersonName(
-                    linkedUser.name.split(/\s+/)[0] ?? "",
-                    linkedUser.name.split(/\s+/).slice(-1)[0] ?? "",
+                    linkedAdmin.name.split(/\s+/)[0] ?? "",
+                    linkedAdmin.name.split(/\s+/).slice(-1)[0] ?? "",
                   )}
-                  colorSeed={`user:${linkedUser.id}`}
+                  colorSeed={`user:${linkedAdmin.id}`}
                   size="md"
                 />
                 <div className="min-w-0">
                   <p className="text-sm text-white truncate">
-                    {linkedUser.name}
+                    {linkedAdmin.name}
                   </p>
                   <p className="text-xs text-white/45 truncate">
-                    {linkedUser.email}
+                    {linkedAdmin.email}
                   </p>
                   <EntityLink
-                    to={`/admin/users?selected=${linkedUser.id}`}
+                    to={`/admin/users?selected=${linkedAdmin.id}`}
                     arrow
                   >
-                    {t("households.detail.rail.linkedUserOpen")}
+                    {t("households.detail.rail.linkedAdminOpen")}
                   </EntityLink>
                 </div>
               </div>
             ) : (
               <p className="mt-2 text-sm text-white/55">
-                {t("households.detail.rail.linkedUserEmpty")}
+                {t("households.detail.rail.linkedAdminEmpty")}
               </p>
             )}
           </div>
@@ -815,7 +751,7 @@ function StudentCard({
   familySpaceNumber,
   hasExceptionToday,
 }: {
-  student: HouseholdStudent;
+  student: StudentRow;
   familySpaceNumber: number | null;
   hasExceptionToday: boolean;
 }) {
@@ -877,7 +813,7 @@ function ContactRow({
   isPrimary,
   pickupApproved,
   hasAccount,
-  linkedUserId,
+  linkedAdminId,
 }: {
   name: string;
   phone: string | null;
@@ -885,7 +821,7 @@ function ContactRow({
   isPrimary?: boolean;
   pickupApproved?: boolean;
   hasAccount?: boolean;
-  linkedUserId?: string | null;
+  linkedAdminId?: string | null;
 }) {
   const { t } = useTranslation("admin");
   if (!name && !phone) return null;
@@ -933,8 +869,8 @@ function ContactRow({
           </div>
         </div>
       </div>
-      {linkedUserId ? (
-        <EntityLink to={`/admin/users?selected=${linkedUserId}`} arrow>
+      {linkedAdminId ? (
+        <EntityLink to={`/admin/users?selected=${linkedAdminId}`} arrow>
           {t("households.detail.contacts.viewUser")}
         </EntityLink>
       ) : null}
@@ -947,8 +883,8 @@ function ExceptionCard({
   students,
   dateFmt,
 }: {
-  exception: HouseholdException;
-  students: HouseholdStudent[];
+  exception: ExceptionRow;
+  students: StudentRow[];
   dateFmt: Intl.DateTimeFormat;
 }) {
   const { t } = useTranslation("admin");
@@ -1018,7 +954,7 @@ function ExceptionCard({
           ) : null}
           <p className="mt-1 text-xs text-white/45">
             {t("households.detail.exceptions.createdBy", {
-              date: dateFmt.format(new Date(exception.createdAt)),
+              date: dateFmt.format(new Date(exception.createdAtIso)),
             })}
           </p>
         </div>
@@ -1036,7 +972,7 @@ function ExceptionCard({
 
 function formatExceptionSchedule(
   t: TFunction,
-  exception: HouseholdException,
+  exception: ExceptionRow,
 ): string {
   if (exception.scheduleKind === "DATE") {
     return exception.exceptionDate

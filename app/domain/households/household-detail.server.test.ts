@@ -1,20 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  findLinkedAdminUser,
-  loadHouseholdWithRelations,
+  loadHouseholdForAdminDetail,
   type HouseholdsDetailPrisma,
 } from "./household-detail.server";
 
 type FindManyArgs = { where?: Record<string, unknown> } & Record<string, unknown>;
 type FindUniqueArgs = { where?: Record<string, unknown> } & Record<string, unknown>;
 
-/**
- * Tiny in-memory stand-in for the slice of Prisma we touch. We don't try to
- * model the full client — just the find-many/-unique pair the helpers call.
- * Each table is just an array; the `where.householdId === id` and
- * `where.id === id` filters cover what these tests need.
- */
 type Tables = {
   households: Array<{
     id: string;
@@ -131,6 +124,8 @@ function buildPrisma(tables: Tables): HouseholdsDetailPrisma {
   } as unknown as HouseholdsDetailPrisma;
 }
 
+const NOW = new Date("2026-04-29T15:00:00Z"); // Wednesday (UTC dayOfWeek = 3)
+
 const baseTables = (): Tables => ({
   households: [
     {
@@ -179,9 +174,10 @@ const baseTables = (): Tables => ({
   ],
   exceptions: [
     {
-      id: "ex_1",
+      // Active today via WEEKLY rule (Wed = 3), bound to Ana (studentId=1).
+      id: "ex_weekly_today",
       householdId: "hh_1",
-      studentId: null,
+      studentId: 1,
       scheduleKind: "WEEKLY",
       exceptionDate: null,
       dayOfWeek: 3,
@@ -195,6 +191,24 @@ const baseTables = (): Tables => ({
       updatedAt: new Date("2026-03-01T00:00:00Z"),
     },
     {
+      // Active later this week (Thursday) — not active today.
+      id: "ex_weekly_thu",
+      householdId: "hh_1",
+      studentId: null,
+      scheduleKind: "WEEKLY",
+      exceptionDate: null,
+      dayOfWeek: 4,
+      startsOn: null,
+      endsOn: null,
+      dismissalPlan: "Bus",
+      pickupContactName: null,
+      notes: null,
+      isActive: true,
+      createdAt: new Date("2026-03-02T00:00:00Z"),
+      updatedAt: new Date("2026-03-02T00:00:00Z"),
+    },
+    {
+      // Archived — must be filtered.
       id: "ex_archived",
       householdId: "hh_1",
       studentId: null,
@@ -255,36 +269,148 @@ const baseTables = (): Tables => ({
   ],
 });
 
-test("loadHouseholdWithRelations stitches students, active exceptions, and recent calls", async () => {
+test("returns null for unknown household", async () => {
   const prisma = buildPrisma(baseTables());
-  const result = await loadHouseholdWithRelations(prisma, "hh_1");
-  assert.ok(result, "expected a household record");
-  assert.equal(result.id, "hh_1");
-  assert.equal(result.name, "Garcia household");
-  assert.equal(result.students.length, 2);
-  assert.deepEqual(
-    result.students.map((s) => s.id),
-    [1, 2],
+  const result = await loadHouseholdForAdminDetail(
+    prisma,
+    { householdId: "hh_does_not_exist", orgId: "org_school" },
+    { now: NOW },
   );
-  // Only the active exception is surfaced — archived rows are filtered.
-  assert.equal(result.exceptions.length, 1);
-  assert.equal(result.exceptions[0].id, "ex_1");
-  // Call events are scoped to this household's students only.
-  assert.deepEqual(
-    result.recentCallEvents.map((e) => e.studentId).sort(),
-    [1, 2],
-  );
-});
-
-test("loadHouseholdWithRelations returns null for unknown household", async () => {
-  const prisma = buildPrisma(baseTables());
-  const result = await loadHouseholdWithRelations(prisma, "hh_does_not_exist");
   assert.equal(result, null);
 });
 
-test("loadHouseholdWithRelations skips call-event lookup when no students are assigned", async () => {
+test("summary aggregates studentCount, contactCount, activeTodayCount", async () => {
+  const prisma = buildPrisma(baseTables());
+  const view = await loadHouseholdForAdminDetail(
+    prisma,
+    { householdId: "hh_1", orgId: "org_school" },
+    { now: NOW },
+  );
+  assert.ok(view);
+  assert.equal(view.summary.id, "hh_1");
+  assert.equal(view.summary.name, "Garcia household");
+  assert.equal(view.summary.studentCount, 2);
+  // Both name and phone present → 2.
+  assert.equal(view.summary.contactCount, 2);
+  assert.equal(view.summary.hasMissingContact, false);
+  // Only the WEEKLY-Wednesday exception is active today.
+  assert.equal(view.summary.activeTodayCount, 1);
+  assert.equal(view.summary.createdAtIso, "2026-01-01T00:00:00.000Z");
+  assert.equal(view.summary.updatedAtIso, "2026-01-02T00:00:00.000Z");
+});
+
+test("summary.hasMissingContact is true when name or phone is missing", async () => {
+  const prisma = buildPrisma(baseTables());
+  const view = await loadHouseholdForAdminDetail(
+    prisma,
+    { householdId: "hh_2", orgId: "org_school" },
+    { now: NOW },
+  );
+  assert.ok(view);
+  assert.equal(view.summary.contactCount, 0);
+  assert.equal(view.summary.hasMissingContact, true);
+});
+
+test("students section pre-computes hasExceptionToday per student", async () => {
+  const prisma = buildPrisma(baseTables());
+  const view = await loadHouseholdForAdminDetail(
+    prisma,
+    { householdId: "hh_1", orgId: "org_school" },
+    { now: NOW },
+  );
+  assert.ok(view);
+  const ana = view.sections.students.find((s) => s.id === 1);
+  const luis = view.sections.students.find((s) => s.id === 2);
+  assert.ok(ana);
+  assert.ok(luis);
+  // Ana is the studentId on the active-today WEEKLY exception.
+  assert.equal(ana.hasExceptionToday, true);
+  assert.equal(luis.hasExceptionToday, false);
+});
+
+test("a house-wide active-today exception flags every student", async () => {
   const tables = baseTables();
-  // Simulate a household with no assigned students.
+  // Replace the targeted exception with a house-wide one (studentId: null).
+  const ex = tables.exceptions.find((e) => e.id === "ex_weekly_today");
+  if (ex) ex.studentId = null;
+  const prisma = buildPrisma(tables);
+  const view = await loadHouseholdForAdminDetail(
+    prisma,
+    { householdId: "hh_1", orgId: "org_school" },
+    { now: NOW },
+  );
+  assert.ok(view);
+  for (const s of view.sections.students) {
+    assert.equal(s.hasExceptionToday, true, `student ${s.id} should be flagged`);
+  }
+});
+
+test("exceptions section converts dates to input strings and computes activeToday", async () => {
+  const prisma = buildPrisma(baseTables());
+  const view = await loadHouseholdForAdminDetail(
+    prisma,
+    { householdId: "hh_1", orgId: "org_school" },
+    { now: NOW },
+  );
+  assert.ok(view);
+  // Archived is filtered out at the query level (isActive: true).
+  const ids = view.sections.exceptions.map((e) => e.id);
+  assert.deepEqual(ids.sort(), ["ex_weekly_thu", "ex_weekly_today"]);
+
+  const today = view.sections.exceptions.find((e) => e.id === "ex_weekly_today")!;
+  const thu = view.sections.exceptions.find((e) => e.id === "ex_weekly_thu")!;
+  assert.equal(today.activeToday, true);
+  assert.equal(thu.activeToday, false);
+  // Date inputs are empty strings when null (matches toDateInputValue contract).
+  assert.equal(today.exceptionDate, "");
+  assert.equal(today.startsOn, "");
+  assert.equal(today.endsOn, "");
+  assert.equal(today.createdAtIso, "2026-03-01T00:00:00.000Z");
+});
+
+test("recentCalls section is scoped to this household's students and capped", async () => {
+  const prisma = buildPrisma(baseTables());
+  const view = await loadHouseholdForAdminDetail(
+    prisma,
+    { householdId: "hh_1", orgId: "org_school" },
+    { now: NOW },
+  );
+  assert.ok(view);
+  const studentIds = view.sections.recentCalls
+    .map((c) => c.studentId)
+    .sort((a, b) => Number(a) - Number(b));
+  assert.deepEqual(studentIds, [1, 2]);
+  for (const c of view.sections.recentCalls) {
+    assert.match(c.createdAtIso, /^\d{4}-\d{2}-\d{2}T/);
+  }
+});
+
+test("recentCallsLimit option overrides default cap", async () => {
+  const tables = baseTables();
+  // Add 7 events for student 1 so we can verify the cap.
+  for (let i = 10; i < 17; i++) {
+    tables.callEvents.push({
+      id: i,
+      studentId: 1,
+      studentName: "Ana Garcia",
+      homeRoomSnapshot: "K-1",
+      spaceNumber: 12,
+      createdAt: new Date(`2026-04-${10 + (i - 10)}T15:00:00Z`),
+    });
+  }
+  const prisma = buildPrisma(tables);
+  const view = await loadHouseholdForAdminDetail(
+    prisma,
+    { householdId: "hh_1", orgId: "org_school" },
+    { now: NOW, recentCallsLimit: 3 },
+  );
+  assert.ok(view);
+  assert.equal(view.sections.recentCalls.length, 3);
+});
+
+test("skips call-event lookup when household has no students", async () => {
+  const tables = baseTables();
+  // Detach all students from hh_2 (it already has only one — drop it).
   tables.students = tables.students.filter((s) => s.householdId !== "hh_2");
   let callEventCalls = 0;
   const base = buildPrisma(tables) as unknown as {
@@ -299,58 +425,42 @@ test("loadHouseholdWithRelations skips call-event lookup when no students are as
       },
     },
   } as HouseholdsDetailPrisma;
-  const result = await loadHouseholdWithRelations(wrapped, "hh_2");
-  assert.ok(result);
-  assert.equal(result.recentCallEvents.length, 0);
-  assert.equal(callEventCalls, 0, "no students → don't query call events");
-});
-
-test("findLinkedAdminUser returns the unique in-org match", async () => {
-  const prisma = buildPrisma(baseTables());
-  const linked = await findLinkedAdminUser(prisma, {
-    orgId: "org_school",
-    contactName: "Maria Garcia",
-  });
-  assert.ok(linked);
-  assert.equal(linked.id, "u_admin_garcia");
-  assert.equal(linked.email, "maria@example.com");
-});
-
-test("findLinkedAdminUser returns null when contact name is empty/whitespace", async () => {
-  const prisma = buildPrisma(baseTables());
-  assert.equal(
-    await findLinkedAdminUser(prisma, { orgId: "org_school", contactName: "" }),
-    null,
+  const view = await loadHouseholdForAdminDetail(
+    wrapped,
+    { householdId: "hh_2", orgId: "org_school" },
+    { now: NOW },
   );
-  assert.equal(
-    await findLinkedAdminUser(prisma, {
-      orgId: "org_school",
-      contactName: "   ",
-    }),
-    null,
-  );
-  assert.equal(
-    await findLinkedAdminUser(prisma, {
-      orgId: "org_school",
-      contactName: null,
-    }),
-    null,
-  );
+  assert.ok(view);
+  assert.equal(view.sections.recentCalls.length, 0);
+  assert.equal(callEventCalls, 0);
 });
 
-test("findLinkedAdminUser ignores users in a different org", async () => {
+test("linkedAdmin resolves the unique in-org user matching contactName", async () => {
   const prisma = buildPrisma(baseTables());
-  const linked = await findLinkedAdminUser(prisma, {
-    orgId: "org_school_does_not_exist",
-    contactName: "Maria Garcia",
-  });
-  assert.equal(linked, null);
+  const view = await loadHouseholdForAdminDetail(
+    prisma,
+    { householdId: "hh_1", orgId: "org_school" },
+    { now: NOW },
+  );
+  assert.ok(view);
+  assert.ok(view.sections.linkedAdmin);
+  assert.equal(view.sections.linkedAdmin.id, "u_admin_garcia");
+  assert.equal(view.sections.linkedAdmin.email, "maria@example.com");
 });
 
-test("findLinkedAdminUser collapses to null on ambiguous matches", async () => {
+test("linkedAdmin is null when household has no primary contact name", async () => {
+  const prisma = buildPrisma(baseTables());
+  const view = await loadHouseholdForAdminDetail(
+    prisma,
+    { householdId: "hh_2", orgId: "org_school" },
+    { now: NOW },
+  );
+  assert.ok(view);
+  assert.equal(view.sections.linkedAdmin, null);
+});
+
+test("linkedAdmin collapses to null on ambiguous matches in the same org", async () => {
   const tables = baseTables();
-  // Add a duplicate name within the same org — the helper should refuse to
-  // guess.
   tables.users.push({
     id: "u_admin_garcia_2",
     orgId: "org_school",
@@ -359,9 +469,22 @@ test("findLinkedAdminUser collapses to null on ambiguous matches", async () => {
     role: "ADMIN",
   });
   const prisma = buildPrisma(tables);
-  const linked = await findLinkedAdminUser(prisma, {
-    orgId: "org_school",
-    contactName: "Maria Garcia",
-  });
-  assert.equal(linked, null);
+  const view = await loadHouseholdForAdminDetail(
+    prisma,
+    { householdId: "hh_1", orgId: "org_school" },
+    { now: NOW },
+  );
+  assert.ok(view);
+  assert.equal(view.sections.linkedAdmin, null);
+});
+
+test("linkedAdmin ignores users in a different org", async () => {
+  const prisma = buildPrisma(baseTables());
+  const view = await loadHouseholdForAdminDetail(
+    prisma,
+    { householdId: "hh_1", orgId: "org_school_does_not_exist" },
+    { now: NOW },
+  );
+  assert.ok(view);
+  assert.equal(view.sections.linkedAdmin, null);
 });
