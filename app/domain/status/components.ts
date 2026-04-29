@@ -9,46 +9,36 @@ import type { ComponentDef } from "./types";
  * add the pill's colour/meaning story in the UI as needed.
  */
 export const COMPONENTS: ComponentDef[] = [
-  // Application section
+  // Application section.
+  //
+  // These three components are fed by an external uptime monitor (UptimeRobot
+  // / Cloudflare Health Checks) that POSTs to /api/status-probe. They were
+  // previously cron-driven HTTP probes against the worker's own zone, which
+  // returned 522 on every tick because of Cloudflare's same-zone loopback.
+  // See docs/status-page-monitor.md for monitor configuration.
   {
     id: "marketing",
     section: "application",
     name: "Marketing site",
     description: "pickuproster.com landing + public pages",
-    probe: "http",
-    config: {
-      url: "https://pickuproster.com/",
-      expectStatus: 200,
-      // Looking for a known-stable string in the landing body. Updating the
-      // marketing hero? Update this too.
-      expectSubstring: "Pickup Roster",
-    },
+    probe: "external",
+    config: {},
   },
   {
     id: "auth",
     section: "application",
     name: "Auth",
     description: "Login + session service",
-    probe: "http",
-    config: {
-      // The login page is a stable public endpoint that exercises session
-      // middleware + DB read. If we add a dedicated /api/auth/ok health
-      // endpoint later, point this at that instead.
-      url: "https://pickuproster.com/login",
-      expectStatus: 200,
-    },
+    probe: "external",
+    config: {},
   },
   {
     id: "app_workers",
     section: "application",
     name: "App workers",
     description: "Cloudflare Workers serving the app",
-    probe: "http",
-    config: {
-      url: "https://pickuproster.com/api/healthz",
-      expectStatus: 200,
-      expectSubstring: '"ok":true',
-    },
+    probe: "external",
+    config: {},
   },
 
   // Data section
@@ -116,17 +106,18 @@ export const COMPONENTS: ComponentDef[] = [
     },
   },
 
-  // Tenants section
+  // Tenants section.
+  //
+  // Externally probed against a canary tenant subdomain. The previous cron
+  // implementation fanned out a fetch per tenant, all hitting the same zone
+  // and receiving 522 from the loopback — see notes on the application-section
+  // components above.
   {
     id: "tenants_aggregate",
     section: "tenants",
     name: "Tenant boards",
-    description: "Aggregate of {slug}.pickuproster.com tenant subdomains",
-    probe: "tenants_aggregate",
-    config: {
-      // Thresholds for the rollup: degraded if 1-40% fail, outage if >40% fail.
-      degradedRatio: 0.0,
-      outageRatio: 0.4,
-    },
+    description: "Canary probe of a representative tenant subdomain",
+    probe: "external",
+    config: {},
   },
 ];

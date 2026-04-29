@@ -36,14 +36,20 @@ export async function runStatusProbes(context: any): Promise<{
   const db = getPrisma(context) as StatusDb;
   const now = new Date();
 
+  // Skip components fed by the external uptime monitor (POSTs to
+  // /api/status-probe). Writing `unknown` here on every tick would clobber the
+  // webhook's `operational` rows in `recent[0]` and prevent the state machine
+  // from ever seeing two consecutive operationals — incidents would stay open.
+  const cronComponents = COMPONENTS.filter((c) => c.probe !== "external");
+
   const settled = await Promise.allSettled(
-    COMPONENTS.map((c) => runProbe(c, env)),
+    cronComponents.map((c) => runProbe(c, env)),
   );
 
   const results: ProbeResult[] = settled.map((s, i) => {
     if (s.status === "fulfilled") return s.value;
     return {
-      componentId: COMPONENTS[i]!.id,
+      componentId: cronComponents[i]!.id,
       status: "outage",
       latencyMs: null,
       detail: `probe rejected: ${String(s.reason).slice(0, 400)}`,
@@ -73,6 +79,33 @@ export async function runStatusProbes(context: any): Promise<{
   }
 
   return { checks: results.length, incidentsOpened: opened, incidentsResolved: resolved };
+}
+
+/**
+ * Single-component variant of `runStatusProbes`, for the /api/status-probe
+ * webhook fed by the external uptime monitor. Persists the row and advances
+ * the incident state machine using the exact same logic the cron uses.
+ */
+export async function recordProbeResult(
+  context: any,
+  result: ProbeResult,
+): Promise<IncidentChange> {
+  const env = context?.cloudflare?.env as Env | undefined;
+  if (!env) {
+    throw new Error("recordProbeResult: cloudflare env not found on context");
+  }
+  const db = getPrisma(context) as StatusDb;
+  const now = new Date();
+  await db.statusCheck.create({
+    data: {
+      componentId: result.componentId,
+      status: result.status,
+      latencyMs: result.latencyMs,
+      detail: result.detail,
+      checkedAt: now,
+    },
+  });
+  return advanceIncidentForComponent(db, result, now);
 }
 
 type IncidentChange = "opened" | "resolved" | null;

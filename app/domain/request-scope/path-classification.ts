@@ -22,7 +22,7 @@ export type RequestPathClassification = {
   isOnboardingApi: boolean;
   /** True for /api/webhooks/stripe. */
   isStripeWebhook: boolean;
-  /** True for /api/check-email, /api/check-org-slug, /api/branding/logo/*, /api/healthz. */
+  /** True for /api/check-email, /api/check-org-slug, /api/branding/logo/*, /api/healthz, /api/status-probe. */
   isPublicApi: boolean;
   /** True for /platform/*. */
   isPlatform: boolean;
@@ -62,10 +62,17 @@ export function classifyRequestPath(
   const isCheckOrgSlugApi = pathname === "/api/check-org-slug";
   const isBrandingLogoApi = pathname.startsWith("/api/branding/logo/");
   const isHealthz = pathname === "/api/healthz";
+  // External uptime monitor webhook. Auth is enforced inside the route via a
+  // shared-secret header; the global middleware must not 302 it to /login.
+  const isStatusProbe = pathname === "/api/status-probe";
   const isPlatform = pathname.startsWith("/platform");
 
   const isPublicApi =
-    isCheckEmailApi || isCheckOrgSlugApi || isBrandingLogoApi || isHealthz;
+    isCheckEmailApi ||
+    isCheckOrgSlugApi ||
+    isBrandingLogoApi ||
+    isHealthz ||
+    isStatusProbe;
 
   const isAuthFlow =
     isLogin || isForgotPassword || isResetPassword || isViewerAccess;

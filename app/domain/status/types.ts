@@ -42,7 +42,11 @@ export type ProbeKind =
   | "resend_manual"
   | "stripe_status"
   | "stripe_status_component"
-  | "tenants_aggregate";
+  | "tenants_aggregate"
+  // Component is fed by an external uptime monitor that POSTs to
+  // /api/status-probe. The cron-side `runProbe` returns "unknown" so
+  // it doesn't drown the webhook signal with stale operational rows.
+  | "external";
 
 export type ComponentDef = {
   id: ComponentId;

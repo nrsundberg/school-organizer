@@ -38,6 +38,8 @@ export async function runProbe(
         return await stripeComponentProbe(component, env, started);
       case "tenants_aggregate":
         return await tenantsAggregateProbe(component, env, started);
+      case "external":
+        return externalProbe(component);
       default: {
         const exhaustive: never = component.probe;
         return {
@@ -219,6 +221,20 @@ async function queueProbe(
     status: "operational",
     latencyMs,
     detail: null,
+  };
+}
+
+// ---- External (fed by webhook from /api/status-probe) ---------------------
+
+function externalProbe(component: ComponentDef): ProbeResult {
+  // The cron must not write `operational` for these — that would race the
+  // webhook and could close incidents on a stale signal. `unknown` is treated
+  // as neutral by the state machine (see runner.server.ts).
+  return {
+    componentId: component.id,
+    status: "unknown",
+    latencyMs: null,
+    detail: "Awaiting external monitor result",
   };
 }
 
