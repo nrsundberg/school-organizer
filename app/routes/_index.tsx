@@ -11,6 +11,17 @@ import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
 
 export const handle = { i18n: ["roster"] };
+
+// Loader data is seeded into local state and then driven by WebSocket
+// broadcasts (spaceUpdate / callEvent / boardReset / programCancellation).
+// React Router auto-revalidates this loader after every fetcher.submit
+// (tile click → /update/:n or /empty/:n) and on every focus, which would
+// re-fire 5 D1 queries we don't need: the WS already carries the state
+// change. Skipping revalidation removes the post-tap round-trip from the
+// perceived UX. Initial nav still runs the loader normally.
+export function shouldRevalidate() {
+  return false;
+}
 import { isMarketingHost } from "~/domain/utils/host.server";
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
 import {
@@ -550,7 +561,12 @@ function ControllerTabView({
       ) : (
         <div className="flex justify-center">
           <div className="grid w-full md:w-5/6 font-extrabold text-large text-center">
-            <ParkingRows data={spaces} cols={10} permitted={true} />
+            <ParkingRows
+              data={spaces}
+              cols={10}
+              permitted={true}
+              onSpaceChange={onSpaceChange}
+            />
           </div>
         </div>
       )}
@@ -564,12 +580,14 @@ function ParkingRows({
   permitted,
   compact = false,
   onDrawingSpace,
+  onSpaceChange,
 }: {
   cols: number;
   data: Space[];
   permitted: boolean;
   compact?: boolean;
   onDrawingSpace?: (spaceNumber: number) => void;
+  onSpaceChange?: (spaceNumber: number, status: string) => void;
 }) {
   const newData = [];
   for (let i = 0; i < data.length; i += cols) {
@@ -583,6 +601,7 @@ function ParkingRows({
       permitted={permitted}
       compact={compact}
       onDrawingSpace={onDrawingSpace}
+      onSpaceChange={onSpaceChange}
     />
   ));
 }
@@ -593,12 +612,14 @@ function ParkingRow({
   permitted,
   compact = false,
   onDrawingSpace,
+  onSpaceChange,
 }: {
   cols: number;
   data: Space[];
   permitted: boolean;
   compact?: boolean;
   onDrawingSpace?: (spaceNumber: number) => void;
+  onSpaceChange?: (spaceNumber: number, status: string) => void;
 }) {
   const columnClass =
     cols === 10 ? "grid-cols-10" : cols === 15 ? "grid-cols-15" : "";
@@ -612,12 +633,17 @@ function ParkingRow({
       }
     >
       {data.map((it) => (
+        // Key on id only — NOT `${id}-${status}`. With status in the key
+        // the tile would unmount/remount on every flip, which would discard
+        // the in-flight fetcher mid-submit and break the optimistic-UI
+        // revert path below.
         <ParkingTile
-          key={`${it.id}-${it.status}`}
+          key={it.id}
           space={it}
           permitted={permitted}
           compact={compact}
           onDrawingSpace={onDrawingSpace}
+          onSpaceChange={onSpaceChange}
         />
       ))}
     </div>
@@ -631,11 +657,13 @@ function ParkingTile({
   permitted,
   compact = false,
   onDrawingSpace,
+  onSpaceChange,
 }: {
   space: Space;
   permitted: boolean;
   compact?: boolean;
   onDrawingSpace?: (spaceNumber: number) => void;
+  onSpaceChange?: (spaceNumber: number, status: string) => void;
 }) {
   const { t } = useTranslation("roster");
   const { timestamp, status, spaceNumber } = space;
@@ -651,11 +679,33 @@ function ParkingTile({
 
   const fetcher = useFetcher();
 
+  // Tracks the status this tile had before the latest optimistic flip, so
+  // that a failed submission (network drop, action threw) can be reverted.
+  // null when no submission is in-flight.
+  const pendingPrevStatus = useRef<string | null>(null);
+
+  // Watch fetcher.state transitions. When a submission lands back at "idle"
+  // with no `data` set, the action either threw to the error boundary or
+  // the request never completed — revert the optimistic state in either
+  // case. On success the action returns `new Response("OK")`, so
+  // fetcher.data is the string "OK" and we just clear pendingPrevStatus.
+  useEffect(() => {
+    if (fetcher.state !== "idle" || pendingPrevStatus.current === null) return;
+    if (fetcher.data === undefined && onSpaceChange) {
+      onSpaceChange(spaceNumber, pendingPrevStatus.current);
+    }
+    pendingPrevStatus.current = null;
+  }, [fetcher.state, fetcher.data, onSpaceChange, spaceNumber]);
+
   const updateToActive = (spaceNumber: number) => {
+    pendingPrevStatus.current = status;
+    onSpaceChange?.(spaceNumber, Status.ACTIVE);
     fetcher.submit({ space: spaceNumber }, { method: "post", action: `update/${spaceNumber}` });
   };
 
   const updateToEmpty = (spaceNumber: number) => {
+    pendingPrevStatus.current = status;
+    onSpaceChange?.(spaceNumber, Status.EMPTY);
     fetcher.submit({ space: spaceNumber }, { method: "post", action: `empty/${spaceNumber}` });
   };
 

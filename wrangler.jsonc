@@ -156,6 +156,12 @@
 	// is included in MARKETING_HOSTS so marketing renders on either host.
 	"env": {
 		"production": {
+			// Smart Placement co-locates the Worker invocation with the D1 home
+			// region for D1-heavy routes (the controller board loader makes 5
+			// queries per render; root re-runs getActiveDrillAudience on every
+			// nav). Cloudflare's published numbers put the win at ~30% loader
+			// latency reduction. Production-only — `wrangler dev` ignores it.
+			"placement": { "mode": "smart" },
 			// Apex + www use Custom Domains; tenant subdomains use a zone route
 			// (wildcard not supported on custom_domain in wrangler). In the
 			// pickuproster.com zone, add a proxied DNS record for

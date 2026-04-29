@@ -114,7 +114,14 @@ export async function getActiveDrillRun(prisma: PrismaClient, orgId: string) {
       orgId,
       status: { in: ["LIVE", "PAUSED"] },
     },
-    include: {
+    select: {
+      id: true,
+      status: true,
+      audience: true,
+      activatedAt: true,
+      pausedAt: true,
+      state: true,
+      updatedAt: true,
       template: {
         select: {
           id: true,
@@ -126,6 +133,23 @@ export async function getActiveDrillRun(prisma: PrismaClient, orgId: string) {
         },
       },
     },
+  });
+}
+
+// Narrow variant for the root loader's takeover gate, which only needs
+// `audience` to decide whether to redirect. Skipping the heavy `state` JSON
+// column and the joined template here keeps every navigation cheap — root
+// runs this on every request that isn't to the marketing host.
+export async function getActiveDrillAudience(
+  prisma: PrismaClient,
+  orgId: string,
+) {
+  return prisma.drillRun.findFirst({
+    where: {
+      orgId,
+      status: { in: ["LIVE", "PAUSED"] },
+    },
+    select: { audience: true },
   });
 }
 

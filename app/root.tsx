@@ -45,7 +45,7 @@ import {
   DEFAULT_SUPPORT_EMAIL,
   getSupportEmail
 } from "~/lib/site";
-import { getActiveDrillRun } from "~/domain/drills/live.server";
+import { getActiveDrillAudience } from "~/domain/drills/live.server";
 import {
   liveDrillRedirectTarget,
   type AudienceMembership
@@ -151,7 +151,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     if (membership !== "NONE") {
       try {
         const prisma = getTenantPrisma(context);
-        const activeRun = await getActiveDrillRun(prisma, org.id);
+        const activeRun = await getActiveDrillAudience(prisma, org.id);
         if (activeRun) {
           const url = new URL(request.url);
           const target = liveDrillRedirectTarget({

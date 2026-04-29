@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { useRevalidator } from "react-router";
 
 type SpaceUpdate = {
   type: "spaceUpdate";
@@ -56,7 +55,6 @@ export function useBingoWebSocket({
   onBoardReset?: (update: BoardResetUpdate) => void;
   onProgramCancellation?: (update: ProgramCancellationUpdate) => void;
 }) {
-  const revalidator = useRevalidator();
   const reconnectDelay = useRef(1000);
   const wsRef = useRef<WebSocket | null>(null);
   const onSpaceUpdateRef = useRef(onSpaceUpdate);
@@ -101,8 +99,11 @@ export function useBingoWebSocket({
 
       ws.onclose = () => {
         if (unmounted) return;
-        // Revalidate to sync state, then reconnect
-        revalidator.revalidate();
+        // Reconnect with exponential backoff. Do NOT call
+        // revalidator.revalidate() here — every WS flap on flaky WiFi
+        // (the picture for front-walkway pickup duty) used to thrash root +
+        // _index loaders through 5+ D1 queries. The reconnect path picks up
+        // fresh state via subsequent spaceUpdate / boardReset broadcasts.
         const delay = reconnectDelay.current;
         reconnectDelay.current = Math.min(delay * 2, 30000);
         setTimeout(connect, delay);
