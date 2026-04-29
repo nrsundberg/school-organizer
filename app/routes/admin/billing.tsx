@@ -60,9 +60,13 @@ export default function AdminBilling({ loaderData }: Route.ComponentProps) {
   const isPortalPending =
     navigation.state !== "idle" &&
     navigation.formAction === "/api/billing/portal";
+  const isCheckoutPending =
+    navigation.state !== "idle" &&
+    navigation.formAction === "/api/billing/checkout";
 
   const isPaidPlan = org?.billingPlan === "CAR_LINE" || org?.billingPlan === "CAMPUS";
   const canManageBilling = isPaidPlan && org?.hasStripeCustomer;
+  const canStartSubscription = isPaidPlan && !org?.hasStripeCustomer;
 
   return (
     <div className="flex flex-col gap-8 p-6 max-w-2xl">
@@ -140,6 +144,17 @@ export default function AdminBilling({ loaderData }: Route.ComponentProps) {
               className="rounded-xl bg-[#E9D500] px-5 py-2.5 text-sm font-semibold text-[#193B4B] hover:bg-[#f5e047] disabled:opacity-50"
             >
               {isPortalPending ? t("billing.redirecting") : t("billing.manageBilling")}
+            </button>
+          </Form>
+        ) : canStartSubscription ? (
+          <Form method="post" action="/api/billing/checkout">
+            <input type="hidden" name="plan" value={org!.billingPlan} />
+            <button
+              type="submit"
+              disabled={isCheckoutPending}
+              className="rounded-xl bg-[#E9D500] px-5 py-2.5 text-sm font-semibold text-[#193B4B] hover:bg-[#f5e047] disabled:opacity-50"
+            >
+              {isCheckoutPending ? t("billing.redirecting") : t("billing.startSubscription")}
             </button>
           </Form>
         ) : (

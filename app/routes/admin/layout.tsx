@@ -19,6 +19,7 @@ import {
 import AdminSidebar from "~/components/admin/AdminSidebar";
 import { AdminUsageBanner } from "~/components/admin/AdminUsageBanner";
 import { PastDuePaymentBanner } from "~/components/admin/PastDuePaymentBanner";
+import { TrialEndingBanner } from "~/components/admin/TrialEndingBanner";
 import Header from "~/components/Header";
 import logo from "/logo-icon.svg?url";
 
@@ -44,9 +45,31 @@ export async function loader({ context }: Route.LoaderArgs) {
     };
   }
 
+  // Trial-ending nudge: only when the org is in trial, has no Stripe customer
+  // yet (so they truly haven't paid), and the trial expires within 7 days.
+  let trialEndingBanner:
+    | { daysRemaining: number; billingPlan: "CAR_LINE" | "CAMPUS" }
+    | null = null;
+  if (
+    org.status === "TRIALING" &&
+    !org.stripeCustomerId &&
+    org.trialEndsAt &&
+    (org.billingPlan === "CAR_LINE" || org.billingPlan === "CAMPUS")
+  ) {
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const daysRemaining = Math.max(
+      0,
+      Math.ceil((org.trialEndsAt.getTime() - now.getTime()) / msPerDay),
+    );
+    if (daysRemaining <= 7) {
+      trialEndingBanner = { daysRemaining, billingPlan: org.billingPlan };
+    }
+  }
+
   return {
     usage,
     pastDuePaymentBanner,
+    trialEndingBanner,
     compedUntil: org.compedUntil ? org.compedUntil.toISOString() : null,
     // Schools inside a district don't manage their own billing — hide the
     // sidebar Billing link.
@@ -125,8 +148,13 @@ export function ErrorBoundary() {
 
 export default function AdminLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { usage, pastDuePaymentBanner, compedUntil, orgIsInDistrict } =
-    useLoaderData<typeof loader>();
+  const {
+    usage,
+    pastDuePaymentBanner,
+    trialEndingBanner,
+    compedUntil,
+    orgIsInDistrict,
+  } = useLoaderData<typeof loader>();
   const { t, i18n } = useTranslation("admin");
   const isComped = !!compedUntil && new Date(compedUntil) > new Date();
   const rootData = useRouteLoaderData("root") as
@@ -149,6 +177,12 @@ export default function AdminLayout() {
       )}
       {pastDuePaymentBanner && (
         <PastDuePaymentBanner suspendOnIso={pastDuePaymentBanner.suspendOnIso} />
+      )}
+      {trialEndingBanner && (
+        <TrialEndingBanner
+          daysRemaining={trialEndingBanner.daysRemaining}
+          billingPlan={trialEndingBanner.billingPlan}
+        />
       )}
       {usage.limits && <AdminUsageBanner usage={usage} />}
       <div className="flex flex-1">

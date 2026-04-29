@@ -11,6 +11,7 @@
     "orgStatus": "Estado de la organización",
     "plan": "Plan",
     "redirecting": "Redirigiendo…",
+    "startSubscription": "Añadir método de pago",
     "subscriptionStatus": "Estado de la suscripción",
     "trialDays_one": "{{count}} día",
     "trialDays_other": "{{count}} días",
@@ -979,6 +980,12 @@
     "headline": "Falló el pago — tu suscripción está vencida.",
     "suffix": " (14 días desde el primer aviso de vencimiento).",
     "updateBilling": "Actualizar facturación"
+  },
+  "trialEndingBanner": {
+    "addPaymentMethod": "Añadir método de pago",
+    "body": "Añade un método de pago para seguir usando Pickup Roster cuando termine tu prueba.",
+    "headline_one": "Tu prueba termina en {{count}} día.",
+    "headline_other": "Tu prueba termina en {{count}} días."
   },
   "print": {
     "board": {

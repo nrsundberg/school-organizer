@@ -51,13 +51,6 @@ export function isSelfServeBillingPlan(
   return plan === "CAR_LINE" || plan === "CAMPUS";
 }
 
-export function shouldStartCheckoutAfterSignup(
-  plan: PublicBillingPlan,
-  selectionSource: PublicPlanSelectionSource
-): plan is SelfServeBillingPlan {
-  return selectionSource === "explicit" && isSelfServeBillingPlan(plan);
-}
-
 export function planLabel(plan: PublicBillingPlan): string {
   if (plan === "DISTRICT") return "District";
   if (plan === "CAMPUS") return "Campus";
