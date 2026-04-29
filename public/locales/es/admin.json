@@ -60,6 +60,21 @@
   "children": {
     "addChild": "Agregar niño",
     "addClass": "Agregar clase",
+    "addMenu": {
+      "child": {
+        "hint": "Inscribir un solo estudiante",
+        "label": "Agregar niño"
+      },
+      "classroom": {
+        "hint": "Crear una nueva aula",
+        "label": "Agregar aula"
+      },
+      "import": {
+        "hint": "Sube un CSV desde tu SIS",
+        "label": "Importar lista"
+      },
+      "trigger": "Agregar"
+    },
     "child_one": "niño",
     "child_other": "niños",
     "edit": "Editar",
@@ -67,6 +82,23 @@
     "heading": "Niños y clases",
     "metaTitle": "Administración – Niños y clases",
     "noChildren": "No hay niños en esta clase.",
+    "pageHeader": {
+      "eyebrow": "Lista",
+      "subtitle": "Explora aulas por grado, accede a registros de estudiantes y mantén tu lista al día.",
+      "title": "Niños y aulas"
+    },
+    "search": {
+      "placeholder": "Buscar estudiantes o aulas"
+    },
+    "stats": {
+      "allPlaced": "Todos los estudiantes están asignados",
+      "avgClassSize": "Tamaño prom. de clase",
+      "classrooms": "Aulas",
+      "defaultCap": "Capacidad por defecto {{count}}",
+      "students": "Estudiantes",
+      "unassigned": "Sin asignar",
+      "unassignedCaption": "Estudiantes sin aula actual"
+    },
     "table": {
       "name": "Nombre",
       "space": "Espacio #"
@@ -118,8 +150,23 @@
     }
   },
   "dashboard": {
+    "auditActions": {
+      "BILLING_PLAN_CHANGED": "Plan de facturación cambiado",
+      "BILLING_PORTAL_OPENED": "Abrió el portal de facturación",
+      "BOARD_RESET": "Tablero reiniciado",
+      "BRANDING_UPDATED": "Marca actualizada",
+      "EXCEPTION_BROADCAST": "Transmitió una excepción de salida",
+      "HOUSEHOLD_CREATED": "Creó una familia",
+      "HOUSEHOLD_DELETED": "Eliminó una familia",
+      "PROGRAM_CANCELLED": "Canceló un programa extracurricular",
+      "USER_INVITED": "Invitó a un usuario",
+      "USER_REMOVED": "Eliminó a un usuario",
+      "USER_ROLE_CHANGED": "Cambió el rol de un usuario",
+      "VIEWER_DRAWING_DISABLED": "Deshabilitó el dibujo del visor",
+      "VIEWER_DRAWING_ENABLED": "Habilitó el dibujo del visor"
+    },
     "actions": {
-      "addedSpaces": "Se agregaron los espacios {{from}}–{{to}}",
+      "addedSpaces":"Se agregaron los espacios {{from}}–{{to}}",
       "createdGrid": "Cuadrícula creada ({{n}} espacios)",
       "deletedAll": "Se eliminaron todos los registros de estudiantes",
       "extendError": "El objetivo debe ser mayor que el número máximo de espacio actual.",
@@ -224,21 +271,21 @@
       "staleSince": "Last reset {{date}}"
     },
     "activity": {
-      "heading": "Recent activity",
-      "empty": "No recent activity yet. Drills and admin changes will appear here.",
-      "systemActor": "System",
-      "justNow": "just now",
-      "minutesAgo_one": "{{count}} minute ago",
-      "minutesAgo_other": "{{count}} minutes ago",
-      "minutesAgo": "{{count}} minutes ago",
-      "hoursAgo_one": "{{count}} hour ago",
-      "hoursAgo_other": "{{count}} hours ago",
-      "hoursAgo": "{{count}} hours ago",
-      "daysAgo_one": "{{count}} day ago",
-      "daysAgo_other": "{{count}} days ago",
-      "daysAgo": "{{count}} days ago",
-      "viewAll": "All pickup history",
-      "viewDrills": "All drill history"
+      "heading": "Actividad reciente",
+      "empty": "Aún no hay actividad reciente. Los simulacros y cambios administrativos aparecerán aquí.",
+      "systemActor": "Sistema",
+      "justNow": "justo ahora",
+      "minutesAgo_one": "hace {{count}} minuto",
+      "minutesAgo_other": "hace {{count}} minutos",
+      "minutesAgo": "hace {{count}} minutos",
+      "hoursAgo_one": "hace {{count}} hora",
+      "hoursAgo_other": "hace {{count}} horas",
+      "hoursAgo": "hace {{count}} horas",
+      "daysAgo_one": "hace {{count}} día",
+      "daysAgo_other": "hace {{count}} días",
+      "daysAgo": "hace {{count}} días",
+      "viewAll": "Todo el historial de salidas",
+      "viewDrills": "Todo el historial de simulacros"
     },
     "setup": {
       "heading": "Setup & maintenance",
@@ -1043,7 +1090,62 @@
     "panelTitle": "Panel de administración",
     "rosterImport": "Importar lista",
     "users": "Usuarios",
-    "print": "Print backups"
+    "print": "Respaldos para impresión"
+  },
+  "students": {
+    "breadcrumb": {
+      "aria": "Migas de pan",
+      "children": "Niños"
+    },
+    "errors": {
+      "classroomNotFound": "El aula seleccionada no existe.",
+      "invalidId": "ID de estudiante inválido.",
+      "namesRequired": "El nombre y el apellido son obligatorios.",
+      "notFound": "Estudiante no encontrado.",
+      "pickClassroom": "Elige un aula.",
+      "unknownAction": "Acción desconocida.",
+      "updateFailed": "La actualización falló."
+    },
+    "fields": {
+      "allergies": "Alergias",
+      "classroom": "Aula",
+      "firstName": "Nombre",
+      "grade": "Grado",
+      "gradeFromClassroom": "Del aula",
+      "gradeTip": "El grado se establece en el aula; cámbialo desde la tarjeta del aula.",
+      "lastName": "Apellido",
+      "medication": "Medicación",
+      "noneOnFile": "Sin registro"
+    },
+    "pills": {
+      "noClassroom": "Sin aula",
+      "noHousehold": "Sin familia",
+      "todaysException": "Hoy: {{plan}}",
+      "ungradedClassroom": "Aula sin grado"
+    },
+    "placeholderTab": {
+      "title": "{{title}}",
+      "subtitle": "Esta pestaña está próximamente."
+    },
+    "sections": {
+      "defaultPlan": "Plan por defecto",
+      "defaultPlanCaption": "Se usa cuando no hay excepción",
+      "healthSafety": "Salud y seguridad",
+      "household": "Familia",
+      "identity": "Identidad",
+      "placement": "Ubicación",
+      "recentPickups": "Salidas recientes"
+    },
+    "tabs": {
+      "activity": "Actividad",
+      "dismissal": "Salida",
+      "files": "Archivos",
+      "notes": "Notas",
+      "profile": "Perfil"
+    },
+    "toasts": {
+      "saved": "Estudiante guardado."
+    }
   },
   "usageBanner": {
     "classrooms": "Aulas",
@@ -1063,6 +1165,130 @@
       "reasonLabel": "Motivo",
       "reasonPlaceholder": "Ingresa el motivo de la suspensión...",
       "submit": "Suspender usuario"
+    },
+    "devices": {
+      "android": "Android",
+      "browser": "Navegador",
+      "ipad": "iPad",
+      "iphone": "iPhone",
+      "linux": "Linux",
+      "mac": "Mac",
+      "unknown": "Dispositivo desconocido",
+      "windows": "Windows"
+    },
+    "drawer": {
+      "actions": {
+        "ban": "Suspender",
+        "cantChangeOwnRole": "No puedes cambiar tu propio rol desde este panel.",
+        "delete": "Eliminar",
+        "deleteConfirm": "¿Eliminar a {{name}}? Esta acción no se puede deshacer.",
+        "resetPassword": "Restablecer contraseña",
+        "unban": "Reactivar"
+      },
+      "activity": {
+        "empty": "Sin actividad reciente.",
+        "heading": "Actividad reciente"
+      },
+      "close": "Cerrar",
+      "empty": {
+        "subtitle": "Aquí verás familias vinculadas, sesiones y actividad reciente.",
+        "title": "Selecciona un usuario para gestionar su acceso."
+      },
+      "households": {
+        "empty": "Aún no hay familias etiquetadas con este usuario.",
+        "heading": "Familias vinculadas",
+        "noStudents": "Sin estudiantes asignados",
+        "studentCount_one": "{{count}} estudiante",
+        "studentCount_other": "{{count}} estudiantes"
+      },
+      "sessions": {
+        "current": "Actual",
+        "empty": "Sin sesiones activas.",
+        "heading": "Sesiones activas",
+        "revokeAll": "Revocar todas"
+      }
+    },
+    "filters": {
+      "searchPlaceholder": "Buscar por nombre o correo…",
+      "sort": {
+        "created": "Creado",
+        "lastActive": "Última actividad",
+        "name": "Nombre",
+        "role": "Rol"
+      },
+      "sortLabel": "Ordenar"
+    },
+    "impersonate": {
+      "start": "Suplantar",
+      "starting": "Suplantando…"
+    },
+    "invite": {
+      "cancel": "Cancelar",
+      "emailLabel": "Correo",
+      "eyebrow": "Invitar",
+      "householdHint": "Asocia previamente este usuario a la familia para el panel de conexión.",
+      "householdLabel": "Vincular a familia (opcional)",
+      "householdNone": "Sin vínculo a familia",
+      "nameLabel": "Nombre completo",
+      "roleLegend": "Rol",
+      "submit": "Enviar invitación",
+      "subtitle": "Le enviaremos una invitación con enlace mágico. Ellos eligen su contraseña al aceptar.",
+      "title": "Invitar a un usuario"
+    },
+    "pageHeader": {
+      "eyebrow": "Acceso",
+      "inviteCta": "Invitar usuario",
+      "passwordResetOff": "Restablecer contraseña: desactivado",
+      "passwordResetOn": "Restablecer contraseña: activado",
+      "subtitle": "Invita personal, gestiona roles y revisa quién ha iniciado sesión recientemente.",
+      "title": "Usuarios y permisos"
+    },
+    "relativeTime": {
+      "days": "hace {{count}} d",
+      "hours": "hace {{count}} h",
+      "justNow": "Justo ahora",
+      "minutes": "hace {{count}} min",
+      "months": "hace {{count}} mes",
+      "never": "Nunca",
+      "years": "hace {{count}} a"
+    },
+    "roles": {
+      "admin": "Administrador",
+      "adminDesc": "Acceso total",
+      "all": "Todos",
+      "controller": "Controlador",
+      "controllerDesc": "Operación de salida",
+      "viewer": "Visor",
+      "viewerDesc": "Solo lectura"
+    },
+    "stats": {
+      "activeTodayCaption": "Sesiones en las últimas 24h",
+      "activeTodayLabel": "Activos hoy",
+      "bannedCaption": "No pueden iniciar sesión",
+      "bannedLabel": "Suspendidos",
+      "pendingCaption": "Esperando aceptación",
+      "pendingLabel": "Invitaciones pendientes",
+      "totalCaption": "En esta escuela",
+      "totalLabel": "Usuarios totales"
+    },
+    "status": {
+      "active": "Activo",
+      "banned": "Suspendido",
+      "idle": "Inactivo",
+      "pending": "Pendiente"
+    },
+    "tableExtra": {
+      "invitationPending": "Invitación pendiente",
+      "lastActive": "Última actividad",
+      "noMatches": "Ningún usuario coincide con tus filtros.",
+      "noSessions": "Sin sesiones",
+      "resend": "Reenviar",
+      "selectAria": "Seleccionar a {{name}}",
+      "sending": "Enviando…",
+      "sessionsCount_one": "{{count}} sesión",
+      "sessionsCount_other": "{{count}} sesiones",
+      "user": "Usuario",
+      "youBadge": "Tú"
     },
     "create": {
       "admin": "Administrador",

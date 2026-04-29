@@ -341,14 +341,17 @@ function inviteErrorMessage(error: InviteUserError, t: TFunction): string {
 type LoaderData = Route.ComponentProps["loaderData"];
 type UserRow = LoaderData["users"][number];
 
-function classifyStatus(user: UserRow): { tone: PillTone; label: string; symbol: string } {
-  if (user.banned) return { tone: "danger", label: "Banned", symbol: "⊘" };
-  if (user.pending) return { tone: "warning", label: "Pending", symbol: "⏳" };
-  if (!user.lastActiveAt) return { tone: "neutral", label: "Idle", symbol: "○" };
+function classifyStatus(
+  user: UserRow,
+  t: TFunction,
+): { tone: PillTone; label: string; symbol: string } {
+  if (user.banned) return { tone: "danger", label: t("users.status.banned"), symbol: "⊘" };
+  if (user.pending) return { tone: "warning", label: t("users.status.pending"), symbol: "⏳" };
+  if (!user.lastActiveAt) return { tone: "neutral", label: t("users.status.idle"), symbol: "○" };
   const ageMs = Date.now() - new Date(user.lastActiveAt).getTime();
   const dayMs = 24 * 60 * 60 * 1000;
-  if (ageMs < dayMs) return { tone: "success", label: "Active", symbol: "●" };
-  return { tone: "neutral", label: "Idle", symbol: "○" };
+  if (ageMs < dayMs) return { tone: "success", label: t("users.status.active"), symbol: "●" };
+  return { tone: "neutral", label: t("users.status.idle"), symbol: "○" };
 }
 
 function roleTone(role: string | null | undefined): PillTone {
@@ -357,32 +360,38 @@ function roleTone(role: string | null | undefined): PillTone {
   return "neutral";
 }
 
-function relativeTime(iso: string | null): string {
-  if (!iso) return "Never";
-  const ms = Date.now() - new Date(iso).getTime();
-  if (ms < 0) return "Just now";
-  const minutes = Math.floor(ms / 60_000);
-  if (minutes < 1) return "Just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
-  const years = Math.floor(months / 12);
-  return `${years}y ago`;
+function roleLabel(role: string | null | undefined, t: TFunction): string {
+  if (role === "ADMIN") return t("users.roles.admin");
+  if (role === "CONTROLLER") return t("users.roles.controller");
+  return t("users.roles.viewer");
 }
 
-function shortDeviceLabel(ua: string | null): string {
-  if (!ua) return "Unknown device";
-  if (/iphone/i.test(ua)) return "iPhone";
-  if (/ipad/i.test(ua)) return "iPad";
-  if (/android/i.test(ua)) return "Android";
-  if (/macintosh|mac os/i.test(ua)) return "Mac";
-  if (/windows/i.test(ua)) return "Windows";
-  if (/linux/i.test(ua)) return "Linux";
-  return "Browser";
+function relativeTime(iso: string | null, t: TFunction): string {
+  if (!iso) return t("users.relativeTime.never");
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 0) return t("users.relativeTime.justNow");
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return t("users.relativeTime.justNow");
+  if (minutes < 60) return t("users.relativeTime.minutes", { count: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t("users.relativeTime.hours", { count: hours });
+  const days = Math.floor(hours / 24);
+  if (days < 30) return t("users.relativeTime.days", { count: days });
+  const months = Math.floor(days / 30);
+  if (months < 12) return t("users.relativeTime.months", { count: months });
+  const years = Math.floor(months / 12);
+  return t("users.relativeTime.years", { count: years });
+}
+
+function shortDeviceLabel(ua: string | null, t: TFunction): string {
+  if (!ua) return t("users.devices.unknown");
+  if (/iphone/i.test(ua)) return t("users.devices.iphone");
+  if (/ipad/i.test(ua)) return t("users.devices.ipad");
+  if (/android/i.test(ua)) return t("users.devices.android");
+  if (/macintosh|mac os/i.test(ua)) return t("users.devices.mac");
+  if (/windows/i.test(ua)) return t("users.devices.windows");
+  if (/linux/i.test(ua)) return t("users.devices.linux");
+  return t("users.devices.browser");
 }
 
 // ---------------------------------------------------------------------------
@@ -475,23 +484,27 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
       />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total users" value={stats.total} caption="Across this school" />
         <StatCard
-          label="Active today"
+          label={t("users.stats.totalLabel")}
+          value={stats.total}
+          caption={t("users.stats.totalCaption")}
+        />
+        <StatCard
+          label={t("users.stats.activeTodayLabel")}
           value={stats.activeToday}
-          caption="Sessions in last 24h"
+          caption={t("users.stats.activeTodayCaption")}
           tone="success"
         />
         <StatCard
-          label="Pending invites"
+          label={t("users.stats.pendingLabel")}
           value={stats.pending}
-          caption="Awaiting acceptance"
+          caption={t("users.stats.pendingCaption")}
           tone="warning"
         />
         <StatCard
-          label="Banned"
+          label={t("users.stats.bannedLabel")}
           value={stats.banned}
-          caption="Cannot sign in"
+          caption={t("users.stats.bannedCaption")}
           tone="danger"
         />
       </section>
@@ -551,25 +564,28 @@ function PageHeader({
   passwordResetEnabled: boolean;
   onInvite: () => void;
 }) {
+  const { t } = useTranslation("admin");
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <p className="text-[11px] font-medium uppercase tracking-[0.9px] text-white/45">
-          Access
+          {t("users.pageHeader.eyebrow")}
         </p>
-        <h1 className="mt-1 text-2xl font-bold text-white">Users &amp; permissions</h1>
+        <h1 className="mt-1 text-2xl font-bold text-white">{t("users.pageHeader.title")}</h1>
         <p className="mt-1 max-w-2xl text-sm text-white/55">
-          Invite staff, manage roles, and review who has signed in recently.
+          {t("users.pageHeader.subtitle")}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <StatusPill tone={passwordResetEnabled ? "success" : "neutral"}>
           <Mail className="h-3 w-3" />
-          {passwordResetEnabled ? "Password reset: on" : "Password reset: off"}
+          {passwordResetEnabled
+            ? t("users.pageHeader.passwordResetOn")
+            : t("users.pageHeader.passwordResetOff")}
         </StatusPill>
         <Button variant="primary" onPress={onInvite} className="gap-1">
           <Plus className="h-4 w-4" />
-          Invite user
+          {t("users.pageHeader.inviteCta")}
         </Button>
       </div>
     </div>
@@ -589,6 +605,7 @@ function FilterRow({
   counts: Record<RoleFilter, number>;
   onChange: (key: string, value: string | null) => void;
 }) {
+  const { t } = useTranslation("admin");
   // Local search input so typing isn't a re-render storm; commit on
   // submit / blur / 250ms idle.
   const [draft, setDraft] = useState(q);
@@ -618,7 +635,7 @@ function FilterRow({
               onChange("q", value.trim() || null);
             }, 250);
           }}
-          placeholder="Search by name or email…"
+          placeholder={t("users.filters.searchPlaceholder")}
           className="w-full rounded-lg border border-white/10 bg-black/30 py-2 pl-9 pr-3 text-sm text-white placeholder-white/35 focus:border-blue-400 focus:outline-none"
         />
       </Form>
@@ -626,7 +643,13 @@ function FilterRow({
         {ROLE_FILTER_OPTIONS.map((opt) => {
           const active = roleFilter === opt;
           const label =
-            opt === "ALL" ? "All" : opt.slice(0, 1) + opt.slice(1).toLowerCase();
+            opt === "ALL"
+              ? t("users.roles.all")
+              : opt === "ADMIN"
+              ? t("users.roles.admin")
+              : opt === "CONTROLLER"
+              ? t("users.roles.controller")
+              : t("users.roles.viewer");
           return (
             <button
               key={opt}
@@ -645,16 +668,16 @@ function FilterRow({
         })}
       </div>
       <label className="flex items-center gap-2 text-xs text-white/55">
-        <span>Sort</span>
+        <span>{t("users.filters.sortLabel")}</span>
         <select
           value={sort}
           onChange={(e) => onChange("sort", e.target.value)}
           className="rounded-md border border-white/10 bg-black/30 px-2 py-1 text-sm text-white focus:border-blue-400 focus:outline-none"
         >
-          <option value="lastActive">Last active</option>
-          <option value="name">Name</option>
-          <option value="role">Role</option>
-          <option value="created">Created</option>
+          <option value="lastActive">{t("users.filters.sort.lastActive")}</option>
+          <option value="name">{t("users.filters.sort.name")}</option>
+          <option value="role">{t("users.filters.sort.role")}</option>
+          <option value="created">{t("users.filters.sort.created")}</option>
         </select>
       </label>
     </section>
@@ -679,21 +702,22 @@ function UsersTable({
   onSelect: (id: string) => void;
   currentUserId: string;
 }) {
+  const { t } = useTranslation("admin");
   return (
     <section className="overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.04]">
       <div
         className={`grid ${GRID_COLS} items-center gap-3 border-b border-white/[0.08] px-3 py-2 text-[11px] font-medium uppercase tracking-[0.9px] text-white/40`}
       >
         <span aria-hidden="true" />
-        <span>User</span>
-        <span>Role</span>
-        <span>Status</span>
-        <span>Last active</span>
-        <span className="text-right">Actions</span>
+        <span>{t("users.tableExtra.user")}</span>
+        <span>{t("users.table.role")}</span>
+        <span>{t("users.table.status")}</span>
+        <span>{t("users.tableExtra.lastActive")}</span>
+        <span className="text-right">{t("users.table.actions")}</span>
       </div>
       {users.length === 0 ? (
         <div className="px-4 py-10 text-center text-sm text-white/45">
-          No users match your filters.
+          {t("users.tableExtra.noMatches")}
         </div>
       ) : (
         <div className="divide-y divide-white/[0.06]">
@@ -723,15 +747,16 @@ function UserRow({
   onSelect: () => void;
   currentUserId: string;
 }) {
-  const status = classifyStatus(user);
+  const { t } = useTranslation("admin");
+  const status = classifyStatus(user, t);
   const isMe = user.id === currentUserId;
   const isPending = user.pending;
-  const lastActiveLabel = isPending ? "—" : relativeTime(user.lastActiveAt);
+  const lastActiveLabel = isPending ? "—" : relativeTime(user.lastActiveAt, t);
   const subLine = isPending
     ? null
     : user.sessionCount > 0
-    ? `${user.sessionCount} session${user.sessionCount === 1 ? "" : "s"}`
-    : "No sessions";
+    ? t("users.tableExtra.sessionsCount", { count: user.sessionCount })
+    : t("users.tableExtra.noSessions");
 
   return (
     <button
@@ -746,7 +771,7 @@ function UserRow({
       <span className="flex justify-center">
         <input
           type="checkbox"
-          aria-label={`Select ${user.name || user.email}`}
+          aria-label={t("users.tableExtra.selectAria", { name: user.name || user.email })}
           onClick={(e) => e.stopPropagation()}
           className="h-3.5 w-3.5 cursor-pointer accent-blue-500"
         />
@@ -764,7 +789,7 @@ function UserRow({
             </span>
             {isMe ? (
               <span className="text-[10px] uppercase tracking-wider text-white/35">
-                You
+                {t("users.tableExtra.youBadge")}
               </span>
             ) : null}
           </span>
@@ -772,15 +797,13 @@ function UserRow({
             <span className="block truncate text-xs text-white/45">{user.email}</span>
           ) : (
             <span className="block truncate text-xs text-amber-300/70">
-              Invitation pending
+              {t("users.tableExtra.invitationPending")}
             </span>
           )}
         </span>
       </span>
       <span>
-        <StatusPill tone={roleTone(user.role)}>
-          {user.role ?? "VIEWER"}
-        </StatusPill>
+        <StatusPill tone={roleTone(user.role)}>{roleLabel(user.role, t)}</StatusPill>
       </span>
       <span>
         <StatusPill tone={status.tone}>
@@ -809,6 +832,7 @@ function UserRow({
 }
 
 function ResendInviteLink({ user }: { user: UserRow }) {
+  const { t } = useTranslation("admin");
   const fetcher = useFetcher();
   return (
     <fetcher.Form method="post" className="inline">
@@ -822,7 +846,9 @@ function ResendInviteLink({ user }: { user: UserRow }) {
         disabled={fetcher.state !== "idle"}
         className="text-xs text-blue-300 hover:underline disabled:opacity-50"
       >
-        {fetcher.state === "idle" ? "Resend" : "Sending…"}
+        {fetcher.state === "idle"
+          ? t("users.tableExtra.resend")
+          : t("users.tableExtra.sending")}
       </button>
     </fetcher.Form>
   );
@@ -833,13 +859,12 @@ function ResendInviteLink({ user }: { user: UserRow }) {
 // ---------------------------------------------------------------------------
 
 function EmptyDrawer() {
+  const { t } = useTranslation("admin");
   return (
     <div className="flex h-full min-h-[420px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/10 bg-white/[0.02] p-6 text-center">
       <UserPlus className="h-6 w-6 text-white/30" />
-      <p className="text-sm text-white/55">Select a user to manage their access.</p>
-      <p className="text-xs text-white/35">
-        You'll see linked households, sessions, and recent activity here.
-      </p>
+      <p className="text-sm text-white/55">{t("users.drawer.empty.title")}</p>
+      <p className="text-xs text-white/35">{t("users.drawer.empty.subtitle")}</p>
     </div>
   );
 }
@@ -861,6 +886,7 @@ function UserDetailDrawer({
   currentUserId: string;
   onClose: () => void;
 }) {
+  const { t } = useTranslation("admin");
   const detailsFetcher = useFetcher<{ details?: DrawerDetails }>();
   const actionFetcher = useFetcher();
   const [banOpen, setBanOpen] = useState(false);
@@ -892,9 +918,9 @@ function UserDetailDrawer({
           </p>
           <p className="truncate text-xs text-white/55">{user.email}</p>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <StatusPill tone={roleTone(user.role)}>{user.role ?? "VIEWER"}</StatusPill>
-            <StatusPill tone={classifyStatus(user).tone}>
-              {classifyStatus(user).label}
+            <StatusPill tone={roleTone(user.role)}>{roleLabel(user.role, t)}</StatusPill>
+            <StatusPill tone={classifyStatus(user, t).tone}>
+              {classifyStatus(user, t).label}
             </StatusPill>
           </div>
         </div>
@@ -902,7 +928,7 @@ function UserDetailDrawer({
           type="button"
           onClick={onClose}
           className="rounded-md p-1 text-white/40 hover:bg-white/5 hover:text-white"
-          aria-label="Close"
+          aria-label={t("users.drawer.close")}
         >
           <X className="h-4 w-4" />
         </button>
@@ -912,20 +938,20 @@ function UserDetailDrawer({
         <RoleTileSelector userId={user.id} role={(user.role ?? "VIEWER") as Role} />
       ) : (
         <p className="rounded-lg bg-white/[0.04] px-3 py-2 text-xs text-white/55">
-          You can't change your own role from this panel.
+          {t("users.drawer.actions.cantChangeOwnRole")}
         </p>
       )}
 
       <section className="space-y-2">
         <SectionHeader
-          title="Linked households"
+          title={t("users.drawer.households.heading")}
           count={details?.households.length ?? 0}
         />
         {!details ? (
           <SkeletonRow />
         ) : details.households.length === 0 ? (
           <p className="rounded-lg bg-white/[0.03] p-3 text-xs text-white/45">
-            No households are tagged with this user yet.
+            {t("users.drawer.households.empty")}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -939,14 +965,13 @@ function UserDetailDrawer({
                     {h.name}
                   </EntityLink>
                   <span className="text-[11px] text-white/40">
-                    {h.studentNames.length} student
-                    {h.studentNames.length === 1 ? "" : "s"}
+                    {t("users.drawer.households.studentCount", { count: h.studentNames.length })}
                   </span>
                 </div>
                 <p className="mt-1 truncate text-xs text-white/55">
                   {h.studentNames.length > 0
                     ? h.studentNames.join(", ")
-                    : "No students assigned"}
+                    : t("users.drawer.households.noStudents")}
                   {h.classroomList.length > 0
                     ? ` · ${h.classroomList.join(", ")}`
                     : ""}
@@ -959,7 +984,7 @@ function UserDetailDrawer({
 
       <section className="space-y-2">
         <SectionHeader
-          title="Active sessions"
+          title={t("users.drawer.sessions.heading")}
           count={details?.sessions.length ?? 0}
           actions={
             !isMe && details && details.sessions.length > 0 ? (
@@ -971,7 +996,7 @@ function UserDetailDrawer({
                   disabled={actionFetcher.state !== "idle"}
                   className="text-xs text-rose-300 hover:underline disabled:opacity-50"
                 >
-                  Revoke all
+                  {t("users.drawer.sessions.revokeAll")}
                 </button>
               </actionFetcher.Form>
             ) : null
@@ -981,7 +1006,7 @@ function UserDetailDrawer({
           <SkeletonRow />
         ) : details.sessions.length === 0 ? (
           <p className="rounded-lg bg-white/[0.03] p-3 text-xs text-white/45">
-            No active sessions.
+            {t("users.drawer.sessions.empty")}
           </p>
         ) : (
           <ul className="flex flex-col gap-1">
@@ -990,12 +1015,12 @@ function UserDetailDrawer({
                 key={s.id}
                 className="flex items-center justify-between rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs"
               >
-                <span className="text-white/80">{shortDeviceLabel(s.userAgent)}</span>
+                <span className="text-white/80">{shortDeviceLabel(s.userAgent, t)}</span>
                 <span className="flex items-center gap-2 text-white/45">
                   {s.current ? (
-                    <StatusPill tone="info">Current</StatusPill>
+                    <StatusPill tone="info">{t("users.drawer.sessions.current")}</StatusPill>
                   ) : null}
-                  <span>{relativeTime(s.createdAt)}</span>
+                  <span>{relativeTime(s.createdAt, t)}</span>
                 </span>
               </li>
             ))}
@@ -1004,12 +1029,12 @@ function UserDetailDrawer({
       </section>
 
       <section className="space-y-2">
-        <SectionHeader title="Recent activity" />
+        <SectionHeader title={t("users.drawer.activity.heading")} />
         {!details ? (
           <SkeletonRow />
         ) : details.recentActivity.length === 0 ? (
           <p className="rounded-lg bg-white/[0.03] p-3 text-xs text-white/45">
-            No recent activity.
+            {t("users.drawer.activity.empty")}
           </p>
         ) : (
           <ul className="flex flex-col gap-1">
@@ -1025,7 +1050,7 @@ function UserDetailDrawer({
                   ) : null}
                 </span>
                 <span className="whitespace-nowrap text-white/40">
-                  {relativeTime(a.at)}
+                  {relativeTime(a.at, t)}
                 </span>
               </li>
             ))}
@@ -1045,7 +1070,7 @@ function UserDetailDrawer({
               isDisabled={actionFetcher.state !== "idle"}
             >
               <RotateCcw className="h-3 w-3" />
-              Reset password
+              {t("users.drawer.actions.resetPassword")}
             </Button>
           </actionFetcher.Form>
         ) : null}
@@ -1062,7 +1087,7 @@ function UserDetailDrawer({
                 isDisabled={actionFetcher.state !== "idle"}
               >
                 <UserCheck className="h-3 w-3" />
-                Unban
+                {t("users.drawer.actions.unban")}
               </Button>
             </actionFetcher.Form>
           ) : (
@@ -1073,7 +1098,7 @@ function UserDetailDrawer({
               className="text-rose-300"
             >
               <Ban className="h-3 w-3" />
-              Ban
+              {t("users.drawer.actions.ban")}
             </Button>
           )
         ) : null}
@@ -1089,7 +1114,9 @@ function UserDetailDrawer({
               onPress={(e: any) => {
                 if (
                   !confirm(
-                    `Delete ${user.name || user.email}? This cannot be undone.`,
+                    t("users.drawer.actions.deleteConfirm", {
+                      name: user.name || user.email,
+                    }),
                   )
                 ) {
                   e?.preventDefault?.();
@@ -1097,7 +1124,7 @@ function UserDetailDrawer({
               }}
             >
               <Trash2 className="h-3 w-3" />
-              Delete
+              {t("users.drawer.actions.delete")}
             </Button>
           </actionFetcher.Form>
         ) : null}
@@ -1120,6 +1147,7 @@ function SkeletonRow() {
 }
 
 function RoleTileSelector({ userId, role }: { userId: string; role: Role }) {
+  const { t } = useTranslation("admin");
   const fetcher = useFetcher();
   return (
     <fetcher.Form method="post" className="grid grid-cols-3 gap-2">
@@ -1146,17 +1174,17 @@ function RoleTileSelector({ userId, role }: { userId: string; role: Role }) {
           >
             <span className="block text-sm font-semibold">
               {opt === "ADMIN"
-                ? "Admin"
+                ? t("users.roles.admin")
                 : opt === "CONTROLLER"
-                ? "Controller"
-                : "Viewer"}
+                ? t("users.roles.controller")
+                : t("users.roles.viewer")}
             </span>
             <span className="mt-0.5 block text-[10px] uppercase tracking-wider opacity-60">
               {opt === "ADMIN"
-                ? "Full access"
+                ? t("users.roles.adminDesc")
                 : opt === "CONTROLLER"
-                ? "Pickup ops"
-                : "Read-only"}
+                ? t("users.roles.controllerDesc")
+                : t("users.roles.viewerDesc")}
             </span>
           </button>
         );
@@ -1166,6 +1194,7 @@ function RoleTileSelector({ userId, role }: { userId: string; role: Role }) {
 }
 
 function ImpersonateButton({ user }: { user: UserRow }) {
+  const { t } = useTranslation("admin");
   const fetcher = useFetcher();
   const isLoading = fetcher.state !== "idle";
   return (
@@ -1179,7 +1208,7 @@ function ImpersonateButton({ user }: { user: UserRow }) {
         isDisabled={isLoading}
       >
         <LogIn className="h-3 w-3" />
-        {isLoading ? "Impersonating…" : "Impersonate"}
+        {isLoading ? t("users.impersonate.starting") : t("users.impersonate.start")}
       </Button>
     </fetcher.Form>
   );
@@ -1246,6 +1275,7 @@ function InviteDrawer({
   households: { id: string; name: string }[];
   onClose: () => void;
 }) {
+  const { t } = useTranslation("admin");
   const fetcher = useFetcher();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -1274,18 +1304,16 @@ function InviteDrawer({
         <header className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.9px] text-white/45">
-              Invite
+              {t("users.invite.eyebrow")}
             </p>
-            <h2 className="text-xl font-semibold text-white">Invite a user</h2>
-            <p className="mt-1 text-sm text-white/55">
-              We'll email a magic-link invite. They set their own password on accept.
-            </p>
+            <h2 className="text-xl font-semibold text-white">{t("users.invite.title")}</h2>
+            <p className="mt-1 text-sm text-white/55">{t("users.invite.subtitle")}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-md p-1 text-white/45 hover:bg-white/5 hover:text-white"
-            aria-label="Close"
+            aria-label={t("users.drawer.close")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -1294,7 +1322,7 @@ function InviteDrawer({
         <fetcher.Form method="post" className="flex flex-col gap-4">
           <input type="hidden" name="action" value="createUser" />
           <label className="flex flex-col gap-1 text-xs text-white/60">
-            <span>Full name</span>
+            <span>{t("users.invite.nameLabel")}</span>
             <Input
               name="name"
               required
@@ -1303,7 +1331,7 @@ function InviteDrawer({
             />
           </label>
           <label className="flex flex-col gap-1 text-xs text-white/60">
-            <span>Email</span>
+            <span>{t("users.invite.emailLabel")}</span>
             <Input
               type="email"
               name="email"
@@ -1313,7 +1341,7 @@ function InviteDrawer({
             />
           </label>
           <fieldset className="flex flex-col gap-2">
-            <legend className="text-xs text-white/60">Role</legend>
+            <legend className="text-xs text-white/60">{t("users.invite.roleLegend")}</legend>
             <div className="grid grid-cols-3 gap-2">
               {ROLE_OPTIONS.map((opt) => {
                 const active = role === opt;
@@ -1333,10 +1361,10 @@ function InviteDrawer({
                     }`}
                   >
                     {opt === "ADMIN"
-                      ? "Admin"
+                      ? t("users.roles.admin")
                       : opt === "CONTROLLER"
-                      ? "Controller"
-                      : "Viewer"}
+                      ? t("users.roles.controller")
+                      : t("users.roles.viewer")}
                   </button>
                 );
               })}
@@ -1344,28 +1372,26 @@ function InviteDrawer({
             <input type="hidden" name="role" value={role} />
           </fieldset>
           <label className="flex flex-col gap-1 text-xs text-white/60">
-            <span>Link to household (optional)</span>
+            <span>{t("users.invite.householdLabel")}</span>
             <select
               name="linkHouseholdId"
               value={linkHouseholdId}
               onChange={(e) => setLinkHouseholdId(e.target.value)}
               className="app-field"
             >
-              <option value="">No household link</option>
+              <option value="">{t("users.invite.householdNone")}</option>
               {households.map((h) => (
                 <option key={h.id} value={h.id}>
                   {h.name}
                 </option>
               ))}
             </select>
-            <span className="text-[11px] text-white/40">
-              Pre-associates this user with the household for the connection panel.
-            </span>
+            <span className="text-[11px] text-white/40">{t("users.invite.householdHint")}</span>
           </label>
 
           <div className="mt-2 flex justify-end gap-2">
             <Button variant="ghost" type="button" onPress={onClose}>
-              Cancel
+              {t("users.invite.cancel")}
             </Button>
             <Button
               variant="primary"
@@ -1373,7 +1399,7 @@ function InviteDrawer({
               isDisabled={fetcher.state !== "idle" || !name.trim() || !email.trim()}
             >
               <Mail className="h-3 w-3" />
-              Send invite
+              {t("users.invite.submit")}
             </Button>
           </div>
         </fetcher.Form>

@@ -762,24 +762,14 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 {error && (
                   <p className="text-center text-sm text-red-400">{error}</p>
                 )}
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1 border-white/20 text-white"
-                    onPress={() => setStep(1)}
-                  >
-                    {t("signup.step2.back")}
-                  </Button>
-                  <Button
-                    type="submit"
-                    isDisabled={!slugIsVerified}
-                    variant="primary"
-                    className="flex-1 bg-[#E9D500] font-semibold text-[#193B4B]"
-                  >
-                    {t("signup.step2.continue")}
-                  </Button>
-                </div>
+                <Button
+                  type="submit"
+                  isDisabled={!slugIsVerified}
+                  variant="primary"
+                  className="bg-[#E9D500] font-semibold text-[#193B4B]"
+                >
+                  {t("signup.step2.continue")}
+                </Button>
               </form>
             </>
           )}

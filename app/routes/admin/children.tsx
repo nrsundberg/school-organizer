@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Form, Link, useSearchParams, useSubmit } from "react-router";
+import { useTranslation } from "react-i18next";
 import { Button } from "@heroui/react";
 import {
   AlertCircle,
@@ -413,20 +414,19 @@ function PageHeader({
   filter: LoaderData["filter"];
   onSearchSubmit: (form: HTMLFormElement) => void;
 }) {
+  const { t } = useTranslation("admin");
   const [addOpen, setAddOpen] = useState(false);
 
   return (
     <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.9px] text-white/45">
-          Roster
+          {t("children.pageHeader.eyebrow")}
         </p>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white">
-          Children &amp; classrooms
+          {t("children.pageHeader.title")}
         </h1>
-        <p className="mt-1 text-sm text-white/55">
-          Browse classrooms by grade, jump into student records, and keep your roster current.
-        </p>
+        <p className="mt-1 text-sm text-white/55">{t("children.pageHeader.subtitle")}</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -458,8 +458,8 @@ function PageHeader({
             type="search"
             name="q"
             defaultValue={filter.q}
-            placeholder="Search students or classrooms"
-            aria-label="Search students or classrooms"
+            placeholder={t("children.search.placeholder")}
+            aria-label={t("children.search.placeholder")}
             className="h-9 w-72 rounded-lg border border-white/10 bg-white/[0.04] pl-9 pr-3 text-sm text-white placeholder:text-white/30 focus:border-blue-400/60 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
           />
         </Form>
@@ -473,7 +473,7 @@ function PageHeader({
             aria-expanded={addOpen}
           >
             <Plus className="mr-1 h-4 w-4" />
-            Add
+            {t("children.addMenu.trigger")}
             <ChevronDown className="ml-1 h-3.5 w-3.5" />
           </Button>
           {addOpen ? (
@@ -482,9 +482,21 @@ function PageHeader({
               onMouseLeave={() => setAddOpen(false)}
               role="menu"
             >
-              <AddMenuItem href="/create/student" label="Add child" hint="Roster a single student" />
-              <AddMenuItem href="/create/homeroom" label="Add classroom" hint="Create a new homeroom" />
-              <AddMenuItem href="/admin/roster-import" label="Import roster" hint="Upload CSV from your SIS" />
+              <AddMenuItem
+                href="/create/student"
+                label={t("children.addMenu.child.label")}
+                hint={t("children.addMenu.child.hint")}
+              />
+              <AddMenuItem
+                href="/create/homeroom"
+                label={t("children.addMenu.classroom.label")}
+                hint={t("children.addMenu.classroom.hint")}
+              />
+              <AddMenuItem
+                href="/admin/roster-import"
+                label={t("children.addMenu.import.label")}
+                hint={t("children.addMenu.import.hint")}
+              />
             </div>
           ) : null}
         </div>
@@ -519,26 +531,31 @@ function AddMenuItem({
 /* --------------------------------------------------------------------- */
 
 function StatsRow({ stats }: { stats: LoaderData["stats"] }) {
+  const { t } = useTranslation("admin");
   return (
     <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <StatCard label="Students" value={stats.totalStudents} icon={<Users className="h-4 w-4" />} />
       <StatCard
-        label="Classrooms"
+        label={t("children.stats.students")}
+        value={stats.totalStudents}
+        icon={<Users className="h-4 w-4" />}
+      />
+      <StatCard
+        label={t("children.stats.classrooms")}
         value={stats.totalClassrooms}
         icon={<UsersRound className="h-4 w-4" />}
       />
       <StatCard
-        label="Avg class size"
+        label={t("children.stats.avgClassSize")}
         value={stats.avgClassSize}
-        caption={`Default cap ${DEFAULT_CLASSROOM_CAPACITY}`}
+        caption={t("children.stats.defaultCap", { count: DEFAULT_CLASSROOM_CAPACITY })}
       />
       <StatCard
-        label="Unassigned"
+        label={t("children.stats.unassigned")}
         value={stats.unassignedCount}
         caption={
           stats.unassignedCount > 0
-            ? "Students without a current classroom"
-            : "All students are placed"
+            ? t("children.stats.unassignedCaption")
+            : t("children.stats.allPlaced")
         }
         tone={stats.unassignedCount > 0 ? "warning" : "default"}
         icon={
