@@ -6,7 +6,10 @@ import {
   resolveActorIds,
   type ActorIds,
 } from "~/domain/auth/impersonate-gate.server";
-import { resolveRequestScope } from "~/domain/request-scope/resolve.server";
+import {
+  resolveRequestScope,
+  type ResolvedRequestScope,
+} from "~/domain/request-scope/resolve.server";
 
 export const userContext = createContext<User | null>(null);
 export const orgContext = createContext<Org | null>(null);
@@ -31,6 +34,15 @@ export const impersonationContext = createContext<{
   orgId: string | null;
 } | null>(null);
 export const impersonatedByContext = createContext<string | null>(null);
+
+// The full resolver output. Loaders that want to read derived fields not
+// surfaced through the legacy contexts (e.g. `realOrg`, `actor`) should
+// consume this directly via `getRequestScopeFromContext` rather than calling
+// `resolveRequestScope` themselves — re-running the resolver re-runs the
+// entire redirect/billing decision tree.
+export const requestScopeContext = createContext<ResolvedRequestScope | null>(
+  null,
+);
 
 export const getOptionalUserFromContext = (context: any): User | null => {
   return context.get(userContext) ?? null;
@@ -93,11 +105,18 @@ export const getTenantPrisma = (context: any) => {
  * loaders that call `getOrgFromContext` / `getUserFromContext` keep working
  * unchanged.
  */
+export const getRequestScopeFromContext = (
+  context: any,
+): ResolvedRequestScope | null => {
+  return context.get(requestScopeContext) ?? null;
+};
+
 export const globalStorageMiddleware: MiddlewareFunction<Response> = async (
   { request, context },
   next,
 ) => {
   const scope = await resolveRequestScope(request, context);
+  context.set(requestScopeContext, scope);
   context.set(userContext, scope.user);
   context.set(orgContext, scope.org);
   context.set(impersonationContext, {
