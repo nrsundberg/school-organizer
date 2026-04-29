@@ -178,13 +178,13 @@ export async function action({ request, context, params }: Route.ActionArgs) {
   const prisma = getTenantPrisma(context);
   const org = getOrgFromContext(context);
   const householdId = params.householdId;
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
   if (!householdId) {
-    return dataWithError(null, "Invalid household.");
+    return dataWithError(null, t("households.errors.invalidHousehold"));
   }
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
 
   try {
     if (intent === "update") {
@@ -982,7 +982,7 @@ function ExceptionCard({
     const weekdayShort =
       exception.dayOfWeek != null
         ? weekdayLabel(t, exception.dayOfWeek).slice(0, 3)
-        : "WK";
+        : t("households.detail.exceptions.recurringTile");
     dateTile = (
       <div className="flex flex-col items-center justify-center rounded-lg bg-cyan-500/15 px-3 py-2 text-cyan-100">
         <span className="text-base leading-none">∞</span>

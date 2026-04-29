@@ -648,7 +648,8 @@
       "space": "Espacio",
       "student": "Estudiante",
       "time": "Hora",
-      "truncated": "Mostrando las {{cap}} llamadas más recientes. Acota los filtros o usa Exportar CSV para obtener el conjunto completo."
+      "truncated": "Mostrando las {{cap}} llamadas más recientes. Acota los filtros o usa Exportar CSV para obtener el conjunto completo.",
+      "viaBadge": "vía"
     },
     "tenant": "Cliente: ",
     "upgrade": {
@@ -706,18 +707,18 @@
       "pickupNotesLabel": "Notas de recogida",
       "primaryContactLabel": "Contacto principal",
       "spaceNumberLabel": "N° de espacio (opcional)",
-      "students_one": "{{count}} student",
-      "students_other": "{{count}} students",
-      "contacts_one": "{{count}} contact",
-      "contacts_other": "{{count}} contacts",
-      "createdOn": "Created {{date}}",
-      "noPlan": "No default plan",
-      "open": "Open",
-      "viewDetail": "View household",
-      "studentsHeading": "Students",
-      "noStudents": "No students assigned",
-      "noContacts": "No contact on file",
-      "active": "Active"
+      "students_one": "{{count}} estudiante",
+      "students_other": "{{count}} estudiantes",
+      "contacts_one": "{{count}} contacto",
+      "contacts_other": "{{count}} contactos",
+      "createdOn": "Creado el {{date}}",
+      "noPlan": "Sin plan por defecto",
+      "open": "Abrir",
+      "viewDetail": "Ver hogar",
+      "studentsHeading": "Estudiantes",
+      "noStudents": "Sin estudiantes asignados",
+      "noContacts": "Sin contacto registrado",
+      "active": "Activo"
     },
     "create": {
       "contactPhoneLabel": "Teléfono de contacto",
@@ -818,7 +819,7 @@
       "label": "Buscar hogares",
       "placeholder": "Buscar por nombre",
       "submit": "Buscar",
-      "richPlaceholder": "Search by name, contact, or student"
+      "richPlaceholder": "Buscar por nombre, contacto o estudiante"
     },
     "roi": {
       "assumptions": "Supuestos: {{minutes}} minutos por llamada de familia evitada, {{exceptions}} llamada evitada por cada ocurrencia de excepción y {{cancellations}} llamadas evitadas por cada cancelación de programa.",
@@ -863,97 +864,97 @@
       "wednesday": "Miércoles"
     },
     "stats": {
-      "totalHouseholds": "Total households",
-      "totalHouseholdsCaption": "Across the org",
-      "studentsAssigned": "Students assigned",
-      "studentsAssignedCaption": "Linked to a household",
-      "exceptionsToday": "Active exceptions today",
-      "exceptionsTodayCaption": "Households with at least one active exception",
-      "missingContact": "Missing contact info",
-      "missingContactCaption": "Households without primary contact name or phone"
+      "totalHouseholds": "Total de hogares",
+      "totalHouseholdsCaption": "En toda la organización",
+      "studentsAssigned": "Estudiantes asignados",
+      "studentsAssignedCaption": "Vinculados a un hogar",
+      "exceptionsToday": "Excepciones activas hoy",
+      "exceptionsTodayCaption": "Hogares con al menos una excepción activa",
+      "missingContact": "Falta información de contacto",
+      "missingContactCaption": "Hogares sin nombre o teléfono de contacto principal"
     },
     "filters": {
-      "label": "Quick filters",
-      "all": "All households",
-      "exceptionToday": "Has exception today",
-      "missingContact": "Missing primary contact",
-      "singleParent": "Single-parent",
-      "multiStudent": "Multi-student",
-      "applied": "{{count}} active"
+      "label": "Filtros rápidos",
+      "all": "Todos los hogares",
+      "exceptionToday": "Tiene excepción hoy",
+      "missingContact": "Sin contacto principal",
+      "singleParent": "Familia monoparental",
+      "multiStudent": "Varios estudiantes",
+      "applied": "{{count}} activos"
     },
     "detail": {
-      "metaTitle": "Admin – {{name}}",
-      "breadcrumbHouseholds": "Households",
+      "metaTitle": "Administración – {{name}}",
+      "breadcrumbHouseholds": "Hogares",
       "actions": {
-        "addException": "Add exception",
-        "message": "Message",
-        "edit": "Edit",
-        "save": "Save changes",
-        "cancel": "Cancel",
-        "delete": "Delete household"
+        "addException": "Agregar excepción",
+        "message": "Mensaje",
+        "edit": "Editar",
+        "save": "Guardar cambios",
+        "cancel": "Cancelar",
+        "delete": "Eliminar hogar"
       },
       "header": {
-        "studentsLabel_one": "{{count}} student",
-        "studentsLabel_other": "{{count}} students",
-        "contactsLabel_one": "{{count}} contact",
-        "contactsLabel_other": "{{count}} contacts",
-        "createdOn": "Created {{date}}",
-        "defaultPlan": "Default plan: {{plan}}",
-        "noDefaultPlan": "No default plan",
+        "studentsLabel_one": "{{count}} estudiante",
+        "studentsLabel_other": "{{count}} estudiantes",
+        "contactsLabel_one": "{{count}} contacto",
+        "contactsLabel_other": "{{count}} contactos",
+        "createdOn": "Creado el {{date}}",
+        "defaultPlan": "Plan por defecto: {{plan}}",
+        "noDefaultPlan": "Sin plan por defecto",
         "spaceLabel": "Espacio #{{number}}"
       },
       "students": {
-        "heading": "Students",
-        "empty": "No students assigned to this household yet.",
-        "viewStudent": "View student",
-        "detach": "Detach",
-        "noTeacher": "Unassigned classroom",
-        "noSpace": "No space"
+        "heading": "Estudiantes",
+        "empty": "Aún no hay estudiantes asignados a este hogar.",
+        "viewStudent": "Ver estudiante",
+        "detach": "Desligar",
+        "noTeacher": "Aula sin asignar",
+        "noSpace": "Sin espacio"
       },
       "contacts": {
-        "heading": "Contacts",
-        "empty": "Add a primary pickup contact above so families can be reached during dismissal.",
-        "rolePrimary": "Primary",
-        "rolePickupApproved": "Pickup-approved",
-        "roleHasAccount": "Has app account",
-        "viewUser": "View user",
-        "noEmail": "No email on file",
-        "noPhone": "No phone on file"
+        "heading": "Contactos",
+        "empty": "Agrega arriba un contacto principal de recogida para poder localizar a las familias durante la salida.",
+        "rolePrimary": "Principal",
+        "rolePickupApproved": "Autorizado para recoger",
+        "roleHasAccount": "Tiene cuenta en la app",
+        "viewUser": "Ver usuario",
+        "noEmail": "Sin correo registrado",
+        "noPhone": "Sin teléfono registrado"
       },
       "exceptions": {
-        "heading": "Upcoming dismissal exceptions",
-        "empty": "No active exceptions for this household.",
-        "addInline": "Add exception",
-        "newHeading": "New dismissal exception",
-        "cancelNew": "Cancel",
-        "saveNew": "Save exception",
-        "createdBy": "Saved {{date}}",
-        "recurringTile": "WK"
+        "heading": "Próximas excepciones de salida",
+        "empty": "No hay excepciones activas para este hogar.",
+        "addInline": "Agregar excepción",
+        "newHeading": "Nueva excepción de salida",
+        "cancelNew": "Cancelar",
+        "saveNew": "Guardar excepción",
+        "createdBy": "Guardado el {{date}}",
+        "recurringTile": "SEM"
       },
       "rail": {
-        "defaultPlanHeading": "Default dismissal plan",
-        "defaultPlanBody": "Used when no exception is active. Update via the household's edit panel.",
-        "noDefaultPlan": "Set a default plan in the household's pickup notes.",
-        "pickupNotesHeading": "Pickup notes",
-        "pickupNotesEmpty": "Add notes families should remember (e.g. shared rides, after-school routines).",
-        "activityHeading": "Recent activity",
-        "activityEmpty": "No recent dismissal activity.",
-        "activityEvent": "Dismissed to space {{space}} · {{when}}",
-        "linkedUserHeading": "Linked admin user",
-        "linkedUserEmpty": "No app account is linked to this household yet.",
-        "linkedUserOpen": "Open user drawer"
+        "defaultPlanHeading": "Plan de salida por defecto",
+        "defaultPlanBody": "Se usa cuando no hay una excepción activa. Actualízalo desde el panel de edición del hogar.",
+        "noDefaultPlan": "Define un plan por defecto en las notas de recogida del hogar.",
+        "pickupNotesHeading": "Notas de recogida",
+        "pickupNotesEmpty": "Agrega notas que las familias deban recordar (p. ej., transportes compartidos, rutinas extraescolares).",
+        "activityHeading": "Actividad reciente",
+        "activityEmpty": "Sin actividad de salida reciente.",
+        "activityEvent": "Asignado al espacio {{space}} · {{when}}",
+        "linkedUserHeading": "Usuario admin vinculado",
+        "linkedUserEmpty": "Aún no hay una cuenta de la app vinculada a este hogar.",
+        "linkedUserOpen": "Abrir cajón de usuario"
       },
       "edit": {
-        "heading": "Edit household",
-        "subtitle": "Update the household name, primary contact, and shared pickup notes."
+        "heading": "Editar hogar",
+        "subtitle": "Actualiza el nombre del hogar, el contacto principal y las notas de recogida compartidas."
       },
-      "notFound": "Household not found.",
-      "backToHouseholds": "Back to households"
+      "notFound": "Hogar no encontrado.",
+      "backToHouseholds": "Volver a hogares"
     },
     "indexHeader": {
       "createCta": "Crear hogar",
-      "title": "Households",
-      "subtitle": "Group siblings, capture shared pickup context, and keep dismissal exceptions in sync."
+      "title": "Hogares",
+      "subtitle": "Agrupa hermanos, captura el contexto de recogida compartido y mantén las excepciones de salida sincronizadas."
     }
   },
   "layout": {
@@ -1093,9 +1094,30 @@
     "print": "Respaldos para impresión"
   },
   "students": {
+    "actions": {
+      "move": "Mover",
+      "moveClassroom": "Cambiar de aula",
+      "pickClassroomOption": "Elige un aula…",
+      "printProfile": "Imprimir perfil",
+      "saveChanges": "Guardar cambios"
+    },
     "breadcrumb": {
       "aria": "Migas de pan",
       "children": "Niños"
+    },
+    "dismissal": {
+      "customPlan": "Personalizado",
+      "exceptionTodayEyebrow": "Excepción hoy",
+      "recognizedPlan": "Plan reconocido",
+      "tiles": {
+        "afterSchool": "Extraescolar",
+        "bus": "Autobús",
+        "carLine": "Fila de autos",
+        "office": "Oficina",
+        "other": "Otro",
+        "walker": "Peatón"
+      },
+      "tilesTip": "Toca una tarjeta para fijar la ruta de salida predeterminada del estudiante. Las excepciones (de hoy o semanales) la anulan los días que apliquen."
     },
     "errors": {
       "classroomNotFound": "El aula seleccionada no existe.",
@@ -1115,7 +1137,15 @@
       "gradeTip": "El grado se establece en el aula; cámbialo desde la tarjeta del aula.",
       "lastName": "Apellido",
       "medication": "Medicación",
-      "noneOnFile": "Sin registro"
+      "noneOnFile": "Sin registro",
+      "space": "Espacio"
+    },
+    "healthFieldsNote": "Los campos de salud aún no están conectados al esquema — próximamente.",
+    "householdRail": {
+      "noSiblings": "No hay hermanos registrados.",
+      "notGrouped": "Este estudiante aún no está agrupado en una familia. Agrúpalo desde la <0>página de Familias</0> para activar excepciones y notas de recogida compartidas.",
+      "siblingsHeading": "Hermanos",
+      "spaceLabel": "Espacio {{number}}"
     },
     "pills": {
       "noClassroom": "Sin aula",
@@ -1126,6 +1156,10 @@
     "placeholderTab": {
       "title": "{{title}}",
       "subtitle": "Esta pestaña está próximamente."
+    },
+    "recentPickups": {
+      "empty": "Aún no se han registrado salidas.",
+      "spaceLabel": "Espacio <0>{{number}}</0>"
     },
     "sections": {
       "defaultPlan": "Plan por defecto",

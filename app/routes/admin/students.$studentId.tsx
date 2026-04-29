@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Form, Link, redirect, useSearchParams } from "react-router";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { Button, Input, TextArea } from "@heroui/react";
 import { dataWithError, dataWithSuccess } from "remix-toast";
 import { detectLocale } from "~/i18n.server";
@@ -394,27 +394,27 @@ function HeaderCard({
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-white/55">
           {classroom ? (
             <span className="inline-flex items-center gap-1.5">
-              <span className="text-white/40">Classroom</span>
+              <span className="text-white/40">{t("students.fields.classroom")}</span>
               <EntityLink to={`/admin/children?grade=${classroom.gradeLevel ?? "ungraded"}#homeroom-${classroom.id}`}>
                 {classroom.homeRoom}
               </EntityLink>
             </span>
           ) : null}
           <span className="inline-flex items-center gap-1.5">
-            <span className="text-white/40">Grade</span>
+            <span className="text-white/40">{t("students.fields.grade")}</span>
             <span className="text-white/80">
               {gradeLabel(classroom?.gradeLevel ?? null)}
             </span>
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="text-white/40">Space</span>
+            <span className="text-white/40">{t("students.fields.space")}</span>
             <span className="text-white/80 tabular-nums">
               {household?.spaceNumber ?? "—"}
             </span>
           </span>
           {household ? (
             <span className="inline-flex items-center gap-1.5">
-              <span className="text-white/40">Household</span>
+              <span className="text-white/40">{t("students.sections.household")}</span>
               <EntityLink to={`/admin/households/${household.id}`}>{household.name}</EntityLink>
             </span>
           ) : null}
@@ -425,7 +425,7 @@ function HeaderCard({
         <details className="relative">
           <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/80 hover:border-white/20 hover:text-white">
             <Home className="h-3.5 w-3.5" />
-            Move classroom
+            {t("students.actions.moveClassroom")}
           </summary>
           <Form
             method="post"
@@ -438,7 +438,7 @@ function HeaderCard({
               className="w-full rounded border border-white/10 bg-black/30 px-2 py-1 text-white"
             >
               <option value="" disabled>
-                Pick classroom…
+                {t("students.actions.pickClassroomOption")}
               </option>
               {classrooms.map((c) => (
                 <option key={c.id} value={c.homeRoom}>
@@ -448,7 +448,7 @@ function HeaderCard({
               ))}
             </select>
             <Button type="submit" variant="primary" size="sm" className="mt-2 w-full">
-              Move
+              {t("students.actions.move")}
             </Button>
           </Form>
         </details>
@@ -460,7 +460,7 @@ function HeaderCard({
           className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-white/80 hover:border-white/20 hover:text-white aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
         >
           <Printer className="h-3.5 w-3.5" />
-          Print profile
+          {t("students.actions.printProfile")}
         </Link>
       </div>
     </header>
@@ -600,10 +600,10 @@ function ProfileTab({
         <div className="flex items-center gap-2">
           <Button type="submit" variant="primary" size="sm">
             <Save className="mr-1 h-3.5 w-3.5" />
-            Save changes
+            {t("students.actions.saveChanges")}
           </Button>
           <p className="text-xs text-white/40">
-            Health fields aren't yet wired to the schema — coming soon.
+            {t("students.healthFieldsNote")}
           </p>
         </div>
       </Form>
@@ -615,13 +615,16 @@ function ProfileTab({
 /* Dismissal tab                                                          */
 /* --------------------------------------------------------------------- */
 
-const DISMISSAL_TILES: { key: string; label: string; icon: ReactNode; tone: "info" | "success" | "warning" | "neutral" | "purple" }[] = [
-  { key: "Car line", label: "Car line", icon: <Car className="h-5 w-5" />, tone: "info" },
-  { key: "Walker", label: "Walker", icon: <Footprints className="h-5 w-5" />, tone: "success" },
-  { key: "Bus", label: "Bus", icon: <Bus className="h-5 w-5" />, tone: "warning" },
-  { key: "After-school program", label: "After-school", icon: <Sparkles className="h-5 w-5" />, tone: "purple" },
-  { key: "Office pickup", label: "Office", icon: <Building2 className="h-5 w-5" />, tone: "neutral" },
-  { key: "Other", label: "Other", icon: <CircleDot className="h-5 w-5" />, tone: "neutral" },
+// `key` is the persistence value (matches DISMISSAL_PLANS); `labelKey` is
+// the i18n key used to render the tile label. Keep them split so a Spanish
+// admin sees translated tile labels without changing what's stored.
+const DISMISSAL_TILES: { key: string; labelKey: string; icon: ReactNode; tone: "info" | "success" | "warning" | "neutral" | "purple" }[] = [
+  { key: "Car line", labelKey: "students.dismissal.tiles.carLine", icon: <Car className="h-5 w-5" />, tone: "info" },
+  { key: "Walker", labelKey: "students.dismissal.tiles.walker", icon: <Footprints className="h-5 w-5" />, tone: "success" },
+  { key: "Bus", labelKey: "students.dismissal.tiles.bus", icon: <Bus className="h-5 w-5" />, tone: "warning" },
+  { key: "After-school program", labelKey: "students.dismissal.tiles.afterSchool", icon: <Sparkles className="h-5 w-5" />, tone: "purple" },
+  { key: "Office pickup", labelKey: "students.dismissal.tiles.office", icon: <Building2 className="h-5 w-5" />, tone: "neutral" },
+  { key: "Other", labelKey: "students.dismissal.tiles.other", icon: <CircleDot className="h-5 w-5" />, tone: "neutral" },
 ];
 
 function DismissalTab({
@@ -642,8 +645,7 @@ function DismissalTab({
           caption={t("students.sections.defaultPlanCaption")}
         />
         <p className="mt-2 text-xs text-white/45">
-          Tap a tile to set the student's default dismissal route. Exceptions
-          (today / weekly) override this on the day they apply.
+          {t("students.dismissal.tilesTip")}
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {DISMISSAL_TILES.map((tile) => {
@@ -668,11 +670,11 @@ function DismissalTab({
                 >
                   {tile.icon}
                 </span>
-                <span className="text-sm font-medium text-white">{tile.label}</span>
+                <span className="text-sm font-medium text-white">{t(tile.labelKey)}</span>
                 <StatusPill tone={tile.tone} dot>
                   {DISMISSAL_PLANS.includes(tile.key as (typeof DISMISSAL_PLANS)[number])
-                    ? "Recognized plan"
-                    : "Custom"}
+                    ? t("students.dismissal.recognizedPlan")
+                    : t("students.dismissal.customPlan")}
                 </StatusPill>
               </button>
             );
@@ -688,7 +690,7 @@ function DismissalTab({
             </span>
             <div className="flex-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.9px] text-amber-200/80">
-                Exception today
+                {t("students.dismissal.exceptionTodayEyebrow")}
               </p>
               <h3 className="mt-1 text-base font-semibold text-white">
                 {todaysException.dismissalPlan}
@@ -738,9 +740,15 @@ function HouseholdRail({
       <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-5">
         <SectionHeader title={t("students.sections.household")} />
         <p className="mt-2 text-sm text-white/55">
-          This student isn't grouped into a household yet. Group them from the{" "}
-          <EntityLink to="/admin/households">Households page</EntityLink> to
-          enable shared exceptions and pickup notes.
+          <Trans
+            t={t}
+            i18nKey="students.householdRail.notGrouped"
+            components={[
+              <EntityLink to="/admin/households" key="0">
+                {null}
+              </EntityLink>,
+            ]}
+          />
         </p>
       </div>
     );
@@ -769,17 +777,21 @@ function HouseholdRail({
             </p>
           ) : null}
           <p className="text-[11px] text-white/45">
-            Space {household.spaceNumber ?? "—"}
+            {t("students.householdRail.spaceLabel", {
+              number: household.spaceNumber ?? "—",
+            })}
           </p>
         </div>
       </div>
 
       <div className="mt-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.9px] text-white/45">
-          Siblings
+          {t("students.householdRail.siblingsHeading")}
         </p>
         {siblings.length === 0 ? (
-          <p className="mt-1 text-xs text-white/45">No siblings on file.</p>
+          <p className="mt-1 text-xs text-white/45">
+            {t("students.householdRail.noSiblings")}
+          </p>
         ) : (
           <ul className="mt-2 flex flex-col gap-1.5">
             {siblings.map((s) => (
@@ -800,7 +812,7 @@ function HouseholdRail({
                     {s.firstName} {s.lastName}
                   </Link>
                   <p className="truncate text-[11px] text-white/45">
-                    {s.homeRoom ?? "No classroom"}
+                    {s.homeRoom ?? t("students.pills.noClassroom")}
                   </p>
                 </div>
               </li>
@@ -821,12 +833,14 @@ function RecentPickupsRail({
 }: {
   callEvents: LoaderData["callEvents"];
 }) {
-  const { t } = useTranslation("admin");
+  const { t, i18n } = useTranslation("admin");
   return (
     <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-5">
       <SectionHeader title={t("students.sections.recentPickups")} />
       {callEvents.length === 0 ? (
-        <p className="mt-2 text-xs text-white/45">No pickups recorded yet.</p>
+        <p className="mt-2 text-xs text-white/45">
+          {t("students.recentPickups.empty")}
+        </p>
       ) : (
         <ul className="mt-3 flex flex-col gap-2">
           {callEvents.map((e) => {
@@ -838,14 +852,21 @@ function RecentPickupsRail({
               >
                 <div className="min-w-0">
                   <p className="text-white/80">
-                    Space <span className="font-semibold tabular-nums">{e.spaceNumber}</span>
+                    <Trans
+                      t={t}
+                      i18nKey="students.recentPickups.spaceLabel"
+                      values={{ number: e.spaceNumber }}
+                      components={[
+                        <span className="font-semibold tabular-nums" key="0" />,
+                      ]}
+                    />
                   </p>
                   <p className="text-white/45">
-                    {when.toLocaleDateString(undefined, {
+                    {when.toLocaleDateString(i18n.language, {
                       month: "short",
                       day: "numeric",
                     })}{" "}
-                    · {when.toLocaleTimeString(undefined, {
+                    · {when.toLocaleTimeString(i18n.language, {
                       hour: "numeric",
                       minute: "2-digit",
                     })}

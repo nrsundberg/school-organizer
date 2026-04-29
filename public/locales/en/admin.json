@@ -648,7 +648,8 @@
       "space": "Space",
       "student": "Student",
       "time": "Time",
-      "truncated": "Showing the most recent {{cap}} calls. Narrow the filters or use Export CSV to get the full set."
+      "truncated": "Showing the most recent {{cap}} calls. Narrow the filters or use Export CSV to get the full set.",
+      "viaBadge": "via"
     },
     "tenant": "Tenant: ",
     "upgrade": {
@@ -1093,9 +1094,30 @@
     "print": "Print backups"
   },
   "students": {
+    "actions": {
+      "move": "Move",
+      "moveClassroom": "Move classroom",
+      "pickClassroomOption": "Pick classroom…",
+      "printProfile": "Print profile",
+      "saveChanges": "Save changes"
+    },
     "breadcrumb": {
       "aria": "Breadcrumb",
       "children": "Children"
+    },
+    "dismissal": {
+      "customPlan": "Custom",
+      "exceptionTodayEyebrow": "Exception today",
+      "recognizedPlan": "Recognized plan",
+      "tiles": {
+        "afterSchool": "After-school",
+        "bus": "Bus",
+        "carLine": "Car line",
+        "office": "Office",
+        "other": "Other",
+        "walker": "Walker"
+      },
+      "tilesTip": "Tap a tile to set the student's default dismissal route. Exceptions (today / weekly) override this on the day they apply."
     },
     "errors": {
       "classroomNotFound": "Selected classroom doesn't exist.",
@@ -1115,7 +1137,15 @@
       "gradeTip": "Grade is set on the classroom; change via the classroom card.",
       "lastName": "Last name",
       "medication": "Medication",
-      "noneOnFile": "None on file"
+      "noneOnFile": "None on file",
+      "space": "Space"
+    },
+    "healthFieldsNote": "Health fields aren't yet wired to the schema — coming soon.",
+    "householdRail": {
+      "noSiblings": "No siblings on file.",
+      "notGrouped": "This student isn't grouped into a household yet. Group them from the <0>Households page</0> to enable shared exceptions and pickup notes.",
+      "siblingsHeading": "Siblings",
+      "spaceLabel": "Space {{number}}"
     },
     "pills": {
       "noClassroom": "No classroom",
@@ -1126,6 +1156,10 @@
     "placeholderTab": {
       "title": "{{title}}",
       "subtitle": "This tab is coming soon."
+    },
+    "recentPickups": {
+      "empty": "No pickups recorded yet.",
+      "spaceLabel": "Space <0>{{number}}</0>"
     },
     "sections": {
       "defaultPlan": "Default plan",
