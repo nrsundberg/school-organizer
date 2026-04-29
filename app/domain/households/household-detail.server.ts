@@ -1,80 +1,95 @@
-/**
- * Server-side helpers for the Households admin detail page.
- *
- * Two responsibilities:
- *
- *  1. `loadHouseholdWithRelations` — pulls a household and all of its
- *     dependent records (students, exceptions, and the call-event tail
- *     filtered to the household's students) in a single helper so the
- *     route loader stays readable. The detail page shows ~5 sections that
- *     all riff on the same household, so co-locating the fetch makes the
- *     query plan easier to reason about.
- *
- *  2. `findLinkedAdminUser` — looks for a `User` row whose email matches
- *     the household's `primaryContactName`/-Phone-adjacent contact. The
- *     household record itself only stores a primary-contact name + phone
- *     (no email), so we treat the contact name as a search hint and fall
- *     back to looking for *any* in-org user whose email matches a hint
- *     the caller supplies (typically a prospective contact email entered
- *     elsewhere in the UI). Today the only signal we have is the contact
- *     name, so the lookup matches Users with the same `name` within the
- *     household's org. Designed so the rule can be tightened (e.g. to
- *     match contact emails) without changing call sites.
- */
-
 import type { PrismaClient } from "~/db";
+import { toDateInputValue } from "~/domain/dismissal/schedule";
 
 export type HouseholdsDetailPrisma = Pick<
   PrismaClient,
   "household" | "student" | "dismissalException" | "callEvent" | "user"
 >;
 
-export type HouseholdDetailRecord = {
-  id: string;
-  name: string;
-  pickupNotes: string | null;
-  primaryContactName: string | null;
-  primaryContactPhone: string | null;
-  spaceNumber: number | null;
-  createdAt: Date;
-  updatedAt: Date;
-  students: Array<{
-    id: number;
-    firstName: string;
-    lastName: string;
-    homeRoom: string | null;
-  }>;
-  exceptions: Array<{
-    id: string;
-    studentId: number | null;
-    scheduleKind: string;
-    exceptionDate: Date | null;
-    dayOfWeek: number | null;
-    startsOn: Date | null;
-    endsOn: Date | null;
-    dismissalPlan: string;
-    pickupContactName: string | null;
-    notes: string | null;
-    isActive: boolean;
-    createdAt: Date;
-    updatedAt: Date;
-  }>;
-  recentCallEvents: Array<{
-    id: number;
-    studentId: number | null;
-    studentName: string;
-    homeRoomSnapshot: string | null;
-    spaceNumber: number;
-    createdAt: Date;
-  }>;
+export type StudentRow = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  homeRoom: string | null;
+  hasExceptionToday: boolean;
 };
 
-export async function loadHouseholdWithRelations(
+export type ExceptionRow = {
+  id: string;
+  studentId: number | null;
+  scheduleKind: string;
+  exceptionDate: string;
+  dayOfWeek: number | null;
+  startsOn: string;
+  endsOn: string;
+  dismissalPlan: string;
+  pickupContactName: string | null;
+  notes: string | null;
+  isActive: boolean;
+  activeToday: boolean;
+  createdAtIso: string;
+  updatedAtIso: string;
+};
+
+export type CallEventRow = {
+  id: number;
+  studentId: number | null;
+  studentName: string;
+  homeRoomSnapshot: string | null;
+  spaceNumber: number;
+  createdAtIso: string;
+};
+
+export type LinkedAdminBlock = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+};
+
+export type HouseholdDetailView = {
+  summary: {
+    id: string;
+    name: string;
+    pickupNotes: string | null;
+    primaryContactName: string | null;
+    primaryContactPhone: string | null;
+    spaceNumber: number | null;
+    studentCount: number;
+    contactCount: number;
+    hasMissingContact: boolean;
+    activeTodayCount: number;
+    createdAtIso: string;
+    updatedAtIso: string;
+  };
+  sections: {
+    students: StudentRow[];
+    exceptions: ExceptionRow[];
+    recentCalls: CallEventRow[];
+    linkedAdmin: LinkedAdminBlock | null;
+  };
+};
+
+export type LoadHouseholdForAdminDetailOptions = {
+  /** Reference instant for the activeToday computation. Defaults to `new Date()`. */
+  now?: Date;
+  /** Cap on `sections.recentCalls`. Defaults to 5. */
+  recentCallsLimit?: number;
+};
+
+const DEFAULT_RECENT_CALLS_LIMIT = 5;
+
+export async function loadHouseholdForAdminDetail(
   prisma: HouseholdsDetailPrisma,
-  householdId: string,
-): Promise<HouseholdDetailRecord | null> {
+  args: { householdId: string; orgId: string },
+  options?: LoadHouseholdForAdminDetailOptions,
+): Promise<HouseholdDetailView | null> {
+  const now = options?.now ?? new Date();
+  const recentCallsLimit =
+    options?.recentCallsLimit ?? DEFAULT_RECENT_CALLS_LIMIT;
+
   const household = await prisma.household.findUnique({
-    where: { id: householdId },
+    where: { id: args.householdId },
     select: {
       id: true,
       name: true,
@@ -88,9 +103,9 @@ export async function loadHouseholdWithRelations(
   });
   if (!household) return null;
 
-  const [students, exceptions] = await Promise.all([
+  const [students, rawExceptions, linkedAdmin] = await Promise.all([
     prisma.student.findMany({
-      where: { householdId },
+      where: { householdId: args.householdId },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
       select: {
         id: true,
@@ -100,7 +115,7 @@ export async function loadHouseholdWithRelations(
       },
     }),
     prisma.dismissalException.findMany({
-      where: { householdId, isActive: true },
+      where: { householdId: args.householdId, isActive: true },
       orderBy: [
         { scheduleKind: "asc" },
         { exceptionDate: "asc" },
@@ -122,16 +137,20 @@ export async function loadHouseholdWithRelations(
         updatedAt: true,
       },
     }),
+    findLinkedAdmin(prisma, {
+      orgId: args.orgId,
+      contactName: household.primaryContactName,
+    }),
   ]);
 
   const studentIds = students.map((s) => s.id);
-  const recentCallEvents =
+  const recentCallsRaw =
     studentIds.length === 0
       ? []
       : await prisma.callEvent.findMany({
           where: { studentId: { in: studentIds } },
           orderBy: { createdAt: "desc" },
-          take: 5,
+          take: recentCallsLimit,
           select: {
             id: true,
             studentId: true,
@@ -142,36 +161,85 @@ export async function loadHouseholdWithRelations(
           },
         });
 
+  const exceptions: ExceptionRow[] = rawExceptions.map((e) => ({
+    id: e.id,
+    studentId: e.studentId,
+    scheduleKind: e.scheduleKind,
+    exceptionDate: toDateInputValue(e.exceptionDate),
+    dayOfWeek: e.dayOfWeek,
+    startsOn: toDateInputValue(e.startsOn),
+    endsOn: toDateInputValue(e.endsOn),
+    dismissalPlan: e.dismissalPlan,
+    pickupContactName: e.pickupContactName,
+    notes: e.notes,
+    isActive: e.isActive,
+    activeToday: exceptionActiveOn(e, now),
+    createdAtIso: e.createdAt.toISOString(),
+    updatedAtIso: e.updatedAt.toISOString(),
+  }));
+
+  // A student "has an exception today" if any active-today exception either
+  // targets this student specifically OR is house-wide (studentId == null).
+  const houseWideToday = exceptions.some(
+    (e) => e.activeToday && e.studentId == null,
+  );
+  const targetedTodayIds = new Set(
+    exceptions
+      .filter((e) => e.activeToday && e.studentId != null)
+      .map((e) => e.studentId as number),
+  );
+
+  const studentRows: StudentRow[] = students.map((s) => ({
+    id: s.id,
+    firstName: s.firstName,
+    lastName: s.lastName,
+    homeRoom: s.homeRoom,
+    hasExceptionToday: houseWideToday || targetedTodayIds.has(s.id),
+  }));
+
+  const recentCalls: CallEventRow[] = recentCallsRaw.map((c) => ({
+    id: c.id,
+    studentId: c.studentId,
+    studentName: c.studentName,
+    homeRoomSnapshot: c.homeRoomSnapshot,
+    spaceNumber: c.spaceNumber,
+    createdAtIso: c.createdAt.toISOString(),
+  }));
+
+  const contactCount =
+    (household.primaryContactName?.trim() ? 1 : 0) +
+    (household.primaryContactPhone?.trim() ? 1 : 0);
+
   return {
-    ...household,
-    students,
-    exceptions,
-    recentCallEvents,
+    summary: {
+      id: household.id,
+      name: household.name,
+      pickupNotes: household.pickupNotes,
+      primaryContactName: household.primaryContactName,
+      primaryContactPhone: household.primaryContactPhone,
+      spaceNumber: household.spaceNumber,
+      studentCount: students.length,
+      contactCount,
+      hasMissingContact: contactCount < 2,
+      activeTodayCount: exceptions.filter((e) => e.activeToday).length,
+      createdAtIso: household.createdAt.toISOString(),
+      updatedAtIso: household.updatedAt.toISOString(),
+    },
+    sections: {
+      students: studentRows,
+      exceptions,
+      recentCalls,
+      linkedAdmin,
+    },
   };
 }
 
-export type LinkedAdminUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-};
-
-/**
- * Best-effort lookup for an admin/staff user attached to this household.
- * Today the household only stores a contact *name*, so we match Users on
- * `name` within the same org. Returns null if either input is empty or no
- * unambiguous match is found. The "ambiguous" case (>1 match) collapses
- * to null on purpose — the UI surfaces a "no linked user" affordance and
- * we'd rather show that than guess wrong.
- */
-export async function findLinkedAdminUser(
+async function findLinkedAdmin(
   prisma: HouseholdsDetailPrisma,
   args: { orgId: string; contactName: string | null | undefined },
-): Promise<LinkedAdminUser | null> {
+): Promise<LinkedAdminBlock | null> {
   const name = (args.contactName ?? "").trim();
   if (!name) return null;
-
   const matches = await prisma.user.findMany({
     where: { orgId: args.orgId, name },
     select: { id: true, name: true, email: true, role: true },
@@ -179,4 +247,42 @@ export async function findLinkedAdminUser(
   });
   if (matches.length !== 1) return null;
   return matches[0];
+}
+
+function startOfUtcDay(date: Date): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
+}
+
+function exceptionActiveOn(
+  exception: {
+    scheduleKind: string;
+    exceptionDate: Date | null;
+    dayOfWeek: number | null;
+    startsOn: Date | null;
+    endsOn: Date | null;
+  },
+  today: Date,
+): boolean {
+  const dayStart = startOfUtcDay(today);
+  if (exception.scheduleKind === "DATE") {
+    if (!exception.exceptionDate) return false;
+    return startOfUtcDay(exception.exceptionDate).getTime() === dayStart.getTime();
+  }
+  if (exception.dayOfWeek == null) return false;
+  if (today.getUTCDay() !== exception.dayOfWeek) return false;
+  if (
+    exception.startsOn &&
+    dayStart.getTime() < startOfUtcDay(exception.startsOn).getTime()
+  ) {
+    return false;
+  }
+  if (
+    exception.endsOn &&
+    dayStart.getTime() > startOfUtcDay(exception.endsOn).getTime()
+  ) {
+    return false;
+  }
+  return true;
 }
