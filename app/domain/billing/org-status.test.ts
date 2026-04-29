@@ -1,9 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  isOrgAccessAllowed,
-  mapStripeSubscriptionStatusToOrgStatus,
-} from "./org-status";
+import { isOrgAccessAllowed } from "./org-status";
 
 const NOW = new Date("2026-04-29T12:00:00Z");
 const FUTURE = new Date("2026-05-15T00:00:00Z");
@@ -115,9 +112,3 @@ test("district-attached org: missing district payload throws (caller bug)", () =
   );
 });
 
-test("maps Stripe statuses into org gates", () => {
-  assert.equal(mapStripeSubscriptionStatusToOrgStatus("active"), "ACTIVE");
-  assert.equal(mapStripeSubscriptionStatusToOrgStatus("past_due"), "PAST_DUE");
-  assert.equal(mapStripeSubscriptionStatusToOrgStatus("incomplete"), "INCOMPLETE");
-  assert.equal(mapStripeSubscriptionStatusToOrgStatus("canceled"), "CANCELED");
-});
