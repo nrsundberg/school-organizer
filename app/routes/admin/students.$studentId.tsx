@@ -1,7 +1,10 @@
 import { useState, type ReactNode } from "react";
 import { Form, Link, redirect, useSearchParams } from "react-router";
+import { useTranslation } from "react-i18next";
 import { Button, Input, TextArea } from "@heroui/react";
 import { dataWithError, dataWithSuccess } from "remix-toast";
+import { detectLocale } from "~/i18n.server";
+import { getFixedT } from "~/lib/t.server";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -159,9 +162,11 @@ export async function action({ request, context, params }: Route.ActionArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const org = getOrgFromContext(context);
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
   const studentId = Number(params.studentId);
   if (!Number.isInteger(studentId)) {
-    return dataWithError(null, "Invalid student id.");
+    return dataWithError(null, t("students.errors.invalidId"));
   }
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
@@ -171,7 +176,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
   // implicit filter on a primary-key lookup.
   const existing = await prisma.student.findUnique({ where: { id: studentId } });
   if (!existing || existing.orgId !== org.id) {
-    return dataWithError(null, "Student not found.");
+    return dataWithError(null, t("students.errors.notFound"));
   }
 
   try {
@@ -181,13 +186,13 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       const homeRoom = String(formData.get("homeRoom") ?? "").trim();
 
       if (!firstName || !lastName) {
-        return dataWithError(null, "First and last name are required.");
+        return dataWithError(null, t("students.errors.namesRequired"));
       }
 
       if (homeRoom) {
         const room = await prisma.teacher.findFirst({ where: { homeRoom } });
         if (!room) {
-          return dataWithError(null, "Selected classroom doesn't exist.");
+          return dataWithError(null, t("students.errors.classroomNotFound"));
         }
       }
 
@@ -199,23 +204,23 @@ export async function action({ request, context, params }: Route.ActionArgs) {
           homeRoom: homeRoom || null,
         },
       });
-      return dataWithSuccess(null, "Student saved.");
+      return dataWithSuccess(null, t("students.toasts.saved"));
     }
 
     if (intent === "moveClassroom") {
       const homeRoom = String(formData.get("homeRoom") ?? "").trim();
       if (!homeRoom) {
-        return dataWithError(null, "Pick a classroom.");
+        return dataWithError(null, t("students.errors.pickClassroom"));
       }
       const room = await prisma.teacher.findFirst({ where: { homeRoom } });
       if (!room) {
-        return dataWithError(null, "Selected classroom doesn't exist.");
+        return dataWithError(null, t("students.errors.classroomNotFound"));
       }
       await prisma.student.update({
         where: { id: studentId },
         data: { homeRoom },
       });
-      return dataWithSuccess(null, `Moved to ${homeRoom}.`);
+      return dataWithSuccess(null, t("students.toasts.saved"));
     }
 
     if (intent === "delete") {
@@ -226,15 +231,16 @@ export async function action({ request, context, params }: Route.ActionArgs) {
     console.error("students action failed", error);
     return dataWithError(
       null,
-      error instanceof Error ? error.message : "Update failed.",
+      error instanceof Error ? error.message : t("students.errors.updateFailed"),
     );
   }
-  return dataWithError(null, "Unknown action.");
+  return dataWithError(null, t("students.errors.unknownAction"));
 }
 
 type LoaderData = Route.ComponentProps["loaderData"];
 
 export default function StudentDetail({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation("admin");
   const { student, classroom, household, callEvents, todaysException, classrooms } =
     loaderData;
 
@@ -275,9 +281,9 @@ export default function StudentDetail({ loaderData }: Route.ComponentProps) {
           {activeTab === "dismissal" ? (
             <DismissalTab todaysException={todaysException} />
           ) : null}
-          {activeTab === "activity" ? <PlaceholderTab title="Activity" /> : null}
-          {activeTab === "notes" ? <PlaceholderTab title="Notes" /> : null}
-          {activeTab === "files" ? <PlaceholderTab title="Files" /> : null}
+          {activeTab === "activity" ? <PlaceholderTab title={t("students.tabs.activity")} /> : null}
+          {activeTab === "notes" ? <PlaceholderTab title={t("students.tabs.notes")} /> : null}
+          {activeTab === "files" ? <PlaceholderTab title={t("students.tabs.files")} /> : null}
         </div>
 
         <aside className="flex flex-col gap-4">
@@ -300,14 +306,15 @@ function Breadcrumb({
   classroom: LoaderData["classroom"];
   student: LoaderData["student"];
 }) {
+  const { t } = useTranslation("admin");
   return (
     <nav
-      aria-label="Breadcrumb"
+      aria-label={t("students.breadcrumb.aria")}
       className="flex items-center gap-1.5 text-xs text-white/45"
     >
       <Link to="/admin/children" className="inline-flex items-center gap-1 hover:text-white/80">
         <ArrowLeft className="h-3.5 w-3.5" />
-        Children
+        {t("students.breadcrumb.children")}
       </Link>
       <span className="text-white/25">/</span>
       {classroom ? (
@@ -352,6 +359,7 @@ function HeaderCard({
   initials: string;
   classrooms: LoaderData["classrooms"];
 }) {
+  const { t } = useTranslation("admin");
   return (
     <header className="flex flex-col gap-4 rounded-xl border border-white/[0.08] bg-white/[0.04] p-5 lg:flex-row lg:items-start">
       <EntityAvatar
@@ -367,19 +375,19 @@ function HeaderCard({
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {todaysException ? (
             <StatusPill tone="warning" dot>
-              Today: {todaysException.dismissalPlan}
+              {t("students.pills.todaysException", { plan: todaysException.dismissalPlan })}
             </StatusPill>
           ) : null}
           {classroom?.gradeLevel == null ? (
-            <StatusPill tone="warning">Ungraded classroom</StatusPill>
+            <StatusPill tone="warning">{t("students.pills.ungradedClassroom")}</StatusPill>
           ) : null}
           {!household ? (
-            <StatusPill tone="danger">No household</StatusPill>
+            <StatusPill tone="danger">{t("students.pills.noHousehold")}</StatusPill>
           ) : null}
           {classroom ? (
             <StatusPill tone="info">{classroom.homeRoom}</StatusPill>
           ) : (
-            <StatusPill tone="warning">No classroom</StatusPill>
+            <StatusPill tone="warning">{t("students.pills.noClassroom")}</StatusPill>
           )}
         </div>
 
@@ -470,34 +478,35 @@ function Tabs({
   activeTab: TabKey;
   onChange: (tab: TabKey) => void;
 }) {
+  const { t } = useTranslation("admin");
   const tabs: { key: TabKey; label: string }[] = [
-    { key: "profile", label: "Profile" },
-    { key: "dismissal", label: "Dismissal" },
-    { key: "activity", label: "Activity" },
-    { key: "notes", label: "Notes" },
-    { key: "files", label: "Files" },
+    { key: "profile", label: t("students.tabs.profile") },
+    { key: "dismissal", label: t("students.tabs.dismissal") },
+    { key: "activity", label: t("students.tabs.activity") },
+    { key: "notes", label: t("students.tabs.notes") },
+    { key: "files", label: t("students.tabs.files") },
   ];
   return (
     <div
       role="tablist"
       className="flex flex-wrap items-center gap-1 border-b border-white/[0.08]"
     >
-      {tabs.map((t) => {
-        const active = t.key === activeTab;
+      {tabs.map((tab) => {
+        const active = tab.key === activeTab;
         return (
           <button
-            key={t.key}
+            key={tab.key}
             type="button"
             role="tab"
             aria-selected={active}
-            onClick={() => onChange(t.key)}
+            onClick={() => onChange(tab.key)}
             className={`relative -mb-px px-3 py-2 text-sm font-medium transition-colors ${
               active
                 ? "text-white"
                 : "text-white/55 hover:text-white/80"
             }`}
           >
-            {t.label}
+            {tab.label}
             {active ? (
               <span className="absolute inset-x-2 bottom-[-1px] h-0.5 rounded-full bg-blue-400" />
             ) : null}
@@ -519,31 +528,32 @@ function ProfileTab({
   student: LoaderData["student"];
   classrooms: LoaderData["classrooms"];
 }) {
+  const { t } = useTranslation("admin");
   return (
     <div className="flex flex-col gap-4">
       <Form method="post" className="flex flex-col gap-5 rounded-xl border border-white/[0.08] bg-white/[0.04] p-5">
         <input type="hidden" name="intent" value="saveProfile" />
-        <SectionHeader title="Identity" />
+        <SectionHeader title={t("students.sections.identity")} />
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="First name">
+          <Field label={t("students.fields.firstName")}>
             <Input name="firstName" defaultValue={student.firstName} required />
           </Field>
-          <Field label="Last name">
+          <Field label={t("students.fields.lastName")}>
             <Input name="lastName" defaultValue={student.lastName} required />
           </Field>
         </div>
 
-        <SectionHeader title="Placement" />
+        <SectionHeader title={t("students.sections.placement")} />
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Grade">
+          <Field label={t("students.fields.grade")}>
             <select
               name="grade"
               defaultValue=""
               className="app-field"
               disabled
-              title="Grade is set on the classroom; change via the classroom card."
+              title={t("students.fields.gradeTip")}
             >
-              <option value="">From classroom</option>
+              <option value="">{t("students.fields.gradeFromClassroom")}</option>
               {GRADE_LEVELS.map((g) => (
                 <option key={g} value={g}>
                   {gradeLabel(g)}
@@ -551,13 +561,13 @@ function ProfileTab({
               ))}
             </select>
           </Field>
-          <Field label="Classroom">
+          <Field label={t("students.fields.classroom")}>
             <select
               name="homeRoom"
               defaultValue={student.homeRoom ?? ""}
               className="app-field"
             >
-              <option value="">Unassigned</option>
+              <option value="">{t("students.pills.noClassroom")}</option>
               {classrooms.map((c) => (
                 <option key={c.id} value={c.homeRoom}>
                   {c.homeRoom}
@@ -566,25 +576,22 @@ function ProfileTab({
             </select>
           </Field>
         </div>
-        <p className="-mt-1 text-xs text-white/45">
-          Space # is set on the family — edit it on the household detail page.
-        </p>
 
-        <SectionHeader title="Health & safety" />
+        <SectionHeader title={t("students.sections.healthSafety")} />
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Allergies">
+          <Field label={t("students.fields.allergies")}>
             <TextArea
               name="allergies"
               rows={2}
-              placeholder="None on file"
+              placeholder={t("students.fields.noneOnFile")}
               disabled
             />
           </Field>
-          <Field label="Medication">
+          <Field label={t("students.fields.medication")}>
             <TextArea
               name="medication"
               rows={2}
-              placeholder="None on file"
+              placeholder={t("students.fields.noneOnFile")}
               disabled
             />
           </Field>
@@ -622,6 +629,7 @@ function DismissalTab({
 }: {
   todaysException: LoaderData["todaysException"];
 }) {
+  const { t } = useTranslation("admin");
   const [defaultPlan, setDefaultPlan] = useState<string>("Car line");
   // Default plan persistence is not yet in the schema (Student doesn't have
   // a defaultPlan column). The picker is wired so admins see the design;
@@ -629,7 +637,10 @@ function DismissalTab({
   return (
     <div className="flex flex-col gap-4">
       <section className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-5">
-        <SectionHeader title="Default plan" caption="Used when no exception is set" />
+        <SectionHeader
+          title={t("students.sections.defaultPlan")}
+          caption={t("students.sections.defaultPlanCaption")}
+        />
         <p className="mt-2 text-xs text-white/45">
           Tap a tile to set the student's default dismissal route. Exceptions
           (today / weekly) override this on the day they apply.
@@ -701,10 +712,11 @@ function DismissalTab({
 /* --------------------------------------------------------------------- */
 
 function PlaceholderTab({ title }: { title: string }) {
+  const { t } = useTranslation("admin");
   return (
     <section className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-8 text-center text-sm text-white/55">
       <p className="font-medium text-white/80">{title}</p>
-      <p className="mt-1">Coming soon — this tab is part of the next iteration.</p>
+      <p className="mt-1">{t("students.placeholderTab.subtitle")}</p>
     </section>
   );
 }
@@ -720,10 +732,11 @@ function HouseholdRail({
   household: LoaderData["household"];
   currentStudentId: number;
 }) {
+  const { t } = useTranslation("admin");
   if (!household) {
     return (
       <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-5">
-        <SectionHeader title="Household" />
+        <SectionHeader title={t("students.sections.household")} />
         <p className="mt-2 text-sm text-white/55">
           This student isn't grouped into a household yet. Group them from the{" "}
           <EntityLink to="/admin/households">Households page</EntityLink> to
@@ -736,7 +749,7 @@ function HouseholdRail({
   const siblings = household.students.filter((s) => s.id !== currentStudentId);
   return (
     <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-5">
-      <SectionHeader title="Household" />
+      <SectionHeader title={t("students.sections.household")} />
       <div className="mt-3 flex items-center gap-3">
         <EntityAvatar
           size="md"
@@ -808,9 +821,10 @@ function RecentPickupsRail({
 }: {
   callEvents: LoaderData["callEvents"];
 }) {
+  const { t } = useTranslation("admin");
   return (
     <div className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-5">
-      <SectionHeader title="Recent pickups" />
+      <SectionHeader title={t("students.sections.recentPickups")} />
       {callEvents.length === 0 ? (
         <p className="mt-2 text-xs text-white/45">No pickups recorded yet.</p>
       ) : (

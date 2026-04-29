@@ -1,6 +1,7 @@
 import { Form, Link, useFetcher } from "react-router";
 import { Button } from "@heroui/react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   AlertTriangle,
   CalendarClock,
@@ -121,35 +122,12 @@ type ActivityItem = {
   href?: string;
 };
 
-/**
- * Map a raw OrgAuditLog `action` string to a user-facing line. We keep the
- * mapping local (rather than i18n) because audit actions are a controlled
- * vocabulary written by the server and most are transparent to admins
- * already (e.g. "BILLING_PLAN_CHANGED"). Unknown actions fall through to a
- * lightly humanized form.
- */
-function humanizeAuditAction(action: string): string {
-  const map: Record<string, string> = {
-    BOARD_RESET: "Board reset",
-    VIEWER_DRAWING_ENABLED: "Enabled viewer drawing",
-    VIEWER_DRAWING_DISABLED: "Disabled viewer drawing",
-    BILLING_PLAN_CHANGED: "Billing plan changed",
-    BILLING_PORTAL_OPENED: "Opened billing portal",
-    USER_INVITED: "Invited a user",
-    USER_REMOVED: "Removed a user",
-    USER_ROLE_CHANGED: "Changed a user's role",
-    BRANDING_UPDATED: "Updated branding",
-    HOUSEHOLD_CREATED: "Created a household",
-    HOUSEHOLD_DELETED: "Deleted a household",
-    EXCEPTION_BROADCAST: "Broadcast a dismissal exception",
-    PROGRAM_CANCELLED: "Cancelled an after-school program",
-  };
-  if (map[action]) return map[action];
-  // Fall through: SCREAMING_SNAKE_CASE → "Screaming snake case"
-  return action
+function humanizeAuditAction(action: string, t: TFunction): string {
+  const fallback = action
     .toLowerCase()
     .replace(/_/g, " ")
     .replace(/^./, (c) => c.toUpperCase());
+  return t(`dashboard.auditActions.${action}`, { defaultValue: fallback });
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -260,6 +238,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       )
     : new Map<string, string | null>();
 
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+
   const activity: ActivityItem[] = [];
 
   // Drill runs: each LIVE/PAUSED/ENDED run is one item. The activatedAt is
@@ -297,7 +278,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       onBehalfOfLabel: log.onBehalfOfUserId
         ? userMap.get(log.onBehalfOfUserId) ?? null
         : null,
-      primary: humanizeAuditAction(log.action),
+      primary: humanizeAuditAction(log.action, t),
     });
   }
 
@@ -309,8 +290,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     ? new Date(lastBoardResetAt).getTime() >= todayStart.getTime()
     : false;
 
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
   return {
     metaTitle: t("dashboard.metaTitle"),
     studentCount,

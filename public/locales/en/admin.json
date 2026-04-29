@@ -60,6 +60,21 @@
   "children": {
     "addChild": "Add Child",
     "addClass": "Add Class",
+    "addMenu": {
+      "child": {
+        "hint": "Roster a single student",
+        "label": "Add child"
+      },
+      "classroom": {
+        "hint": "Create a new homeroom",
+        "label": "Add classroom"
+      },
+      "import": {
+        "hint": "Upload CSV from your SIS",
+        "label": "Import roster"
+      },
+      "trigger": "Add"
+    },
     "child_one": "child",
     "child_other": "children",
     "edit": "Edit",
@@ -67,6 +82,23 @@
     "heading": "Children & Classes",
     "metaTitle": "Admin – Children & Classes",
     "noChildren": "No children in this class.",
+    "pageHeader": {
+      "eyebrow": "Roster",
+      "subtitle": "Browse classrooms by grade, jump into student records, and keep your roster current.",
+      "title": "Children & classrooms"
+    },
+    "search": {
+      "placeholder": "Search students or classrooms"
+    },
+    "stats": {
+      "allPlaced": "All students are placed",
+      "avgClassSize": "Avg class size",
+      "classrooms": "Classrooms",
+      "defaultCap": "Default cap {{count}}",
+      "students": "Students",
+      "unassigned": "Unassigned",
+      "unassignedCaption": "Students without a current classroom"
+    },
     "table": {
       "name": "Name",
       "space": "Space #"
@@ -118,6 +150,21 @@
     }
   },
   "dashboard": {
+    "auditActions": {
+      "BILLING_PLAN_CHANGED": "Billing plan changed",
+      "BILLING_PORTAL_OPENED": "Opened billing portal",
+      "BOARD_RESET": "Board reset",
+      "BRANDING_UPDATED": "Updated branding",
+      "EXCEPTION_BROADCAST": "Broadcast a dismissal exception",
+      "HOUSEHOLD_CREATED": "Created a household",
+      "HOUSEHOLD_DELETED": "Deleted a household",
+      "PROGRAM_CANCELLED": "Cancelled an after-school program",
+      "USER_INVITED": "Invited a user",
+      "USER_REMOVED": "Removed a user",
+      "USER_ROLE_CHANGED": "Changed a user's role",
+      "VIEWER_DRAWING_DISABLED": "Disabled viewer drawing",
+      "VIEWER_DRAWING_ENABLED": "Enabled viewer drawing"
+    },
     "actions": {
       "addedSpaces": "Added spaces {{from}}–{{to}}",
       "createdGrid": "Created grid ({{n}} spaces)",
@@ -1045,6 +1092,61 @@
     "users": "Users",
     "print": "Print backups"
   },
+  "students": {
+    "breadcrumb": {
+      "aria": "Breadcrumb",
+      "children": "Children"
+    },
+    "errors": {
+      "classroomNotFound": "Selected classroom doesn't exist.",
+      "invalidId": "Invalid student id.",
+      "namesRequired": "First and last name are required.",
+      "notFound": "Student not found.",
+      "pickClassroom": "Pick a classroom.",
+      "unknownAction": "Unknown action.",
+      "updateFailed": "Update failed."
+    },
+    "fields": {
+      "allergies": "Allergies",
+      "classroom": "Classroom",
+      "firstName": "First name",
+      "grade": "Grade",
+      "gradeFromClassroom": "From classroom",
+      "gradeTip": "Grade is set on the classroom; change via the classroom card.",
+      "lastName": "Last name",
+      "medication": "Medication",
+      "noneOnFile": "None on file"
+    },
+    "pills": {
+      "noClassroom": "No classroom",
+      "noHousehold": "No household",
+      "todaysException": "Today: {{plan}}",
+      "ungradedClassroom": "Ungraded classroom"
+    },
+    "placeholderTab": {
+      "title": "{{title}}",
+      "subtitle": "This tab is coming soon."
+    },
+    "sections": {
+      "defaultPlan": "Default plan",
+      "defaultPlanCaption": "Used when no exception is set",
+      "healthSafety": "Health & safety",
+      "household": "Household",
+      "identity": "Identity",
+      "placement": "Placement",
+      "recentPickups": "Recent pickups"
+    },
+    "tabs": {
+      "activity": "Activity",
+      "dismissal": "Dismissal",
+      "files": "Files",
+      "notes": "Notes",
+      "profile": "Profile"
+    },
+    "toasts": {
+      "saved": "Student saved."
+    }
+  },
   "usageBanner": {
     "classrooms": "Classrooms",
     "families": "Families",
@@ -1063,6 +1165,130 @@
       "reasonLabel": "Reason",
       "reasonPlaceholder": "Enter ban reason...",
       "submit": "Ban User"
+    },
+    "devices": {
+      "android": "Android",
+      "browser": "Browser",
+      "ipad": "iPad",
+      "iphone": "iPhone",
+      "linux": "Linux",
+      "mac": "Mac",
+      "unknown": "Unknown device",
+      "windows": "Windows"
+    },
+    "drawer": {
+      "actions": {
+        "ban": "Ban",
+        "cantChangeOwnRole": "You can't change your own role from this panel.",
+        "delete": "Delete",
+        "deleteConfirm": "Delete {{name}}? This cannot be undone.",
+        "resetPassword": "Reset password",
+        "unban": "Unban"
+      },
+      "activity": {
+        "empty": "No recent activity.",
+        "heading": "Recent activity"
+      },
+      "close": "Close",
+      "empty": {
+        "subtitle": "You'll see linked households, sessions, and recent activity here.",
+        "title": "Select a user to manage their access."
+      },
+      "households": {
+        "empty": "No households are tagged with this user yet.",
+        "heading": "Linked households",
+        "noStudents": "No students assigned",
+        "studentCount_one": "{{count}} student",
+        "studentCount_other": "{{count}} students"
+      },
+      "sessions": {
+        "current": "Current",
+        "empty": "No active sessions.",
+        "heading": "Active sessions",
+        "revokeAll": "Revoke all"
+      }
+    },
+    "filters": {
+      "searchPlaceholder": "Search by name or email…",
+      "sort": {
+        "created": "Created",
+        "lastActive": "Last active",
+        "name": "Name",
+        "role": "Role"
+      },
+      "sortLabel": "Sort"
+    },
+    "impersonate": {
+      "start": "Impersonate",
+      "starting": "Impersonating…"
+    },
+    "invite": {
+      "cancel": "Cancel",
+      "emailLabel": "Email",
+      "eyebrow": "Invite",
+      "householdHint": "Pre-associates this user with the household for the connection panel.",
+      "householdLabel": "Link to household (optional)",
+      "householdNone": "No household link",
+      "nameLabel": "Full name",
+      "roleLegend": "Role",
+      "submit": "Send invite",
+      "subtitle": "We'll email a magic-link invite. They set their own password on accept.",
+      "title": "Invite a user"
+    },
+    "pageHeader": {
+      "eyebrow": "Access",
+      "inviteCta": "Invite user",
+      "passwordResetOff": "Password reset: off",
+      "passwordResetOn": "Password reset: on",
+      "subtitle": "Invite staff, manage roles, and review who has signed in recently.",
+      "title": "Users & permissions"
+    },
+    "relativeTime": {
+      "days": "{{count}}d ago",
+      "hours": "{{count}}h ago",
+      "justNow": "Just now",
+      "minutes": "{{count}}m ago",
+      "months": "{{count}}mo ago",
+      "never": "Never",
+      "years": "{{count}}y ago"
+    },
+    "roles": {
+      "admin": "Admin",
+      "adminDesc": "Full access",
+      "all": "All",
+      "controller": "Controller",
+      "controllerDesc": "Pickup ops",
+      "viewer": "Viewer",
+      "viewerDesc": "Read-only"
+    },
+    "stats": {
+      "activeTodayCaption": "Sessions in last 24h",
+      "activeTodayLabel": "Active today",
+      "bannedCaption": "Cannot sign in",
+      "bannedLabel": "Banned",
+      "pendingCaption": "Awaiting acceptance",
+      "pendingLabel": "Pending invites",
+      "totalCaption": "Across this school",
+      "totalLabel": "Total users"
+    },
+    "status": {
+      "active": "Active",
+      "banned": "Banned",
+      "idle": "Idle",
+      "pending": "Pending"
+    },
+    "tableExtra": {
+      "invitationPending": "Invitation pending",
+      "lastActive": "Last active",
+      "noMatches": "No users match your filters.",
+      "noSessions": "No sessions",
+      "resend": "Resend",
+      "selectAria": "Select {{name}}",
+      "sending": "Sending…",
+      "sessionsCount_one": "{{count}} session",
+      "sessionsCount_other": "{{count}} sessions",
+      "user": "User",
+      "youBadge": "You"
     },
     "create": {
       "admin": "Admin",
