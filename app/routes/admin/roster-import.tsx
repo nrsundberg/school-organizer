@@ -14,6 +14,7 @@ import {
   serializeRosterRows,
   type RosterImportPlan,
   type RosterPreviewRow,
+  type RosterPrisma,
 } from "~/domain/csv/roster-import.server";
 import type { ServerMessage } from "~/domain/types/server-message";
 import {
@@ -151,7 +152,10 @@ export async function action({ request, context }: Route.ActionArgs) {
       );
     }
 
-    const plan = await buildRosterImportPlanFromDatabase(prisma, parseResult.rows);
+    const plan = await buildRosterImportPlanFromDatabase(
+      prisma as unknown as RosterPrisma,
+      parseResult.rows,
+    );
     const planLimitError = await usageErrorForPlan(context, plan);
     const canApply =
       parseResult.rows.length > 0 &&
@@ -196,7 +200,10 @@ export async function action({ request, context }: Route.ActionArgs) {
       );
     }
 
-    const plan = await buildRosterImportPlanFromDatabase(prisma, rows);
+    const plan = await buildRosterImportPlanFromDatabase(
+      prisma as unknown as RosterPrisma,
+      rows,
+    );
     const planLimitError = await usageErrorForPlan(context, plan);
     if (planLimitError) {
       return data<ActionData>({
@@ -211,7 +218,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       });
     }
 
-    const result = await applyRosterImport(prisma, rows);
+    const result = await applyRosterImport(prisma as unknown as RosterPrisma, rows);
     if (!result.ok) {
       return data<ActionData>(
         { stage: "error", error: translateServerMessage(t, result.error) },
