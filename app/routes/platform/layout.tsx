@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router";
+import { Link, NavLink, Outlet } from "react-router";
 import type { Route } from "./+types/layout";
 import { requirePlatformAdmin } from "~/domain/auth/platform-admin.server";
 import { DEFAULT_SITE_NAME } from "~/lib/site";
@@ -18,8 +18,18 @@ export default function PlatformLayout() {
   return (
     <div className="min-h-screen bg-[#0f1414] text-white">
       <header className="border-b border-white/10 px-4 py-3">
-        <p className="text-sm font-semibold uppercase tracking-wide text-[#E9D500]">Platform</p>
-        <h1 className="text-xl font-bold">{`${DEFAULT_SITE_NAME} — internal`}</h1>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-[#E9D500]">Platform</p>
+            <h1 className="text-xl font-bold">{`${DEFAULT_SITE_NAME} — internal`}</h1>
+          </div>
+          <Link
+            to="/logout"
+            className="rounded-md px-3 py-1.5 text-sm font-medium text-white/50 transition-colors hover:bg-white/5 hover:text-white"
+          >
+            Sign out
+          </Link>
+        </div>
         <nav className="mt-4 flex flex-wrap gap-1 border-t border-white/10 pt-3">
           <NavLink to="/platform" end className={navLinkClass}>
             Orgs

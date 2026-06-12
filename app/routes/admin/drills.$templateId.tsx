@@ -460,52 +460,32 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
         </Link>
       </div>
 
-      <div className="flex flex-wrap items-end gap-4 justify-between">
-        <Form
-          method="post"
-          {...getFormProps(renameForm)}
-          className="flex flex-wrap items-end gap-3 flex-1 min-w-[240px]"
-        >
-          <input type="hidden" name="intent" value="rename" />
-          <label className={`${formClasses.labelStack} flex-1 max-w-md`}>
-            {t("drills.edit.templateName")}
-            <input
-              {...getInputProps(renameFields.name, { type: "text" })}
-              key={template.updatedAt.toISOString()}
-              defaultValue={template.name}
-              className={formClasses.input}
-              aria-invalid={renameError ? true : undefined}
-              aria-describedby={renameError ? `${renameFields.name.id}-error` : undefined}
-            />
-            {renameError ? (
-              <span id={`${renameFields.name.id}-error`} className={formClasses.fieldError}>
-                {renameError}
-              </span>
-            ) : null}
-          </label>
-          <button type="submit" className={formClasses.btnSecondary}>
-            {t("drills.edit.saveName")}
-          </button>
-        </Form>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={formClasses.btnSecondary} onClick={() => addColumn("text")}>
-            <Plus className="w-4 h-4 mr-1 inline" />
-            {t("drills.edit.addText")}
-          </button>
-          <button type="button" className={formClasses.btnSecondary} onClick={() => addColumn("toggle")}>
-            <Plus className="w-4 h-4 mr-1 inline" />
-            {t("drills.edit.addToggle")}
-          </button>
-          <button
-            type="button"
-            className={formClasses.btnPrimary}
-            onClick={saveDefinition}
-            disabled={saveFetcher.state !== "idle"}
-          >
-            {saveFetcher.state !== "idle" ? t("drills.edit.saving") : t("drills.edit.saveLayout")}
-          </button>
-        </div>
-      </div>
+      <Form
+        method="post"
+        {...getFormProps(renameForm)}
+        className="flex flex-wrap items-end gap-3"
+      >
+        <input type="hidden" name="intent" value="rename" />
+        <label className={`${formClasses.labelStack} flex-1 max-w-md`}>
+          {t("drills.edit.templateName")}
+          <input
+            {...getInputProps(renameFields.name, { type: "text" })}
+            key={template.updatedAt.toISOString()}
+            defaultValue={template.name}
+            className={formClasses.input}
+            aria-invalid={renameError ? true : undefined}
+            aria-describedby={renameError ? `${renameFields.name.id}-error` : undefined}
+          />
+          {renameError ? (
+            <span id={`${renameFields.name.id}-error`} className={formClasses.fieldError}>
+              {renameError}
+            </span>
+          ) : null}
+        </label>
+        <button type="submit" className={formClasses.btnSecondary}>
+          {t("drills.edit.saveName")}
+        </button>
+      </Form>
 
       <p className="text-xs text-white/40">
         {t("drills.edit.intro")}
@@ -668,6 +648,25 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
           </p>
         </div>
       </section>
+
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={formClasses.btnSecondary} onClick={() => addColumn("text")}>
+          <Plus className="w-4 h-4 mr-1 inline" />
+          {t("drills.edit.addText")}
+        </button>
+        <button type="button" className={formClasses.btnSecondary} onClick={() => addColumn("toggle")}>
+          <Plus className="w-4 h-4 mr-1 inline" />
+          {t("drills.edit.addToggle")}
+        </button>
+        <button
+          type="button"
+          className={formClasses.btnPrimary}
+          onClick={saveDefinition}
+          disabled={saveFetcher.state !== "idle"}
+        >
+          {saveFetcher.state !== "idle" ? t("drills.edit.saving") : t("drills.edit.saveLayout")}
+        </button>
+      </div>
 
       <div className="overflow-x-auto rounded-xl border border-white/10">
         <table className="w-full text-sm min-w-[640px]">
