@@ -73,3 +73,16 @@ test("set-password is its own bucket (mustChangePassword guard)", () => {
   assert.equal(tenant("/set-password").isSetPassword, true);
   assert.equal(tenant("/admin/dashboard").isSetPassword, false);
 });
+
+test("/accept-invite is anonymous-skippable (anon users can open invite links)", () => {
+  assert.equal(
+    marketing("/accept-invite").anonSkipsViewer,
+    true,
+    "marketing host: anon visitor must reach /accept-invite",
+  );
+  assert.equal(
+    tenant("/accept-invite").anonSkipsViewer,
+    true,
+    "tenant host: same rule (belt-and-suspenders)",
+  );
+});

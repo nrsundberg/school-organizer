@@ -28,6 +28,8 @@ export type RequestPathClassification = {
   isPlatform: boolean;
   /** True for /billing-required. */
   isBillingRequired: boolean;
+  /** True for /accept-invite — anonymous users must reach this page to complete their invite. */
+  isAcceptInvite: boolean;
 
   /** Anonymous requests don't need viewer-access checks for these paths. */
   anonSkipsViewer: boolean;
@@ -66,6 +68,7 @@ export function classifyRequestPath(
   // shared-secret header; the global middleware must not 302 it to /login.
   const isStatusProbe = pathname === "/api/status-probe";
   const isPlatform = pathname.startsWith("/platform");
+  const isAcceptInvite = pathname === "/accept-invite";
 
   const isPublicApi =
     isCheckEmailApi ||
@@ -99,7 +102,8 @@ export function classifyRequestPath(
     isAuthApi ||
     isStatic ||
     isPublicApi ||
-    isPublicMarketingPath;
+    isPublicMarketingPath ||
+    isAcceptInvite;
 
   const skipTenantOrgBinding = isStatic || isAuthApi || isStripeWebhook || isLogout;
 
@@ -122,6 +126,7 @@ export function classifyRequestPath(
     isPublicApi,
     isPlatform,
     isBillingRequired,
+    isAcceptInvite,
     anonSkipsViewer,
     skipTenantOrgBinding,
     exemptFromBillingGate,
