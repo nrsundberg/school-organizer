@@ -253,6 +253,29 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       return data({ ok: true });
     }
 
+    case "set-limits": {
+      const parseLimit = (v: FormDataEntryValue | null): number | null => {
+        const n = parseInt(String(v ?? ""), 10);
+        return isNaN(n) || n <= 0 ? null : n;
+      };
+      const limitStudents = parseLimit(formData.get("limitStudents"));
+      const limitFamilies = parseLimit(formData.get("limitFamilies"));
+      const limitClassrooms = parseLimit(formData.get("limitClassrooms"));
+      await db.org.update({
+        where: { id: orgId },
+        data: { limitStudents, limitFamilies, limitClassrooms },
+      });
+      await recordOrgAudit({
+        context,
+        orgId,
+        actorUserId: actor.actorUserId ?? me?.id ?? null,
+        onBehalfOfUserId: actor.onBehalfOfUserId,
+        action: "org.limits_overridden",
+        payload: { limitStudents, limitFamilies, limitClassrooms },
+      });
+      return data({ ok: true });
+    }
+
     case "invite-user": {
       const email = String(formData.get("email") ?? "").trim().toLowerCase();
       const name = String(formData.get("name") ?? "").trim();
@@ -727,6 +750,59 @@ export default function PlatformOrgDetail({
             the trial has expired drops them back to SUSPENDED.
           </p>
         </div>
+      </div>
+
+      {/* Usage limit overrides */}
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+        <h2 className="mb-1 text-sm font-semibold uppercase tracking-wide text-[#E9D500]">Usage limit overrides</h2>
+        <p className="mb-3 text-xs text-white/40">
+          Override the plan tier defaults for this org. Leave blank to use the tier default.
+          Current plan defaults — FREE/CAR_LINE: 400 students / 150 families / 35 classrooms.
+          CAMPUS: 900 / 300 / 80.
+        </p>
+        <Form method="post" className="flex flex-wrap gap-3 items-end">
+          <input type="hidden" name="intent" value="set-limits" />
+          <label className="flex flex-col gap-1 text-xs text-white/50">
+            Max students
+            <input
+              type="number"
+              name="limitStudents"
+              min={1}
+              defaultValue={(org as any).limitStudents ?? ""}
+              placeholder="tier default"
+              className="app-field w-32"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-white/50">
+            Max families
+            <input
+              type="number"
+              name="limitFamilies"
+              min={1}
+              defaultValue={(org as any).limitFamilies ?? ""}
+              placeholder="tier default"
+              className="app-field w-32"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-white/50">
+            Max classrooms
+            <input
+              type="number"
+              name="limitClassrooms"
+              min={1}
+              defaultValue={(org as any).limitClassrooms ?? ""}
+              placeholder="tier default"
+              className="app-field w-32"
+            />
+          </label>
+          <button
+            type="submit"
+            className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20"
+          >
+            Save limits
+          </button>
+        </Form>
+        <p className="mt-2 text-xs text-white/30">Clearing all three fields resets to the plan tier defaults.</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

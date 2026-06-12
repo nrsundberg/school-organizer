@@ -122,6 +122,11 @@ model Org {
   /// billing enforcement (isOrgAccessAllowed, trial-expiry suspension)
   /// is bypassed entirely. Use `compedUntil` for time-bounded comps.
   isComped                 Boolean                  @default(false)
+  /// Per-org usage cap overrides. When set, these replace the plan tier defaults
+  /// for limit enforcement. Null means "use tier default".
+  limitStudents            Int?
+  limitFamilies            Int?
+  limitClassrooms          Int?
   /// Whether this org's users can reset their password via email. Orgs using
   /// SSO should disable this so users are forced through the SSO flow.
   passwordResetEnabled     Boolean                  @default(true)

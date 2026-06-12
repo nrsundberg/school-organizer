@@ -28,10 +28,24 @@ export function resolveLimitTier(plan: BillingPlan): PlanLimitTier {
   }
 }
 
-export function getNumericLimits(plan: BillingPlan): NumericPlanLimits | null {
+type OrgLimitOverrides = {
+  limitStudents?: number | null;
+  limitFamilies?: number | null;
+  limitClassrooms?: number | null;
+};
+
+export function getNumericLimits(
+  plan: BillingPlan,
+  overrides?: OrgLimitOverrides,
+): NumericPlanLimits | null {
   const tier = resolveLimitTier(plan);
   if (tier === "ENTERPRISE") return null;
-  return PLAN_LIMITS[tier];
+  const base = PLAN_LIMITS[tier];
+  return {
+    students: overrides?.limitStudents ?? base.students,
+    families: overrides?.limitFamilies ?? base.families,
+    classrooms: overrides?.limitClassrooms ?? base.classrooms,
+  };
 }
 
 /**
@@ -79,11 +93,11 @@ function maxRatio(count: number, cap: number): number {
 }
 
 export function buildUsageSnapshot(
-  org: Pick<Org, "billingPlan" | "usageGraceStartedAt">,
+  org: Pick<Org, "billingPlan" | "usageGraceStartedAt" | "limitStudents" | "limitFamilies" | "limitClassrooms">,
   counts: UsageCounts,
   now: Date,
 ): UsageSnapshot {
-  const limits = getNumericLimits(org.billingPlan);
+  const limits = getNumericLimits(org.billingPlan, org);
   const tier = resolveLimitTier(org.billingPlan);
 
   if (!limits) {
@@ -192,12 +206,12 @@ function assertDimension(
  * Call before adding students (and new families when household is new).
  */
 export function assertUsageAllowsIncrement(
-  org: Pick<Org, "billingPlan" | "usageGraceStartedAt">,
+  org: Pick<Org, "billingPlan" | "usageGraceStartedAt" | "limitStudents" | "limitFamilies" | "limitClassrooms">,
   current: UsageCounts,
   delta: { students: number; families: number; classrooms: number },
   now = new Date(),
 ): void {
-  const limits = getNumericLimits(org.billingPlan);
+  const limits = getNumericLimits(org.billingPlan, org);
   if (!limits) return;
 
   const next: UsageCounts = {
@@ -220,7 +234,7 @@ export async function syncUsageGracePeriod(
   counts: UsageCounts,
   now = new Date(),
 ): Promise<void> {
-  const limits = getNumericLimits(org.billingPlan);
+  const limits = getNumericLimits(org.billingPlan, org);
   if (!limits) {
     if (org.usageGraceStartedAt) {
       await prisma.org.update({
