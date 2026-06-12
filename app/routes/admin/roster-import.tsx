@@ -103,7 +103,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 function importDelta(plan: RosterImportPlan) {
   return {
     students: plan.summary.createCount,
-    families: plan.summary.createCount,
+    families: plan.summary.newFamilies,
     classrooms: plan.summary.newHomerooms,
   };
 }
