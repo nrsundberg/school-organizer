@@ -126,6 +126,19 @@ export async function action({ request, context }: Route.ActionArgs) {
     const userId = String(form.get("userId") ?? "");
     if (!userId) return data({ error: "Missing user." }, { status: 400 });
     await revokePendingInvites(context, userId);
+    // Delete the user shell — it was never activated (mustChangePassword=true)
+    // and has no useful state. Deletion makes the row disappear immediately
+    // rather than lingering as a ghost "Invite pending" entry.
+    const db = getPrisma(context);
+    const shell = await db.user.findUnique({
+      where: { id: userId },
+      select: { mustChangePassword: true },
+    });
+    if (shell?.mustChangePassword) {
+      await db.session.deleteMany({ where: { userId } });
+      await db.account.deleteMany({ where: { userId } });
+      await db.user.delete({ where: { id: userId } });
+    }
     throw redirect("/platform/users");
   }
 
