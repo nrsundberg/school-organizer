@@ -48,9 +48,12 @@ export async function runStatusProbes(context: any): Promise<{
 
   const results: ProbeResult[] = settled.map((s, i) => {
     if (s.status === "fulfilled") return s.value;
+    // runProbe() has its own try/catch and should never reject, but if it
+    // does we cannot determine health — record "unknown" (neutral) rather
+    // than "outage" to avoid a false major-outage banner.
     return {
       componentId: cronComponents[i]!.id,
-      status: "outage",
+      status: "unknown",
       latencyMs: null,
       detail: `probe rejected: ${String(s.reason).slice(0, 400)}`,
     };
