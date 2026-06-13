@@ -51,12 +51,16 @@ export async function runProbe(
       }
     }
   } catch (err) {
+    // An unexpected throw means we could not determine health — record
+    // "unknown" (neutral) rather than "outage" so that infrastructure
+    // hiccups, missing bindings that slipped past the per-probe guard, or
+    // transient network errors don't show up as a false major outage.
     const message = err instanceof Error ? err.message : String(err);
     return {
       componentId: component.id,
-      status: "outage",
+      status: "unknown",
       latencyMs: Date.now() - started,
-      detail: `probe threw: ${message}`.slice(0, 500),
+      detail: `probe error (status undetermined): ${message}`.slice(0, 500),
     };
   }
 }
