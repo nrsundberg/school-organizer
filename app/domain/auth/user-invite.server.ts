@@ -69,6 +69,32 @@ export type InviteTokenLookup =
   | { ok: true; tokenId: string; userId: string; expiresAt: Date }
   | { ok: false; reason: "not-found" | "used" | "expired" | "revoked" };
 
+/** Shape of a raw DB row returned by `userInviteToken.findFirst`. */
+export type InviteTokenRow = {
+  id: string;
+  userId: string;
+  expiresAt: Date;
+  usedAt: Date | null;
+  revokedAt: Date | null;
+};
+
+/**
+ * Pure validation: given a raw DB row (or null) and the current time,
+ * return the same discriminated union that `lookupInviteToken` returns.
+ * Extracted so the validity rules can be unit-tested without a DB
+ * connection.
+ */
+export function checkInviteTokenRow(
+  row: InviteTokenRow | null,
+  now: Date = new Date(),
+): InviteTokenLookup {
+  if (!row) return { ok: false, reason: "not-found" };
+  if (row.usedAt) return { ok: false, reason: "used" };
+  if (row.revokedAt) return { ok: false, reason: "revoked" };
+  if (row.expiresAt <= now) return { ok: false, reason: "expired" };
+  return { ok: true, tokenId: row.id, userId: row.userId, expiresAt: row.expiresAt };
+}
+
 /**
  * Look up an invite token by its raw value. Does NOT mark it used. Use
  * this from the GET handler to decide between rendering the form or an
@@ -82,11 +108,7 @@ export async function lookupInviteToken(
   if (!rawToken) return { ok: false, reason: "not-found" };
   const tokenHash = await sha256Hex(rawToken);
   const row = await db.userInviteToken.findFirst({ where: { tokenHash } });
-  if (!row) return { ok: false, reason: "not-found" };
-  if (row.usedAt) return { ok: false, reason: "used" };
-  if (row.revokedAt) return { ok: false, reason: "revoked" };
-  if (row.expiresAt <= new Date()) return { ok: false, reason: "expired" };
-  return { ok: true, tokenId: row.id, userId: row.userId, expiresAt: row.expiresAt };
+  return checkInviteTokenRow(row);
 }
 
 export type ConsumeInviteResult =
