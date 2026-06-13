@@ -32,7 +32,7 @@ export default function DistrictLayout({ loaderData }: Route.ComponentProps) {
             <img
               src={district.logoUrl}
               alt=""
-              className="h-8 w-8 rounded"
+              className="h-8 w-8 rounded object-contain"
             />
           ) : null}
           <h1 className="text-xl font-bold">{district.name}</h1>

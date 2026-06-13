@@ -89,7 +89,7 @@ export default function ({
       <Link to="/" className={`${fgText} font-bold inline-flex items-center`}>
         {tenantLogo ? (
           <>
-            <img src={tenantLogo} alt={t("header.logoAlt", { orgName })} height={40} width={40} />
+            <img src={tenantLogo} alt={t("header.logoAlt", { orgName })} height={40} width={40} className="h-10 w-10 object-contain" />
             {t("header.tenantTitle", { orgName })}
           </>
         ) : (
@@ -150,7 +150,7 @@ export default function ({
       <Link to="/" className={`${fgText} font-bold inline-flex items-center`}>
         {tenantLogo ? (
           <>
-            <img src={tenantLogo} alt={t("header.logoAlt", { orgName })} height={40} width={40} />
+            <img src={tenantLogo} alt={t("header.logoAlt", { orgName })} height={40} width={40} className="h-10 w-10 object-contain" />
             {t("header.tenantTitle", { orgName })}
           </>
         ) : (
