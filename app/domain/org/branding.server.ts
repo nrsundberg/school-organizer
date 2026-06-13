@@ -30,6 +30,29 @@ export {
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 const ALLOWED_LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
+// ---------------------------------------------------------------------------
+// Custom domain validation
+// ---------------------------------------------------------------------------
+// Lowercase domain validator: one or more labels separated by dots, each label
+// starting and ending with an alphanumeric character.  Hyphens are allowed in
+// the middle.  The TLD must be at least two characters.
+export const CUSTOM_DOMAIN_RE = /^([a-z0-9](-?[a-z0-9])*\.)+[a-z]{2,}$/;
+
+/**
+ * Validates a candidate custom domain string.
+ * - Returns `null` when the value is valid (or empty — empty means "clear it").
+ * - Returns a user-facing error string on failure.
+ *
+ * Callers are responsible for normalising to lowercase before calling this.
+ */
+export function validateCustomDomain(raw: string): string | null {
+  if (raw === "") return null; // empty = clear, always valid
+  if (!CUSTOM_DOMAIN_RE.test(raw)) {
+    return "Invalid domain format. Use lowercase letters, numbers, and hyphens (e.g. myschool.example.com).";
+  }
+  return null;
+}
+
 export type OrgBranding = {
   orgId: string | null;
   orgName: string;

@@ -19,6 +19,7 @@ import {
   type InviteUserError,
 } from "~/domain/admin-users/invite-user.server";
 import { revokePendingInvites } from "~/domain/auth/user-invite.server";
+import { validateCustomDomain } from "~/domain/org/branding.server";
 
 export const meta: Route.MetaFunction = ({ data }) => [
   { title: data?.org ? `Platform — ${data.org.name}` : "Platform — Org" },
@@ -342,6 +343,41 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       return data({ ok: true });
     }
 
+    case "set-custom-domain": {
+      // Platform staff only: set or clear the custom domain for this org.
+      // Empty value = clear (set null). Validates format before writing.
+      const rawDomain = String(formData.get("customDomain") ?? "").trim().toLowerCase();
+      const validationError = validateCustomDomain(rawDomain);
+      if (validationError) {
+        return data({ ok: false, error: validationError }, { status: 400 });
+      }
+      const prevDomain = org.customDomain ?? null;
+      const nextDomain = rawDomain === "" ? null : rawDomain;
+      try {
+        await db.org.update({
+          where: { id: orgId },
+          data: { customDomain: nextDomain },
+        });
+      } catch (e: any) {
+        if (e?.code === "P2002") {
+          return data(
+            { ok: false, error: "That domain is in use by another org." },
+            { status: 400 },
+          );
+        }
+        throw e;
+      }
+      await recordOrgAudit({
+        context,
+        orgId,
+        actorUserId: actor.actorUserId ?? me?.id ?? null,
+        onBehalfOfUserId: actor.onBehalfOfUserId,
+        action: "branding.custom_domain",
+        payload: { from: prevDomain, to: nextDomain },
+      });
+      return data({ ok: true });
+    }
+
     case "impersonate": {
       const userId = String(formData.get("userId") ?? "").trim();
       if (!userId) {
@@ -537,17 +573,50 @@ export default function PlatformOrgDetail({
                 </a>
               </dd>
             </div>
-            {org.customDomain ? (
-              <div>
-                <dt className="text-white/50">Custom domain</dt>
-                <dd>{org.customDomain}</dd>
-              </div>
-            ) : null}
             <div>
               <dt className="text-white/50">PUBLIC_ROOT_DOMAIN</dt>
               <dd className="font-mono text-xs text-white/70">{publicRootDomain || "(empty → slug.localhost)"}</dd>
             </div>
           </dl>
+
+          {/* Custom domain management — platform staff only */}
+          <div className="mt-4 border-t border-white/10 pt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/50">
+              Custom domain
+            </p>
+            {org.customDomain ? (
+              <p className="mb-3 font-mono text-sm text-white">
+                {org.customDomain}
+              </p>
+            ) : (
+              <p className="mb-3 text-xs text-white/40">Not set</p>
+            )}
+            <Form method="post" className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="intent" value="set-custom-domain" />
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-white/50" htmlFor="customDomain">
+                  {org.customDomain ? "Change or clear domain" : "Set domain"}
+                </label>
+                <input
+                  id="customDomain"
+                  name="customDomain"
+                  type="text"
+                  defaultValue={org.customDomain ?? ""}
+                  placeholder="e.g. pickup.myschool.org (blank to clear)"
+                  className="app-field w-72"
+                />
+              </div>
+              <button
+                type="submit"
+                className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/20"
+              >
+                {org.customDomain ? "Update domain" : "Set domain"}
+              </button>
+            </Form>
+            <p className="mt-1.5 text-xs text-white/30">
+              Leave blank to clear the custom domain. DNS must point to pickuproster.com first.
+            </p>
+          </div>
         </div>
 
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
