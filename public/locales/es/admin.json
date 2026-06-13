@@ -43,10 +43,17 @@
       "primaryHex": "El color primario debe usar el formato hexadecimal completo, como #1A2B3C.",
       "secondaryHex": "El color secundario debe usar el formato hexadecimal completo, como #1A2B3C."
     },
+    "cropModal": {
+      "apply": "Aplicar recorte",
+      "cancel": "Cancelar",
+      "title": "Recortar logo",
+      "zoomLabel": "Zoom"
+    },
     "heading": "Branding",
     "logoLabel": "Logo (PNG, JPEG, WEBP hasta 2 MB)",
     "logoPreviewAlt": "Vista previa del logo",
-    "logoPreviewNote": "Vista previa (aún no guardada)",
+    "logoPreviewNote": "Vista previa (recortada y comprimida, aún no guardada)",
+    "logoPreviewSize": "{{kb}} KB",
     "metaTitle": "Configuración de branding",
     "overridingDefault": "Sobrescribiendo el predeterminado",
     "primaryColor": "Color primario",

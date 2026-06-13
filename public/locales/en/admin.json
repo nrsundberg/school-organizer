@@ -43,10 +43,17 @@
       "primaryHex": "Primary color must use full hex format like #1A2B3C.",
       "secondaryHex": "Secondary color must use full hex format like #1A2B3C."
     },
+    "cropModal": {
+      "apply": "Apply crop",
+      "cancel": "Cancel",
+      "title": "Crop logo",
+      "zoomLabel": "Zoom"
+    },
     "heading": "Branding",
     "logoLabel": "Logo (PNG, JPEG, WEBP up to 2MB)",
     "logoPreviewAlt": "Logo preview",
-    "logoPreviewNote": "Preview (not yet saved)",
+    "logoPreviewNote": "Preview (cropped & compressed, not yet saved)",
+    "logoPreviewSize": "{{kb}} KB",
     "metaTitle": "Branding Settings",
     "overridingDefault": "Overriding default",
     "primaryColor": "Primary color",

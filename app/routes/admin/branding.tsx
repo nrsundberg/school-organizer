@@ -1,9 +1,13 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, useNavigation } from "react-router";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Link, useNavigation, useSubmit } from "react-router";
 import { Button } from "@heroui/react";
 import { dataWithError, redirectWithSuccess } from "remix-toast";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/branding";
+
+// Lazily load the crop modal so the browser-only libs (react-easy-crop,
+// browser-image-compression, canvas) never execute during SSR.
+const LogoCropModal = lazy(() => import("~/components/LogoCropModal"));
 import { getPrisma } from "~/db.server";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getOrgFromContext } from "~/domain/utils/global-context.server";
@@ -177,9 +181,14 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function AdminBranding({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation("admin");
   const navigation = useNavigation();
+  const submit = useSubmit();
   const isPending = navigation.state === "submitting";
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [processedFile, setProcessedFile] = useState<File | null>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   // Live-preview values for the palette override pickers. `null` means
   // "no override set" — the swatch displays the default palette value.
@@ -195,25 +204,55 @@ export default function AdminBranding({ loaderData }: Route.ComponentProps) {
   const [resetPrimary, setResetPrimary] = useState(false);
   const [resetSecondary, setResetSecondary] = useState(false);
 
-  // Clean up object URL on unmount or when a new one is created
+  // Clean up object URLs on unmount or when a new one is created.
   useEffect(() => {
     return () => {
-      if (logoPreviewUrl) {
-        URL.revokeObjectURL(logoPreviewUrl);
-      }
+      if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl);
     };
   }, [logoPreviewUrl]);
 
+  useEffect(() => {
+    return () => {
+      if (cropSrc) URL.revokeObjectURL(cropSrc);
+    };
+  }, [cropSrc]);
+
   function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (logoPreviewUrl) {
-      URL.revokeObjectURL(logoPreviewUrl);
-    }
-    if (file) {
-      setLogoPreviewUrl(URL.createObjectURL(file));
-    } else {
-      setLogoPreviewUrl(null);
-    }
+    if (!file) return;
+    // Revoke any previous URLs.
+    if (logoPreviewUrl) URL.revokeObjectURL(logoPreviewUrl);
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    // Open the crop modal with the raw file.
+    setPendingFile(file);
+    setCropSrc(URL.createObjectURL(file));
+    setProcessedFile(null);
+    setLogoPreviewUrl(null);
+  }
+
+  function handleCropConfirm(cropped: File) {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
+    setPendingFile(null);
+    setProcessedFile(cropped);
+    setLogoPreviewUrl(URL.createObjectURL(cropped));
+  }
+
+  function handleCropCancel() {
+    if (cropSrc) URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
+    setPendingFile(null);
+    // Reset the file input so the user can pick again.
+    if (logoInputRef.current) logoInputRef.current.value = "";
+  }
+
+  function handleFormSubmit(e: React.FormEvent<HTMLFormElement>) {
+    if (!processedFile) return; // let RR handle normally (no logo selected)
+    e.preventDefault();
+    const raw = new FormData(e.currentTarget);
+    // Replace the raw file input value with our processed file.
+    raw.set("logo", processedFile, processedFile.name);
+    submit(raw, { method: "post", encType: "multipart/form-data" });
   }
 
   return (
@@ -245,7 +284,26 @@ export default function AdminBranding({ loaderData }: Route.ComponentProps) {
         )}
       </div>
 
-      <form method="post" encType="multipart/form-data" className="flex flex-col gap-5">
+      {/* Crop modal — rendered at root level so it overlays everything */}
+      {cropSrc && pendingFile && (
+        <Suspense fallback={null}>
+          <LogoCropModal
+            imageSrc={cropSrc}
+            originalFile={pendingFile}
+            onConfirm={handleCropConfirm}
+            onCancel={handleCropCancel}
+          />
+        </Suspense>
+      )}
+
+      <form
+        ref={formRef}
+        method="post"
+        encType="multipart/form-data"
+        className="flex flex-col gap-5"
+        onSubmit={handleFormSubmit}
+      >
+
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <label className="text-sm text-white/70 flex flex-col gap-2">
             {t("branding.primaryColor")}
@@ -328,15 +386,22 @@ export default function AdminBranding({ loaderData }: Route.ComponentProps) {
                   className="rounded border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
                 />
               </label>
-              {/* Browser-side logo preview before upload */}
-              {logoPreviewUrl && (
+              {/* Browser-side logo preview after crop+compress */}
+              {logoPreviewUrl && processedFile && (
                 <div className="mt-2 flex items-center gap-3">
                   <img
                     src={logoPreviewUrl}
                     alt={t("branding.logoPreviewAlt")}
                     className="h-14 w-14 rounded bg-black/20 object-contain border border-white/10"
                   />
-                  <span className="text-xs text-white/50">{t("branding.logoPreviewNote")}</span>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs text-white/50">{t("branding.logoPreviewNote")}</span>
+                    <span className="text-xs text-white/30">
+                      {t("branding.logoPreviewSize", {
+                        kb: Math.round(processedFile.size / 1024),
+                      })}
+                    </span>
+                  </div>
                 </div>
               )}
               {loaderData.logoUrl && !logoPreviewUrl ? (
