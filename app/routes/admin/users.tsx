@@ -49,7 +49,6 @@ import {
   findLinkedHouseholdsForUser,
   findPendingInviteByUser,
   loadLastActiveByUser,
-  loadPendingInviteIdsForOrg,
   loadRecentActivity,
   loadUserSessions,
   type UserActivityEntry,
@@ -93,9 +92,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     currentUserId: me.id,
   });
   const userIds = data.users.map((u) => u.id);
-  const [lastActiveMap, pendingInviteIds, householdsForCurrentUser] = await Promise.all([
+  const [lastActiveMap, householdsForCurrentUser] = await Promise.all([
     loadLastActiveByUser(prisma, userIds),
-    loadPendingInviteIdsForOrg(prisma, userIds),
     // Pre-load household options once (for invite drawer).
     prisma.household.findMany({
       where: { orgId: org.id },
@@ -119,7 +117,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
           : String(user.createdAt),
       lastActiveAt: last?.lastActiveAt ?? null,
       sessionCount: last?.sessionCount ?? 0,
-      pending: pendingInviteIds.has(user.id),
+      // A user is pending until they activate their account (set their
+      // password). mustChangePassword stays true from invite creation until
+      // the user completes set-password — independent of whether an open
+      // UserInviteToken still exists. This matches the platform page's
+      // definition and avoids false "Invite pending" after activation.
+      pending: user.mustChangePassword === true,
     };
   });
 
