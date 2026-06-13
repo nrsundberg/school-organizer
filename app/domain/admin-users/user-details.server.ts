@@ -233,18 +233,3 @@ export async function findPendingInviteByUser(
   };
 }
 
-/**
- * Returns the set of userIds with a still-pending invite (one query for
- * the index page so we can mark each row as "Pending").
- */
-export async function loadPendingInviteIdsForOrg(
-  prisma: DetailsPrisma,
-  userIds: string[],
-): Promise<Set<string>> {
-  if (userIds.length === 0) return new Set();
-  const invites = await prisma.userInviteToken.findMany({
-    where: { userId: { in: userIds }, usedAt: null, revokedAt: null },
-    select: { userId: true },
-  });
-  return new Set(invites.map((i) => i.userId));
-}

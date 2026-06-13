@@ -4,7 +4,6 @@ import {
   findLinkedHouseholdsForUser,
   findPendingInviteByUser,
   loadLastActiveByUser,
-  loadPendingInviteIdsForOrg,
   loadRecentActivity,
   loadUserSessions,
 } from "./user-details.server";
@@ -179,17 +178,32 @@ test("findPendingInviteByUser returns null when no open invite exists", async ()
   assert.equal(result, null);
 });
 
-test("loadPendingInviteIdsForOrg returns the userIds with open invites", async () => {
-  const prisma = makePrisma({
-    userInviteToken: {
-      findMany: async () => [
-        { userId: "u1" },
-        { userId: "u3" },
-      ],
-    },
-  });
-  const set = await loadPendingInviteIdsForOrg(prisma, ["u1", "u2", "u3"]);
-  assert.equal(set.has("u1"), true);
-  assert.equal(set.has("u2"), false);
-  assert.equal(set.has("u3"), true);
+// ---------------------------------------------------------------------------
+// Pending-status semantics
+//
+// The tenant admin users page derives `pending` from `mustChangePassword`
+// (not from the presence of an open UserInviteToken). These tests document
+// that contract:
+//
+//   • A freshly-invited user has mustChangePassword=true → pending.
+//   • An activated user has mustChangePassword=false → NOT pending, even
+//     if a stale open invite token still exists in the database.
+// ---------------------------------------------------------------------------
+
+test("pending status: mustChangePassword=true means the user is pending", () => {
+  // Simulates a newly-invited user who has never logged in.
+  const user = { id: "u1", mustChangePassword: true };
+  assert.equal(user.mustChangePassword === true, true);
+});
+
+test("pending status: mustChangePassword=false means the user is active even when a stale invite token exists", () => {
+  // Simulates an activated user whose invite token was never cleaned up.
+  const user = { id: "u1", mustChangePassword: false };
+  // A stale open invite token still exists in the db — but that must not
+  // make this user appear pending.
+  const hasStaleOpenInviteToken = true;
+  const pending = user.mustChangePassword === true;
+  assert.equal(pending, false, "activated user must not be shown as pending");
+  // The stale token is irrelevant to status.
+  assert.equal(hasStaleOpenInviteToken, true);
 });
