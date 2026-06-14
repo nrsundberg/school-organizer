@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { admin } from "better-auth/plugins";
 import { adminAc } from "better-auth/plugins/admin/access";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { getPrisma } from "~/db.server";
+import { getPrisma, requestKey } from "~/db.server";
 import { assertUserScopeXor } from "./user-scope.server";
 import {
   shouldShareAuthCookiesAcrossSubdomains,
@@ -44,19 +44,31 @@ function marketingHostsFromEnv(env: Record<string, string | undefined>): string[
     .filter(Boolean);
 }
 
-// Cache at module level — reused across requests within the same CF Worker isolate.
-// Keyed by env object reference so local dev (process.env) and prod (CF env) stay separate.
+// One auth instance **per request**, not per isolate. The instance captures
+// a Prisma client through prismaAdapter; caching it across requests would pin
+// the first request's client and reintroduce the cross-request promise
+// problem `db.server` avoids. Keyed on the same per-request `context` object
+// `getPrisma` uses, so auth and direct queries share one client within a
+// request and never leak across requests. WeakMap → collected with the
+// request context.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let cachedAuth: any = null;
-let cachedEnvRef: unknown = null;
+const REQUEST_AUTH = new WeakMap<object, any>();
 
-export function getAuth(context: any) {
-  const env = context?.cloudflare?.env ?? process.env;
-
-  if (cachedAuth && cachedEnvRef === env) {
-    return cachedAuth;
+export function getAuth(
+  context: any,
+  build: (context: any) => any = buildAuth,
+) {
+  const key = requestKey(context);
+  let auth = REQUEST_AUTH.get(key);
+  if (!auth) {
+    auth = build(context);
+    REQUEST_AUTH.set(key, auth);
   }
+  return auth;
+}
 
+function buildAuth(context: any) {
+  const env = context?.cloudflare?.env ?? process.env;
   const db = getPrisma(context);
   const isProduction = env.ENVIRONMENT !== "development";
   const envRecord = env as Record<string, string | undefined>;
@@ -309,8 +321,6 @@ export function getAuth(context: any) {
     ],
   });
 
-  cachedAuth = auth;
-  cachedEnvRef = env;
   return auth;
 }
 
