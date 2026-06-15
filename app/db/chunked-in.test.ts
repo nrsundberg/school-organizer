@@ -1,6 +1,26 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { D1_IN_CHUNK_SIZE, chunk, chunkedFindMany, groupBy } from "./chunked-in";
+import {
+  D1_IN_CHUNK_SIZE,
+  D1_MAX_BOUND_PARAMS,
+  chunk,
+  chunkedFindMany,
+  groupBy,
+} from "./chunked-in";
+
+test("a full chunk plus injected WHERE params stays under D1's bound-param cap", () => {
+  // The tenant extension wraps every read on a tenant model in
+  // `AND: [where, { orgId }]`, adding one bound param, and call sites add
+  // their own (e.g. households.tsx adds `isActive`). A fully-saturated chunk
+  // must leave room for these, or D1 throws "too many SQL variables".
+  // Regression for the duplicates page overflowing at chunk size 100 (#68).
+  const EXTRA_WHERE_PARAMS = 2; // orgId + one call-site filter
+  assert.ok(
+    D1_IN_CHUNK_SIZE + EXTRA_WHERE_PARAMS <= D1_MAX_BOUND_PARAMS,
+    `chunk size ${D1_IN_CHUNK_SIZE} + ${EXTRA_WHERE_PARAMS} extra params ` +
+      `exceeds D1 cap ${D1_MAX_BOUND_PARAMS}`,
+  );
+});
 
 test("chunk returns empty array for empty input", () => {
   assert.deepEqual(chunk([]), []);

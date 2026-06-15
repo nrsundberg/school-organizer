@@ -1,18 +1,26 @@
 /**
- * D1 caps the number of bound parameters per SQL statement. Cloudflare's
- * documented ceiling is 100; the engine accepts more in practice but is
- * not unlimited (we've observed failures around ~500). Any Prisma query
- * whose `IN (?, ?, …)` list scales with tenant size — including the
- * implicit `IN` Prisma generates when resolving an `include` relation —
- * will eventually overflow.
+ * D1 caps the number of bound parameters per SQL statement at 100 (Cloudflare's
+ * documented hard limit). Any Prisma query whose `IN (?, ?, …)` list scales with
+ * tenant size — including the implicit `IN` Prisma generates when resolving an
+ * `include` relation — will eventually overflow.
  *
- * Use these helpers any time a query's parameter count is not statically
- * bounded. The chunk size is deliberately conservative so a single chunk
- * always fits even when other `WHERE` conditions add a handful more vars
- * (e.g. the tenant extension's `orgId` filter).
+ * Use these helpers any time a query's parameter count is not statically bounded.
+ *
+ * The chunk size MUST be strictly below the cap, because the bound params for
+ * the `IN` list are not the only ones in the statement: the tenant extension
+ * wraps every read in `AND: [where, { orgId }]` (+1 param), and call sites add
+ * their own filters (e.g. `isActive`). A chunk size of exactly 100 overflowed
+ * by one as soon as a chunk filled completely — the duplicates page, with
+ * hundreds of involved households, hit this on its very first chunk (#68 set
+ * the size to the cap; this leaves headroom instead).
  */
 
-export const D1_IN_CHUNK_SIZE = 100;
+export const D1_MAX_BOUND_PARAMS = 100;
+
+/** Headroom for params D1 adds beyond the IN list (orgId + a couple call-site filters). */
+const RESERVED_PARAMS = 10;
+
+export const D1_IN_CHUNK_SIZE = D1_MAX_BOUND_PARAMS - RESERVED_PARAMS;
 
 export function chunk<T>(
   items: readonly T[],
