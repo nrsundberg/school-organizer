@@ -30,21 +30,25 @@ export async function loader({ context, params }: Route.LoaderArgs) {
   if (!templateId) {
     throw new Response("Not found", { status: 404 });
   }
-  const template = await prisma.drillTemplate.findFirst({
-    where: { id: templateId },
-    select: { id: true, name: true, definition: true },
-  });
+  // The template lookup and the most-recent-run lookup share no data
+  // dependency, so run them concurrently. (Migration 0021 dropped the
+  // unique-on-templateId constraint — see admin/drills.$templateId.run.tsx for
+  // the same treatment — so we use findFirst ordered by updatedAt to get the
+  // most recent run.) One Prisma client per request makes this safe.
+  const [template, run] = await Promise.all([
+    prisma.drillTemplate.findFirst({
+      where: { id: templateId },
+      select: { id: true, name: true, definition: true },
+    }),
+    prisma.drillRun.findFirst({
+      where: { templateId },
+      orderBy: { updatedAt: "desc" },
+      select: { state: true },
+    }),
+  ]);
   if (!template) {
     throw new Response("Not found", { status: 404 });
   }
-  // Migration 0021 dropped the unique-on-templateId constraint (see
-  // admin/drills.$templateId.run.tsx for the same treatment) — use findFirst
-  // ordered by updatedAt to get the most recent run.
-  const run = await prisma.drillRun.findFirst({
-    where: { templateId },
-    orderBy: { updatedAt: "desc" },
-    select: { state: true },
-  });
   const state = run ? parseRunState(run.state) : emptyRunState();
   const printLocale = getOrgDefaultLocale(context);
   return { template, state, printLocale };
