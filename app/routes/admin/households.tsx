@@ -21,6 +21,7 @@ import {
   parseStudentIds,
   studentDisplayName,
 } from "~/domain/households/households";
+import { groupDuplicateHouseholds } from "~/domain/households/merge.server";
 import {
   DISMISSAL_PLANS,
   dateRangeFromSearchParams,
@@ -40,6 +41,7 @@ import StatusPill from "~/components/admin/StatusPill";
 import EntityLink from "~/components/admin/EntityLink";
 import StatCard from "~/components/admin/StatCard";
 import SectionHeader from "~/components/admin/SectionHeader";
+import DuplicateHouseholdsBanner from "~/components/admin/DuplicateHouseholdsBanner";
 
 export const handle = { i18n: ["admin", "errors", "common"] };
 
@@ -427,8 +429,18 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       ? totalHouseholds / HOUSEHOLDS_PAGE_SIZE
       : filteredHouseholds.length / HOUSEHOLDS_PAGE_SIZE),
   );
+
+  // Count pickup spaces that have more than one household (duplicates created
+  // by the pre-fix importer). Drives the dismissible banner on this page.
+  const householdsWithSpace = await prisma.household.findMany({
+    where: { spaceNumber: { not: null } },
+    select: { id: true, spaceNumber: true, createdAt: true },
+  });
+  const duplicateSpaceCount = groupDuplicateHouseholds(householdsWithSpace).length;
+
   return {
     metaTitle: t("households.metaTitle"),
+    duplicateSpaceCount,
     households: filteredHouseholds,
     householdOptions,
     pagination: {
@@ -718,6 +730,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
     programs,
     recentCancellations,
     stats,
+    duplicateSpaceCount,
   } = loaderData;
   const { t, i18n } = useTranslation("admin");
   const [createOpen, setCreateOpen] = useState(false);
@@ -730,6 +743,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      <DuplicateHouseholdsBanner count={duplicateSpaceCount} />
       {/* Header */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
