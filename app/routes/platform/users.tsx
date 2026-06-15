@@ -19,29 +19,30 @@ export async function loader({ context }: Route.LoaderArgs) {
   await requirePlatformAdmin(context);
   const db = getPrisma(context) as any;
 
-  const platformAdmins = await db.user.findMany({
-    where: { role: "PLATFORM_ADMIN" },
-    orderBy: { createdAt: "asc" },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      mustChangePassword: true,
-      createdAt: true,
-    },
-  });
-
   // Pending invites for any platform admin shell that hasn't accepted.
-  const pendingByUser = await db.userInviteToken.findMany({
-    where: {
-      usedAt: null,
-      revokedAt: null,
-      expiresAt: { gt: new Date() },
-      user: { role: "PLATFORM_ADMIN" },
-    },
-    orderBy: { createdAt: "desc" },
-    select: { userId: true, expiresAt: true, createdAt: true },
-  });
+  const [platformAdmins, pendingByUser] = await Promise.all([
+    db.user.findMany({
+      where: { role: "PLATFORM_ADMIN" },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        mustChangePassword: true,
+        createdAt: true,
+      },
+    }),
+    db.userInviteToken.findMany({
+      where: {
+        usedAt: null,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+        user: { role: "PLATFORM_ADMIN" },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { userId: true, expiresAt: true, createdAt: true },
+    }),
+  ]);
 
   const pendingMap = new Map<
     string,
