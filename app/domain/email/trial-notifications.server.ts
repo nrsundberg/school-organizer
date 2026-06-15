@@ -1,4 +1,5 @@
 import { getPrisma } from "~/db.server";
+import { startOfUtcDay } from "~/domain/dismissal/schedule";
 import { enqueueEmails } from "./queue.server";
 import type { EmailMessage } from "./types";
 
@@ -21,17 +22,17 @@ export async function runTrialEmailNotifications(context: any): Promise<{
   const db = getPrisma(context);
   const now = new Date();
 
-  const expiringCounts = await enqueueTrialExpiring(db, now, context);
-  const checkinCount = await enqueueMidTrialCheckins(db, now, context);
+  // Independent windows over disjoint org sets with idempotent SentEmail
+  // records — safe to enqueue concurrently on the per-request Prisma client.
+  const [expiringCounts, checkinCount] = await Promise.all([
+    enqueueTrialExpiring(db, now, context),
+    enqueueMidTrialCheckins(db, now, context),
+  ]);
 
   return { trialExpiring: expiringCounts, midTrialCheckin: checkinCount };
 }
 
 // ---- helpers ----
-
-function startOfUtcDay(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-}
 
 function addDaysUtc(d: Date, days: number): Date {
   const out = new Date(d);

@@ -55,12 +55,12 @@ export async function provisionSchoolForDistrict(
   const input = validateSchoolProvisioningInput(args.input);
   const db = getPrisma(context);
 
-  const slugTaken = await db.org.findUnique({
-    where: { slug: input.schoolSlug },
-  });
+  // Both are independent reads taken before any write — run concurrently.
+  const [slugTaken, beforeCount] = await Promise.all([
+    db.org.findUnique({ where: { slug: input.schoolSlug } }),
+    getDistrictSchoolCount(context, args.district.id),
+  ]);
   if (slugTaken) throw new Error("That school slug is already in use.");
-
-  const beforeCount = await getDistrictSchoolCount(context, args.district.id);
 
   const org = await db.org.create({
     data: {

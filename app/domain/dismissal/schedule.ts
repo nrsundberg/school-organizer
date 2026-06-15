@@ -52,6 +52,11 @@ export function endOfUtcDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
 }
 
+/** UTC midnight at the start of `date`'s calendar day. */
+export function startOfUtcDay(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
 export function toDateInputValue(value: Date | string | null | undefined): string {
   if (!value) return "";
   const date = value instanceof Date ? value : new Date(value);

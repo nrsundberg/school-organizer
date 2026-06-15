@@ -1,5 +1,6 @@
 import type { MidTrialCheckinMessage, RenderedEmail } from "../types";
 import { getFixedT } from "~/lib/t.server";
+import { escapeHtml, firstNameOrFallback } from "../html";
 
 /**
  * Day ~14 check-in, founder voice.
@@ -53,20 +54,4 @@ ${signOff}
 ${signOffTitle}`;
 
   return { subject, html, text };
-}
-
-function firstNameOrFallback(
-  name: string | null | undefined,
-  fallback: string,
-): string {
-  if (!name) return fallback;
-  const first = name.trim().split(/\s+/)[0];
-  return first || fallback;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
