@@ -96,11 +96,11 @@
     "noChildren": "No hay niños en esta clase.",
     "pageHeader": {
       "eyebrow": "Lista",
-      "subtitle": "Explora aulas por grado, accede a registros de estudiantes y mantén tu lista al día.",
-      "title": "Niños y aulas"
+      "subtitle": "Explora aulas por grado, asigna niveles de grado y accede a registros de estudiantes.",
+      "title": "Aulas"
     },
     "search": {
-      "placeholder": "Buscar estudiantes o aulas"
+      "placeholder": "Buscar aulas o maestros"
     },
     "stats": {
       "allPlaced": "Todos los estudiantes están asignados",
@@ -114,6 +114,34 @@
     "table": {
       "name": "Nombre",
       "space": "Espacio #"
+    }
+  },
+  "childrenList": {
+    "card": {
+      "household": "Hogar",
+      "noClassroom": "Sin aula",
+      "noHousehold": "Sin hogar",
+      "viewDetail": "Ver estudiante"
+    },
+    "header": {
+      "subtitle": "Busca por nombre o aula y abre el registro de un estudiante.",
+      "title": "Niños"
+    },
+    "list": {
+      "empty": "Aún no hay estudiantes. Agrega un niño o importa tu lista.",
+      "heading": "Estudiantes",
+      "noResults": "Ningún estudiante coincide con «{{query}}»."
+    },
+    "search": {
+      "clear": "Limpiar",
+      "label": "Buscar estudiantes",
+      "placeholder": "Buscar por nombre o aula"
+    },
+    "stats": {
+      "allStudents": "Todos los estudiantes",
+      "matching": "Coincidencias con «{{query}}»",
+      "showing": "Mostrando",
+      "totalStudents": "Total de estudiantes"
     }
   },
   "create": {
@@ -1101,7 +1129,8 @@
   "sidebar": {
     "billing": "Facturación",
     "branding": "Branding",
-    "children": "Niños y clases",
+    "children": "Niños",
+    "classrooms": "Aulas",
     "dashboard": "Panel",
     "drills": "Simulacros",
     "history": "Historial",

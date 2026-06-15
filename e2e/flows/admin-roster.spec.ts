@@ -26,7 +26,7 @@
  */
 import { test, expect } from "../fixtures/seeded-tenant";
 
-test.describe("@flow admin-roster — create student + see it on /admin/children", () => {
+test.describe("@flow admin-roster — create student + see it on /admin/classrooms", () => {
   test("admin seeds student and roster reflects homeroom", async ({ page, tenant }) => {
     await page.context().addCookies([tenant.adminCookie]);
 
@@ -52,9 +52,12 @@ test.describe("@flow admin-roster — create student + see it on /admin/children
       page.getByRole("button", { name: /Create Student/i }).click(),
     ]);
 
-    // Verify the student appears under the expected homeroom on /admin/children.
-    await page.goto(tenant.tenantUrl("/admin/children"));
-    await expect(page.getByRole("heading", { name: /Children|Classes/i }).first()).toBeVisible();
+    // Verify the student appears under the expected homeroom on /admin/classrooms.
+    // The expandable homeroom cards now live on the Classrooms page (the old
+    // combined /admin/children page was split into Classrooms + a lighter
+    // Children student list).
+    await page.goto(tenant.tenantUrl("/admin/classrooms"));
+    await expect(page.getByRole("heading", { name: /Classrooms/i }).first()).toBeVisible();
 
     // Click the homeroom row to expand it, then assert the student row.
     const homeroomRow = page.getByRole("button", { name: new RegExp(tenant.homeroomName) });
