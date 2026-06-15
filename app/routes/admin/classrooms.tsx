@@ -30,6 +30,7 @@ import {
   type GradeLevel,
 } from "~/domain/children/grade";
 import { buildRoomIndex } from "~/domain/children/classroom-roster";
+import { chunkedFindMany } from "~/db/chunked-in";
 import { EntityAvatar, initialsFromName } from "~/components/admin/EntityAvatar";
 import { StatusPill } from "~/components/admin/StatusPill";
 import { EntityLink } from "~/components/admin/EntityLink";
@@ -149,13 +150,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const householdIds = Array.from(
     new Set(allStudents.map((s) => s.householdId).filter((id): id is string => !!id)),
   );
-  const households =
-    householdIds.length === 0
-      ? []
-      : await prisma.household.findMany({
-          where: { id: { in: householdIds } },
-          select: { id: true, name: true },
-        });
+  // `householdIds` is distinct households across the whole roster, so it is not
+  // statically bounded — a direct `id: { in: householdIds }` overflows D1's
+  // 100-bound-param cap (the tenant extension adds orgId too). Chunk the IN.
+  const households = await chunkedFindMany(householdIds, (idChunk) =>
+    prisma.household.findMany({
+      where: { id: { in: idChunk } },
+      select: { id: true, name: true },
+    }),
+  );
   const householdNameById = new Map(households.map((h) => [h.id, h.name]));
 
   // Index per-student exceptions. Household-scoped exceptions cascade to

@@ -5,6 +5,7 @@ import type { Route } from "./+types/children";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getTenantPrisma } from "~/domain/utils/global-context.server";
 import { gradeLabel, type GradeLevel } from "~/domain/children/grade";
+import { chunkedFindMany } from "~/db/chunked-in";
 import { EntityAvatar, initialsFromName } from "~/components/admin/EntityAvatar";
 import { StatusPill } from "~/components/admin/StatusPill";
 import { EntityLink } from "~/components/admin/EntityLink";
@@ -36,9 +37,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const q = (url.searchParams.get("q") ?? "").trim();
 
   // Lighter than the classrooms page: a single searchable card grid. Even a
-  // 600-student school is <60kB on the wire, so no pagination. We join the
-  // classroom (teacher) for the grade-anchored link and the household for its
-  // name + pickup space number.
+  // 600-student school is <60kB on the wire, so no pagination.
+  //
+  // We deliberately do NOT use nested relation `select`s for teacher/household.
+  // Prisma resolves those with an implicit `WHERE id IN (…all distinct ids…)`
+  // query, and with hundreds of distinct households that overflows D1's
+  // 100-bound-param cap ("too many SQL variables"). Instead fetch the scalar
+  // rows, then load each relation via chunked IN queries and stitch in JS.
   const studentsRaw = await prisma.student.findMany({
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     select: {
@@ -46,22 +51,48 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       firstName: true,
       lastName: true,
       homeRoom: true,
-      teacher: { select: { id: true, homeRoom: true, gradeLevel: true } },
-      household: { select: { id: true, name: true, spaceNumber: true } },
+      householdId: true,
     },
   });
 
-  const students: StudentCard[] = studentsRaw.map((s) => ({
-    id: s.id,
-    firstName: s.firstName,
-    lastName: s.lastName,
-    homeRoom: s.homeRoom,
-    classroomId: s.teacher?.id ?? null,
-    classroomGrade: (s.teacher?.gradeLevel as GradeLevel | null) ?? null,
-    householdId: s.household?.id ?? null,
-    householdName: s.household?.name ?? null,
-    spaceNumber: s.household?.spaceNumber ?? null,
-  }));
+  const householdIds = [
+    ...new Set(studentsRaw.map((s) => s.householdId).filter((id): id is string => id != null)),
+  ];
+  const homeRooms = [
+    ...new Set(studentsRaw.map((s) => s.homeRoom).filter((r): r is string => r != null)),
+  ];
+
+  const householdRows = await chunkedFindMany(householdIds, (idChunk) =>
+    prisma.household.findMany({
+      where: { id: { in: idChunk } },
+      select: { id: true, name: true, spaceNumber: true },
+    }),
+  );
+  const teacherRows = await chunkedFindMany(homeRooms, (roomChunk) =>
+    prisma.teacher.findMany({
+      where: { homeRoom: { in: roomChunk } },
+      select: { id: true, homeRoom: true, gradeLevel: true },
+    }),
+  );
+
+  const householdById = new Map(householdRows.map((h) => [h.id, h]));
+  const teacherByHomeRoom = new Map(teacherRows.map((t) => [t.homeRoom, t]));
+
+  const students: StudentCard[] = studentsRaw.map((s) => {
+    const teacher = s.homeRoom != null ? teacherByHomeRoom.get(s.homeRoom) : undefined;
+    const household = s.householdId != null ? householdById.get(s.householdId) : undefined;
+    return {
+      id: s.id,
+      firstName: s.firstName,
+      lastName: s.lastName,
+      homeRoom: s.homeRoom,
+      classroomId: teacher?.id ?? null,
+      classroomGrade: (teacher?.gradeLevel as GradeLevel | null) ?? null,
+      householdId: household?.id ?? null,
+      householdName: household?.name ?? null,
+      spaceNumber: household?.spaceNumber ?? null,
+    };
+  });
 
   // Search matches first/last name OR homeRoom (case-insensitive).
   const lowerQ = q.toLowerCase();
