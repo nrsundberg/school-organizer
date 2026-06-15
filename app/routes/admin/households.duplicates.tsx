@@ -1,4 +1,4 @@
-import { Form, Link, redirect } from "react-router";
+import { Form, Link } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { redirectWithSuccess, redirectWithError } from "remix-toast";
 import type { Route } from "./+types/households.duplicates";
@@ -98,6 +98,16 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (!survivorId || losingIds.length === 0) {
     return redirectWithError("/admin/households/duplicates", "Nothing to merge.");
+  }
+
+  // Guard against a crafted POST that lists the survivor among the losers —
+  // mergeHouseholdGroup would reassign the survivor's rows to itself and then
+  // delete it. The UI never does this, but the action must not trust the form.
+  if (losingIds.includes(survivorId)) {
+    return redirectWithError(
+      "/admin/households/duplicates",
+      "Invalid merge: the surviving household cannot also be a losing one.",
+    );
   }
 
   const scalars: HouseholdScalars = {

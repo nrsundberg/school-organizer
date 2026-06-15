@@ -84,7 +84,10 @@ export async function mergeHouseholdGroup(
   prisma: MergePrisma,
   input: MergeHouseholdGroupInput,
 ): Promise<void> {
-  for (const losingId of input.losingIds) {
+  // Never let the survivor appear among the losers — that would reassign its
+  // rows to itself and then delete it. Defensive: callers should not do this.
+  const losingIds = input.losingIds.filter((id) => id !== input.survivorId);
+  for (const losingId of losingIds) {
     await prisma.student.updateMany({
       where: { householdId: losingId },
       data: { householdId: input.survivorId },
@@ -99,6 +102,6 @@ export async function mergeHouseholdGroup(
     data: input.scalars,
   });
   await prisma.household.deleteMany({
-    where: { id: { in: input.losingIds } },
+    where: { id: { in: losingIds } },
   });
 }

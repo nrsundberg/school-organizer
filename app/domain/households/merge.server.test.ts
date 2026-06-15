@@ -135,3 +135,18 @@ test("mergeHouseholdGroup: deletes losers only AFTER reassigning their rows", as
   const deleteIdx = fake.calls.indexOf("household.deleteMany");
   assert.ok(deleteIdx > lastReassign, "deleteMany must run after all reassignments");
 });
+
+test("mergeHouseholdGroup: never deletes the survivor even if it appears in losingIds", async () => {
+  const fake = makeMergeFake();
+  await mergeHouseholdGroup(fake.prisma, {
+    ...baseInput,
+    losingIds: ["survivor", "lose1"],
+  });
+
+  assert.deepEqual(fake.deleted, ["lose1"], "survivor must be filtered out of the delete set");
+  assert.deepEqual(
+    fake.studentReassigned,
+    [{ from: "lose1", to: "survivor" }],
+    "survivor must not have its own rows reassigned to itself",
+  );
+});
