@@ -1,4 +1,5 @@
 import { getPrisma } from "~/db.server";
+import { startOfUtcDay } from "~/domain/dismissal/schedule";
 import { COMPONENTS } from "./components";
 
 // Typed as any for the same reason as runner.server.ts — `prisma generate`
@@ -141,12 +142,6 @@ async function safeStatusRead<T>(
     console.warn(`status page read failed; rendering unknown status (${code})`);
     return fallback;
   }
-}
-
-function startOfUtcDay(d: Date): Date {
-  return new Date(
-    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
-  );
 }
 
 function addDaysUtc(d: Date, days: number): Date {

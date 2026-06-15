@@ -1,5 +1,5 @@
 import type { PrismaClient } from "~/db";
-import { toDateInputValue } from "~/domain/dismissal/schedule";
+import { startOfUtcDay, toDateInputValue } from "~/domain/dismissal/schedule";
 
 export type HouseholdsDetailPrisma = Pick<
   PrismaClient,
@@ -247,12 +247,6 @@ async function findLinkedAdmin(
   });
   if (matches.length !== 1) return null;
   return matches[0];
-}
-
-function startOfUtcDay(date: Date): Date {
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
-  );
 }
 
 function exceptionActiveOn(

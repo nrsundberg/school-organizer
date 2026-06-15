@@ -1,5 +1,6 @@
 import type { RenderedEmail, WelcomeMessage } from "../types";
 import { getFixedT } from "~/lib/t.server";
+import { escapeHtml, firstNameOrFallback } from "../html";
 
 /**
  * Founder-voice welcome email (Variant A — gratitude-led). Replies land in
@@ -58,20 +59,4 @@ ${signOffTitle}`;
     // Route replies to the founder's personal inbox.
     replyTo: "noahsundberg@gmail.com",
   };
-}
-
-function firstNameOrFallback(
-  name: string | null | undefined,
-  fallback: string,
-): string {
-  if (!name) return fallback;
-  const first = name.trim().split(/\s+/)[0];
-  return first || fallback;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }
