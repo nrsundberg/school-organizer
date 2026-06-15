@@ -97,15 +97,15 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   if (!id) {
     throw new Response("Not found", { status: 404 });
   }
-  const view = await loadHouseholdForAdminDetail(prisma, {
-    householdId: id,
-    orgId: org.id,
-  });
+  // The household detail load and locale resolution don't depend on each
+  // other, so run them concurrently within this request.
+  const [view, t] = await Promise.all([
+    loadHouseholdForAdminDetail(prisma, { householdId: id, orgId: org.id }),
+    detectLocale(request, context).then((locale) => getFixedT(locale, "admin")),
+  ]);
   if (!view) {
     throw new Response("Not found", { status: 404 });
   }
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
   return {
     metaTitle: t("households.detail.metaTitle", { name: view.summary.name }),
     view,

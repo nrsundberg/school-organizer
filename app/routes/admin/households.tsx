@@ -25,6 +25,7 @@ import { groupDuplicateHouseholds } from "~/domain/households/merge.server";
 import {
   DISMISSAL_PLANS,
   dateRangeFromSearchParams,
+  exceptionActiveOn,
   parseDateOnly,
   parseOptionalDateOnly,
   toDateInputValue,
@@ -114,50 +115,11 @@ function initialsFromPersonName(first: string, last: string): string {
   return `${a}${b}` || "?";
 }
 
-function startOfUtcDay(date: Date): Date {
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
-  );
-}
-
-/**
- * Returns true if the given exception is "active today" — either a DATE row
- * matching today's UTC day or a WEEKLY row whose `dayOfWeek` matches today
- * and whose optional starts/ends window contains today.
- */
-function exceptionActiveOn(
-  exception: {
-    scheduleKind: string;
-    exceptionDate: Date | null;
-    dayOfWeek: number | null;
-    startsOn: Date | null;
-    endsOn: Date | null;
-  },
-  today: Date,
-): boolean {
-  const dayStart = startOfUtcDay(today);
-  if (exception.scheduleKind === "DATE") {
-    if (!exception.exceptionDate) return false;
-    return startOfUtcDay(exception.exceptionDate).getTime() === dayStart.getTime();
-  }
-  if (exception.dayOfWeek == null) return false;
-  if (today.getUTCDay() !== exception.dayOfWeek) return false;
-  if (exception.startsOn && dayStart.getTime() < startOfUtcDay(exception.startsOn).getTime()) {
-    return false;
-  }
-  if (exception.endsOn && dayStart.getTime() > startOfUtcDay(exception.endsOn).getTime()) {
-    return false;
-  }
-  return true;
-}
-
 export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const url = new URL(request.url);
   const roiRange = dateRangeFromSearchParams(url);
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
 
   // Pagination + name search. Schools can grow into the hundreds of
   // households; loading them all on one page is both slow and unusable.
@@ -189,6 +151,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     recentCancellations,
     studentsAssignedCount,
     allActiveExceptions,
+    t,
   ] = await Promise.all([
     prisma.household.findMany({
       where: householdSearchWhere,
@@ -263,6 +226,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         householdId: true,
       },
     }),
+    // Locale/translations are independent of every query above; resolve them
+    // in the same concurrent batch (the locale→getFixedT chain stays ordered).
+    detectLocale(request, context).then((locale) => getFixedT(locale, "admin")),
   ]);
 
   type HouseholdStudentRow = {
@@ -411,17 +377,30 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }),
   );
 
-  // Stats row aggregates — totals are org-wide (not paginated).
-  const householdsMissingContactCount = await prisma.household.count({
-    where: {
-      OR: [
-        { primaryContactName: null },
-        { primaryContactName: "" },
-        { primaryContactPhone: null },
-        { primaryContactPhone: "" },
-      ],
-    },
-  });
+  // Two org-wide aggregates for the page chrome: the "missing contact" stat
+  // count and the set of space-assigned households used to detect duplicates.
+  // They're independent of each other (and of the paginated data above), so
+  // fetch them concurrently within this request.
+  const [householdsMissingContactCount, householdsWithSpace] =
+    await Promise.all([
+      // Stats row aggregate — totals are org-wide (not paginated).
+      prisma.household.count({
+        where: {
+          OR: [
+            { primaryContactName: null },
+            { primaryContactName: "" },
+            { primaryContactPhone: null },
+            { primaryContactPhone: "" },
+          ],
+        },
+      }),
+      // Count pickup spaces that have more than one household (duplicates
+      // created by the pre-fix importer). Drives the dismissible banner.
+      prisma.household.findMany({
+        where: { spaceNumber: { not: null } },
+        select: { id: true, spaceNumber: true, createdAt: true },
+      }),
+    ]);
 
   const totalPages = Math.max(
     1,
@@ -430,12 +409,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       : filteredHouseholds.length / HOUSEHOLDS_PAGE_SIZE),
   );
 
-  // Count pickup spaces that have more than one household (duplicates created
-  // by the pre-fix importer). Drives the dismissible banner on this page.
-  const householdsWithSpace = await prisma.household.findMany({
-    where: { spaceNumber: { not: null } },
-    select: { id: true, spaceNumber: true, createdAt: true },
-  });
   const duplicateSpaceCount = groupDuplicateHouseholds(householdsWithSpace).length;
 
   return {

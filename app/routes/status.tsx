@@ -35,10 +35,12 @@ export function headers() {
 }
 
 export async function loader({ request, context }: LoaderFunctionArgs) {
-  const data = await getStatusPageData(context);
   // Localize meta tags at the edge — the meta() helper runs before the
   // component mounts so we can't use useTranslation there.
-  const locale = await detectLocale(request, context);
+  const [data, locale] = await Promise.all([
+    getStatusPageData(context),
+    detectLocale(request, context),
+  ]);
   const t = await getFixedT(locale, "common");
   return {
     ...data,

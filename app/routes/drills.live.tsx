@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@heroui/react";
 import { AlertTriangle, ArrowLeft, Check, Pause, Play, Plus, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { dataWithError, dataWithSuccess } from "remix-toast";
+import { btnDanger, btnGhost, btnPrimary, btnSecondary } from "~/lib/button-classes";
 import type { Route } from "./+types/drills.live";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
@@ -70,15 +71,6 @@ export function formatActorLabel(
   if (a && o) return `${a} as ${o}`;
   return a || o || fallback;
 }
-
-const btnPrimary =
-  "inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-const btnSecondary =
-  "inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-const btnDanger =
-  "inline-flex items-center justify-center rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-const btnGhost =
-  "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = getOptionalUserFromContext(context);
@@ -324,14 +316,16 @@ export async function action({ request, context }: Route.ActionArgs) {
         audit.userAgent,
       );
       if (env) {
-        await broadcastDrillUpdate(env, org.id, {
-          id: updated.id,
-          status: "PAUSED",
-          audience: updated.audience,
-          state: updated.state,
-          updatedAtIso: updated.updatedAt.toISOString(),
-        });
-        await broadcastDrillActivity(env, org.id, runId, [synthEvent("paused")]);
+        await Promise.all([
+          broadcastDrillUpdate(env, org.id, {
+            id: updated.id,
+            status: "PAUSED",
+            audience: updated.audience,
+            state: updated.state,
+            updatedAtIso: updated.updatedAt.toISOString(),
+          }),
+          broadcastDrillActivity(env, org.id, runId, [synthEvent("paused")]),
+        ]);
       }
       return dataWithSuccess(null, t("drillsLive.toasts.paused"));
     }
@@ -347,14 +341,16 @@ export async function action({ request, context }: Route.ActionArgs) {
         audit.userAgent,
       );
       if (env) {
-        await broadcastDrillUpdate(env, org.id, {
-          id: updated.id,
-          status: "LIVE",
-          audience: updated.audience,
-          state: updated.state,
-          updatedAtIso: updated.updatedAt.toISOString(),
-        });
-        await broadcastDrillActivity(env, org.id, runId, [synthEvent("resumed")]);
+        await Promise.all([
+          broadcastDrillUpdate(env, org.id, {
+            id: updated.id,
+            status: "LIVE",
+            audience: updated.audience,
+            state: updated.state,
+            updatedAtIso: updated.updatedAt.toISOString(),
+          }),
+          broadcastDrillActivity(env, org.id, runId, [synthEvent("resumed")]),
+        ]);
       }
       return dataWithSuccess(null, t("drillsLive.toasts.resumed"));
     }
@@ -382,8 +378,10 @@ export async function action({ request, context }: Route.ActionArgs) {
         audit.userAgent,
       );
       if (env) {
-        await broadcastDrillActivity(env, org.id, runId, [synthEvent("ended")]);
-        await broadcastDrillEnded(env, org.id, runId);
+        await Promise.all([
+          broadcastDrillActivity(env, org.id, runId, [synthEvent("ended")]),
+          broadcastDrillEnded(env, org.id, runId),
+        ]);
       }
       // After ending, the user no longer needs the takeover. Send them home.
       throw redirect("/");
@@ -409,36 +407,41 @@ export async function action({ request, context }: Route.ActionArgs) {
         audit.userAgent,
       );
       if (env) {
-        await broadcastDrillUpdate(
-          env,
-          org.id,
-          {
-            id: updated.id,
-            status: updated.status as "LIVE" | "PAUSED" | "ENDED",
-            audience: updated.audience,
-            state: updated.state,
-            updatedAtIso: updated.updatedAt.toISOString(),
-          },
-          clientId,
-        );
-        if (events.length > 0) {
-          await broadcastDrillActivity(
+        const broadcasts: Promise<unknown>[] = [
+          broadcastDrillUpdate(
             env,
             org.id,
-            runId,
-            events.map((ev) => ({
-              id: ev.id,
-              runId: ev.runId,
-              kind: ev.kind,
-              payload: ev.payload,
-              actorUserId: ev.actorUserId,
-              actorLabel,
-              onBehalfOfUserId: ev.onBehalfOfUserId,
-              onBehalfOfLabel,
-              occurredAtIso: ev.occurredAt.toISOString(),
-            })),
+            {
+              id: updated.id,
+              status: updated.status as "LIVE" | "PAUSED" | "ENDED",
+              audience: updated.audience,
+              state: updated.state,
+              updatedAtIso: updated.updatedAt.toISOString(),
+            },
+            clientId,
+          ),
+        ];
+        if (events.length > 0) {
+          broadcasts.push(
+            broadcastDrillActivity(
+              env,
+              org.id,
+              runId,
+              events.map((ev) => ({
+                id: ev.id,
+                runId: ev.runId,
+                kind: ev.kind,
+                payload: ev.payload,
+                actorUserId: ev.actorUserId,
+                actorLabel,
+                onBehalfOfUserId: ev.onBehalfOfUserId,
+                onBehalfOfLabel,
+                occurredAtIso: ev.occurredAt.toISOString(),
+              })),
+            ),
           );
         }
+        await Promise.all(broadcasts);
       }
       // No toast — the page renders an inline "Saving…/Saved" indicator
       // instead. Returning a non-null body so fetcher.data signals

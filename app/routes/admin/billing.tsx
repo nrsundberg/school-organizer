@@ -3,8 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/billing";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getOptionalOrgFromContext } from "~/domain/utils/global-context.server";
-import { getFixedT } from "~/lib/t.server";
-import { detectLocale } from "~/i18n.server";
+import { getAdminT } from "~/lib/t.server";
 
 export const handle = { i18n: ["admin"] };
 
@@ -31,8 +30,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const isComped =
     !!org?.compedUntil && new Date(org.compedUntil) > now;
 
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
 
   return {
     metaTitle: t("billing.metaTitle"),

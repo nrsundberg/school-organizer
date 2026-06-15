@@ -1,4 +1,5 @@
 import type { UserInviteMessage, RenderedEmail } from "../types";
+import { escapeAttr, escapeHtml, firstNameOrFallback } from "../html";
 
 /**
  * Transactional invite email. Single CTA — the magic link to set a
@@ -65,24 +66,4 @@ ${didNotExpect}`;
     html,
     text,
   };
-}
-
-function firstNameOrFallback(
-  name: string | null | undefined,
-  fallback: string,
-): string {
-  if (!name) return fallback;
-  const first = name.trim().split(/\s+/)[0];
-  return first || fallback;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-function escapeAttr(s: string): string {
-  return escapeHtml(s).replace(/"/g, "&quot;");
 }

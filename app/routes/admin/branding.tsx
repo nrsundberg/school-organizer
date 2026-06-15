@@ -20,8 +20,7 @@ import {
   validateLogoUpload,
 } from "~/domain/org/branding.server";
 import { planAllowsAdvancedBranding } from "~/lib/plan-limits";
-import { getFixedT } from "~/lib/t.server";
-import { detectLocale } from "~/i18n.server";
+import { getAdminT } from "~/lib/t.server";
 
 export const handle = { i18n: ["admin", "common"] };
 
@@ -40,8 +39,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     primaryColor?: string | null;
     secondaryColor?: string | null;
   };
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
   return {
     metaTitle: t("branding.metaTitle"),
     orgName: org.name,
@@ -64,8 +62,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const org = getOrgFromContext(context);
   const db = getPrisma(context);
 
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
 
   const formData = await request.formData();
   const brandColor = String(formData.get("brandColor") ?? "").trim();

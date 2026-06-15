@@ -56,8 +56,7 @@ import {
   type UserSessionInfo,
 } from "~/domain/admin-users/user-details.server";
 import { assertNotAlreadyImpersonating } from "~/domain/auth/impersonate-gate.server";
-import { detectLocale } from "~/i18n.server";
-import { getFixedT } from "~/lib/t.server";
+import { getAdminT } from "~/lib/t.server";
 import type { TFunction } from "i18next";
 import { EntityAvatar, deriveInitials } from "~/components/admin/EntityAvatar";
 import { StatusPill, type PillTone } from "~/components/admin/StatusPill";
@@ -138,8 +137,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         : null,
   }));
 
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
   return {
     users: usersWithMeta,
     locks: locksSerialized,
@@ -164,8 +162,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const auth = getAuth(context);
   const formData = await request.formData();
   const org = getOrgFromContext(context);
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, ["admin", "errors"]);
+  const t = await getAdminT(request, context, ["admin", "errors"]);
 
   const action = String(formData.get("action") ?? "");
 
@@ -271,14 +268,19 @@ export async function action({ request, context }: Route.ActionArgs) {
       }
       throw err;
     }
-    const target = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, name: true, email: true, role: true },
-    });
+    // The target lookup and the current-session read share no data
+    // dependency, so run them concurrently (both are reads; one client per
+    // request makes this safe).
+    const [target, session] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, name: true, email: true, role: true },
+      }),
+      auth.api.getSession({ headers: request.headers }),
+    ]);
     if (!target) {
       return dataWithError(null, t("admin:users.errors.userNotFound"));
     }
-    const session = await auth.api.getSession({ headers: request.headers });
     const currentSessionId = session?.session?.id ?? null;
     const [households, sessions, recentActivity, pendingInvite] = await Promise.all([
       findLinkedHouseholdsForUser(prisma, {

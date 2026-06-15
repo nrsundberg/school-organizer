@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Plus, Printer, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills.$templateId.run";
+import { btnGhost, btnPrimary, btnSecondary } from "~/lib/button-classes";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import {
   getActorIdsFromContext,
@@ -29,13 +30,6 @@ import { detectLocale } from "~/i18n.server";
 
 export const handle = { i18n: ["admin", "common"] };
 
-const btnPrimary =
-  "inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-const btnSecondary =
-  "inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-const btnGhost =
-  "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-
 export const meta: Route.MetaFunction = ({ data }) => [
   { title: data?.metaTitle ?? (data?.template ? `Run – ${data.template.name}` : "Run checklist") },
 ];
@@ -48,21 +42,28 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   if (!templateId) {
     throw new Response("Not found", { status: 404 });
   }
-  const template = await prisma.drillTemplate.findFirst({
-    where: { id: templateId, deletedAt: null },
-    select: { id: true, name: true, definition: true, updatedAt: true },
-  });
+  // The template lookup, the most-recent-run lookup, and the locale resolution
+  // share no data dependency, so run them concurrently. (Migration 0021 dropped
+  // the unique-on-templateId constraint to allow run history, so we look up the
+  // most recent run via findFirst instead of findUnique.) One Prisma client per
+  // request makes the parallel reads safe.
+  const [template, run0, locale] = await Promise.all([
+    prisma.drillTemplate.findFirst({
+      where: { id: templateId, deletedAt: null },
+      select: { id: true, name: true, definition: true, updatedAt: true },
+    }),
+    prisma.drillRun.findFirst({
+      where: { templateId },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, state: true, updatedAt: true },
+    }),
+    detectLocale(request, context),
+  ]);
   if (!template) {
     throw new Response("Not found", { status: 404 });
   }
 
-  // Migration 0021 dropped the unique-on-templateId constraint to allow run
-  // history, so we look up the most recent run (if any) instead of findUnique.
-  let run = await prisma.drillRun.findFirst({
-    where: { templateId },
-    orderBy: { updatedAt: "desc" },
-    select: { id: true, state: true, updatedAt: true },
-  });
+  let run = run0;
   if (!run) {
     const orgId = getOrgFromContext(context).id;
     const seeded = seedRunStateFromTemplate(parseTemplateDefinition(template.definition));
@@ -78,7 +79,6 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
     });
   }
 
-  const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
 
   const me = getOptionalUserFromContext(context);

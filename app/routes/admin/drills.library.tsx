@@ -2,14 +2,14 @@ import { Form, Link, redirect } from "react-router";
 import { ArrowLeft, Check, Library } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills.library";
+import { btnPrimary } from "~/lib/button-classes";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 import { GLOBAL_TEMPLATES, getGlobalTemplate } from "~/domain/drills/library";
 import { DRILL_TYPE_LABELS, type DrillType } from "~/domain/drills/types";
 import { cloneGlobalTemplateToOrg } from "~/domain/drills/clone.server";
 import { dataWithError } from "remix-toast";
-import { getFixedT } from "~/lib/t.server";
-import { detectLocale } from "~/i18n.server";
+import { getAdminT } from "~/lib/t.server";
 
 export const handle = { i18n: ["admin", "common"] };
 
@@ -17,8 +17,8 @@ export const meta: Route.MetaFunction = ({ data }) => [
   { title: data?.metaTitle ?? "Admin – Drill template library" },
 ];
 
-const btnPrimary =
-  "inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+// `btnSecondary` here intentionally omits `disabled:cursor-not-allowed`, so it
+// stays local; only the shared `btnPrimary` is imported.
 const btnSecondary =
   "inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50";
 
@@ -39,8 +39,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       clonedByKey[row.globalKey] = row.id;
     }
   }
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
   return {
     templates: GLOBAL_TEMPLATES,
     clonedByKey,
@@ -56,8 +55,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
 
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
 
   if (intent === "clone") {
     const globalKey = String(formData.get("globalKey") ?? "").trim();

@@ -62,18 +62,23 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     ...new Set(studentsRaw.map((s) => s.homeRoom).filter((r): r is string => r != null)),
   ];
 
-  const householdRows = await chunkedFindMany(householdIds, (idChunk) =>
-    prisma.household.findMany({
-      where: { id: { in: idChunk } },
-      select: { id: true, name: true, spaceNumber: true },
-    }),
-  );
-  const teacherRows = await chunkedFindMany(homeRooms, (roomChunk) =>
-    prisma.teacher.findMany({
-      where: { homeRoom: { in: roomChunk } },
-      select: { id: true, homeRoom: true, gradeLevel: true },
-    }),
-  );
+  // Household and teacher lookups are independent — both derive only from the
+  // already-loaded student rows — so resolve them concurrently within this
+  // request. Each keeps its own chunked IN to stay under D1's param cap.
+  const [householdRows, teacherRows] = await Promise.all([
+    chunkedFindMany(householdIds, (idChunk) =>
+      prisma.household.findMany({
+        where: { id: { in: idChunk } },
+        select: { id: true, name: true, spaceNumber: true },
+      }),
+    ),
+    chunkedFindMany(homeRooms, (roomChunk) =>
+      prisma.teacher.findMany({
+        where: { homeRoom: { in: roomChunk } },
+        select: { id: true, homeRoom: true, gradeLevel: true },
+      }),
+    ),
+  ]);
 
   const householdById = new Map(householdRows.map((h) => [h.id, h]));
   const teacherByHomeRoom = new Map(teacherRows.map((t) => [t.homeRoom, t]));

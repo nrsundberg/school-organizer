@@ -3,8 +3,7 @@ import { Form, Link, redirect, useSearchParams } from "react-router";
 import { Trans, useTranslation } from "react-i18next";
 import { Button, Input, TextArea } from "@heroui/react";
 import { dataWithError, dataWithSuccess } from "remix-toast";
-import { detectLocale } from "~/i18n.server";
-import { getFixedT } from "~/lib/t.server";
+import { getAdminT } from "~/lib/t.server";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -91,28 +90,32 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
   );
   const dow = now.getUTCDay();
-  const todaysException = await prisma.dismissalException.findFirst({
-    where: {
-      isActive: true,
-      OR: [
-        { studentId: student.id },
-        student.householdId ? { householdId: student.householdId } : { id: "__none__" },
-      ],
-      AND: {
+  // Today's exception is scoped to this student/household; the classroom list
+  // for the move dropdown is independent of it. They both only depend on the
+  // already-loaded `student`, so resolve them concurrently within this request.
+  const [todaysException, classrooms] = await Promise.all([
+    prisma.dismissalException.findFirst({
+      where: {
+        isActive: true,
         OR: [
-          { scheduleKind: "DATE", exceptionDate: todayUtc },
-          { scheduleKind: "WEEKLY", dayOfWeek: dow },
+          { studentId: student.id },
+          student.householdId ? { householdId: student.householdId } : { id: "__none__" },
         ],
+        AND: {
+          OR: [
+            { scheduleKind: "DATE", exceptionDate: todayUtc },
+            { scheduleKind: "WEEKLY", dayOfWeek: dow },
+          ],
+        },
       },
-    },
-    orderBy: [{ updatedAt: "desc" }],
-  });
-
-  // Classrooms list for the move-classroom dropdown.
-  const classrooms = await prisma.teacher.findMany({
-    orderBy: [{ gradeLevel: "asc" }, { homeRoom: "asc" }],
-    select: { id: true, homeRoom: true, gradeLevel: true },
-  });
+      orderBy: [{ updatedAt: "desc" }],
+    }),
+    // Classrooms list for the move-classroom dropdown.
+    prisma.teacher.findMany({
+      orderBy: [{ gradeLevel: "asc" }, { homeRoom: "asc" }],
+      select: { id: true, homeRoom: true, gradeLevel: true },
+    }),
+  ]);
 
   return {
     metaTitle: `${student.firstName} ${student.lastName}`,
@@ -162,8 +165,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const org = getOrgFromContext(context);
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
   const studentId = Number(params.studentId);
   if (!Number.isInteger(studentId)) {
     return dataWithError(null, t("students.errors.invalidId"));

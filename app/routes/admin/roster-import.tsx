@@ -29,8 +29,7 @@ import {
 } from "~/domain/utils/global-context.server";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { redirectWithSuccess } from "remix-toast";
-import { detectLocale } from "~/i18n.server";
-import { getFixedT } from "~/lib/t.server";
+import { getAdminT } from "~/lib/t.server";
 
 export const handle = { i18n: ["admin", "errors", "common"] };
 
@@ -90,8 +89,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     prisma.student.count(),
     prisma.teacher.count(),
   ]);
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
 
   return {
     studentCount,
@@ -132,8 +130,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const org = getOrgFromContext(context);
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "preview");
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
 
   if (intent === "preview") {
     const file = formData.get("file");
@@ -226,9 +223,14 @@ export async function action({ request, context }: Route.ActionArgs) {
       );
     }
     const summary = result.data;
-    const freshOrg = await prisma.org.findUnique({ where: { id: org.id } });
+    // Both reads key off org.id and don't depend on each other, so fetch them
+    // concurrently before reconciling the grace period (one Prisma client per
+    // request makes this safe).
+    const [freshOrg, nextCounts] = await Promise.all([
+      prisma.org.findUnique({ where: { id: org.id } }),
+      countOrgUsage(prisma, org.id),
+    ]);
     if (freshOrg) {
-      const nextCounts = await countOrgUsage(prisma, org.id);
       await syncUsageGracePeriod(prisma, freshOrg, nextCounts);
     }
 

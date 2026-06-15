@@ -30,28 +30,31 @@ export async function loader({ request, context, params }: Route.LoaderArgs) {
   }
 
   const sort = new URL(request.url).searchParams.get("sort") === "space" ? "space" : "name";
-  const studentsRaw = await prisma.student.findMany({
-    where: { homeRoom: teacher.homeRoom },
-    orderBy:
-      sort === "space"
-        ? [{ household: { spaceNumber: "asc" } }, { lastName: "asc" }, { firstName: "asc" }]
-        : [{ lastName: "asc" }, { firstName: "asc" }],
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      household: { select: { spaceNumber: true } },
-    },
-  });
+  // The roster query and the print-locale resolution share no data dependency,
+  // so run them concurrently (one Prisma client per request makes this safe).
+  // Print locale rule: teacher.locale wins, else org.defaultLocale.
+  const [studentsRaw, printLocale] = await Promise.all([
+    prisma.student.findMany({
+      where: { homeRoom: teacher.homeRoom },
+      orderBy:
+        sort === "space"
+          ? [{ household: { spaceNumber: "asc" } }, { lastName: "asc" }, { firstName: "asc" }]
+          : [{ lastName: "asc" }, { firstName: "asc" }],
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        household: { select: { spaceNumber: true } },
+      },
+    }),
+    getTeacherPrintLocale(context, teacherId),
+  ]);
   const students = studentsRaw.map((s) => ({
     id: s.id,
     firstName: s.firstName,
     lastName: s.lastName,
     spaceNumber: s.household?.spaceNumber ?? null,
   }));
-
-  // Print locale rule: teacher.locale wins, else org.defaultLocale.
-  const printLocale = await getTeacherPrintLocale(context, teacherId);
 
   return {
     homeRoom: teacher.homeRoom,

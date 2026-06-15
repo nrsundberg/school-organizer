@@ -5,8 +5,7 @@ import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getTenantPrisma } from "~/domain/utils/global-context.server";
 import { SectionHeader } from "~/components/admin/SectionHeader";
 import { StatusPill } from "~/components/admin/StatusPill";
-import { getFixedT } from "~/lib/t.server";
-import { detectLocale } from "~/i18n.server";
+import { getAdminT } from "~/lib/t.server";
 import type { Route } from "./+types/print.index";
 
 export const handle = { i18n: ["admin", "common"] };
@@ -35,8 +34,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       select: { id: true, name: true },
     }),
   ]);
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
   return {
     metaTitle: t("printables.metaTitle"),
     teachers,

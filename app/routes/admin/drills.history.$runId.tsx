@@ -17,11 +17,10 @@ import {
   parseDrillMode,
   parseRunState,
   parseTemplateDefinition,
-  type DrillAudience,
-  type DrillMode,
   type DrillRunStatus,
   type RunState,
 } from "~/domain/drills/types";
+import { AudienceChip, ModeChip, StatusChip } from "~/components/admin/DrillChips";
 import { synthesizeLifecycleEvents } from "~/domain/drills/replay";
 import { ChecklistTable } from "~/domain/drills/ChecklistTable";
 import { ReplayTimeline } from "~/domain/drills/ReplayTimeline";
@@ -36,8 +35,7 @@ import {
 } from "~/domain/drills/useDrillReplay";
 import { parseIntent } from "~/lib/forms.server";
 import { dataWithError, dataWithSuccess } from "remix-toast";
-import { getFixedT } from "~/lib/t.server";
-import { detectLocale } from "~/i18n.server";
+import { getAdminT } from "~/lib/t.server";
 import { formatDurationSeconds } from "./drills.history";
 
 export const handle = { i18n: ["admin", "common"] };
@@ -79,30 +77,32 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
     ? Math.max(0, Math.round((end.getTime() - start.getTime()) / 1000))
     : null;
 
-  // Latest-run check so we only show the "Print" link when the print page
-  // (which always renders the most recent run for the template) matches the
-  // run we're viewing.
-  const latest = await prisma.drillRun.findFirst({
-    where: { templateId: run.templateId },
-    orderBy: { updatedAt: "desc" },
-    select: { id: true },
-  });
+  // Once the run is loaded these three reads share no data dependency on one
+  // another (they key off run.templateId / runId), so issue them concurrently.
+  //   - latest: latest-run check so we only show the "Print" link when the
+  //     print page (which always renders the most recent run for the template)
+  //     matches the run we're viewing.
+  //   - rawEvents: every event for this run, so the replay feed can resolve
+  //     names instead of raw IDs (actor lookup happens below).
+  //   - rawPresenceSamples: presence snapshots written every 30s by the
+  //     BingoBoardDO alarm while the drill was LIVE. ~120 rows for an hour of
+  //     drill regardless of viewer count, so an unbounded query is fine here.
+  const [latest, rawEvents, rawPresenceSamples] = await Promise.all([
+    prisma.drillRun.findFirst({
+      where: { templateId: run.templateId },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true },
+    }),
+    prisma.drillRunEvent.findMany({
+      where: { runId },
+      orderBy: { occurredAt: "asc" },
+    }),
+    prisma.drillRunPresenceSample.findMany({
+      where: { runId },
+      orderBy: { occurredAt: "asc" },
+    }),
+  ]);
   const isLatestForTemplate = latest?.id === run.id;
-
-  // Pull every event for this run, plus the unique users who acted on it, so
-  // the replay feed can show names instead of raw IDs.
-  const rawEvents = await prisma.drillRunEvent.findMany({
-    where: { runId },
-    orderBy: { occurredAt: "asc" },
-  });
-
-  // Presence snapshots written every 30s by the BingoBoardDO alarm while
-  // the drill was LIVE. ~120 rows for an hour of drill regardless of
-  // viewer count, so an unbounded query is fine here.
-  const rawPresenceSamples = await prisma.drillRunPresenceSample.findMany({
-    where: { runId },
-    orderBy: { occurredAt: "asc" },
-  });
 
   const actorIds = [
     ...new Set(
@@ -193,8 +193,7 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
     }
   }
 
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
 
   // Translate raw DrillRunPresenceSample rows into the relative-ms shape
   // ReplayViewerTrack expects. The `viewers` column is `Json` in Prisma,
@@ -283,8 +282,7 @@ export async function action({ context, params, request }: Route.ActionArgs) {
   const prisma = getTenantPrisma(context);
   const org = getOrgFromContext(context);
   const runId = params.runId;
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
   if (!runId) {
     return dataWithError(null, t("drillsHistory.signoff.errors.missingId"));
   }
@@ -325,70 +323,6 @@ export async function action({ context, params, request }: Route.ActionArgs) {
   }
 
   return dataWithError(null, t("drillsHistory.signoff.errors.unknown"));
-}
-
-function StatusChip({ status }: { status: DrillRunStatus }) {
-  const { t } = useTranslation("admin");
-  const cls =
-    status === "LIVE"
-      ? "bg-rose-600/20 text-rose-200 border border-rose-500/40"
-      : status === "PAUSED"
-        ? "bg-amber-500/20 text-amber-200 border border-amber-500/40"
-        : status === "ENDED"
-          ? "bg-emerald-600/20 text-emerald-200 border border-emerald-500/40"
-          : "bg-white/10 text-white/70 border border-white/20";
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}
-    >
-      {status === "LIVE" && (
-        <span
-          aria-hidden="true"
-          className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse"
-        />
-      )}
-      {t(`drillsHistory.status.${status}`)}
-    </span>
-  );
-}
-
-/**
- * Visual badge for the run's mode. Real events get a high-contrast amber
- * treatment so a glance at the history list makes it obvious which rows are
- * actual incidents vs planned drills.
- */
-function ModeChip({ mode }: { mode: DrillMode }) {
-  const { t } = useTranslation("admin");
-  const cls =
-    mode === "ACTUAL"
-      ? "bg-amber-500/25 text-amber-100 border border-amber-400/50"
-      : mode === "FALSE_ALARM"
-        ? "bg-purple-500/20 text-purple-100 border border-purple-400/40"
-        : "bg-white/10 text-white/70 border border-white/20";
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}
-    >
-      {t(`drills.mode.${mode === "ACTUAL" ? "actualShort" : mode === "FALSE_ALARM" ? "falseAlarmShort" : "drillShort"}`)}
-    </span>
-  );
-}
-
-function AudienceChip({ audience }: { audience: DrillAudience }) {
-  const { t } = useTranslation("admin");
-  const cls =
-    audience === "STAFF_ONLY"
-      ? "bg-blue-500/20 text-blue-200 border border-blue-500/40"
-      : "bg-white/10 text-white/70 border border-white/20";
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}
-    >
-      {audience === "STAFF_ONLY"
-        ? t("drillsHistory.replay.audience.staffOnly")
-        : t("drillsHistory.replay.audience.everyone")}
-    </span>
-  );
 }
 
 export default function AdminDrillsHistoryReplay({

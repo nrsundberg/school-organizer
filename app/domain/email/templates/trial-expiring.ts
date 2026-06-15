@@ -1,6 +1,7 @@
 import type { RenderedEmail, TrialExpiringMessage } from "../types";
 import { getFixedT } from "~/lib/t.server";
 import type { TFunction } from "i18next";
+import { escapeHtml, firstNameOrFallback } from "../html";
 
 /**
  * Trial-expiring copy has three variants keyed off `daysLeft` (7 / 3 / 1).
@@ -170,20 +171,4 @@ ${signOff}
 ${signOffTitle}`;
 
   return { subject, html, text };
-}
-
-function firstNameOrFallback(
-  name: string | null | undefined,
-  fallback: string,
-): string {
-  if (!name) return fallback;
-  const first = name.trim().split(/\s+/)[0];
-  return first || fallback;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
 }

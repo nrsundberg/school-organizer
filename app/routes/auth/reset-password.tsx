@@ -39,12 +39,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const rawToken = url.searchParams.get("token")?.trim() ?? "";
   const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "auth");
+  // The token read doesn't depend on i18n, so run it concurrently with the
+  // translator load when a token is present.
+  const [t, lookup] = await Promise.all([
+    getFixedT(locale, "auth"),
+    rawToken ? lookupPasswordResetToken(context, rawToken) : Promise.resolve(null),
+  ]);
   const metaTitle = t("resetPassword.metaTitle");
-  if (!rawToken) {
+  if (!rawToken || lookup === null) {
     return { state: "invalid" as const, token: "", metaTitle };
   }
-  const lookup = await lookupPasswordResetToken(context, rawToken);
   if (!lookup.ok) {
     return { state: "invalid" as const, token: "", reason: lookup.reason, metaTitle };
   }

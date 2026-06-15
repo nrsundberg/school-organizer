@@ -1,5 +1,6 @@
 import type { PasswordResetMessage, RenderedEmail } from "../types";
 import { getFixedT } from "~/lib/t.server";
+import { escapeAttr, escapeHtml, firstNameOrFallback } from "../html";
 
 /**
  * Transactional password reset. One CTA: the reset link. We intentionally
@@ -61,24 +62,4 @@ ${didNotRequest}`;
     text,
     // No replyTo override — replies go to the default From address.
   };
-}
-
-function firstNameOrFallback(
-  name: string | null | undefined,
-  fallback: string,
-): string {
-  if (!name) return fallback;
-  const first = name.trim().split(/\s+/)[0];
-  return first || fallback;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-function escapeAttr(s: string): string {
-  return escapeHtml(s).replace(/"/g, "&quot;");
 }
