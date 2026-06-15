@@ -37,3 +37,68 @@ export function groupDuplicateHouseholds<T extends HouseholdLite>(households: T[
       }),
     );
 }
+
+export type HouseholdScalars = {
+  name: string;
+  pickupNotes: string | null;
+  primaryContactName: string | null;
+  primaryContactPhone: string | null;
+};
+
+export type MergeHouseholdGroupInput = {
+  survivorId: string;
+  losingIds: string[];
+  scalars: HouseholdScalars;
+};
+
+/** Structural slice of Prisma used by the merge. */
+export type MergePrisma = {
+  student: {
+    updateMany: (args: {
+      where: { householdId: string };
+      data: { householdId: string };
+    }) => Promise<unknown>;
+  };
+  dismissalException: {
+    updateMany: (args: {
+      where: { householdId: string };
+      data: { householdId: string };
+    }) => Promise<unknown>;
+  };
+  household: {
+    update: (args: { where: { id: string }; data: HouseholdScalars }) => Promise<unknown>;
+    deleteMany: (args: { where: { id: { in: string[] } } }) => Promise<unknown>;
+  };
+};
+
+/**
+ * Merge duplicate households into one survivor.
+ *
+ * Order matters and is intentional: D1 has no interactive transactions here, so
+ * we reassign every loser's students and dismissal exceptions to the survivor
+ * FIRST, then delete the losers LAST. Deleting first would trip the schema's
+ * `onDelete` rules (Student.householdId -> SetNull, DismissalException -> Cascade)
+ * and lose the very rows we mean to move.
+ */
+export async function mergeHouseholdGroup(
+  prisma: MergePrisma,
+  input: MergeHouseholdGroupInput,
+): Promise<void> {
+  for (const losingId of input.losingIds) {
+    await prisma.student.updateMany({
+      where: { householdId: losingId },
+      data: { householdId: input.survivorId },
+    });
+    await prisma.dismissalException.updateMany({
+      where: { householdId: losingId },
+      data: { householdId: input.survivorId },
+    });
+  }
+  await prisma.household.update({
+    where: { id: input.survivorId },
+    data: input.scalars,
+  });
+  await prisma.household.deleteMany({
+    where: { id: { in: input.losingIds } },
+  });
+}
