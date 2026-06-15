@@ -3,8 +3,7 @@ import { Form, Link, redirect, useSearchParams } from "react-router";
 import { Trans, useTranslation } from "react-i18next";
 import { Button, Input, TextArea } from "@heroui/react";
 import { dataWithError, dataWithSuccess } from "remix-toast";
-import { detectLocale } from "~/i18n.server";
-import { getFixedT } from "~/lib/t.server";
+import { getAdminT } from "~/lib/t.server";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -166,8 +165,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const org = getOrgFromContext(context);
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
   const studentId = Number(params.studentId);
   if (!Number.isInteger(studentId)) {
     return dataWithError(null, t("students.errors.invalidId"));

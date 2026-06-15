@@ -2,6 +2,7 @@ import { Form, Link, redirect } from "react-router";
 import { ClipboardList, History, Library, Radio, StopCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills";
+import { btnPrimary } from "~/lib/button-classes";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import {
   getActorIdsFromContext,
@@ -26,8 +27,7 @@ import {
 } from "~/lib/broadcast.server";
 import { computeCadenceStatus, type CadenceStatus } from "~/domain/drills/cadence";
 import { dataWithError, dataWithSuccess } from "remix-toast";
-import { getFixedT } from "~/lib/t.server";
-import { detectLocale } from "~/i18n.server";
+import { getAdminT } from "~/lib/t.server";
 
 export const handle = { i18n: ["admin", "common"] };
 
@@ -35,8 +35,9 @@ export const meta: Route.MetaFunction = ({ data }) => [
   { title: data?.metaTitle ?? "Admin – Drill checklists" },
 ];
 
-const btnPrimary =
-  "inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+// `btnSecondary` here intentionally omits `disabled:cursor-not-allowed` and
+// `btnGhostDanger` is a one-off rose tint, so both stay local; only the shared
+// `btnPrimary` is imported.
 const btnSecondary =
   "inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50";
 const btnGhostDanger =
@@ -119,8 +120,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         templateName: activeRunRow.template?.name ?? "(deleted template)",
       }
     : null;
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
   return {
     templates: templatesWithCadence,
     activeRun,
@@ -134,8 +134,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
 
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
 
   if (intent === "create") {
     const name = String(formData.get("name") ?? "").trim();

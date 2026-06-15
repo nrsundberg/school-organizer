@@ -48,6 +48,7 @@ export function parseOptionalDateOnly(raw: string | null | undefined, fieldName 
   return value ? parseDateOnly(value, fieldName) : null;
 }
 
+/** UTC end-of-day (23:59:59.999) of `date`'s calendar day. */
 export function endOfUtcDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
 }
@@ -55,6 +56,42 @@ export function endOfUtcDay(date: Date): Date {
 /** UTC midnight at the start of `date`'s calendar day. */
 export function startOfUtcDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+/** Minimal shape of a dismissal-exception row needed to test "active today". */
+export type ExceptionActivityWindow = {
+  scheduleKind: string;
+  exceptionDate: Date | null;
+  dayOfWeek: number | null;
+  startsOn: Date | null;
+  endsOn: Date | null;
+};
+
+/**
+ * Returns true if `exception` is "active" on the given `today` (compared in
+ * UTC day terms): either a DATE row whose `exceptionDate` is the same UTC day,
+ * or a WEEKLY row whose `dayOfWeek` matches and whose optional `startsOn`/
+ * `endsOn` window contains the day. Shared by the households index and the
+ * admin dashboard so their "exceptions today" views always agree.
+ */
+export function exceptionActiveOn(
+  exception: ExceptionActivityWindow,
+  today: Date,
+): boolean {
+  const dayStart = startOfUtcDay(today);
+  if (exception.scheduleKind === "DATE") {
+    if (!exception.exceptionDate) return false;
+    return startOfUtcDay(exception.exceptionDate).getTime() === dayStart.getTime();
+  }
+  if (exception.dayOfWeek == null) return false;
+  if (today.getUTCDay() !== exception.dayOfWeek) return false;
+  if (exception.startsOn && dayStart.getTime() < startOfUtcDay(exception.startsOn).getTime()) {
+    return false;
+  }
+  if (exception.endsOn && dayStart.getTime() > startOfUtcDay(exception.endsOn).getTime()) {
+    return false;
+  }
+  return true;
 }
 
 export function toDateInputValue(value: Date | string | null | undefined): string {

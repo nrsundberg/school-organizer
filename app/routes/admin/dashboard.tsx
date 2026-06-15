@@ -42,73 +42,17 @@ import {
 import { broadcastBoardReset } from "~/lib/broadcast.server";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
+import {
+  endOfUtcDay,
+  exceptionActiveOn,
+  startOfUtcDay,
+} from "~/domain/dismissal/schedule";
 
 export const handle = { i18n: ["admin", "common"] };
 
 export const meta: Route.MetaFunction = ({ data }) => [
   { title: data?.metaTitle ?? "Admin Dashboard" },
 ];
-
-// --- Date helpers (UTC, mirrors households.tsx so "today" semantics line up
-// across admin pages) -------------------------------------------------------
-function startOfUtcDay(d: Date): Date {
-  return new Date(
-    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0),
-  );
-}
-function endOfUtcDay(d: Date): Date {
-  return new Date(
-    Date.UTC(
-      d.getUTCFullYear(),
-      d.getUTCMonth(),
-      d.getUTCDate(),
-      23,
-      59,
-      59,
-      999,
-    ),
-  );
-}
-
-/**
- * Returns true if the given exception is "active today" — either a DATE row
- * matching today's UTC day or a WEEKLY row whose `dayOfWeek` matches today
- * and whose optional starts/ends window contains today. Mirrors the helper
- * in households.tsx so the dashboard stat agrees with the households index.
- */
-function exceptionActiveOn(
-  exception: {
-    scheduleKind: string;
-    exceptionDate: Date | null;
-    dayOfWeek: number | null;
-    startsOn: Date | null;
-    endsOn: Date | null;
-  },
-  today: Date,
-): boolean {
-  const dayStart = startOfUtcDay(today);
-  if (exception.scheduleKind === "DATE") {
-    if (!exception.exceptionDate) return false;
-    return (
-      startOfUtcDay(exception.exceptionDate).getTime() === dayStart.getTime()
-    );
-  }
-  if (exception.dayOfWeek == null) return false;
-  if (today.getUTCDay() !== exception.dayOfWeek) return false;
-  if (
-    exception.startsOn &&
-    dayStart.getTime() < startOfUtcDay(exception.startsOn).getTime()
-  ) {
-    return false;
-  }
-  if (
-    exception.endsOn &&
-    dayStart.getTime() > startOfUtcDay(exception.endsOn).getTime()
-  ) {
-    return false;
-  }
-  return true;
-}
 
 // --- Activity feed --------------------------------------------------------
 type ActivityItem = {

@@ -33,6 +33,7 @@ import {
   type I18nNamespace,
 } from "~/lib/i18n-config";
 import { i18nResources as resources } from "~/lib/i18n-bundles";
+import { detectLocale } from "~/i18n.server";
 
 /**
  * Get a `t` function pinned to a specific language and namespace(s).
@@ -65,4 +66,28 @@ export async function getFixedT(
     language,
     namespaces.length === 1 ? (namespaces[0] as I18nNamespace) : (namespaces as I18nNamespace[]),
   );
+}
+
+/**
+ * Resolve the request's locale and return a `t` function for the admin UI.
+ *
+ * Collapses the `detectLocale(request, context)` → `getFixedT(locale, ns)`
+ * pair that opens nearly every admin loader/action. Defaults to the "admin"
+ * namespace; pass extra namespaces (e.g. `["admin", "errors"]`) when a handler
+ * also needs them. Use it only when the raw `locale` value isn't needed
+ * separately — if a handler also formats numbers/dates with the locale, keep
+ * the explicit `detectLocale` call.
+ *
+ * @param request - incoming request (cookie / Accept-Language inputs).
+ * @param context - RR router context (resolved user/org locale).
+ * @param ns - i18n namespace(s) to pin; defaults to `"admin"`.
+ * @returns a `t` translator pinned to the resolved locale and namespace(s).
+ */
+export async function getAdminT(
+  request: Request,
+  context: any,
+  ns: I18nNamespace | I18nNamespace[] = "admin",
+): Promise<TFunction> {
+  const locale = await detectLocale(request, context);
+  return getFixedT(locale, ns);
 }

@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@heroui/react";
 import { AlertTriangle, ArrowLeft, Check, Pause, Play, Plus, Square, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { dataWithError, dataWithSuccess } from "remix-toast";
+import { btnDanger, btnGhost, btnPrimary, btnSecondary } from "~/lib/button-classes";
 import type { Route } from "./+types/drills.live";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
@@ -70,15 +71,6 @@ export function formatActorLabel(
   if (a && o) return `${a} as ${o}`;
   return a || o || fallback;
 }
-
-const btnPrimary =
-  "inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-const btnSecondary =
-  "inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-const btnDanger =
-  "inline-flex items-center justify-center rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-const btnGhost =
-  "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const user = getOptionalUserFromContext(context);

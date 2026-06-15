@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Plus, Printer, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills.$templateId.run";
+import { btnGhost, btnPrimary, btnSecondary } from "~/lib/button-classes";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import {
   getActorIdsFromContext,
@@ -28,13 +29,6 @@ import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
 
 export const handle = { i18n: ["admin", "common"] };
-
-const btnPrimary =
-  "inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-const btnSecondary =
-  "inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
-const btnGhost =
-  "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium text-white/70 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 
 export const meta: Route.MetaFunction = ({ data }) => [
   { title: data?.metaTitle ?? (data?.template ? `Run – ${data.template.name}` : "Run checklist") },

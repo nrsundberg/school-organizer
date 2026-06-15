@@ -25,6 +25,7 @@ import { groupDuplicateHouseholds } from "~/domain/households/merge.server";
 import {
   DISMISSAL_PLANS,
   dateRangeFromSearchParams,
+  exceptionActiveOn,
   parseDateOnly,
   parseOptionalDateOnly,
   toDateInputValue,
@@ -112,43 +113,6 @@ function initialsFromPersonName(first: string, last: string): string {
   const a = (first || "").trim().slice(0, 1);
   const b = (last || "").trim().slice(0, 1);
   return `${a}${b}` || "?";
-}
-
-function startOfUtcDay(date: Date): Date {
-  return new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
-  );
-}
-
-/**
- * Returns true if the given exception is "active today" — either a DATE row
- * matching today's UTC day or a WEEKLY row whose `dayOfWeek` matches today
- * and whose optional starts/ends window contains today.
- */
-function exceptionActiveOn(
-  exception: {
-    scheduleKind: string;
-    exceptionDate: Date | null;
-    dayOfWeek: number | null;
-    startsOn: Date | null;
-    endsOn: Date | null;
-  },
-  today: Date,
-): boolean {
-  const dayStart = startOfUtcDay(today);
-  if (exception.scheduleKind === "DATE") {
-    if (!exception.exceptionDate) return false;
-    return startOfUtcDay(exception.exceptionDate).getTime() === dayStart.getTime();
-  }
-  if (exception.dayOfWeek == null) return false;
-  if (today.getUTCDay() !== exception.dayOfWeek) return false;
-  if (exception.startsOn && dayStart.getTime() < startOfUtcDay(exception.startsOn).getTime()) {
-    return false;
-  }
-  if (exception.endsOn && dayStart.getTime() > startOfUtcDay(exception.endsOn).getTime()) {
-    return false;
-  }
-  return true;
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {

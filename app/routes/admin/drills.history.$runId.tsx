@@ -17,11 +17,10 @@ import {
   parseDrillMode,
   parseRunState,
   parseTemplateDefinition,
-  type DrillAudience,
-  type DrillMode,
   type DrillRunStatus,
   type RunState,
 } from "~/domain/drills/types";
+import { AudienceChip, ModeChip, StatusChip } from "~/components/admin/DrillChips";
 import { synthesizeLifecycleEvents } from "~/domain/drills/replay";
 import { ChecklistTable } from "~/domain/drills/ChecklistTable";
 import { ReplayTimeline } from "~/domain/drills/ReplayTimeline";
@@ -36,8 +35,7 @@ import {
 } from "~/domain/drills/useDrillReplay";
 import { parseIntent } from "~/lib/forms.server";
 import { dataWithError, dataWithSuccess } from "remix-toast";
-import { getFixedT } from "~/lib/t.server";
-import { detectLocale } from "~/i18n.server";
+import { getAdminT } from "~/lib/t.server";
 import { formatDurationSeconds } from "./drills.history";
 
 export const handle = { i18n: ["admin", "common"] };
@@ -195,8 +193,7 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
     }
   }
 
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
 
   // Translate raw DrillRunPresenceSample rows into the relative-ms shape
   // ReplayViewerTrack expects. The `viewers` column is `Json` in Prisma,
@@ -285,8 +282,7 @@ export async function action({ context, params, request }: Route.ActionArgs) {
   const prisma = getTenantPrisma(context);
   const org = getOrgFromContext(context);
   const runId = params.runId;
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+  const t = await getAdminT(request, context);
   if (!runId) {
     return dataWithError(null, t("drillsHistory.signoff.errors.missingId"));
   }
@@ -327,70 +323,6 @@ export async function action({ context, params, request }: Route.ActionArgs) {
   }
 
   return dataWithError(null, t("drillsHistory.signoff.errors.unknown"));
-}
-
-function StatusChip({ status }: { status: DrillRunStatus }) {
-  const { t } = useTranslation("admin");
-  const cls =
-    status === "LIVE"
-      ? "bg-rose-600/20 text-rose-200 border border-rose-500/40"
-      : status === "PAUSED"
-        ? "bg-amber-500/20 text-amber-200 border border-amber-500/40"
-        : status === "ENDED"
-          ? "bg-emerald-600/20 text-emerald-200 border border-emerald-500/40"
-          : "bg-white/10 text-white/70 border border-white/20";
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}
-    >
-      {status === "LIVE" && (
-        <span
-          aria-hidden="true"
-          className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse"
-        />
-      )}
-      {t(`drillsHistory.status.${status}`)}
-    </span>
-  );
-}
-
-/**
- * Visual badge for the run's mode. Real events get a high-contrast amber
- * treatment so a glance at the history list makes it obvious which rows are
- * actual incidents vs planned drills.
- */
-function ModeChip({ mode }: { mode: DrillMode }) {
-  const { t } = useTranslation("admin");
-  const cls =
-    mode === "ACTUAL"
-      ? "bg-amber-500/25 text-amber-100 border border-amber-400/50"
-      : mode === "FALSE_ALARM"
-        ? "bg-purple-500/20 text-purple-100 border border-purple-400/40"
-        : "bg-white/10 text-white/70 border border-white/20";
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}
-    >
-      {t(`drills.mode.${mode === "ACTUAL" ? "actualShort" : mode === "FALSE_ALARM" ? "falseAlarmShort" : "drillShort"}`)}
-    </span>
-  );
-}
-
-function AudienceChip({ audience }: { audience: DrillAudience }) {
-  const { t } = useTranslation("admin");
-  const cls =
-    audience === "STAFF_ONLY"
-      ? "bg-blue-500/20 text-blue-200 border border-blue-500/40"
-      : "bg-white/10 text-white/70 border border-white/20";
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cls}`}
-    >
-      {audience === "STAFF_ONLY"
-        ? t("drillsHistory.replay.audience.staffOnly")
-        : t("drillsHistory.replay.audience.everyone")}
-    </span>
-  );
 }
 
 export default function AdminDrillsHistoryReplay({
