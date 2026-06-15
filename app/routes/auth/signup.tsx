@@ -133,8 +133,10 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "auth");
-  const tErrors = await getFixedT(locale, "errors");
+  const [t, tErrors] = await Promise.all([
+    getFixedT(locale, "auth"),
+    getFixedT(locale, "errors"),
+  ]);
 
   // 0. Rate limit by IP
   const clientIp = clientIpFromRequest(request);
