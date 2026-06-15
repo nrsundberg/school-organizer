@@ -154,6 +154,7 @@ export const tenantAuthedRoutes: RouteSpec[] = [
   { path: "/admin", expect: "either", landmark: { role: "heading" } },
   { path: "/admin/users", expect: "either", landmark: { role: "heading" } },
   { path: "/admin/children", expect: "either", landmark: { role: "heading" } },
+  { path: "/admin/classrooms", expect: "either", landmark: { role: "heading" } },
   { path: "/admin/billing", expect: "either", landmark: { role: "heading" } },
   { path: "/admin/branding", expect: "either", landmark: { role: "heading" } },
   // /admin/history is listed in the nightly spec but not registered in
