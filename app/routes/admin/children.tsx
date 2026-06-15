@@ -227,7 +227,7 @@ function StudentCardItem({ student }: { student: StudentRecord }) {
         initials={initialsFromName(`${student.firstName} ${student.lastName}`)}
         colorSeed={`${student.firstName}-${student.lastName}-${student.id}`}
       />
-      <div className="relative min-w-0 flex-1">
+      <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="truncate text-sm font-semibold text-white">
             {student.firstName} {student.lastName}
@@ -243,7 +243,7 @@ function StudentCardItem({ student }: { student: StudentRecord }) {
           <span className="inline-flex items-center gap-1.5">
             <GraduationCap className="h-3.5 w-3.5 text-white/40" />
             {classroomHref ? (
-              <EntityLink to={classroomHref} arrow={false}>
+              <EntityLink to={classroomHref} arrow={false} className="relative z-10">
                 {student.homeRoom ?? gradeLabel(student.classroomGrade)}
               </EntityLink>
             ) : (
@@ -258,6 +258,7 @@ function StudentCardItem({ student }: { student: StudentRecord }) {
               <EntityLink
                 to={`/admin/households/${student.householdId}`}
                 arrow={false}
+                className="relative z-10"
               >
                 {student.householdName ?? t("childrenList.card.household")}
               </EntityLink>
