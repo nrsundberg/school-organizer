@@ -28,11 +28,13 @@ export const meta: Route.MetaFunction = ({ data }) => {
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const prisma = getTenantPrisma(context);
-  const homerooms = await prisma.teacher.findMany({
-    select: { homeRoom: true },
-    orderBy: { homeRoom: "asc" }
-  });
-  const locale = await detectLocale(request, context);
+  const [homerooms, locale] = await Promise.all([
+    prisma.teacher.findMany({
+      select: { homeRoom: true },
+      orderBy: { homeRoom: "asc" }
+    }),
+    detectLocale(request, context),
+  ]);
   const t = await getFixedT(locale, "admin");
   return {
     success: true,
@@ -69,8 +71,10 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
 
     const householdId = null;
-    const counts = await countOrgUsage(prisma, org.id);
-    const famDelta = await familiesDeltaForNewStudent(prisma, org.id, householdId);
+    const [counts, famDelta] = await Promise.all([
+      countOrgUsage(prisma, org.id),
+      familiesDeltaForNewStudent(prisma, org.id, householdId),
+    ]);
     assertUsageAllowsIncrement(org, counts, {
       students: 1,
       families: famDelta,
