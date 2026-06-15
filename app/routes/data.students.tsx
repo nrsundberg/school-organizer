@@ -49,16 +49,19 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   const allCsvData = parseResult.rows;
 
-  const homeRooms = new Set(allCsvData.map((row) => row.Homeroom));
-  let newClassrooms = 0;
-  for (const room of homeRooms) {
-    const exists = await prisma.teacher.findFirst({
-      where: { homeRoom: room },
-    });
-    if (!exists) {
-      newClassrooms += 1;
-    }
-  }
+  const homeRooms = [...new Set(allCsvData.map((row) => row.Homeroom))];
+  // Resolve existence for every homeroom once (independent reads run
+  // concurrently). The set of missing rooms drives both the new-classroom
+  // count below and the creation pass after the usage gate — no teacher is
+  // created between these points, so a single existence check is equivalent
+  // to the previous two sequential per-room passes.
+  const roomExists = await Promise.all(
+    homeRooms.map((room) =>
+      prisma.teacher.findFirst({ where: { homeRoom: room } }),
+    ),
+  );
+  const missingRooms = homeRooms.filter((_, i) => !roomExists[i]);
+  const newClassrooms = missingRooms.length;
 
   const rowCount = allCsvData.length;
   const counts = await countOrgUsage(prisma, org.id);
@@ -75,14 +78,11 @@ export async function action({ request, context }: Route.ActionArgs) {
     throw e;
   }
 
-  for (const room of homeRooms) {
-    const exists = await prisma.teacher.findFirst({
-      where: { homeRoom: room },
-    });
-    if (!exists) {
-      await prisma.teacher.create({ data: { homeRoom: room } });
-    }
-  }
+  await Promise.all(
+    missingRooms.map((room) =>
+      prisma.teacher.create({ data: { homeRoom: room } }),
+    ),
+  );
 
   // Note: row["Carline Number"] from the CSV is currently dropped — space
   // numbers now live on Household, not Student. The roster importer will

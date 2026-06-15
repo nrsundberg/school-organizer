@@ -324,14 +324,16 @@ export async function action({ request, context }: Route.ActionArgs) {
         audit.userAgent,
       );
       if (env) {
-        await broadcastDrillUpdate(env, org.id, {
-          id: updated.id,
-          status: "PAUSED",
-          audience: updated.audience,
-          state: updated.state,
-          updatedAtIso: updated.updatedAt.toISOString(),
-        });
-        await broadcastDrillActivity(env, org.id, runId, [synthEvent("paused")]);
+        await Promise.all([
+          broadcastDrillUpdate(env, org.id, {
+            id: updated.id,
+            status: "PAUSED",
+            audience: updated.audience,
+            state: updated.state,
+            updatedAtIso: updated.updatedAt.toISOString(),
+          }),
+          broadcastDrillActivity(env, org.id, runId, [synthEvent("paused")]),
+        ]);
       }
       return dataWithSuccess(null, t("drillsLive.toasts.paused"));
     }
@@ -347,14 +349,16 @@ export async function action({ request, context }: Route.ActionArgs) {
         audit.userAgent,
       );
       if (env) {
-        await broadcastDrillUpdate(env, org.id, {
-          id: updated.id,
-          status: "LIVE",
-          audience: updated.audience,
-          state: updated.state,
-          updatedAtIso: updated.updatedAt.toISOString(),
-        });
-        await broadcastDrillActivity(env, org.id, runId, [synthEvent("resumed")]);
+        await Promise.all([
+          broadcastDrillUpdate(env, org.id, {
+            id: updated.id,
+            status: "LIVE",
+            audience: updated.audience,
+            state: updated.state,
+            updatedAtIso: updated.updatedAt.toISOString(),
+          }),
+          broadcastDrillActivity(env, org.id, runId, [synthEvent("resumed")]),
+        ]);
       }
       return dataWithSuccess(null, t("drillsLive.toasts.resumed"));
     }
@@ -382,8 +386,10 @@ export async function action({ request, context }: Route.ActionArgs) {
         audit.userAgent,
       );
       if (env) {
-        await broadcastDrillActivity(env, org.id, runId, [synthEvent("ended")]);
-        await broadcastDrillEnded(env, org.id, runId);
+        await Promise.all([
+          broadcastDrillActivity(env, org.id, runId, [synthEvent("ended")]),
+          broadcastDrillEnded(env, org.id, runId),
+        ]);
       }
       // After ending, the user no longer needs the takeover. Send them home.
       throw redirect("/");
@@ -409,36 +415,41 @@ export async function action({ request, context }: Route.ActionArgs) {
         audit.userAgent,
       );
       if (env) {
-        await broadcastDrillUpdate(
-          env,
-          org.id,
-          {
-            id: updated.id,
-            status: updated.status as "LIVE" | "PAUSED" | "ENDED",
-            audience: updated.audience,
-            state: updated.state,
-            updatedAtIso: updated.updatedAt.toISOString(),
-          },
-          clientId,
-        );
-        if (events.length > 0) {
-          await broadcastDrillActivity(
+        const broadcasts: Promise<unknown>[] = [
+          broadcastDrillUpdate(
             env,
             org.id,
-            runId,
-            events.map((ev) => ({
-              id: ev.id,
-              runId: ev.runId,
-              kind: ev.kind,
-              payload: ev.payload,
-              actorUserId: ev.actorUserId,
-              actorLabel,
-              onBehalfOfUserId: ev.onBehalfOfUserId,
-              onBehalfOfLabel,
-              occurredAtIso: ev.occurredAt.toISOString(),
-            })),
+            {
+              id: updated.id,
+              status: updated.status as "LIVE" | "PAUSED" | "ENDED",
+              audience: updated.audience,
+              state: updated.state,
+              updatedAtIso: updated.updatedAt.toISOString(),
+            },
+            clientId,
+          ),
+        ];
+        if (events.length > 0) {
+          broadcasts.push(
+            broadcastDrillActivity(
+              env,
+              org.id,
+              runId,
+              events.map((ev) => ({
+                id: ev.id,
+                runId: ev.runId,
+                kind: ev.kind,
+                payload: ev.payload,
+                actorUserId: ev.actorUserId,
+                actorLabel,
+                onBehalfOfUserId: ev.onBehalfOfUserId,
+                onBehalfOfLabel,
+                occurredAtIso: ev.occurredAt.toISOString(),
+              })),
+            ),
           );
         }
+        await Promise.all(broadcasts);
       }
       // No toast — the page renders an inline "Saving…/Saved" indicator
       // instead. Returning a non-null body so fetcher.data signals
