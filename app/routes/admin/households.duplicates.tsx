@@ -4,6 +4,7 @@ import { redirectWithSuccess, redirectWithError } from "remix-toast";
 import type { Route } from "./+types/households.duplicates";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getTenantPrisma } from "~/domain/utils/global-context.server";
+import { chunkedFindMany } from "~/db/chunked-in";
 import {
   groupDuplicateHouseholds,
   mergeHouseholdGroup,
@@ -47,14 +48,18 @@ export async function loader({ context }: Route.LoaderArgs) {
     households.map((h) => ({ id: h.id, spaceNumber: h.spaceNumber, createdAt: h.createdAt })),
   );
 
+  // When the pre-fix importer ran, it could create hundreds of duplicate
+  // households, so `involvedIds` is not statically bounded. A single
+  // `householdId: { in: involvedIds }` overflows D1's bound-parameter cap
+  // ("too many SQL variables"); chunk the IN list and stitch in JS.
   const involvedIds = groups.flat().map((h) => h.id);
-  const students = involvedIds.length
-    ? await prisma.student.findMany({
-        where: { householdId: { in: involvedIds } },
-        select: { id: true, firstName: true, lastName: true, householdId: true },
-        orderBy: { lastName: "asc" },
-      })
-    : [];
+  const students = await chunkedFindMany(involvedIds, (idChunk) =>
+    prisma.student.findMany({
+      where: { householdId: { in: idChunk } },
+      select: { id: true, firstName: true, lastName: true, householdId: true },
+      orderBy: { lastName: "asc" },
+    }),
+  );
 
   const studentsByHousehold = new Map<string, { id: number; firstName: string; lastName: string }[]>();
   for (const s of students) {
