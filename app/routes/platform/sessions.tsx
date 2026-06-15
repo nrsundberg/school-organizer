@@ -2,6 +2,7 @@ import { Form } from "react-router";
 import { getPrisma } from "~/db.server";
 import type { Route } from "./+types/sessions";
 import { requirePlatformAdmin } from "~/domain/auth/platform-admin.server";
+import { deviceLabelFromUserAgent } from "~/domain/utils/user-agent";
 
 export const meta: Route.MetaFunction = () => [{ title: "Platform — Sessions" }];
 
@@ -90,7 +91,7 @@ export default function PlatformSessions({ loaderData }: Route.ComponentProps) {
               <th className="px-3 py-2 font-semibold">Expires</th>
               <th className="px-3 py-2 font-semibold">Created</th>
               <th className="px-3 py-2 font-semibold">IP</th>
-              <th className="px-3 py-2 font-semibold">User agent</th>
+              <th className="px-3 py-2 font-semibold">Device</th>
               <th className="px-3 py-2 font-semibold">Action</th>
             </tr>
           </thead>
@@ -109,8 +110,11 @@ export default function PlatformSessions({ loaderData }: Route.ComponentProps) {
                   {s.createdAt.toISOString().slice(0, 19).replace("T", " ")}Z
                 </td>
                 <td className="px-3 py-2 font-mono text-xs text-white/70">{s.ipAddress ?? "—"}</td>
-                <td className="px-3 py-2 max-w-[240px] break-all text-xs text-white/60">
-                  {s.userAgent ?? "—"}
+                <td
+                  className="whitespace-nowrap px-3 py-2 text-xs text-white/70"
+                  title={s.userAgent ?? undefined}
+                >
+                  {deviceLabelFromUserAgent(s.userAgent)}
                 </td>
                 <td className="px-3 py-2">
                   <Form
