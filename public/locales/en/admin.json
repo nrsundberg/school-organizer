@@ -96,11 +96,11 @@
     "noChildren": "No children in this class.",
     "pageHeader": {
       "eyebrow": "Roster",
-      "subtitle": "Browse classrooms by grade, jump into student records, and keep your roster current.",
-      "title": "Children & classrooms"
+      "subtitle": "Browse classrooms by grade, set grade levels, and jump into student records.",
+      "title": "Classrooms"
     },
     "search": {
-      "placeholder": "Search students or classrooms"
+      "placeholder": "Search classrooms or teachers"
     },
     "stats": {
       "allPlaced": "All students are placed",
@@ -114,6 +114,34 @@
     "table": {
       "name": "Name",
       "space": "Space #"
+    }
+  },
+  "childrenList": {
+    "card": {
+      "household": "Household",
+      "noClassroom": "No classroom",
+      "noHousehold": "No household",
+      "viewDetail": "View student"
+    },
+    "header": {
+      "subtitle": "Search by name or classroom and open a student record.",
+      "title": "Children"
+    },
+    "list": {
+      "empty": "No students yet. Add a child or import your roster.",
+      "heading": "Students",
+      "noResults": "No students match “{{query}}”."
+    },
+    "search": {
+      "clear": "Clear",
+      "label": "Search students",
+      "placeholder": "Search by name or classroom"
+    },
+    "stats": {
+      "allStudents": "All students",
+      "matching": "Matching “{{query}}”",
+      "showing": "Showing",
+      "totalStudents": "Total students"
     }
   },
   "create": {
@@ -1101,7 +1129,8 @@
   "sidebar": {
     "billing": "Billing",
     "branding": "Branding",
-    "children": "Children & Classes",
+    "children": "Children",
+    "classrooms": "Classrooms",
     "dashboard": "Dashboard",
     "drills": "Drills",
     "history": "History",

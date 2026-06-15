@@ -320,14 +320,14 @@ function Breadcrumb({
       {classroom ? (
         <>
           <Link
-            to={`/admin/children?grade=${classroom.gradeLevel ?? "ungraded"}`}
+            to={`/admin/classrooms?grade=${classroom.gradeLevel ?? "ungraded"}`}
             className="hover:text-white/80"
           >
             {gradeLabel(classroom.gradeLevel)}
           </Link>
           <span className="text-white/25">/</span>
           <Link
-            to={`/admin/children?grade=${classroom.gradeLevel ?? "ungraded"}#homeroom-${classroom.id}`}
+            to={`/admin/classrooms?grade=${classroom.gradeLevel ?? "ungraded"}#homeroom-${classroom.id}`}
             className="hover:text-white/80"
           >
             {classroom.homeRoom}
@@ -395,7 +395,7 @@ function HeaderCard({
           {classroom ? (
             <span className="inline-flex items-center gap-1.5">
               <span className="text-white/40">{t("students.fields.classroom")}</span>
-              <EntityLink to={`/admin/children?grade=${classroom.gradeLevel ?? "ungraded"}#homeroom-${classroom.id}`}>
+              <EntityLink to={`/admin/classrooms?grade=${classroom.gradeLevel ?? "ungraded"}#homeroom-${classroom.id}`}>
                 {classroom.homeRoom}
               </EntityLink>
             </span>
