@@ -13,6 +13,7 @@ export default [
     index("routes/admin/dashboard.tsx"),
     route("users", "routes/admin/users.tsx"),
     route("households", "routes/admin/households.tsx"),
+    route("households/duplicates", "routes/admin/households.duplicates.tsx"),
     route("households/:householdId", "routes/admin/households.$householdId.tsx"),
     route("children", "routes/admin/children.tsx"),
     route("classrooms", "routes/admin/classrooms.tsx"),
