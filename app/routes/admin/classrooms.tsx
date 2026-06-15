@@ -13,7 +13,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { dataWithError, dataWithSuccess } from "remix-toast";
-import type { Route } from "./+types/children";
+import type { Route } from "./+types/classrooms";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 import {
@@ -29,6 +29,7 @@ import {
   isGradeLevel,
   type GradeLevel,
 } from "~/domain/children/grade";
+import { buildRoomIndex } from "~/domain/children/classroom-roster";
 import { EntityAvatar, initialsFromName } from "~/components/admin/EntityAvatar";
 import { StatusPill } from "~/components/admin/StatusPill";
 import { EntityLink } from "~/components/admin/EntityLink";
@@ -38,7 +39,7 @@ import { StatCard } from "~/components/admin/StatCard";
 export const handle = { i18n: ["admin", "common"] };
 
 export const meta: Route.MetaFunction = ({ data }) => [
-  { title: data?.metaTitle ?? "Children & classrooms" },
+  { title: data?.metaTitle ?? "Classrooms" },
 ];
 
 type ClassroomLoaderRow = {
@@ -178,67 +179,72 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }
   }
 
-  // Apply search filter — matches on first/last name OR homeRoom (case
-  // insensitive). Empty `q` is a no-op.
+  // Build the per-room roster AND count from the SAME unfiltered student set.
+  // This is the count-vs-roster fix: previously the count came from all
+  // students but the expandable roster came from the search-filtered set, so a
+  // stale `?q=` made a card claim "N students" yet expand to "no kids".
+  // `buildRoomIndex` guarantees `countByRoom.get(room) === roster.length`.
+  const roomStudents = allStudents.map((s) => ({
+    id: s.id,
+    firstName: s.firstName,
+    lastName: s.lastName,
+    homeRoom: s.homeRoom,
+    spaceNumber: s.spaceNumber,
+    householdId: s.householdId,
+    householdName: s.householdId
+      ? householdNameById.get(s.householdId) ?? null
+      : null,
+    todaysException: exceptionsByStudent.get(s.id) ?? null,
+  }));
+  const { studentsByRoom, countByRoom } = buildRoomIndex(roomStudents);
+
+  // Search on THIS page filters the classroom list (by homeRoom / teacher
+  // name), not students — student-name search lives on the Children page now.
   const lowerQ = q.toLowerCase();
-  const filteredStudents = q
-    ? allStudents.filter((s) => {
-        const full = `${s.firstName} ${s.lastName}`.toLowerCase();
-        return (
-          full.includes(lowerQ) ||
-          (s.homeRoom ?? "").toLowerCase().includes(lowerQ)
-        );
-      })
-    : allStudents;
+  const matchingClassrooms = q
+    ? classrooms.filter(
+        (c) =>
+          c.homeRoom.toLowerCase().includes(lowerQ) ||
+          (c.teacherName ?? "").toLowerCase().includes(lowerQ),
+      )
+    : classrooms;
 
-  const studentsByRoom = new Map<string, StudentLoaderRow[]>();
-  for (const s of filteredStudents) {
-    if (!s.homeRoom) continue;
-    const arr = studentsByRoom.get(s.homeRoom) ?? [];
-    arr.push({
-      id: s.id,
-      firstName: s.firstName,
-      lastName: s.lastName,
-      homeRoom: s.homeRoom,
-      spaceNumber: s.spaceNumber,
-      householdId: s.householdId,
-      householdName: s.householdId
-        ? householdNameById.get(s.householdId) ?? null
-        : null,
-      todaysException: exceptionsByStudent.get(s.id) ?? null,
-    });
-    studentsByRoom.set(s.homeRoom, arr);
-  }
-
-  // Build the canonical classroom rows used by the page. studentCount
-  // reflects the *unfiltered* enrollment so the stats stay stable as you
-  // type in the search box; the expanded list uses the filtered students.
-  const enrolmentByRoom = new Map<string, number>();
-  for (const s of allStudents) {
-    if (!s.homeRoom) continue;
-    enrolmentByRoom.set(s.homeRoom, (enrolmentByRoom.get(s.homeRoom) ?? 0) + 1);
-  }
-  const classroomRows: ClassroomLoaderRow[] = classrooms.map((c) => ({
+  const classroomRows: ClassroomLoaderRow[] = matchingClassrooms.map((c) => ({
     id: c.id,
     homeRoom: c.homeRoom,
     gradeLevel: (c.gradeLevel as GradeLevel | null) ?? null,
     capacity: c.capacity,
     teacherName: c.teacherName,
-    studentCount: enrolmentByRoom.get(c.homeRoom) ?? 0,
+    studentCount: countByRoom.get(c.homeRoom) ?? 0,
   }));
+
+  // Grade pill counts are computed from ALL classrooms (not the search subset)
+  // so the pills stay representative of the whole school while searching.
+  const allClassroomRows: ClassroomLoaderRow[] = classrooms.map((c) => ({
+    id: c.id,
+    homeRoom: c.homeRoom,
+    gradeLevel: (c.gradeLevel as GradeLevel | null) ?? null,
+    capacity: c.capacity,
+    teacherName: c.teacherName,
+    studentCount: countByRoom.get(c.homeRoom) ?? 0,
+  }));
+  const gradePillCounts = gradeFilterCounts(allClassroomRows);
 
   const unassignedStudentsList = findUnassignedStudents(allStudents, validHomeRooms);
 
+  // Stats stay org-wide (not affected by the classroom search) so they don't
+  // jump around as you type.
   const totalStudents = allStudents.length;
-  const totalClassrooms = classroomRows.length;
+  const totalClassrooms = classrooms.length;
   const avgClassSize =
     totalClassrooms > 0
       ? Math.round((totalStudents / totalClassrooms) * 10) / 10
       : 0;
 
   return {
-    metaTitle: "Children & classrooms",
+    metaTitle: "Classrooms",
     classrooms: classroomRows,
+    gradePillCounts,
     studentsByRoom: Object.fromEntries(studentsByRoom),
     unassignedStudents: unassignedStudentsList.map((s) => ({
       id: s.id,
@@ -301,7 +307,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 type LoaderData = Route.ComponentProps["loaderData"];
 
 export default function AdminChildren({ loaderData }: Route.ComponentProps) {
-  const { classrooms, studentsByRoom, stats, filter } = loaderData;
+  const { classrooms, gradePillCounts, studentsByRoom, stats, filter } = loaderData;
   const [searchParams, setSearchParams] = useSearchParams();
   const submit = useSubmit();
 
@@ -339,10 +345,10 @@ export default function AdminChildren({ loaderData }: Route.ComponentProps) {
     return () => clearTimeout(tm);
   }, []);
 
-  // Grade pill filter buckets — derived from the loader data. We ignore the
-  // search filter here so the pills stay representative of the school as a
-  // whole; the cards handle per-search filtering separately.
-  const filterCounts = useMemo(() => gradeFilterCounts(classrooms), [classrooms]);
+  // Grade pill filter buckets — computed in the loader from ALL classrooms so
+  // they stay representative of the school as a whole regardless of the
+  // classroom search; the grid below handles `?grade=` filtering separately.
+  const filterCounts = gradePillCounts;
 
   // Render groups (filtered by `?grade=`).
   const groups = useMemo(() => {
