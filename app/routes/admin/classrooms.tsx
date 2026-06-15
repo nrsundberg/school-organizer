@@ -75,36 +75,69 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       ? "ungraded"
       : null;
 
-  // Pull all classrooms for the org. Schools rarely have more than ~50, so
-  // listing them all on a single page is fine. Students are joined via
-  // homeRoom/orgId composite (see schema). We fetch students separately so
-  // the search filter can run on either side.
-  const classrooms = await prisma.teacher.findMany({
-    orderBy: [{ gradeLevel: "asc" }, { homeRoom: "asc" }],
-    select: {
-      id: true,
-      homeRoom: true,
-      gradeLevel: true,
-      capacity: true,
-      teacherName: true,
-    },
-  });
+  // Classrooms, the full student roster, and today's active exceptions are
+  // mutually independent reads, so fetch them concurrently within this
+  // request. We use UTC date midnight for the exception window to match how
+  // DATE rows are stored; WEEKLY rows are filtered to today's day-of-week.
+  const now = new Date();
+  const todayUtc = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  ));
+  const dow = now.getUTCDay();
+
+  const [classrooms, allStudentsRaw, exceptions] = await Promise.all([
+    // Pull all classrooms for the org. Schools rarely have more than ~50, so
+    // listing them all on a single page is fine. Students are joined via
+    // homeRoom/orgId composite (see schema). We fetch students separately so
+    // the search filter can run on either side.
+    prisma.teacher.findMany({
+      orderBy: [{ gradeLevel: "asc" }, { homeRoom: "asc" }],
+      select: {
+        id: true,
+        homeRoom: true,
+        gradeLevel: true,
+        capacity: true,
+        teacherName: true,
+      },
+    }),
+    // Pull every student (no pagination here — even a 600-student school is
+    // <60kB on the wire). Search applies to first/last name OR homeRoom.
+    prisma.student.findMany({
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        homeRoom: true,
+        householdId: true,
+        household: { select: { spaceNumber: true } },
+      },
+    }),
+    // Active exceptions for "today" so we can flag students with an override
+    // on the index.
+    prisma.dismissalException.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { scheduleKind: "DATE", exceptionDate: todayUtc },
+          { scheduleKind: "WEEKLY", dayOfWeek: dow },
+        ],
+      },
+      select: {
+        id: true,
+        studentId: true,
+        householdId: true,
+        dismissalPlan: true,
+        scheduleKind: true,
+        startsOn: true,
+        endsOn: true,
+      },
+    }),
+  ]);
 
   const validHomeRooms = new Set(classrooms.map((c) => c.homeRoom));
-
-  // Pull every student (no pagination here — even a 600-student school is
-  // <60kB on the wire). Search applies to first/last name OR homeRoom.
-  const allStudentsRaw = await prisma.student.findMany({
-    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      homeRoom: true,
-      householdId: true,
-      household: { select: { spaceNumber: true } },
-    },
-  });
   const allStudents = allStudentsRaw.map((s) => ({
     id: s.id,
     firstName: s.firstName,
@@ -113,36 +146,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     householdId: s.householdId,
     spaceNumber: s.household?.spaceNumber ?? null,
   }));
-
-  // Pull active exceptions for "today" so we can flag students with an
-  // override on the index. We use UTC date midnight to match how DATE rows
-  // are stored. WEEKLY rows are filtered separately below so we only
-  // include the day matching today.
-  const now = new Date();
-  const todayUtc = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  ));
-  const dow = now.getUTCDay();
-  const exceptions = await prisma.dismissalException.findMany({
-    where: {
-      isActive: true,
-      OR: [
-        { scheduleKind: "DATE", exceptionDate: todayUtc },
-        { scheduleKind: "WEEKLY", dayOfWeek: dow },
-      ],
-    },
-    select: {
-      id: true,
-      studentId: true,
-      householdId: true,
-      dismissalPlan: true,
-      scheduleKind: true,
-      startsOn: true,
-      endsOn: true,
-    },
-  });
 
   // Resolve household names in one extra query — used both for the
   // student.householdName field on the index and for resolving

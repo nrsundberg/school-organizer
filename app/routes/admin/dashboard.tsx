@@ -221,25 +221,30 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   ).length;
 
   // Resolve user names for the activity feed in one batched query so we can
-  // render "Alice via Bob" labels without N+1 lookups.
+  // render "Alice via Bob" labels without N+1 lookups. The name lookup and the
+  // locale resolution are independent, so run them concurrently within this
+  // request (the locale→getFixedT chain stays ordered inside its own branch).
   const userIds = new Set<string>();
   for (const log of recentAuditLogs) {
     if (log.actorUserId) userIds.add(log.actorUserId);
     if (log.onBehalfOfUserId) userIds.add(log.onBehalfOfUserId);
   }
-  const userMap = userIds.size
-    ? new Map(
-        (
-          await prisma.user.findMany({
+  const [userMap, t] = await Promise.all([
+    userIds.size
+      ? prisma.user
+          .findMany({
             where: { id: { in: Array.from(userIds) } },
             select: { id: true, name: true },
           })
-        ).map((u) => [u.id, u.name?.trim() || null] as const),
-      )
-    : new Map<string, string | null>();
-
-  const locale = await detectLocale(request, context);
-  const t = await getFixedT(locale, "admin");
+          .then(
+            (users) =>
+              new Map(
+                users.map((u) => [u.id, u.name?.trim() || null] as const),
+              ),
+          )
+      : Promise.resolve(new Map<string, string | null>()),
+    detectLocale(request, context).then((locale) => getFixedT(locale, "admin")),
+  ]);
 
   const activity: ActivityItem[] = [];
 
