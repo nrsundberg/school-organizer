@@ -75,23 +75,31 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // We pull the most recent ENDED run per template — `findFirst` with desc
   // order is a single query per template; with the typical N=10–20 templates
   // this is fine. If we ever exceed that, switch to a single GROUP BY query.
+  // The per-template lookups are independent, so we issue them concurrently —
+  // one Prisma client per request makes the parallel reads safe.
   const now = new Date();
   const cadenceById = new Map<string, CadenceStatus>();
-  for (const tpl of templates) {
-    if (tpl.requiredPerYear == null) {
-      cadenceById.set(tpl.id, { state: "none" });
-      continue;
-    }
-    const lastEnded = await prisma.drillRun.findFirst({
-      where: { templateId: tpl.id, status: "ENDED" },
-      orderBy: { endedAt: "desc" },
-      select: { endedAt: true },
-    });
-    cadenceById.set(
-      tpl.id,
-      computeCadenceStatus(tpl.requiredPerYear, lastEnded?.endedAt ?? null, now),
-    );
-  }
+  await Promise.all(
+    templates.map(async (tpl: (typeof templates)[number]) => {
+      if (tpl.requiredPerYear == null) {
+        cadenceById.set(tpl.id, { state: "none" });
+        return;
+      }
+      const lastEnded = await prisma.drillRun.findFirst({
+        where: { templateId: tpl.id, status: "ENDED" },
+        orderBy: { endedAt: "desc" },
+        select: { endedAt: true },
+      });
+      cadenceById.set(
+        tpl.id,
+        computeCadenceStatus(
+          tpl.requiredPerYear,
+          lastEnded?.endedAt ?? null,
+          now,
+        ),
+      );
+    }),
+  );
   const templatesWithCadence = templates.map((tpl) => ({
     ...tpl,
     cadence: cadenceById.get(tpl.id) ?? ({ state: "none" } as CadenceStatus),

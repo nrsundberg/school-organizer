@@ -226,9 +226,14 @@ export async function action({ request, context }: Route.ActionArgs) {
       );
     }
     const summary = result.data;
-    const freshOrg = await prisma.org.findUnique({ where: { id: org.id } });
+    // Both reads key off org.id and don't depend on each other, so fetch them
+    // concurrently before reconciling the grace period (one Prisma client per
+    // request makes this safe).
+    const [freshOrg, nextCounts] = await Promise.all([
+      prisma.org.findUnique({ where: { id: org.id } }),
+      countOrgUsage(prisma, org.id),
+    ]);
     if (freshOrg) {
-      const nextCounts = await countOrgUsage(prisma, org.id);
       await syncUsageGracePeriod(prisma, freshOrg, nextCounts);
     }
 

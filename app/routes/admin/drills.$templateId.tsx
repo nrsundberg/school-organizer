@@ -124,22 +124,26 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   if (!id) {
     throw new Response("Not found", { status: 404 });
   }
-  const template = await prisma.drillTemplate.findFirst({
-    where: { id, deletedAt: null },
-    select: {
-      id: true,
-      name: true,
-      definition: true,
-      updatedAt: true,
-      defaultAudience: true,
-      requiredPerYear: true,
-      instructions: true,
-    },
-  });
+  // The template lookup and the locale resolution share no data dependency,
+  // so run them concurrently (one Prisma client per request makes this safe).
+  const [template, locale] = await Promise.all([
+    prisma.drillTemplate.findFirst({
+      where: { id, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        definition: true,
+        updatedAt: true,
+        defaultAudience: true,
+        requiredPerYear: true,
+        instructions: true,
+      },
+    }),
+    detectLocale(request, context),
+  ]);
   if (!template) {
     throw new Response("Not found", { status: 404 });
   }
-  const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
   return { template, metaTitle: t("drills.metaEdit", { name: template.name }) };
 }

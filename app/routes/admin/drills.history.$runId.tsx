@@ -79,30 +79,32 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
     ? Math.max(0, Math.round((end.getTime() - start.getTime()) / 1000))
     : null;
 
-  // Latest-run check so we only show the "Print" link when the print page
-  // (which always renders the most recent run for the template) matches the
-  // run we're viewing.
-  const latest = await prisma.drillRun.findFirst({
-    where: { templateId: run.templateId },
-    orderBy: { updatedAt: "desc" },
-    select: { id: true },
-  });
+  // Once the run is loaded these three reads share no data dependency on one
+  // another (they key off run.templateId / runId), so issue them concurrently.
+  //   - latest: latest-run check so we only show the "Print" link when the
+  //     print page (which always renders the most recent run for the template)
+  //     matches the run we're viewing.
+  //   - rawEvents: every event for this run, so the replay feed can resolve
+  //     names instead of raw IDs (actor lookup happens below).
+  //   - rawPresenceSamples: presence snapshots written every 30s by the
+  //     BingoBoardDO alarm while the drill was LIVE. ~120 rows for an hour of
+  //     drill regardless of viewer count, so an unbounded query is fine here.
+  const [latest, rawEvents, rawPresenceSamples] = await Promise.all([
+    prisma.drillRun.findFirst({
+      where: { templateId: run.templateId },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true },
+    }),
+    prisma.drillRunEvent.findMany({
+      where: { runId },
+      orderBy: { occurredAt: "asc" },
+    }),
+    prisma.drillRunPresenceSample.findMany({
+      where: { runId },
+      orderBy: { occurredAt: "asc" },
+    }),
+  ]);
   const isLatestForTemplate = latest?.id === run.id;
-
-  // Pull every event for this run, plus the unique users who acted on it, so
-  // the replay feed can show names instead of raw IDs.
-  const rawEvents = await prisma.drillRunEvent.findMany({
-    where: { runId },
-    orderBy: { occurredAt: "asc" },
-  });
-
-  // Presence snapshots written every 30s by the BingoBoardDO alarm while
-  // the drill was LIVE. ~120 rows for an hour of drill regardless of
-  // viewer count, so an unbounded query is fine here.
-  const rawPresenceSamples = await prisma.drillRunPresenceSample.findMany({
-    where: { runId },
-    orderBy: { occurredAt: "asc" },
-  });
 
   const actorIds = [
     ...new Set(

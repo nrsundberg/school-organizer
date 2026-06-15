@@ -271,14 +271,19 @@ export async function action({ request, context }: Route.ActionArgs) {
       }
       throw err;
     }
-    const target = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, name: true, email: true, role: true },
-    });
+    // The target lookup and the current-session read share no data
+    // dependency, so run them concurrently (both are reads; one client per
+    // request makes this safe).
+    const [target, session] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, name: true, email: true, role: true },
+      }),
+      auth.api.getSession({ headers: request.headers }),
+    ]);
     if (!target) {
       return dataWithError(null, t("admin:users.errors.userNotFound"));
     }
-    const session = await auth.api.getSession({ headers: request.headers });
     const currentSessionId = session?.session?.id ?? null;
     const [households, sessions, recentActivity, pendingInvite] = await Promise.all([
       findLinkedHouseholdsForUser(prisma, {

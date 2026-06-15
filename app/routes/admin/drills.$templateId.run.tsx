@@ -48,21 +48,28 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   if (!templateId) {
     throw new Response("Not found", { status: 404 });
   }
-  const template = await prisma.drillTemplate.findFirst({
-    where: { id: templateId, deletedAt: null },
-    select: { id: true, name: true, definition: true, updatedAt: true },
-  });
+  // The template lookup, the most-recent-run lookup, and the locale resolution
+  // share no data dependency, so run them concurrently. (Migration 0021 dropped
+  // the unique-on-templateId constraint to allow run history, so we look up the
+  // most recent run via findFirst instead of findUnique.) One Prisma client per
+  // request makes the parallel reads safe.
+  const [template, run0, locale] = await Promise.all([
+    prisma.drillTemplate.findFirst({
+      where: { id: templateId, deletedAt: null },
+      select: { id: true, name: true, definition: true, updatedAt: true },
+    }),
+    prisma.drillRun.findFirst({
+      where: { templateId },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, state: true, updatedAt: true },
+    }),
+    detectLocale(request, context),
+  ]);
   if (!template) {
     throw new Response("Not found", { status: 404 });
   }
 
-  // Migration 0021 dropped the unique-on-templateId constraint to allow run
-  // history, so we look up the most recent run (if any) instead of findUnique.
-  let run = await prisma.drillRun.findFirst({
-    where: { templateId },
-    orderBy: { updatedAt: "desc" },
-    select: { id: true, state: true, updatedAt: true },
-  });
+  let run = run0;
   if (!run) {
     const orgId = getOrgFromContext(context).id;
     const seeded = seedRunStateFromTemplate(parseTemplateDefinition(template.definition));
@@ -78,7 +85,6 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
     });
   }
 
-  const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
 
   const me = getOptionalUserFromContext(context);
