@@ -82,8 +82,16 @@ async function getOrCreateFingerprint({ request, context }: Ctx): Promise<{ clie
   return { clientKey, setCookie, ipHint: ipHint(ip) };
 }
 
-export async function hasValidViewerAccess({ request, context }: Ctx): Promise<boolean> {
-  const prisma = getTenantPrisma(context);
+export async function hasValidViewerAccess(
+  { request, context }: Ctx,
+  // Optional explicit client. The request-scope resolver calls this DURING
+  // middleware resolution — before `orgContext` is populated — so it passes a
+  // client built directly from the resolved org id. Default-resolving from
+  // context there would throw "Org should be available here" and 500 every
+  // anonymous board visit. Other callers (loaders, post-middleware) omit it
+  // and get the tenant client from context as before.
+  prisma: ReturnType<typeof getTenantPrisma> = getTenantPrisma(context),
+): Promise<boolean> {
   const cookies = parseCookies(request);
   const token = cookies.get(VIEWER_SESSION_COOKIE);
   if (!token) return false;

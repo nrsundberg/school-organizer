@@ -70,7 +70,7 @@ export type SessionFacts = {
 export type ResolveDeps = {
   db: PrismaClient;
   loadSession: (request: Request) => Promise<SessionFacts>;
-  hasViewerAccess: (request: Request) => Promise<boolean>;
+  hasViewerAccess: (request: Request, org: Org) => Promise<boolean>;
   isMarketingHost: (request: Request) => boolean;
   isPlatformAdmin: (user: User) => boolean;
   marketingOrigin: (request: Request) => string;
@@ -84,7 +84,11 @@ export function buildResolveDeps(context: any): ResolveDeps {
   return {
     db,
     loadSession: (request) => loadBetterAuthSession(db, request, context),
-    hasViewerAccess: (request) => hasValidViewerAccess({ request, context }),
+    // Build the tenant client directly from the resolved org id: this runs
+    // before globalStorageMiddleware sets `orgContext`, so the default
+    // context-based resolution inside hasValidViewerAccess would throw.
+    hasViewerAccess: (request, org) =>
+      hasValidViewerAccess({ request, context }, getPrisma(context, org.id)),
     isMarketingHost: (request) => isMarketingHost(request, context),
     isPlatformAdmin: (user) => isPlatformAdmin(user, context),
     marketingOrigin: (request) => marketingOriginFromRequest(request, context),
@@ -347,7 +351,7 @@ export async function enforceAnonymousAccess(args: {
   if (path.isPlatform || !org) {
     throw redirect(`/login?next=${encodeURIComponent(nextPath)}`);
   }
-  const hasAccess = await deps.hasViewerAccess(request);
+  const hasAccess = await deps.hasViewerAccess(request, org);
   if (!hasAccess) {
     throw redirect(`/viewer-access?next=${encodeURIComponent(nextPath)}`);
   }
