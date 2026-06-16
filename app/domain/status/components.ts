@@ -11,36 +11,36 @@ import type { ComponentDef } from "./types";
 export const COMPONENTS: ComponentDef[] = [
   // Application section.
   //
-  // Active cron HTTP probes against the deploy's own public root domain
-  // (env.PUBLIC_ROOT_DOMAIN). A Cloudflare Worker fetching its own zone can
-  // loop back through the edge and return a 520–527 edge error even when the
-  // app is healthy; httpProbe maps that band to "unknown" (inconclusive)
-  // rather than "outage" so a same-zone loopback degrades to gray, never a
-  // false outage. A fresh /api/status-probe webhook row still wins because the
-  // read service takes the latest row by timestamp.
+  // Fed by an external uptime monitor (UptimeRobot) that POSTs to
+  // /api/status-probe. NOT cron-probed: a Cloudflare Worker cannot reliably
+  // fetch its own zone apex — same-zone subrequests loop back through the edge
+  // and time out (522), so a cron probe would write false "unknown" rows every
+  // tick and clobber the webhook's operational signal. The read-side staleness
+  // guard turns a silent monitor into honest gray, never a false outage. See
+  // docs/status-page-monitor.md.
   {
     id: "marketing",
     section: "application",
     name: "Marketing site",
     description: "pickuproster.com landing + public pages",
-    probe: "http",
-    config: { path: "/", expectStatus: 200, expectSubstring: "Pickup Roster" },
+    probe: "external",
+    config: {},
   },
   {
     id: "auth",
     section: "application",
     name: "Auth",
     description: "Login + session service",
-    probe: "http",
-    config: { path: "/login", expectStatus: 200 },
+    probe: "external",
+    config: {},
   },
   {
     id: "app_workers",
     section: "application",
     name: "App workers",
     description: "Cloudflare Workers serving the app",
-    probe: "http",
-    config: { path: "/api/healthz", expectStatus: 200, expectSubstring: "\"ok\":true" },
+    probe: "external",
+    config: {},
   },
 
   // Data section
