@@ -9,6 +9,30 @@ import type { ComponentStatus, ProbeResult } from "./types";
 // that pass `db` as `any` around helpers.
 type StatusDb = any;
 
+// An open incident with no fresh failing signal for 30 min is stale — either
+// it recovered or we lost monitoring for that component. Either way, holding it
+// open keeps blaring a false outage on /status, so the janitor auto-resolves
+// it. The window is wider than the 15-min status-pill window so a brief probe
+// gap doesn't prematurely close a real, actively-failing incident.
+const INCIDENT_STALE_AFTER_MS = 30 * 60_000;
+
+/**
+ * Pure predicate: is an open incident stale and safe to auto-resolve?
+ *
+ * Returns true when `lastFailAt` is null (legacy zombie rows with no failing
+ * signal recorded) OR when the most recent failing signal is older than
+ * INCIDENT_STALE_AFTER_MS. Actively-failing incidents get `lastFailAt` bumped
+ * to "now" every cron tick, so this returns false for them — that's the safety
+ * property that prevents closing a real outage.
+ */
+export function isIncidentStale(
+  lastFailAt: Date | null,
+  now: Date,
+): boolean {
+  if (lastFailAt == null) return true;
+  return now.getTime() - lastFailAt.getTime() > INCIDENT_STALE_AFTER_MS;
+}
+
 /**
  * Runs every component probe in parallel, persists results, and advances the
  * incident state machine. Safe to call from the 2-minute cron; caller should
@@ -79,6 +103,25 @@ export async function runStatusProbes(context: any): Promise<{
     const changed = await advanceIncidentForComponent(db, result, now);
     if (changed === "opened") opened++;
     else if (changed === "resolved") resolved++;
+  }
+
+  // Janitor pass: auto-resolve stale open incidents. The per-component state
+  // machine only closes an incident after two consecutive `operational` checks,
+  // which can never happen for a component whose monitor stopped posting — those
+  // incidents stay open forever and keep showing a false outage. Closing any
+  // open incident with no fresh failing signal in INCIDENT_STALE_AFTER_MS
+  // self-heals those zombies on the next cron tick, with no manual DB write.
+  const openIncidents = await db.statusIncident.findMany({
+    where: { resolvedAt: null },
+  });
+  for (const incident of openIncidents) {
+    if (isIncidentStale(incident.lastFailAt, now)) {
+      await db.statusIncident.update({
+        where: { id: incident.id },
+        data: { resolvedAt: now },
+      });
+      resolved++;
+    }
   }
 
   return { checks: results.length, incidentsOpened: opened, incidentsResolved: resolved };
