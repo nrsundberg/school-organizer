@@ -144,7 +144,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     totalHouseholds,
     householdOptions,
     unassignedStudents,
-    allStudents,
     roi,
     activeExceptionsRaw,
     programs,
@@ -172,15 +171,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         firstName: true,
         lastName: true,
         homeRoom: true,
-      },
-    }),
-    prisma.student.findMany({
-      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        householdId: true,
       },
     }),
     buildRoiDashboardSnapshot(prisma, roiRange),
@@ -431,7 +421,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       householdsMissingContact: householdsMissingContactCount,
     },
     unassignedStudents,
-    allStudents,
     roi,
     activeExceptions: activeExceptions.map((exception) => ({
       ...exception,
@@ -697,7 +686,6 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
     householdOptions,
     pagination,
     unassignedStudents,
-    allStudents,
     roi,
     activeExceptions,
     programs,
@@ -855,7 +843,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
               </select>
             </Field>
             <StudentCheckboxList
-              students={allStudents}
+              students={unassignedStudents}
               emptyText={t("households.assign.noStudents")}
               compact
             />
