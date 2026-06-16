@@ -210,3 +210,151 @@ test("worstOf: outage beats everything", () => {
   assert.equal(worstOf("outage", "degraded"), "outage");
   assert.equal(worstOf("degraded", "outage"), "outage");
 });
+
+// ---------------------------------------------------------------------------
+// HTTP probe status mapping — mirrors httpStatusToComponentStatus /
+// isCloudflareEdgeStatus in probes.server.ts (kept inline per repo convention).
+//
+// CRITICAL: the Cloudflare edge-error band (520–527) must map to "unknown",
+// not "outage", because a worker fetching its own zone can loop back through
+// the edge and return one of these even when the app is healthy. A genuine
+// app error (500/404/503) still maps to "outage".
+// ---------------------------------------------------------------------------
+
+function isCloudflareEdgeStatus(status: number): boolean {
+  return status >= 520 && status <= 527;
+}
+
+function httpStatusToComponentStatus(
+  status: number,
+  expectStatus: number,
+): ComponentStatus {
+  if (isCloudflareEdgeStatus(status)) return "unknown";
+  const ok =
+    status === expectStatus ||
+    (expectStatus === 200 && status >= 200 && status < 300);
+  return ok ? "operational" : "outage";
+}
+
+test("httpStatusToComponentStatus: 200 → operational", () => {
+  assert.equal(httpStatusToComponentStatus(200, 200), "operational");
+  assert.equal(httpStatusToComponentStatus(204, 200), "operational");
+});
+
+test("httpStatusToComponentStatus: app errors → outage", () => {
+  assert.equal(httpStatusToComponentStatus(500, 200), "outage");
+  assert.equal(httpStatusToComponentStatus(404, 200), "outage");
+  assert.equal(httpStatusToComponentStatus(503, 200), "outage");
+});
+
+test("httpStatusToComponentStatus: 522 (Cloudflare edge) → unknown", () => {
+  assert.equal(httpStatusToComponentStatus(522, 200), "unknown");
+});
+
+test("httpStatusToComponentStatus: full 520–527 band → unknown", () => {
+  for (let code = 520; code <= 527; code++) {
+    assert.equal(
+      httpStatusToComponentStatus(code, 200),
+      "unknown",
+      `code ${code} should be unknown`,
+    );
+  }
+});
+
+test("httpStatusToComponentStatus: band boundaries 519/528 → outage", () => {
+  assert.equal(httpStatusToComponentStatus(519, 200), "outage");
+  assert.equal(httpStatusToComponentStatus(528, 200), "outage");
+});
+
+test("httpStatusToComponentStatus: non-200 expectStatus matched exactly", () => {
+  assert.equal(httpStatusToComponentStatus(301, 301), "operational");
+  // With a non-200 expectStatus, a 2xx that isn't the expected code is outage.
+  assert.equal(httpStatusToComponentStatus(200, 301), "outage");
+});
+
+// ---------------------------------------------------------------------------
+// Tenant-aggregate rollup over conclusive / inconclusive results — mirrors
+// rollupTenantResults in probes.server.ts (kept inline per repo convention).
+//
+//   - `true`  = tenant up
+//   - `false` = tenant down (or hard fetch rejection)
+//   - `null`  = inconclusive (520–527 same-zone loopback)
+//
+// The fail ratio is computed over CONCLUSIVE results only. If fewer than half
+// of the probed tenants are conclusive, the rollup is "unknown" (never outage).
+// ---------------------------------------------------------------------------
+
+function rollupTenantResults(
+  results: Array<boolean | null>,
+  opts: { degradedRatio: number; outageRatio: number },
+): ComponentStatus {
+  const total = results.length;
+  if (total === 0) return "unknown";
+
+  const conclusive = results.filter((r) => r !== null) as boolean[];
+  if (conclusive.length < total / 2) return "unknown";
+
+  const fails = conclusive.filter((up) => up === false).length;
+  const failRatio = fails / conclusive.length;
+  if (failRatio > opts.outageRatio) return "outage";
+  if (fails > 0 && failRatio > opts.degradedRatio) return "degraded";
+  return "operational";
+}
+
+const DEFAULT_RATIOS = { degradedRatio: 0.0, outageRatio: 0.4 };
+
+test("rollupTenantResults: all up → operational", () => {
+  assert.equal(
+    rollupTenantResults([true, true, true, true], DEFAULT_RATIOS),
+    "operational",
+  );
+});
+
+test("rollupTenantResults: > outageRatio down → outage", () => {
+  // 3/4 down = 0.75 > 0.4 → outage.
+  assert.equal(
+    rollupTenantResults([false, false, false, true], DEFAULT_RATIOS),
+    "outage",
+  );
+});
+
+test("rollupTenantResults: some down but below outageRatio → degraded", () => {
+  // 1/4 down = 0.25, > degradedRatio (0) and <= outageRatio (0.4) → degraded.
+  assert.equal(
+    rollupTenantResults([false, true, true, true], DEFAULT_RATIOS),
+    "degraded",
+  );
+});
+
+test("rollupTenantResults: majority inconclusive (null) → unknown, NOT outage", () => {
+  // Only 1 of 4 conclusive (< half) → unknown even though the conclusive one is down.
+  const result = rollupTenantResults([false, null, null, null], DEFAULT_RATIOS);
+  assert.equal(result, "unknown");
+  assert.notEqual(result, "outage");
+});
+
+test("rollupTenantResults: exactly half conclusive is enough (not unknown)", () => {
+  // 2/4 conclusive (>= half), both up → operational.
+  assert.equal(
+    rollupTenantResults([true, true, null, null], DEFAULT_RATIOS),
+    "operational",
+  );
+});
+
+test("rollupTenantResults: fail ratio uses conclusive denominator only", () => {
+  // 2 down, 2 up, 0 null → 4 conclusive, failRatio 0.5 > 0.4 → outage.
+  assert.equal(
+    rollupTenantResults([false, false, true, true], DEFAULT_RATIOS),
+    "outage",
+  );
+  // 2 down, 2 up, but with nulls the conclusive denominator stays 4 here.
+  // 1 down of 3 conclusive = 0.33 <= 0.4 → degraded (the null is excluded).
+  assert.equal(
+    rollupTenantResults([false, true, true, null], DEFAULT_RATIOS),
+    "degraded",
+  );
+});
+
+test("rollupTenantResults: empty input → unknown", () => {
+  assert.equal(rollupTenantResults([], DEFAULT_RATIOS), "unknown");
+});

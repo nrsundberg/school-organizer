@@ -11,34 +11,36 @@ import type { ComponentDef } from "./types";
 export const COMPONENTS: ComponentDef[] = [
   // Application section.
   //
-  // These three components are fed by an external uptime monitor (UptimeRobot
-  // / Cloudflare Health Checks) that POSTs to /api/status-probe. They were
-  // previously cron-driven HTTP probes against the worker's own zone, which
-  // returned 522 on every tick because of Cloudflare's same-zone loopback.
-  // See docs/status-page-monitor.md for monitor configuration.
+  // Active cron HTTP probes against the deploy's own public root domain
+  // (env.PUBLIC_ROOT_DOMAIN). A Cloudflare Worker fetching its own zone can
+  // loop back through the edge and return a 520–527 edge error even when the
+  // app is healthy; httpProbe maps that band to "unknown" (inconclusive)
+  // rather than "outage" so a same-zone loopback degrades to gray, never a
+  // false outage. A fresh /api/status-probe webhook row still wins because the
+  // read service takes the latest row by timestamp.
   {
     id: "marketing",
     section: "application",
     name: "Marketing site",
     description: "pickuproster.com landing + public pages",
-    probe: "external",
-    config: {},
+    probe: "http",
+    config: { path: "/", expectStatus: 200, expectSubstring: "Pickup Roster" },
   },
   {
     id: "auth",
     section: "application",
     name: "Auth",
     description: "Login + session service",
-    probe: "external",
-    config: {},
+    probe: "http",
+    config: { path: "/login", expectStatus: 200 },
   },
   {
     id: "app_workers",
     section: "application",
     name: "App workers",
     description: "Cloudflare Workers serving the app",
-    probe: "external",
-    config: {},
+    probe: "http",
+    config: { path: "/api/healthz", expectStatus: 200, expectSubstring: "\"ok\":true" },
   },
 
   // Data section
@@ -108,16 +110,16 @@ export const COMPONENTS: ComponentDef[] = [
 
   // Tenants section.
   //
-  // Externally probed against a canary tenant subdomain. The previous cron
-  // implementation fanned out a fetch per tenant, all hitting the same zone
-  // and receiving 522 from the loopback — see notes on the application-section
-  // components above.
+  // Active cron aggregate probe that fans out a fetch per tenant subdomain on
+  // PUBLIC_ROOT_DOMAIN. Same-zone loopback 520–527 responses are treated as
+  // inconclusive (not failures); if too few tenants return a conclusive
+  // up/down the rollup degrades to "unknown" rather than a false "outage".
   {
     id: "tenants_aggregate",
     section: "tenants",
     name: "Tenant boards",
     description: "Canary probe of a representative tenant subdomain",
-    probe: "external",
+    probe: "tenants_aggregate",
     config: {},
   },
 ];

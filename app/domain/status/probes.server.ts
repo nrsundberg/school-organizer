@@ -23,7 +23,7 @@ export async function runProbe(
   try {
     switch (component.probe) {
       case "http":
-        return await httpProbe(component, started);
+        return await httpProbe(component, env, started);
       case "d1":
         return await d1Probe(component, env, started);
       case "r2":
@@ -67,16 +67,67 @@ export async function runProbe(
 
 // ---- HTTP -----------------------------------------------------------------
 
+/** True for the Cloudflare edge error band (520–527). */
+function isCloudflareEdgeStatus(status: number): boolean {
+  return status >= 520 && status <= 527;
+}
+
+/**
+ * Pure mapping of an observed HTTP status to a ComponentStatus for the http
+ * probe, given the expected status.
+ *
+ * Mirrored verbatim in probes.server.test.ts (repo convention: pure decision
+ * logic is duplicated inline in tests to avoid importing server-only modules).
+ *
+ *   - 520–527 (Cloudflare edge errors) → "unknown" (probe inconclusive). A
+ *     same-zone loopback can return these even when the app is healthy, so we
+ *     never treat them as a real outage.
+ *   - status matches expectStatus (or any 2xx when expectStatus === 200)
+ *     → "operational".
+ *   - anything else (e.g. our own app's 500/404/503) → "outage".
+ */
+function httpStatusToComponentStatus(
+  status: number,
+  expectStatus: number,
+): ComponentStatus {
+  if (isCloudflareEdgeStatus(status)) return "unknown";
+  const ok =
+    status === expectStatus ||
+    (expectStatus === 200 && status >= 200 && status < 300);
+  return ok ? "operational" : "outage";
+}
+
 async function httpProbe(
   component: ComponentDef,
+  env: Env,
   started: number,
 ): Promise<ProbeResult> {
-  const url = String(component.config.url ?? "");
   const expectStatus = Number(component.config.expectStatus ?? 200);
   const expectSubstring =
     typeof component.config.expectSubstring === "string"
       ? (component.config.expectSubstring as string)
       : null;
+
+  // Prefer building the URL from PUBLIC_ROOT_DOMAIN + config.path so staging
+  // probes staging, not prod. Fall back to an absolute config.url when no path
+  // is set (preserves the original behaviour for any future component).
+  const path =
+    typeof component.config.path === "string"
+      ? (component.config.path as string)
+      : null;
+  let url: string;
+  if (path !== null) {
+    const root =
+      (
+        (env as unknown as Record<string, string | undefined>)
+          .PUBLIC_ROOT_DOMAIN ?? ""
+      )
+        .trim()
+        .toLowerCase() || "pickuproster.com";
+    url = `https://${root}${path}`;
+  } else {
+    url = String(component.config.url ?? "");
+  }
 
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS);
@@ -88,14 +139,24 @@ async function httpProbe(
       headers: { "User-Agent": "PickupRoster-StatusProbe/1" },
     });
     const latencyMs = Date.now() - started;
-    const statusOk =
-      res.status === expectStatus ||
-      (expectStatus === 200 && res.status >= 200 && res.status < 300);
 
-    if (!statusOk) {
+    // Cloudflare edge errors (520–527) are inconclusive — a worker fetching
+    // its own zone can loop back through the edge and surface one of these even
+    // when the app is fine. Report "unknown" (gray), never a false outage.
+    if (isCloudflareEdgeStatus(res.status)) {
       return {
         componentId: component.id,
-        status: "outage",
+        status: "unknown",
+        latencyMs,
+        detail: `cloudflare edge status ${res.status} (probe inconclusive)`,
+      };
+    }
+
+    const mapped = httpStatusToComponentStatus(res.status, expectStatus);
+    if (mapped !== "operational") {
+      return {
+        componentId: component.id,
+        status: mapped,
         latencyMs,
         detail: `unexpected HTTP ${res.status}`,
       };
@@ -388,6 +449,35 @@ async function stripeComponentProbe(
 
 // ---- Tenants aggregate ----------------------------------------------------
 
+/**
+ * Pure rollup of per-tenant probe results into a ComponentStatus.
+ *
+ * Each result is `true` (up), `false` (down), or `null` (inconclusive — e.g. a
+ * Cloudflare 520–527 same-zone loopback). The fail ratio is computed over
+ * CONCLUSIVE (non-null) results only. If fewer than half of the probed tenants
+ * returned a conclusive up/down we cannot trust the signal and return
+ * "unknown" rather than risk a false outage.
+ *
+ * Mirrored verbatim in probes.server.test.ts (repo convention).
+ */
+function rollupTenantResults(
+  results: Array<boolean | null>,
+  opts: { degradedRatio: number; outageRatio: number },
+): ComponentStatus {
+  const total = results.length;
+  if (total === 0) return "unknown";
+
+  const conclusive = results.filter((r) => r !== null) as boolean[];
+  // Too few conclusive results (fewer than half) → inconclusive overall.
+  if (conclusive.length < total / 2) return "unknown";
+
+  const fails = conclusive.filter((up) => up === false).length;
+  const failRatio = fails / conclusive.length;
+  if (failRatio > opts.outageRatio) return "outage";
+  if (fails > 0 && failRatio > opts.degradedRatio) return "degraded";
+  return "operational";
+}
+
 async function tenantsAggregateProbe(
   component: ComponentDef,
   env: Env,
@@ -435,34 +525,44 @@ async function tenantsAggregateProbe(
       .trim()
       .toLowerCase() || "pickuproster.com";
 
-  const results = await Promise.allSettled(
+  const settled = await Promise.allSettled(
     slugs.map((slug) => probeTenantSubdomain(slug, publicRoot)),
   );
+  // A hard fetch rejection (timeout / network error) is a real failure → down.
+  // A fulfilled `null` is a 520–527 edge loopback → inconclusive.
+  const results: Array<boolean | null> = settled.map((r) =>
+    r.status === "rejected" ? false : r.value,
+  );
   const total = results.length;
-  const fails = results.filter(
-    (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value),
-  ).length;
+  const conclusive = results.filter((r) => r !== null).length;
+  const fails = results.filter((r) => r === false).length;
 
-  const failRatio = fails / total;
-  let rollup: ComponentStatus = "operational";
-  if (failRatio > outageRatio) {
-    rollup = "outage";
-  } else if (fails > 0 && failRatio > degradedRatio) {
-    rollup = "degraded";
-  }
+  const rollup = rollupTenantResults(results, { degradedRatio, outageRatio });
+  const detail =
+    rollup === "unknown" && conclusive < total / 2
+      ? `only ${conclusive}/${total} tenant subdomains conclusive (probe inconclusive)`
+      : `${fails}/${conclusive} conclusive tenant subdomains failing (${
+          total - conclusive
+        } inconclusive)`;
 
   return {
     componentId: component.id,
     status: rollup,
     latencyMs: Date.now() - started,
-    detail: `${fails}/${total} tenant subdomains failing`,
+    detail,
   };
 }
 
+/**
+ * Probe a single tenant subdomain.
+ *   - `true`  — reachable (status < 500).
+ *   - `null`  — Cloudflare edge error 520–527 (same-zone loopback); inconclusive.
+ *   - `false` — our own app returned 5xx, or the fetch hard-rejected/timed out.
+ */
 async function probeTenantSubdomain(
   slug: string,
   publicRoot: string,
-): Promise<boolean> {
+): Promise<boolean | null> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), PROBE_TIMEOUT_MS);
   try {
@@ -472,9 +572,12 @@ async function probeTenantSubdomain(
       signal: ctrl.signal,
       headers: { "User-Agent": "PickupRoster-StatusProbe/1" },
     });
+    // Cloudflare edge errors are inconclusive, not a tenant failure.
+    if (isCloudflareEdgeStatus(res.status)) return null;
     // Any 2xx/3xx counts as up. Redirects (e.g. to /login) are expected.
     return res.status < 500;
   } catch {
+    // Hard fetch rejection (timeout/network) is a real failure → down.
     return false;
   } finally {
     clearTimeout(t);
