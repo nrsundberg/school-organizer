@@ -81,9 +81,7 @@ export async function getStatusPageData(context: any): Promise<{
   const components: StatusPageComponent[] = COMPONENTS.map((def) => {
     const rows = byComponent.get(def.id) ?? [];
     const latest = rows[rows.length - 1];
-    const currentStatus: ComponentStatus = latest
-      ? normalizeStatus(latest.status)
-      : "unknown";
+    const currentStatus: ComponentStatus = resolveCurrentStatus(latest, now);
     const note = staticNoteFor(def.id, currentStatus);
     return {
       id: def.id,
@@ -127,6 +125,30 @@ export async function getStatusPageData(context: any): Promise<{
 }
 
 // ---- helpers --------------------------------------------------------------
+
+// Cron probes run every ~2 min, and the optional external monitor reports
+// every few minutes. A latest check older than this means we've lost signal —
+// it does NOT mean the component is healthy (or unhealthy) at its last-seen
+// value, so we render "unknown" rather than pinning to a stale status.
+const CHECK_STALE_AFTER_MS = 15 * 60_000;
+
+/**
+ * Resolve a component's live pill from its latest check, guarding against a
+ * stale last-seen row. Returns "unknown" if there is no check, or if the
+ * latest check is older than CHECK_STALE_AFTER_MS relative to `now`. A lost
+ * signal must never keep the page pinned to a stale status (especially a false
+ * outage). Otherwise returns the normalized stored status.
+ */
+export function resolveCurrentStatus(
+  latest: { status: string; checkedAt: Date } | undefined,
+  now: Date
+): ComponentStatus {
+  if (!latest) return "unknown";
+  if (now.getTime() - latest.checkedAt.getTime() > CHECK_STALE_AFTER_MS) {
+    return "unknown";
+  }
+  return normalizeStatus(latest.status);
+}
 
 async function safeStatusRead<T>(
   read: () => Promise<T>,
