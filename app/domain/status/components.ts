@@ -110,16 +110,20 @@ export const COMPONENTS: ComponentDef[] = [
 
   // Tenants section.
   //
-  // Active cron aggregate probe that fans out a fetch per tenant subdomain on
-  // PUBLIC_ROOT_DOMAIN. Same-zone loopback 520–527 responses are treated as
-  // inconclusive (not failures); if too few tenants return a conclusive
-  // up/down the rollup degrades to "unknown" rather than a false "outage".
+  // Fed by the external uptime monitor (UptimeRobot), same as the application
+  // components above. A cron aggregate probe was tried and confirmed unusable:
+  // the worker fanning out fetches to its own *.PUBLIC_ROOT_DOMAIN subdomains
+  // hits the same same-zone loopback as the apex — the subrequests time out and
+  // count as failures, reporting a false outage even when every tenant board is
+  // healthy from the outside. An off-box monitor is the only reliable signal.
+  // The tenantsAggregateProbe code is retained in probes.server.ts for a future
+  // environment where same-zone fetches resolve. See docs/status-page-monitor.md.
   {
     id: "tenants_aggregate",
     section: "tenants",
     name: "Tenant boards",
     description: "Canary probe of a representative tenant subdomain",
-    probe: "tenants_aggregate",
+    probe: "external",
     config: {},
   },
 ];
