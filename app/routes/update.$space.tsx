@@ -68,7 +68,7 @@ export async function action({ params, request, context }: Route.ActionArgs) {
       select: {
         name: true,
         students: {
-          select: { id: true, firstName: true, lastName: true, homeRoom: true },
+          select: { id: true, firstName: true, lastName: true, suffix: true, homeRoom: true },
         },
       },
     }),
@@ -81,7 +81,7 @@ export async function action({ params, request, context }: Route.ActionArgs) {
   const students = household?.students ?? [];
   const sole = students.length === 1 ? students[0] : null;
   const studentName = sole
-    ? `${sole.firstName} ${sole.lastName}`
+    ? [sole.firstName, sole.lastName, sole.suffix].filter(Boolean).join(" ")
     : household && students.length > 1
       ? household.name
       : `Space ${spaceNumber}`;

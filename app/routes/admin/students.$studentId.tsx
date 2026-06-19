@@ -118,11 +118,12 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   ]);
 
   return {
-    metaTitle: `${student.firstName} ${student.lastName}`,
+    metaTitle: [student.firstName, student.lastName, student.suffix].filter(Boolean).join(" "),
     student: {
       id: student.id,
       firstName: student.firstName,
       lastName: student.lastName,
+      suffix: student.suffix ?? null,
       homeRoom: student.homeRoom,
       householdId: student.householdId,
     },
@@ -185,6 +186,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
     if (intent === "saveProfile") {
       const firstName = String(formData.get("firstName") ?? "").trim();
       const lastName = String(formData.get("lastName") ?? "").trim();
+      const suffix = String(formData.get("suffix") ?? "").trim() || null;
       const homeRoom = String(formData.get("homeRoom") ?? "").trim();
 
       if (!firstName || !lastName) {
@@ -203,6 +205,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         data: {
           firstName,
           lastName,
+          suffix,
           homeRoom: homeRoom || null,
         },
       });
@@ -255,7 +258,9 @@ export default function StudentDetail({ loaderData }: Route.ComponentProps) {
     setSearchParams(sp, { replace: true });
   };
 
-  const fullName = `${student.firstName} ${student.lastName}`;
+  const fullName = [student.firstName, student.lastName, student.suffix]
+    .filter(Boolean)
+    .join(" ");
   const initials = initialsFromName(fullName);
 
   return (
@@ -337,7 +342,7 @@ function Breadcrumb({
           <span className="text-white/25">/</span>
         </>
       ) : null}
-      <span className="text-white/80">{student.firstName} {student.lastName}</span>
+      <span className="text-white/80">{student.firstName} {student.lastName}{student.suffix ? ` ${student.suffix}` : ""}</span>
     </nav>
   );
 }
@@ -372,7 +377,7 @@ function HeaderCard({
       />
       <div className="min-w-0 flex-1">
         <h1 className="text-2xl font-semibold tracking-tight text-white">
-          {student.firstName} {student.lastName}
+          {student.firstName} {student.lastName}{student.suffix ? ` ${student.suffix}` : ""}
         </h1>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {todaysException ? (
@@ -542,6 +547,9 @@ function ProfileTab({
           </Field>
           <Field label={t("students.fields.lastName")}>
             <Input name="lastName" defaultValue={student.lastName} required />
+          </Field>
+          <Field label={t("students.fields.suffix")}>
+            <Input name="suffix" defaultValue={student.suffix ?? ""} placeholder={t("students.fields.suffixPlaceholder")} />
           </Field>
         </div>
 

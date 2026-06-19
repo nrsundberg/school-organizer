@@ -548,6 +548,8 @@ model Student {
   org         Org      @relation(fields: [orgId], references: [id])
   firstName   String
   lastName    String
+  /// Optional name suffix (Jr., Sr., II, III, IV, etc.). Null for most students.
+  suffix      String?
   /// Siblings share one household; each distinct household (or unassigned student) counts toward family cap.
   /// Space (car-line) number lives on Household — children inherit their household's space.
   householdId String?
