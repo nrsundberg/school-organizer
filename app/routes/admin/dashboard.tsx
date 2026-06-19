@@ -530,8 +530,12 @@ function ActivityRow({
     : {};
   return (
     <Wrapper {...wrapperProps}>
-      <div className="group flex items-start gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-white/[0.04]">
-        <span className="mt-1 inline-flex h-2 w-2 shrink-0 rounded-full bg-white/30 group-hover:bg-blue-400/80" />
+      <div
+        className={`group flex items-start gap-3 rounded-lg px-3 py-2 transition-colors${item.href ? " hover:bg-white/[0.04]" : ""}`}
+      >
+        <span
+          className={`mt-1 inline-flex h-2 w-2 shrink-0 rounded-full bg-white/30${item.href ? " group-hover:bg-blue-400/80" : ""}`}
+        />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm text-white/85">
             {item.primary}
