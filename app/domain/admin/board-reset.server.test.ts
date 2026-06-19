@@ -9,16 +9,17 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildBoardResetBatch, type D1Like } from "./board-reset.server";
+import { buildBoardResetBatch } from "./board-reset.server";
 
 // ---------------------------------------------------------------------------
 // Minimal D1 fake — records which SQL strings were prepared and which bind
-// values were attached.
+// values were attached. Cast to the ambient `D1Database` type; only `prepare`
+// and `bind` are exercised by buildBoardResetBatch.
 // ---------------------------------------------------------------------------
 
 type PreparedCall = { sql: string; bindings: unknown[] };
 
-function fakeD1(): { d1: D1Like; calls: PreparedCall[] } {
+function fakeD1(): { d1: D1Database; calls: PreparedCall[] } {
   const calls: PreparedCall[] = [];
 
   function makeStmt(sql: string, bindings: unknown[]) {
@@ -30,7 +31,7 @@ function fakeD1(): { d1: D1Like; calls: PreparedCall[] } {
     };
   }
 
-  const d1: D1Like = {
+  const d1 = {
     prepare(sql: string) {
       const stmt = makeStmt(sql, []);
       // Wrap bind to record the final stmt into calls when the outer batch
@@ -47,9 +48,9 @@ function fakeD1(): { d1: D1Like; calls: PreparedCall[] } {
           }
           return (target as Record<string | symbol, unknown>)[prop];
         },
-      }) as unknown as ReturnType<D1Like["prepare"]>;
+      }) as unknown as D1PreparedStatement;
     },
-  };
+  } as unknown as D1Database;
 
   return { d1, calls };
 }

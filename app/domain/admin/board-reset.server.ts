@@ -8,16 +8,10 @@
  *
  * The raw D1 batch interface is used because D1's Prisma adapter ignores
  * $transaction; the caller obtains the D1 binding from context and invokes
- * `d1.batch(buildBoardResetBatch(d1, orgId, nowIso))`.
+ * `d1.batch(buildBoardResetBatch(d1, orgId, nowIso))`. `D1Database` and
+ * `D1PreparedStatement` are the ambient Cloudflare Workers types, so the result
+ * is directly assignable to `d1.batch(...)`.
  */
-
-export type D1PreparedStatement = {
-  bind: (...values: unknown[]) => D1PreparedStatement;
-};
-
-export type D1Like = {
-  prepare: (sql: string) => D1PreparedStatement;
-};
 
 /**
  * Build the D1 batch statements for a board reset.
@@ -31,7 +25,7 @@ export type D1Like = {
  * pickup history — deleting it on reset was the root cause of #74.
  */
 export function buildBoardResetBatch(
-  d1: D1Like,
+  d1: D1Database,
   orgId: string,
   nowIso: string,
 ): D1PreparedStatement[] {
