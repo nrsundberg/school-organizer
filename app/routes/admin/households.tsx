@@ -1329,7 +1329,13 @@ function StudentCheckboxList({
         >
           <input type="checkbox" name="studentIds" value={student.id} className="mt-1" />
           <span>
-            <span className="font-medium">{studentDisplayName(student)}</span>
+            <Link
+              to={`/admin/students/${student.id}`}
+              className="font-medium hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 rounded"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {studentDisplayName(student)}
+            </Link>
             <span className="block text-xs text-white/45">
               {student.homeRoom
                 ? t("households.studentList.homeroomSeparator", {
