@@ -8,7 +8,6 @@ import {
   Megaphone,
   Plus,
   Search,
-  TrendingUp,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -24,13 +23,11 @@ import {
 import { groupDuplicateHouseholds } from "~/domain/households/merge.server";
 import {
   DISMISSAL_PLANS,
-  dateRangeFromSearchParams,
   exceptionActiveOn,
   parseDateOnly,
   parseOptionalDateOnly,
   toDateInputValue,
 } from "~/domain/dismissal/schedule";
-import { buildRoiDashboardSnapshot } from "~/domain/dismissal/roi.server";
 import { chunk, chunkedFindMany, groupBy } from "~/db/chunked-in";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
 import { broadcastProgramCancellation } from "~/lib/broadcast.server";
@@ -119,7 +116,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const url = new URL(request.url);
-  const roiRange = dateRangeFromSearchParams(url);
 
   // Pagination + name search. Schools can grow into the hundreds of
   // households; loading them all on one page is both slow and unusable.
@@ -144,7 +140,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     totalHouseholds,
     householdOptions,
     unassignedStudents,
-    roi,
     activeExceptionsRaw,
     programs,
     recentCancellations,
@@ -173,7 +168,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         homeRoom: true,
       },
     }),
-    buildRoiDashboardSnapshot(prisma, roiRange),
     prisma.dismissalException.findMany({
       where: { isActive: true },
       orderBy: [{ updatedAt: "desc" }],
@@ -421,7 +415,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       householdsMissingContact: householdsMissingContactCount,
     },
     unassignedStudents,
-    roi,
     activeExceptions: activeExceptions.map((exception) => ({
       ...exception,
       exceptionDate: toDateInputValue(exception.exceptionDate),
@@ -686,7 +679,6 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
     householdOptions,
     pagination,
     unassignedStudents,
-    roi,
     activeExceptions,
     programs,
     recentCancellations,
@@ -756,8 +748,6 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
           tone={stats.householdsMissingContact > 0 ? "warning" : "default"}
         />
       </section>
-
-      <RoiPanel roi={roi} />
 
       {/* Create household drawer (collapsible) */}
       {createOpen ? (
@@ -1171,115 +1161,6 @@ function HouseholdsPaginationControls({
         <span aria-hidden="true" />
       )}
     </nav>
-  );
-}
-
-function RoiPanel({ roi }: { roi: LoaderData["roi"] }) {
-  const { t } = useTranslation("admin");
-  return (
-    <section
-      id="roi"
-      className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.07] p-5"
-    >
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-emerald-200">
-            <TrendingUp className="h-4 w-4" />
-            {t("households.roi.eyebrow")}
-          </div>
-          <h2 className="mt-2 text-lg font-semibold text-white">
-            {t("households.roi.summary", {
-              calls: roi.avoidedCalls.total,
-              minutes: roi.minutesSaved,
-            })}
-          </h2>
-          <p className="mt-1 max-w-3xl text-sm text-white/70">
-            {t("households.roi.rangeNote", {
-              from: roi.range.from,
-              to: roi.range.to,
-            })}
-          </p>
-        </div>
-        <Form method="get" className="grid gap-3 sm:grid-cols-3">
-          <Field label={t("households.roi.fromLabel")}>
-            <input
-              type="date"
-              name="from"
-              defaultValue={roi.range.from}
-              className="app-field"
-            />
-          </Field>
-          <Field label={t("households.roi.toLabel")}>
-            <input
-              type="date"
-              name="to"
-              defaultValue={roi.range.to}
-              className="app-field"
-            />
-          </Field>
-          <Button type="submit" variant="secondary" className="self-end">
-            {t("households.roi.refresh")}
-          </Button>
-        </Form>
-      </div>
-
-      <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <RoiMetric
-          label={t("households.roi.metrics.householdGroups")}
-          value={String(roi.householdGroups)}
-          detail={t("households.roi.metrics.householdGroupsDetail", {
-            count: roi.householdSiblingSlots,
-          })}
-        />
-        <RoiMetric
-          label={t("households.roi.metrics.recurringExceptions")}
-          value={String(roi.exceptionOccurrences)}
-          detail={t("households.roi.metrics.recurringExceptionsDetail", {
-            count: roi.avoidedCalls.exceptions,
-          })}
-        />
-        <RoiMetric
-          label={t("households.roi.metrics.programCancellations")}
-          value={String(roi.programCancellations)}
-          detail={t("households.roi.metrics.programCancellationsDetail", {
-            count: roi.avoidedCalls.cancellations,
-          })}
-        />
-        <RoiMetric
-          label={t("households.roi.metrics.pickupDaysWithCalls")}
-          value={String(roi.pickupDaysWithCalls)}
-          detail={t("households.roi.metrics.pickupDaysWithCallsDetail", {
-            count: roi.baselineCalls,
-          })}
-        />
-      </div>
-
-      <p className="mt-4 text-xs text-white/55">
-        {t("households.roi.assumptions", {
-          minutes: roi.assumptions.minutesPerAvoidedCall,
-          exceptions: roi.assumptions.callsAvoidedPerExceptionOccurrence,
-          cancellations: roi.assumptions.callsAvoidedPerProgramCancellation,
-        })}
-      </p>
-    </section>
-  );
-}
-
-function RoiMetric({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-      <p className="text-xs uppercase tracking-wide text-white/50">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
-      <p className="mt-1 text-sm text-white/60">{detail}</p>
-    </div>
   );
 }
 
