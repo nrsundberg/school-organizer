@@ -6,6 +6,7 @@ import { suspendExpiredTrialingOrgs } from "../app/domain/billing/trial-expiry.s
 import { runTrialEmailNotifications } from "../app/domain/email/trial-notifications.server";
 import { handleEmailQueue } from "../app/domain/email/consumer.server";
 import { pruneExpiredPasswordResetTokens } from "../app/domain/auth/password-reset.server";
+import { pruneOldCallEvents } from "../app/domain/admin/call-event-retention.server";
 import { runStatusProbes } from "../app/domain/status/runner.server";
 import type { EmailMessage } from "../app/domain/email/types";
 import {
@@ -196,6 +197,18 @@ export default withSentry(
           }
         } catch (e) {
           console.error("password-reset token prune failed", e);
+          // Isolated: cleanup failure shouldn't break the rest of the cron.
+        }
+        // Enforce each tenant's pickup-history retention window (D1 has no
+        // native row TTL). Tenants default to 90 days; CallEvent older than
+        // their window is pruned here.
+        try {
+          const pruned = await pruneOldCallEvents(context);
+          if (pruned > 0) {
+            console.log(`[cron] pruned ${pruned} expired call-event(s).`);
+          }
+        } catch (e) {
+          console.error("call-event retention prune failed", e);
           // Isolated: cleanup failure shouldn't break the rest of the cron.
         }
       } catch (e) {

@@ -670,6 +670,10 @@
     },
     "heading": "Historial y reportes",
     "metaTitle": "Administración – Historial y reportes",
+    "retention": {
+      "note": "El historial de recogidas se conserva durante {{days}} días. ¿Necesitas una retención más larga?",
+      "contact": "Contactar a soporte"
+    },
     "stats": {
       "busiestDay": "Día más ocupado",
       "dash": "—",
