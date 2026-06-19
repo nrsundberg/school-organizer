@@ -991,6 +991,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
           method="get"
           className="flex flex-wrap items-end gap-3"
           role="search"
+          preventScrollReset
         >
           <Field label={t("households.search.label")}>
             <div className="relative">
@@ -1015,6 +1016,7 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
             <Link
               to={pagination.filter !== "all" ? `?filter=${pagination.filter}` : "?"}
               className="rounded-full border border-white/15 px-3 py-2 text-sm text-white/70 hover:border-white/30 hover:text-white"
+              preventScrollReset
             >
               {t("households.search.clear")}
             </Link>
@@ -1061,6 +1063,10 @@ export default function AdminHouseholds({ loaderData }: Route.ComponentProps) {
             label={t("households.filters.multiStudent")}
           />
         </div>
+
+        {pagination.totalPages > 1 ? (
+          <HouseholdsPaginationControls pagination={pagination} t={t} />
+        ) : null}
 
         <div className="grid gap-4 xl:grid-cols-2">
           {households.length === 0 ? (
@@ -1116,6 +1122,7 @@ function FilterPill({
           : "border-white/10 bg-white/5 text-white/65 hover:border-white/25 hover:text-white"
       }`}
       aria-pressed={active}
+      preventScrollReset
     >
       {label}
     </Link>
@@ -1150,6 +1157,7 @@ function HouseholdsPaginationControls({
           to={buildHref(prevPage)}
           rel="prev"
           className="rounded-full border border-white/15 px-3 py-1 text-white/80 hover:border-white/30 hover:text-white"
+          preventScrollReset
         >
           {t("households.pagination.prev")}
         </Link>
@@ -1164,6 +1172,7 @@ function HouseholdsPaginationControls({
           to={buildHref(nextPage)}
           rel="next"
           className="rounded-full border border-white/15 px-3 py-1 text-white/80 hover:border-white/30 hover:text-white"
+          preventScrollReset
         >
           {t("households.pagination.next")}
         </Link>
