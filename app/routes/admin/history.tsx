@@ -18,7 +18,11 @@ import {
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
 import { formatActorLabel } from "~/domain/auth/format-actor";
+import { DEFAULT_HISTORY_RETENTION_DAYS } from "~/domain/admin/call-event-retention.server";
 import { planAllowsReports } from "~/lib/plan-limits";
+
+/** Where tenants are pointed for longer-than-default retention requests. */
+const SUPPORT_EMAIL = "support@pickuproster.com";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
 
@@ -344,12 +348,22 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (filters.room) homeroomSet.add(filters.room);
   const homerooms = Array.from(homeroomSet).sort();
 
+  // Per-tenant retention window, surfaced in the page notice. Defaults to 90
+  // for orgs without an AppSettings row yet.
+  const settingsRow = await prisma.appSettings.findUnique({
+    where: { orgId: org.id },
+    select: { historyRetentionDays: true },
+  });
+  const retentionDays =
+    settingsRow?.historyRetentionDays ?? DEFAULT_HISTORY_RETENTION_DAYS;
+
   return {
     upgradeRequired: false as const,
     orgName: org.name,
     orgSlug: org.slug,
     billingPlan: org.billingPlan,
     metaTitle: t("history.metaTitle"),
+    retentionDays,
     filters: {
       from: filters.fromIso,
       to: filters.toIso,
@@ -429,8 +443,12 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
     );
   }
 
-  const { filters, rows, truncated, rowCap, summary, homerooms, orgName } =
+  const { filters, rows, truncated, rowCap, summary, homerooms, orgName, retentionDays } =
     loaderData;
+
+  const supportMailto = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(
+    `Longer history retention for ${orgName}`,
+  )}`;
 
   // Build the CSV export href by carrying the current filters forward.
   const csvParams = new URLSearchParams();
@@ -449,6 +467,17 @@ export default function AdminHistory({ loaderData }: Route.ComponentProps) {
         <p className="text-sm text-white/60">
           {t("history.tenant")}<span className="text-white">{orgName}</span>
         </p>
+      </div>
+
+      {/* Retention notice + support escalation for longer windows. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-white/10 bg-white/[0.02] px-4 py-2.5 text-xs text-white/60">
+        <span>{t("history.retention.note", { days: retentionDays })}</span>
+        <a
+          href={supportMailto}
+          className="font-semibold text-[#E9D500] hover:brightness-110"
+        >
+          {t("history.retention.contact")}
+        </a>
       </div>
 
       {/* Filter bar */}

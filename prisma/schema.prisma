@@ -419,6 +419,12 @@ model AppSettings {
   /// been wiped before the morning bell. Nullable for orgs that have
   /// never reset (or are on a fresh install).
   lastBoardResetAt       DateTime?
+  /// How many days of pickup history (CallEvent rows) this tenant keeps.
+  /// D1 has no native row TTL, so a daily cron prunes CallEvent older than
+  /// this window (see pruneOldCallEvents). Defaults to 90; surfaced on
+  /// /admin/history. Intended as a future paid add-on — bump the value to
+  /// extend a tenant's retention.
+  historyRetentionDays   Int     @default(90)
 }
 
 model ViewerAccessAttempt {

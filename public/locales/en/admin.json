@@ -672,6 +672,10 @@
     },
     "heading": "History & Reports",
     "metaTitle": "Admin – History & Reports",
+    "retention": {
+      "note": "Pickup history is kept for {{days}} days. Need longer retention?",
+      "contact": "Contact support"
+    },
     "stats": {
       "busiestDay": "Busiest day",
       "dash": "—",

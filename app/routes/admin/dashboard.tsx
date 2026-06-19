@@ -42,6 +42,7 @@ import {
 import { broadcastBoardReset } from "~/lib/broadcast.server";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
+import { buildBoardResetBatch } from "~/domain/admin/board-reset.server";
 import {
   endOfUtcDay,
   exceptionActiveOn,
@@ -360,21 +361,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     // timestamps. Stored as ISO string; D1's DATETIME column accepts it.
     const d1 = (context as any).cloudflare.env.D1_DATABASE as D1Database;
     const nowIso = new Date().toISOString();
-    await d1.batch([
-      d1
-        .prepare(
-          'UPDATE "Space" SET status = ?, timestamp = NULL WHERE orgId = ?',
-        )
-        .bind(Status.EMPTY, org.id),
-      d1.prepare('DELETE FROM "CallEvent" WHERE orgId = ?').bind(org.id),
-      // Upsert the stamp. AppSettings has orgId as PK so an INSERT-with-
-      // conflict pattern is the cleanest single-statement approach in D1.
-      d1
-        .prepare(
-          'INSERT INTO "AppSettings" ("orgId", "viewerDrawingEnabled", "lastBoardResetAt") VALUES (?, 0, ?) ON CONFLICT("orgId") DO UPDATE SET "lastBoardResetAt" = excluded."lastBoardResetAt"',
-        )
-        .bind(org.id, nowIso),
-    ]);
+    // buildBoardResetBatch deliberately omits a DELETE on CallEvent — those
+    // rows are the persistent history that backs /admin/history (fixes #74).
+    await d1.batch(buildBoardResetBatch(d1, org.id, nowIso));
     try {
       await broadcastBoardReset((context as any).cloudflare.env, org.id);
     } catch {
