@@ -54,6 +54,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const homeRoom = formData.get("homeRoom") as string;
   const firstName = formData.get("firstName") as string;
   const lastName = formData.get("lastName") as string;
+  const suffix = (formData.get("suffix") as string | null)?.trim() || null;
 
   try {
     if (!firstName?.trim() || !lastName?.trim()) {
@@ -85,6 +86,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       data: {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        suffix,
         homeRoom: trimmedHomeRoom || null,
         householdId,
       }
@@ -96,10 +98,11 @@ export async function action({ request, context }: Route.ActionArgs) {
       await syncUsageGracePeriod(prisma, freshOrg, nextCounts);
     }
 
+    const displayName = [student.firstName, student.lastName, student.suffix]
+      .filter(Boolean)
+      .join(" ");
     return redirectWithSuccess("/admin", {
-      message: t("create.student.created", {
-        name: `${student.firstName} ${student.lastName}`,
-      }),
+      message: t("create.student.created", { name: displayName }),
     });
   } catch (error) {
     console.error("Error creating student:", error);
@@ -120,6 +123,7 @@ export default function CreateStudent({ loaderData }: Route.ComponentProps) {
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [suffix, setSuffix] = useState("");
   const [homeRoom, setHomeRoom] = useState("");
 
   const isSubmitting = fetcher.state === "submitting";
@@ -145,6 +149,10 @@ export default function CreateStudent({ loaderData }: Route.ComponentProps) {
               <div className="flex flex-col gap-1">
                 <label htmlFor="lastName" className="text-sm text-gray-400">{t("create.student.lastName")}</label>
                 <Input id="lastName" name="lastName" placeholder={t("create.student.lastNamePlaceholder")} value={lastName} onChange={(e) => setLastName(e.target.value)} required disabled={isSubmitting} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="suffix" className="text-sm text-gray-400">{t("create.student.suffix")}</label>
+                <Input id="suffix" name="suffix" placeholder={t("create.student.suffixPlaceholder")} value={suffix} onChange={(e) => setSuffix(e.target.value)} disabled={isSubmitting} />
               </div>
             </div>
           </div>
@@ -182,7 +190,7 @@ export default function CreateStudent({ loaderData }: Route.ComponentProps) {
           )}
 
           <div className="flex justify-between items-center pt-6 border-t">
-            <Button variant="ghost" onPress={() => { setFirstName(""); setLastName(""); setHomeRoom(""); }} isDisabled={isSubmitting}>
+            <Button variant="ghost" onPress={() => { setFirstName(""); setLastName(""); setSuffix(""); setHomeRoom(""); }} isDisabled={isSubmitting}>
               <ArrowLeftIcon size={16} /> {tCommon("buttons.back")}
             </Button>
             <div className="flex gap-3">

@@ -12,10 +12,12 @@
 type StudentName = {
   firstName: string;
   lastName: string;
+  suffix?: string | null;
 };
 
 export function studentDisplayName(student: StudentName): string {
-  return `${student.firstName} ${student.lastName}`.trim();
+  const base = `${student.firstName} ${student.lastName}`.trim();
+  return student.suffix ? `${base} ${student.suffix}` : base;
 }
 
 export function parseStudentIds(formData: FormData): number[] {

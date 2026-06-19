@@ -82,6 +82,7 @@ export async function findLinkedHouseholdsForUser(
     select: {
       firstName: true,
       lastName: true,
+      suffix: true,
       homeRoom: true,
       householdId: true,
     },
@@ -98,7 +99,9 @@ export async function findLinkedHouseholdsForUser(
     return {
       id: h.id,
       name: h.name,
-      studentNames: list.map((s) => `${s.firstName} ${s.lastName}`.trim()),
+      studentNames: list.map((s) =>
+        [s.firstName, s.lastName, s.suffix].filter(Boolean).join(" "),
+      ),
       classroomList: Array.from(
         new Set(
           list

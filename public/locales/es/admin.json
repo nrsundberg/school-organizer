@@ -182,6 +182,8 @@
       "homeroomPlaceholder": "Selecciona un salón principal existente",
       "lastName": "Apellido",
       "lastNamePlaceholder": "Ingresa el apellido",
+      "suffix": "Sufijo (Opcional)",
+      "suffixPlaceholder": "Jr., Sr., III…",
       "leaveEmpty": "Déjalo vacío si no está asignado",
       "metaTitle": "Crear estudiante",
       "spaceHint": "El número de espacio se establece en la familia — asígnalo desde la página del hogar una vez que el estudiante esté agrupado.",
@@ -1185,7 +1187,9 @@
       "lastName": "Apellido",
       "medication": "Medicación",
       "noneOnFile": "Sin registro",
-      "space": "Espacio"
+      "space": "Espacio",
+      "suffix": "Sufijo (Opcional)",
+      "suffixPlaceholder": "Jr., Sr., III…"
     },
     "healthFieldsNote": "Los campos de salud aún no están conectados al esquema — próximamente.",
     "householdRail": {
