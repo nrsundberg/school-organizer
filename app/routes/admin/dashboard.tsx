@@ -43,6 +43,9 @@ import { broadcastBoardReset } from "~/lib/broadcast.server";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
 import { buildBoardResetBatch } from "~/domain/admin/board-reset.server";
+import { enqueueEmails } from "~/domain/email/queue.server";
+import type { StudentsDeletedMessage } from "~/domain/email/types";
+import { getSupportEmail } from "~/lib/site";
 import {
   endOfUtcDay,
   exceptionActiveOn,
@@ -373,8 +376,54 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   if (action === "deleteStudents") {
+    // Destructive + irreversible-in-app: lock to ADMIN only (CONTROLLER can
+    // reach the rest of the dashboard but must not wipe the roster).
+    const actor = await requireRole(context, "ADMIN");
+
+    const deletedCount = await prisma.student.count();
     await prisma.student.deleteMany();
-    return dataWithWarning(null, t("dashboard.actions.deletedAll"));
+
+    // Notify every org admin + Pickup Roster ops that the roster was wiped, so
+    // a surprise/accidental deletion is caught while it's still recoverable
+    // from database backups.
+    const admins = await prisma.user.findMany({
+      where: { role: "ADMIN" },
+      select: { email: true, locale: true },
+    });
+    const actorLabel =
+      (actor.name && actor.name.trim().length > 0
+        ? actor.name
+        : (actor as { email?: string }).email) ?? t("dashboard.danger.unknownActor");
+    const deletedAt = new Date().toLocaleString(locale);
+    const supportEmail = getSupportEmail(context);
+
+    const messages: StudentsDeletedMessage[] = admins
+      .filter((a): a is { email: string; locale: string } => !!a.email)
+      .map((a) => ({
+        kind: "students_deleted" as const,
+        to: a.email,
+        orgName: org.name,
+        actorLabel,
+        deletedCount,
+        deletedAt,
+        locale: a.locale ?? "en",
+      }));
+    // Add the internal ops recipient unless an admin already covers that inbox.
+    if (!messages.some((m) => m.to === supportEmail)) {
+      messages.push({
+        kind: "students_deleted",
+        to: supportEmail,
+        orgName: org.name,
+        actorLabel,
+        deletedCount,
+        deletedAt,
+        isOps: true,
+        locale: "en",
+      });
+    }
+    await enqueueEmails(context, messages);
+
+    return dataWithWarning(null, t("dashboard.actions.deletedAll", { count: deletedCount }));
   }
 
   return dataWithError(null, t("dashboard.actions.unknown"));
@@ -933,8 +982,11 @@ export default function AdminDashboard({ loaderData }: Route.ComponentProps) {
               {t("dashboard.danger.heading")}
             </h3>
           </div>
-          <p className="mb-3 text-sm text-rose-200/70">
+          <p className="mb-2 text-sm text-rose-200/70">
             {t("dashboard.danger.subtitle")}
+          </p>
+          <p className="mb-3 text-xs text-rose-200/60">
+            {t("dashboard.danger.notice")}
           </p>
           <Button
             variant="danger"

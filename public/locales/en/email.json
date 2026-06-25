@@ -62,5 +62,14 @@
       "para1": "Your trial ends tomorrow. To keep PickupRoster running at {{orgName}} without a gap, upgrade here: {{appLink}}",
       "para1Html": "Your trial ends tomorrow. To keep PickupRoster running at {{orgName}} without a gap, upgrade here: <a href=\"{{appLink}}\">{{appLink}}</a>"
     }
+  },
+  "studentsDeleted": {
+    "subject": "All student records deleted for {{orgName}}",
+    "preview": "{{actor}} deleted {{count}} student records.",
+    "heading": "Student records were deleted",
+    "para1": "{{actor}} deleted all student records for {{orgName}} on {{when}} — {{count}} records in total. Households and classrooms were kept.",
+    "para1Ops": "Heads up: {{actor}} deleted all {{count}} student records for {{orgName}} on {{when}} via the dashboard Danger Zone. Households and classrooms were kept.",
+    "para2": "If you expected this, no action is needed.",
+    "recovery": "If this was a mistake, the data can still be recovered from database backups for a limited time. Reply to this email or contact support@pickuproster.com as soon as possible."
   }
 }
