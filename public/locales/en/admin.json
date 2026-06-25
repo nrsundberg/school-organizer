@@ -468,7 +468,15 @@
         "saving": "Saving…",
         "saved": "Saved",
         "idle": "All changes saved"
-      }
+      },
+      "addSelection": "Add selection",
+      "kindSelection": "Selection",
+      "autofillColumnLabel": "Auto-fill column",
+      "autofillNone": "Auto-fill: none",
+      "autofillInto": "Auto-fill → {{label}}",
+      "selectClassroom": "Select classroom…",
+      "overridden": "Overridden",
+      "resetAutofill": "Reset"
     },
     "library": {
       "alreadyCloned": "Already cloned",

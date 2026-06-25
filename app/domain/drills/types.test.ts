@@ -89,6 +89,49 @@ describe("parseTemplateDefinition", () => {
     assert.equal(out.rows[0].cells.c3, undefined);
   });
 
+  it("preserves selection columns, their source config, and backfills cells", () => {
+    const input = {
+      columns: [
+        {
+          id: "c1",
+          label: "Classroom",
+          kind: "selection" as const,
+          selectionSource: { type: "classrooms", autoFillColumnId: "c2" },
+        },
+        { id: "c2", label: "Teacher", kind: "text" as const },
+        { id: "c3", label: "Done", kind: "toggle" as const },
+      ],
+      rows: [{ id: "r1", cells: { c1: "Room 101" } }],
+    };
+    const out = parseTemplateDefinition(input as object);
+    assert.equal(out.columns[0].kind, "selection");
+    assert.deepEqual(out.columns[0].selectionSource, {
+      type: "classrooms",
+      autoFillColumnId: "c2",
+    });
+    // Selection cells are value-bearing like text cells.
+    assert.equal(out.rows[0].cells.c1, "Room 101");
+    // The auto-fill target (text) cell is backfilled to "".
+    assert.equal(out.rows[0].cells.c2, "");
+  });
+
+  it("keeps row overrides and drops non-string entries", () => {
+    const input = {
+      columns: [
+        { id: "c1", label: "Teacher", kind: "text" as const },
+        { id: "c2", label: "Done", kind: "toggle" as const },
+      ],
+      rows: [
+        { id: "r1", cells: { c1: "Ms. Lee" }, overrides: ["c1", 5, null] },
+        { id: "r2", cells: { c1: "Mr. Poe" }, overrides: [] },
+      ],
+    };
+    const out = parseTemplateDefinition(input as object);
+    assert.deepEqual(out.rows[0].overrides, ["c1"]);
+    // Empty override arrays are dropped (no key).
+    assert.equal(out.rows[1].overrides, undefined);
+  });
+
   it("returns defaultTemplateDefinition() for null", () => {
     const out = parseTemplateDefinition(null);
     assert.equal(out.columns.length, defaultTemplateDefinition().columns.length);

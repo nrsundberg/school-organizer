@@ -468,7 +468,15 @@
         "saving": "Guardando…",
         "saved": "Guardado",
         "idle": "Todos los cambios guardados"
-      }
+      },
+      "addSelection": "Agregar selección",
+      "kindSelection": "Selección",
+      "autofillColumnLabel": "Columna de autocompletado",
+      "autofillNone": "Autocompletar: ninguno",
+      "autofillInto": "Autocompletar → {{label}}",
+      "selectClassroom": "Seleccionar aula…",
+      "overridden": "Modificado",
+      "resetAutofill": "Restablecer"
     },
     "library": {
       "alreadyCloned": "Ya clonada",

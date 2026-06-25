@@ -12,7 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import { StartLivePopover } from "~/domain/drills/StartLivePopover";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import { useTranslation } from "react-i18next";
@@ -132,9 +132,10 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   if (!id) {
     throw new Response("Not found", { status: 404 });
   }
-  // The template lookup and the locale resolution share no data dependency,
-  // so run them concurrently (one Prisma client per request makes this safe).
-  const [template, locale] = await Promise.all([
+  // The template lookup, the classroom list (the data source for "selection"
+  // columns), and the locale resolution share no data dependency, so run them
+  // concurrently (one Prisma client per request makes this safe).
+  const [template, classroomRows, locale] = await Promise.all([
     prisma.drillTemplate.findFirst({
       where: { id, deletedAt: null },
       select: {
@@ -147,13 +148,25 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
         instructions: true,
       },
     }),
+    prisma.teacher.findMany({
+      select: { homeRoom: true, teacherName: true },
+      orderBy: [{ gradeLevel: "asc" }, { homeRoom: "asc" }],
+    }),
     detectLocale(request, context),
   ]);
   if (!template) {
     throw new Response("Not found", { status: 404 });
   }
+  // Shape for the editor: each classroom's homeroom label + its teacher name
+  // (so picking a homeroom can auto-fill a teacher column).
+  const classrooms = classroomRows.map(
+    (c: { homeRoom: string; teacherName: string | null }) => ({
+      homeRoom: c.homeRoom,
+      teacherName: c.teacherName ?? "",
+    }),
+  );
   const t = await getFixedT(locale, "admin");
-  return { template, metaTitle: t("drills.metaEdit", { name: template.name }) };
+  return { template, classrooms, metaTitle: t("drills.metaEdit", { name: template.name }) };
 }
 
 export async function action({ request, context, params }: Route.ActionArgs) {
@@ -302,10 +315,14 @@ function newId(): string {
 
 function cloneDefinition(def: TemplateDefinition): TemplateDefinition {
   const cloned: TemplateDefinition = {
-    columns: def.columns.map((c) => ({ ...c })),
+    columns: def.columns.map((c) => ({
+      ...c,
+      ...(c.selectionSource ? { selectionSource: { ...c.selectionSource } } : {}),
+    })),
     rows: def.rows.map((r) => {
       const row: typeof r = { id: r.id, cells: { ...r.cells } };
       if (r.sectionId !== undefined) row.sectionId = r.sectionId;
+      if (r.overrides && r.overrides.length > 0) row.overrides = [...r.overrides];
       return row;
     }),
   };
@@ -382,11 +399,28 @@ function useAutosaver() {
 }
 
 export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) {
-  const { template } = loaderData;
+  const { template, classrooms } = loaderData;
   const { t } = useTranslation("admin");
   const [definition, setDefinition] = useState<TemplateDefinition>(() =>
     cloneDefinition(parseTemplateDefinition(template.definition)),
   );
+
+  // Homeroom → teacher-name lookup, the data source for "selection" columns.
+  const teacherByHomeroom = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of classrooms) m.set(c.homeRoom, c.teacherName);
+    return m;
+  }, [classrooms]);
+  // Column ids that are the auto-fill target of some selection column.
+  const autoFillTargetIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of definition.columns) {
+      if (c.kind === "selection" && c.selectionSource?.autoFillColumnId) {
+        s.add(c.selectionSource.autoFillColumnId);
+      }
+    }
+    return s;
+  }, [definition.columns]);
 
   // One autosave channel per editable section.
   const nameSaver = useAutosaver();
@@ -536,9 +570,16 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
             delete row.cells[merged.id];
           }
         } else {
+          // text + selection both carry a per-row string value.
           for (const row of next.rows) {
             row.cells[merged.id] = row.cells[merged.id] ?? "";
           }
+        }
+        // Manage the selection config alongside the kind.
+        if (merged.kind === "selection") {
+          merged.selectionSource = merged.selectionSource ?? { type: "classrooms" };
+        } else {
+          delete merged.selectionSource;
         }
       }
       return next;
@@ -573,9 +614,11 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
     setDefinition((d) => {
       const next = cloneDefinition(d);
       const id = newId();
-      const label = kind === "toggle" ? "Check" : "Column";
-      next.columns.push({ id, label, kind });
-      if (kind === "text") {
+      const label = kind === "toggle" ? "Check" : kind === "selection" ? "Classroom" : "Column";
+      const col: ColumnDef = { id, label, kind };
+      if (kind === "selection") col.selectionSource = { type: "classrooms" };
+      next.columns.push(col);
+      if (kind === "text" || kind === "selection") {
         for (const row of next.rows) {
           row.cells[id] = "";
         }
@@ -590,7 +633,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
       const id = newId();
       const cells: Record<string, string> = {};
       for (const c of next.columns) {
-        if (c.kind === "text") {
+        if (c.kind === "text" || c.kind === "selection") {
           cells[c.id] = "";
         }
       }
@@ -599,15 +642,68 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
     });
   }, []);
 
-  const updateRowCell = useCallback((rowIndex: number, colId: string, value: string) => {
-    setDefinition((d) => {
-      const next = cloneDefinition(d);
-      const row = next.rows[rowIndex];
-      if (!row) return d;
-      row.cells[colId] = value;
-      return next;
-    });
-  }, []);
+  // Edit a text cell. When the cell is the auto-fill target of a selection
+  // column, a manual edit marks it overridden so later selection changes won't
+  // clobber the hand-typed value (and we can show an "overridden" badge).
+  const updateRowCell = useCallback(
+    (rowIndex: number, colId: string, value: string, isAutoFillTarget = false) => {
+      setDefinition((d) => {
+        const next = cloneDefinition(d);
+        const row = next.rows[rowIndex];
+        if (!row) return d;
+        row.cells[colId] = value;
+        if (isAutoFillTarget) {
+          const set = new Set(row.overrides ?? []);
+          set.add(colId);
+          row.overrides = [...set];
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  // Pick a value in a selection cell. If the column auto-fills another column
+  // and that target hasn't been manually overridden, fill it from the chosen
+  // classroom's teacher name.
+  const selectRowCell = useCallback(
+    (rowIndex: number, col: ColumnDef, value: string) => {
+      setDefinition((d) => {
+        const next = cloneDefinition(d);
+        const row = next.rows[rowIndex];
+        if (!row) return d;
+        row.cells[col.id] = value;
+        const targetId = col.selectionSource?.autoFillColumnId;
+        if (targetId && !(row.overrides ?? []).includes(targetId)) {
+          row.cells[targetId] = teacherByHomeroom.get(value) ?? "";
+        }
+        return next;
+      });
+    },
+    [teacherByHomeroom],
+  );
+
+  // Clear an override so the target cell re-links to its selection column and
+  // refills from the current selection.
+  const clearOverride = useCallback(
+    (rowIndex: number, targetColId: string) => {
+      setDefinition((d) => {
+        const next = cloneDefinition(d);
+        const row = next.rows[rowIndex];
+        if (!row) return d;
+        row.overrides = (row.overrides ?? []).filter((c) => c !== targetColId);
+        if (row.overrides.length === 0) delete row.overrides;
+        const selCol = next.columns.find(
+          (c) => c.kind === "selection" && c.selectionSource?.autoFillColumnId === targetColId,
+        );
+        if (selCol) {
+          row.cells[targetColId] = teacherByHomeroom.get(row.cells[selCol.id] ?? "") ?? "";
+        }
+        return next;
+      });
+    },
+    [teacherByHomeroom],
+  );
 
   const removeRow = useCallback((index: number) => {
     setDefinition((d) => {
@@ -876,6 +972,10 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
           <Plus className="w-4 h-4 mr-1 inline" />
           {t("drills.edit.addToggle")}
         </button>
+        <button type="button" className={formClasses.btnSecondary} onClick={() => addColumn("selection")}>
+          <Plus className="w-4 h-4 mr-1 inline" />
+          {t("drills.edit.addSelection")}
+        </button>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-white/10">
@@ -895,14 +995,43 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                     />
                     <select
                       value={col.kind}
-                      onChange={(e) =>
-                        updateColumn(ci, { kind: e.target.value === "toggle" ? "toggle" : "text" })
-                      }
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        updateColumn(ci, {
+                          kind: v === "toggle" ? "toggle" : v === "selection" ? "selection" : "text",
+                        });
+                      }}
                       className="app-field text-xs"
                     >
                       <option value="text">{t("drills.edit.kindText")}</option>
                       <option value="toggle">{t("drills.edit.kindToggle")}</option>
+                      <option value="selection">{t("drills.edit.kindSelection")}</option>
                     </select>
+                    {col.kind === "selection" ? (
+                      <select
+                        value={col.selectionSource?.autoFillColumnId ?? ""}
+                        onChange={(e) =>
+                          updateColumn(ci, {
+                            selectionSource: {
+                              type: "classrooms",
+                              autoFillColumnId: e.target.value || undefined,
+                            },
+                          })
+                        }
+                        onBlur={() => definitionSaver.flush()}
+                        className="app-field text-xs"
+                        aria-label={t("drills.edit.autofillColumnLabel")}
+                      >
+                        <option value="">{t("drills.edit.autofillNone")}</option>
+                        {definition.columns
+                          .filter((c) => c.kind === "text")
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {t("drills.edit.autofillInto", { label: c.label })}
+                            </option>
+                          ))}
+                      </select>
+                    ) : null}
                     <div className="flex gap-1">
                       <button
                         type="button"
@@ -941,13 +1070,45 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                 <td className="px-2 py-2 text-white/40 text-xs align-middle">{ri + 1}</td>
                 {definition.columns.map((col) => (
                   <td key={col.id} className="px-2 py-2 align-middle">
-                    {col.kind === "text" ? (
-                      <input
+                    {col.kind === "selection" ? (
+                      <select
                         value={row.cells[col.id] ?? ""}
-                        onChange={(e) => updateRowCell(ri, col.id, e.target.value)}
+                        onChange={(e) => selectRowCell(ri, col, e.target.value)}
                         onBlur={() => definitionSaver.flush()}
                         className="w-full min-w-[6rem] app-field"
-                      />
+                        aria-label={t("drills.edit.selectClassroom")}
+                      >
+                        <option value="">{t("drills.edit.selectClassroom")}</option>
+                        {classrooms.map((c: { homeRoom: string; teacherName: string }) => (
+                          <option key={c.homeRoom} value={c.homeRoom}>
+                            {c.homeRoom}
+                          </option>
+                        ))}
+                      </select>
+                    ) : col.kind === "text" ? (
+                      <div className="flex flex-col gap-1">
+                        <input
+                          value={row.cells[col.id] ?? ""}
+                          onChange={(e) =>
+                            updateRowCell(ri, col.id, e.target.value, autoFillTargetIds.has(col.id))
+                          }
+                          onBlur={() => definitionSaver.flush()}
+                          className="w-full min-w-[6rem] app-field"
+                        />
+                        {autoFillTargetIds.has(col.id) &&
+                        (row.overrides ?? []).includes(col.id) ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-amber-300/80">
+                            {t("drills.edit.overridden")}
+                            <button
+                              type="button"
+                              className="underline hover:text-amber-200"
+                              onClick={() => clearOverride(ri, col.id)}
+                            >
+                              {t("drills.edit.resetAutofill")}
+                            </button>
+                          </span>
+                        ) : null}
+                      </div>
                     ) : (
                       <span className="text-white/30 text-xs">{t("drills.edit.checkOnRun")}</span>
                     )}
