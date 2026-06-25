@@ -1068,7 +1068,7 @@
       "importedSummaryWithHomerooms_other": "Se importaron {{created}} estudiantes nuevos y se actualizaron {{updated}} estudiantes existentes. Se crearon {{homerooms}} salones principales."
     },
     "errors": {
-      "chooseFile": "Elige un archivo CSV antes de previsualizar.",
+      "chooseFile": "Elige un archivo CSV o Excel para continuar.",
       "previewAgain": "Vuelve a previsualizar el CSV.",
       "unknown": "Acción de importación de lista desconocida."
     },
@@ -1080,7 +1080,7 @@
       "heading": "Importar lista",
       "homerooms_one": "{{count}} salón principal",
       "homerooms_other": "{{count}} salones principales",
-      "intro": "Sube un CSV, previsualiza cada fila y luego confirma cuando el resumen se vea bien. Las columnas del CSV son <0>firstName</0>, <1>lastName</1>, <2>homeRoom</2> y opcionalmente <3>spaceNumber</3>."
+      "intro": "Sube un archivo CSV o Excel, asigna tus columnas, previsualiza cada fila y luego confirma cuando el resumen se vea bien. Los campos del registro son <0>firstName</0>, <1>lastName</1>, <2>homeRoom</2> y opcionalmente <3>spaceNumber</3>."
     },
     "metaTitle": "Administración – Importar lista",
     "preview": {
@@ -1117,7 +1117,28 @@
         "summary": "Resumen",
         "unassigned": "Sin asignar"
       },
-      "uploadDifferent": "Subir un CSV distinto"
+      "downloadErrors": "Descargar informe de errores (CSV)",
+      "skipInvalid_one": "Omitir {{count}} fila no válida e importar el resto",
+      "skipInvalid_other": "Omitir {{count}} filas no válidas e importar el resto",
+      "uploadDifferent": "Subir otro archivo"
+    },
+    "mapping": {
+      "eyebrow": "Paso 2 · Asignar columnas",
+      "heading": "Asigna tus columnas",
+      "intro": "Relaciona cada campo del registro con una columna de tu archivo. Hicimos una sugerencia según tus encabezados; cambia las que no coincidan.",
+      "detected": "Columnas en tu archivo: {{columns}}",
+      "field": {
+        "firstName": "Nombre",
+        "lastName": "Apellido",
+        "homeRoom": "Aula",
+        "spaceNumber": "Número de espacio de recogida"
+      },
+      "required": "obligatorio",
+      "optional": "opcional",
+      "selectColumn": "— Selecciona una columna —",
+      "notImported": "— No importar —",
+      "submit": "Previsualizar filas",
+      "uploadDifferent": "Subir otro archivo"
     },
     "status": {
       "error": "Error",
@@ -1125,11 +1146,11 @@
       "update": "Actualizar"
     },
     "upload": {
-      "fileLabel": "Archivo CSV",
-      "heading": "Subir CSV para vista previa",
-      "previewSubmit": "Previsualizar CSV",
+      "fileLabel": "Archivo del registro (CSV o Excel)",
+      "heading": "Subir un archivo del registro",
+      "previewSubmit": "Subir archivo",
       "selected": "Seleccionado: {{name}}",
-      "subtitle": "Los archivos XLSX aún no son compatibles. Exporta tu hoja de cálculo como CSV primero para que el importador pueda validarla con seguridad."
+      "subtitle": "Sube un archivo CSV o Excel (.xlsx). Asignarás tus columnas a los campos del registro, previsualizarás cada fila y luego confirmarás; no se guarda nada hasta que lo hagas."
     }
   },
   "sidebar": {

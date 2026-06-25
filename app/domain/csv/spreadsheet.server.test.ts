@@ -15,7 +15,7 @@ function xlsxFile(aoa: (string | number)[][], name = "roster.xlsx"): File {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
   const out = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as Uint8Array;
-  return new File([out], name);
+  return new File([out as unknown as BlobPart], name);
 }
 
 test("parseSpreadsheetToGrid: parses a CSV file into header + rows", async () => {

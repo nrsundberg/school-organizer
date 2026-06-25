@@ -1,21 +1,35 @@
 import { useState } from "react";
 import { data, Form, Link, useActionData, useNavigation } from "react-router";
 import { Button } from "@heroui/react";
-import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, Upload } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Download,
+  FileSpreadsheet,
+  Upload,
+} from "lucide-react";
 import { Trans, useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { Route } from "./+types/roster-import";
 import {
+  applyColumnMapping,
   applyRosterImport,
+  buildErrorReportCsv,
   buildRosterImportPlanFromDatabase,
-  parseRosterImportFile,
+  parseSerializedGrid,
   parseSerializedRosterRows,
+  ROSTER_FIELDS,
   RosterImportError,
+  serializeGrid,
   serializeRosterRows,
+  suggestColumnMapping,
+  type ColumnMapping,
+  type RosterField,
   type RosterImportPlan,
   type RosterPreviewRow,
   type RosterPrisma,
 } from "~/domain/csv/roster-import.server";
+import { parseSpreadsheetToGrid } from "~/domain/csv/spreadsheet.server";
 import type { ServerMessage } from "~/domain/types/server-message";
 import {
   assertUsageAllowsIncrement,
@@ -50,13 +64,21 @@ type LocalizedPlan = Omit<RosterImportPlan, "rows"> & {
   rows: LocalizedPreviewRow[];
 };
 
+type MapActionData = {
+  stage: "map";
+  header: string[];
+  suggestion: ColumnMapping;
+  gridJson: string;
+  mappingError: string | null;
+};
+
 type PreviewActionData = {
   stage: "preview";
   plan: LocalizedPlan;
   rowErrors: LocalizedRowError[];
-  warnings: string[];
   skippedBlank: number;
   rowsJson: string;
+  errorReportCsv: string;
   planLimitError: string | null;
   canApply: boolean;
 };
@@ -66,7 +88,7 @@ type ErrorActionData = {
   error: string;
 };
 
-type ActionData = PreviewActionData | ErrorActionData;
+type ActionData = MapActionData | PreviewActionData | ErrorActionData;
 
 function translateServerMessage(t: TFunction, message: ServerMessage): string {
   return t(message.key, message.params ?? {}) as string;
@@ -79,6 +101,22 @@ function localizePlan(t: TFunction, plan: RosterImportPlan): LocalizedPlan {
       ...row,
       message: translateServerMessage(t, row.message),
     })),
+  };
+}
+
+/** Rebuild a column mapping from the mapping-form selects. */
+function readMappingFromForm(formData: FormData): ColumnMapping {
+  const read = (field: RosterField): number | null => {
+    const value = formData.get(`map_${field}`);
+    if (typeof value !== "string" || value === "") return null;
+    const index = Number(value);
+    return Number.isInteger(index) && index >= 0 ? index : null;
+  };
+  return {
+    firstName: read("firstName"),
+    lastName: read("lastName"),
+    homeRoom: read("homeRoom"),
+    spaceNumber: read("spaceNumber"),
   };
 }
 
@@ -129,10 +167,11 @@ export async function action({ request, context }: Route.ActionArgs) {
   const prisma = getTenantPrisma(context);
   const org = getOrgFromContext(context);
   const formData = await request.formData();
-  const intent = String(formData.get("intent") ?? "preview");
+  const intent = String(formData.get("intent") ?? "upload");
   const t = await getAdminT(request, context);
 
-  if (intent === "preview") {
+  // Stage 1 — parse the uploaded file into a grid and suggest a mapping.
+  if (intent === "upload") {
     const file = formData.get("file");
     if (!(file instanceof File) || file.size === 0) {
       return data<ActionData>(
@@ -141,42 +180,76 @@ export async function action({ request, context }: Route.ActionArgs) {
       );
     }
 
-    const parseResult = await parseRosterImportFile(file);
-    if (!parseResult.ok) {
+    const parsed = await parseSpreadsheetToGrid(file);
+    if (!parsed.ok) {
       return data<ActionData>(
-        { stage: "error", error: translateServerMessage(t, parseResult.error) },
+        { stage: "error", error: translateServerMessage(t, parsed.error) },
         { status: 400 },
       );
     }
 
+    return data<ActionData>({
+      stage: "map",
+      header: parsed.grid.header,
+      suggestion: suggestColumnMapping(parsed.grid.header),
+      gridJson: serializeGrid(parsed.grid),
+      mappingError: null,
+    });
+  }
+
+  // Stage 2 — apply the chosen mapping and build a DB-aware preview.
+  if (intent === "preview") {
+    let grid;
+    try {
+      grid = parseSerializedGrid(formData.get("gridJson"));
+    } catch (error) {
+      const message =
+        error instanceof RosterImportError
+          ? translateServerMessage(t, error.serverMessage)
+          : t("rosterImport.errors.unknown");
+      return data<ActionData>({ stage: "error", error: message }, { status: 400 });
+    }
+
+    const mapping = readMappingFromForm(formData);
+    const mapped = applyColumnMapping(grid, mapping);
+    if (!mapped.ok) {
+      // Required column missing — bounce back to the mapping step, keeping the
+      // admin's current selections so they only fix what's wrong.
+      return data<ActionData>({
+        stage: "map",
+        header: grid.header,
+        suggestion: mapping,
+        gridJson: serializeGrid(grid),
+        mappingError: translateServerMessage(t, mapped.error),
+      });
+    }
+
     const plan = await buildRosterImportPlanFromDatabase(
       prisma as unknown as RosterPrisma,
-      parseResult.rows,
+      mapped.rows,
     );
     const planLimitError = await usageErrorForPlan(context, plan);
+    const rowErrors = mapped.rowErrors.map((err) => ({
+      row: err.row,
+      message: translateServerMessage(t, err.message),
+    }));
     const canApply =
-      parseResult.rows.length > 0 &&
-      parseResult.rowErrors.length === 0 &&
-      plan.summary.errorCount === 0 &&
-      !planLimitError;
+      mapped.rows.length > 0 && rowErrors.length === 0 && !planLimitError;
 
     return data<ActionData>({
       stage: "preview",
       plan: localizePlan(t, plan),
-      rowErrors: parseResult.rowErrors.map((err) => ({
-        row: err.row,
-        message: translateServerMessage(t, err.message),
-      })),
-      warnings: parseResult.warnings.map((warning) =>
-        translateServerMessage(t, warning),
-      ),
-      skippedBlank: parseResult.skippedBlank,
-      rowsJson: serializeRosterRows(parseResult.rows),
+      rowErrors,
+      skippedBlank: mapped.skippedBlank,
+      rowsJson: serializeRosterRows(mapped.rows),
+      errorReportCsv: buildErrorReportCsv(rowErrors),
       planLimitError,
       canApply,
     });
   }
 
+  // Stage 3 — write the valid rows. (Invalid rows were already excluded from
+  // `rowsJson`, so "skip invalid and import the rest" needs no special path.)
   if (intent === "apply") {
     let rows;
     try {
@@ -188,13 +261,7 @@ export async function action({ request, context }: Route.ActionArgs) {
           : error instanceof Error
             ? error.message
             : t("rosterImport.errors.previewAgain");
-      return data<ActionData>(
-        {
-          stage: "error",
-          error: message,
-        },
-        { status: 400 },
-      );
+      return data<ActionData>({ stage: "error", error: message }, { status: 400 });
     }
 
     const plan = await buildRosterImportPlanFromDatabase(
@@ -207,9 +274,9 @@ export async function action({ request, context }: Route.ActionArgs) {
         stage: "preview",
         plan: localizePlan(t, plan),
         rowErrors: [],
-        warnings: [],
         skippedBlank: 0,
         rowsJson: serializeRosterRows(rows),
+        errorReportCsv: buildErrorReportCsv([]),
         planLimitError,
         canApply: false,
       });
@@ -223,9 +290,6 @@ export async function action({ request, context }: Route.ActionArgs) {
       );
     }
     const summary = result.data;
-    // Both reads key off org.id and don't depend on each other, so fetch them
-    // concurrently before reconciling the grace period (one Prisma client per
-    // request makes this safe).
     const [freshOrg, nextCounts] = await Promise.all([
       prisma.org.findUnique({ where: { id: org.id } }),
       countOrgUsage(prisma, org.id),
@@ -287,10 +351,100 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
   );
 }
 
+const REQUIRED_FIELDS: RosterField[] = ["firstName", "lastName", "homeRoom"];
+
+function MappingPanel({ map }: { map: MapActionData }) {
+  const { t } = useTranslation("admin");
+
+  return (
+    <section className="rounded-2xl border border-white/10 bg-[#181d1d] p-5 shadow-2xl shadow-black/20">
+      <p className="text-sm font-semibold uppercase tracking-[0.25em] text-blue-200/70">
+        {t("rosterImport.mapping.eyebrow")}
+      </p>
+      <h2 className="mt-2 text-xl font-bold text-white">
+        {t("rosterImport.mapping.heading")}
+      </h2>
+      <p className="mt-1 max-w-2xl text-sm text-white/60">
+        {t("rosterImport.mapping.intro")}
+      </p>
+      <p className="mt-2 text-xs text-white/40">
+        {t("rosterImport.mapping.detected", {
+          columns: map.header.map((h, i) => h || `#${i + 1}`).join(", "),
+        })}
+      </p>
+
+      {map.mappingError ? (
+        <div className="mt-4 rounded-xl border border-red-400/25 bg-red-500/10 p-3 text-sm text-red-100">
+          {map.mappingError}
+        </div>
+      ) : null}
+
+      <Form method="post" className="mt-5 flex flex-col gap-4">
+        <input type="hidden" name="intent" value="preview" />
+        <input type="hidden" name="gridJson" value={map.gridJson} />
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {ROSTER_FIELDS.map((field) => {
+            const required = REQUIRED_FIELDS.includes(field);
+            const selected = map.suggestion[field];
+            return (
+              <label key={field} className="flex flex-col gap-1.5 text-sm text-white/70">
+                <span>
+                  {t(`rosterImport.mapping.field.${field}`)}{" "}
+                  <span className="text-xs text-white/40">
+                    ({t(required ? "rosterImport.mapping.required" : "rosterImport.mapping.optional")})
+                  </span>
+                </span>
+                <select
+                  name={`map_${field}`}
+                  defaultValue={selected == null ? "" : String(selected)}
+                  className="rounded-xl border border-white/15 bg-[#111616] px-3 py-2 text-sm text-white focus:border-blue-400 focus:outline-none"
+                >
+                  <option value="">
+                    {required
+                      ? t("rosterImport.mapping.selectColumn")
+                      : t("rosterImport.mapping.notImported")}
+                  </option>
+                  {map.header.map((label, index) => (
+                    <option key={index} value={String(index)}>
+                      {label || `#${index + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            );
+          })}
+        </div>
+
+        <div className="mt-1 flex flex-col gap-3 sm:flex-row">
+          <Button type="submit" variant="primary" className="w-full sm:w-auto">
+            {t("rosterImport.mapping.submit")}
+          </Button>
+          <Link
+            to="/admin/roster-import"
+            className="inline-flex items-center justify-center rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            {t("rosterImport.mapping.uploadDifferent")}
+          </Link>
+        </div>
+      </Form>
+    </section>
+  );
+}
+
 function PreviewPanel({ preview }: { preview: PreviewActionData }) {
   const { t } = useTranslation("admin");
+  const [skipInvalid, setSkipInvalid] = useState(false);
   const visibleRows = preview.plan.rows.slice(0, 25);
-  const totalErrors = preview.rowErrors.length + preview.plan.summary.errorCount;
+  const hasErrors = preview.rowErrors.length > 0;
+  const validRows = preview.plan.summary.validRows;
+  const canImport =
+    preview.canApply ||
+    (hasErrors && skipInvalid && validRows > 0 && !preview.planLimitError);
+
+  const errorReportHref = `data:text/csv;charset=utf-8,${encodeURIComponent(
+    preview.errorReportCsv,
+  )}`;
 
   return (
     <section className="rounded-2xl border border-white/10 bg-[#181d1d] p-5 shadow-2xl shadow-black/20">
@@ -300,17 +454,15 @@ function PreviewPanel({ preview }: { preview: PreviewActionData }) {
             {t("rosterImport.preview.eyebrow")}
           </p>
           <h2 className="mt-2 text-xl font-bold text-white">
-            {preview.canApply
-              ? t("rosterImport.preview.ready", {
-                  count: preview.plan.summary.validRows,
-                })
+            {canImport
+              ? t("rosterImport.preview.ready", { count: validRows })
               : t("rosterImport.preview.review")}
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-white/60">
             {t("rosterImport.preview.intro")}
           </p>
         </div>
-        {preview.canApply ? (
+        {canImport ? (
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-sm text-emerald-200">
             <CheckCircle2 className="h-4 w-4" />
             {t("rosterImport.preview.noBlocking")}
@@ -326,7 +478,7 @@ function PreviewPanel({ preview }: { preview: PreviewActionData }) {
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <SummaryCard
           label={t("rosterImport.preview.summary.validRows")}
-          value={preview.plan.summary.validRows}
+          value={validRows}
         />
         <SummaryCard
           label={t("rosterImport.preview.summary.newStudents")}
@@ -346,24 +498,14 @@ function PreviewPanel({ preview }: { preview: PreviewActionData }) {
         />
         <SummaryCard
           label={t("rosterImport.preview.summary.errors")}
-          value={totalErrors}
+          value={preview.rowErrors.length}
         />
       </div>
 
       {preview.skippedBlank > 0 ? (
         <p className="mt-3 text-sm text-white/50">
-          {t("rosterImport.preview.skippedBlank", {
-            count: preview.skippedBlank,
-          })}
+          {t("rosterImport.preview.skippedBlank", { count: preview.skippedBlank })}
         </p>
-      ) : null}
-
-      {preview.warnings.length > 0 ? (
-        <div className="mt-4 rounded-xl border border-amber-400/25 bg-amber-500/10 p-3 text-sm text-amber-100">
-          {preview.warnings.map((warning) => (
-            <p key={warning}>{warning}</p>
-          ))}
-        </div>
       ) : null}
 
       {preview.planLimitError ? (
@@ -372,11 +514,21 @@ function PreviewPanel({ preview }: { preview: PreviewActionData }) {
         </div>
       ) : null}
 
-      {preview.rowErrors.length > 0 ? (
+      {hasErrors ? (
         <div className="mt-4 rounded-xl border border-red-400/25 bg-red-500/10 p-3">
-          <h3 className="text-sm font-semibold text-red-100">
-            {t("rosterImport.preview.rowsToFix")}
-          </h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-red-100">
+              {t("rosterImport.preview.rowsToFix")}
+            </h3>
+            <a
+              href={errorReportHref}
+              download="roster-import-errors.csv"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-300/30 px-2.5 py-1 text-xs font-semibold text-red-100 hover:bg-red-500/15"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {t("rosterImport.preview.downloadErrors")}
+            </a>
+          </div>
           <ul className="mt-2 space-y-1 text-sm text-red-100/85">
             {preview.rowErrors.slice(0, 12).map((error) => (
               <li key={`${error.row}-${error.message}`}>
@@ -442,6 +594,19 @@ function PreviewPanel({ preview }: { preview: PreviewActionData }) {
         ) : null}
       </div>
 
+      {hasErrors && !preview.planLimitError ? (
+        <label className="mt-4 flex items-center gap-2 text-sm text-white/75">
+          <input
+            type="checkbox"
+            checked={skipInvalid}
+            onChange={(event) => setSkipInvalid(event.currentTarget.checked)}
+          />
+          {t("rosterImport.preview.skipInvalid", {
+            count: preview.rowErrors.length,
+          })}
+        </label>
+      ) : null}
+
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <Form method="post">
           <input type="hidden" name="intent" value="apply" />
@@ -449,13 +614,11 @@ function PreviewPanel({ preview }: { preview: PreviewActionData }) {
           <Button
             type="submit"
             variant="primary"
-            isDisabled={!preview.canApply}
+            isDisabled={!canImport}
             className="w-full sm:w-auto"
           >
             <Upload className="h-4 w-4" />
-            {t("rosterImport.preview.import", {
-              count: preview.plan.summary.validRows,
-            })}
+            {t("rosterImport.preview.import", { count: validRows })}
           </Button>
         </Form>
         <Link
@@ -475,7 +638,6 @@ export default function AdminRosterImport({ loaderData }: Route.ComponentProps) 
   const { t } = useTranslation("admin");
   const [fileName, setFileName] = useState("");
   const isSubmitting = navigation.state === "submitting";
-  const preview = actionData?.stage === "preview" ? actionData : null;
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -537,14 +699,14 @@ export default function AdminRosterImport({ loaderData }: Route.ComponentProps) 
               encType="multipart/form-data"
               className="mt-4 flex flex-col gap-4 md:flex-row md:items-end"
             >
-              <input type="hidden" name="intent" value="preview" />
+              <input type="hidden" name="intent" value="upload" />
               <label className="flex flex-1 flex-col gap-2 text-sm text-white/65" htmlFor="roster-file">
                 {t("rosterImport.upload.fileLabel")}
                 <input
                   id="roster-file"
                   name="file"
                   type="file"
-                  accept=".csv,text/csv"
+                  accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                   required
                   onChange={(event) =>
                     setFileName(event.currentTarget.files?.item(0)?.name ?? "")
@@ -576,7 +738,10 @@ export default function AdminRosterImport({ loaderData }: Route.ComponentProps) 
         </div>
       ) : null}
 
-      {preview ? <PreviewPanel preview={preview} /> : null}
+      {actionData?.stage === "map" ? <MappingPanel map={actionData} /> : null}
+      {actionData?.stage === "preview" ? (
+        <PreviewPanel preview={actionData} />
+      ) : null}
     </div>
   );
 }

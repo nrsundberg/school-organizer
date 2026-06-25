@@ -1068,7 +1068,7 @@
       "importedSummaryWithHomerooms_other": "Imported {{created}} new students and updated {{updated}} existing students. Created {{homerooms}} homerooms."
     },
     "errors": {
-      "chooseFile": "Choose a CSV file before previewing.",
+      "chooseFile": "Choose a CSV or Excel file to continue.",
       "previewAgain": "Preview the CSV again.",
       "unknown": "Unknown roster import action."
     },
@@ -1080,7 +1080,7 @@
       "heading": "Import roster",
       "homerooms_one": "{{count}} homeroom",
       "homerooms_other": "{{count}} homerooms",
-      "intro": "Upload a CSV, preview every row, then confirm when the summary looks right. CSV columns are <0>firstName</0>, <1>lastName</1>, <2>homeRoom</2>, and optional <3>spaceNumber</3>."
+      "intro": "Upload a CSV or Excel file, map your columns, preview every row, then confirm when the summary looks right. Roster fields are <0>firstName</0>, <1>lastName</1>, <2>homeRoom</2>, and optional <3>spaceNumber</3>."
     },
     "metaTitle": "Admin – Roster Import",
     "preview": {
@@ -1117,7 +1117,28 @@
         "summary": "Summary",
         "unassigned": "Unassigned"
       },
-      "uploadDifferent": "Upload a different CSV"
+      "downloadErrors": "Download error report (CSV)",
+      "skipInvalid_one": "Skip {{count}} invalid row and import the rest",
+      "skipInvalid_other": "Skip {{count}} invalid rows and import the rest",
+      "uploadDifferent": "Upload a different file"
+    },
+    "mapping": {
+      "eyebrow": "Step 2 · Map columns",
+      "heading": "Map your columns",
+      "intro": "Match each roster field to a column from your file. We've guessed based on your headers — change any that look wrong.",
+      "detected": "Columns in your file: {{columns}}",
+      "field": {
+        "firstName": "First name",
+        "lastName": "Last name",
+        "homeRoom": "Homeroom",
+        "spaceNumber": "Pickup space number"
+      },
+      "required": "required",
+      "optional": "optional",
+      "selectColumn": "— Select a column —",
+      "notImported": "— Not imported —",
+      "submit": "Preview rows",
+      "uploadDifferent": "Upload a different file"
     },
     "status": {
       "error": "Error",
@@ -1125,11 +1146,11 @@
       "update": "Update"
     },
     "upload": {
-      "fileLabel": "CSV file",
-      "heading": "Upload CSV for preview",
-      "previewSubmit": "Preview CSV",
+      "fileLabel": "Roster file (CSV or Excel)",
+      "heading": "Upload a roster file",
+      "previewSubmit": "Upload file",
       "selected": "Selected: {{name}}",
-      "subtitle": "XLSX files are not supported yet. Export your spreadsheet as CSV first so the importer can validate it safely."
+      "subtitle": "Upload a CSV or Excel (.xlsx) file. You'll map your columns to the roster fields, preview every row, then confirm — nothing is saved until you do."
     }
   },
   "sidebar": {
