@@ -30,6 +30,7 @@ import {
 } from "~/domain/dismissal/schedule";
 import { chunk, chunkedFindMany, groupBy } from "~/db/chunked-in";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
+import { auditOrgAction } from "~/domain/org/audit.server";
 import { broadcastProgramCancellation } from "~/lib/broadcast.server";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { detectLocale } from "~/i18n.server";
@@ -488,6 +489,13 @@ export async function action({ request, context }: Route.ActionArgs) {
         });
       }
 
+      await auditOrgAction(context, request, {
+        action: "household.create",
+        targetType: "household",
+        targetId: household.id,
+        always: true,
+        payload: { name: household.name, studentCount: students.length },
+      });
       return dataWithSuccess(
         null,
         t("households.actions.createdHousehold", { name: household.name }),
@@ -501,16 +509,34 @@ export async function action({ request, context }: Route.ActionArgs) {
         return dataWithError(null, t("households.errors.nameRequired"));
       }
 
+      const before = await prisma.household.findUnique({
+        where: { id: householdId },
+        select: {
+          name: true,
+          pickupNotes: true,
+          primaryContactName: true,
+          primaryContactPhone: true,
+        },
+      });
+      const after = {
+        name,
+        pickupNotes: String(formData.get("pickupNotes") ?? "").trim() || null,
+        primaryContactName:
+          String(formData.get("primaryContactName") ?? "").trim() || null,
+        primaryContactPhone:
+          String(formData.get("primaryContactPhone") ?? "").trim() || null,
+      };
       await prisma.household.update({
         where: { id: householdId },
-        data: {
-          name,
-          pickupNotes: String(formData.get("pickupNotes") ?? "").trim() || null,
-          primaryContactName:
-            String(formData.get("primaryContactName") ?? "").trim() || null,
-          primaryContactPhone:
-            String(formData.get("primaryContactPhone") ?? "").trim() || null,
-        },
+        data: after,
+      });
+      await auditOrgAction(context, request, {
+        action: "household.update",
+        targetType: "household",
+        targetId: householdId,
+        before: before ?? {},
+        after,
+        keys: ["name", "pickupNotes", "primaryContactName", "primaryContactPhone"],
       });
       return dataWithSuccess(null, t("households.actions.pickupContextUpdated"));
     }
@@ -531,6 +557,13 @@ export async function action({ request, context }: Route.ActionArgs) {
           data: { householdId },
         });
       }
+      await auditOrgAction(context, request, {
+        action: "household.assign",
+        targetType: "household",
+        targetId: householdId,
+        always: true,
+        payload: { studentIds },
+      });
       return dataWithSuccess(null, t("households.actions.studentAssignmentUpdated"));
     }
 
@@ -544,6 +577,13 @@ export async function action({ request, context }: Route.ActionArgs) {
         where: { id: studentId },
         data: { householdId: null },
       });
+      await auditOrgAction(context, request, {
+        action: "household.detachStudent",
+        targetType: "student",
+        targetId: String(studentId),
+        always: true,
+        payload: { studentId },
+      });
       return dataWithWarning(null, t("households.actions.studentDetached"));
     }
 
@@ -553,11 +593,22 @@ export async function action({ request, context }: Route.ActionArgs) {
         return dataWithError(null, t("households.errors.invalidHousehold"));
       }
 
+      const deleted = await prisma.household.findUnique({
+        where: { id: householdId },
+        select: { name: true },
+      });
       await prisma.student.updateMany({
         where: { householdId },
         data: { householdId: null },
       });
       await prisma.household.delete({ where: { id: householdId } });
+      await auditOrgAction(context, request, {
+        action: "household.delete",
+        targetType: "household",
+        targetId: householdId,
+        always: true,
+        payload: { name: deleted?.name ?? null },
+      });
       return dataWithWarning(
         null,
         t("households.actions.householdDeleted"),
@@ -651,6 +702,18 @@ export async function action({ request, context }: Route.ActionArgs) {
         }
       }
 
+      await auditOrgAction(context, request, {
+        action: "cancellation.broadcast",
+        targetType: "programCancellation",
+        targetId: cancellation.id,
+        always: true,
+        payload: {
+          programId: program.id,
+          programName: program.name,
+          cancellationDate: toDateInputValue(cancellation.cancellationDate),
+          title,
+        },
+      });
       return dataWithSuccess(
         null,
         t("households.actions.cancellationSent", { name: program.name }),

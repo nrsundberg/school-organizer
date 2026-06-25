@@ -4,6 +4,7 @@ import { redirectWithSuccess, redirectWithError } from "remix-toast";
 import type { Route } from "./+types/households.duplicates";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getTenantPrisma } from "~/domain/utils/global-context.server";
+import { auditOrgAction } from "~/domain/org/audit.server";
 import { chunkedFindMany } from "~/db/chunked-in";
 import {
   groupDuplicateHouseholds,
@@ -132,6 +133,13 @@ export async function action({ request, context }: Route.ActionArgs) {
     );
   }
 
+  await auditOrgAction(context, request, {
+    action: "household.merge",
+    targetType: "household",
+    targetId: survivorId,
+    always: true,
+    payload: { survivorId, losingIds, name: scalars.name },
+  });
   return redirectWithSuccess("/admin/households/duplicates", "Households merged.");
 }
 

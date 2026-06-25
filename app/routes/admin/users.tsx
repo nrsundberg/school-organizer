@@ -56,6 +56,7 @@ import {
   type UserSessionInfo,
 } from "~/domain/admin-users/user-details.server";
 import { assertNotAlreadyImpersonating } from "~/domain/auth/impersonate-gate.server";
+import { auditOrgAction } from "~/domain/org/audit.server";
 import { getAdminT } from "~/lib/t.server";
 import type { TFunction } from "i18next";
 import { EntityAvatar, deriveInitials } from "~/components/admin/EntityAvatar";
@@ -211,6 +212,13 @@ export async function action({ request, context }: Route.ActionArgs) {
       }
     }
 
+    await auditOrgAction(context, request, {
+      action: "user.invite",
+      targetType: "user",
+      targetId: email,
+      always: true,
+      payload: { email, role },
+    });
     return dataWithSuccess(null, t("admin:users.toasts.userInvited", { email }));
   }
 
@@ -244,6 +252,13 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!response.ok) {
       return dataWithError(null, t("admin:users.table.impersonateGenericError"));
     }
+
+    await auditOrgAction(context, request, {
+      action: "user.impersonate.start",
+      targetType: "user",
+      targetId: userId,
+      always: true,
+    });
 
     const redirectHeaders = new Headers();
     for (const cookie of response.headers.getSetCookie?.() ?? []) {
@@ -327,6 +342,37 @@ export async function action({ request, context }: Route.ActionArgs) {
       return dataWithError(null, t("admin:users.errors.userNotFound"));
     }
     throw err;
+  }
+
+  // Audit the delegated user/viewer mutations once they've succeeded. The
+  // handler owns the write; we map its `action` to a canonical audit code.
+  if (outcome.kind !== "error") {
+    const auditCodes: Record<string, string> = {
+      resetPassword: "user.password.reset",
+      changeRole: "user.role.changed",
+      revokeUserSessions: "user.sessions.revoked",
+      deleteUser: "user.deleted",
+      ban: "user.banned",
+      unban: "user.unbanned",
+      setViewerPin: "viewer.pin.changed",
+      resetViewerLock: "viewer.lock.reset",
+      createViewerMagicLink: "viewer.magiclink.created",
+      setPasswordResetEnabled: "user.passwordReset.policy",
+    };
+    const code = auditCodes[action];
+    if (code) {
+      const targetUserId = String(formData.get("userId") ?? "") || null;
+      await auditOrgAction(context, request, {
+        action: code,
+        targetType: targetUserId ? "user" : "viewer",
+        targetId: targetUserId,
+        always: true,
+        payload:
+          action === "changeRole"
+            ? { role: String(formData.get("role") ?? "") }
+            : undefined,
+      });
+    }
   }
   return dataWithToast(outcome, t);
 }

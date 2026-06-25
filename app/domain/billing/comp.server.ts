@@ -1,5 +1,12 @@
 import { getPrisma } from "~/db.server";
+import { writeOrgAudit } from "~/domain/org/audit.server";
 
+/**
+ * Billing/platform audit shim. Kept for its existing platform-side callers
+ * (comp changes, org creation, invites); it now delegates to the single
+ * `writeOrgAudit` writer in `~/domain/org/audit.server` so there's one place
+ * that owns the `OrgAuditLog` insert.
+ */
 export async function recordOrgAudit(params: {
   context: any;
   orgId: string;
@@ -15,25 +22,7 @@ export async function recordOrgAudit(params: {
   action: string;
   payload?: unknown;
 }) {
-  const { context, orgId, actorUserId, onBehalfOfUserId, action, payload } =
-    params;
-  const db = getPrisma(context);
-  // Cast to any: OrgAuditLog is a new Prisma model; the generated client gets
-  // this delegate the next time `prisma generate` runs against the updated
-  // schema. This keeps the server code buildable without forcing a local
-  // regeneration (which requires the schema engine binary).
-  await (db as any).orgAuditLog.create({
-    data: {
-      orgId,
-      actorUserId: actorUserId ?? null,
-      onBehalfOfUserId: onBehalfOfUserId ?? null,
-      action,
-      payload:
-        payload === undefined
-          ? undefined
-          : (payload as object | null | undefined),
-    },
-  });
+  await writeOrgAudit(params);
 }
 
 export async function setOrgComp(params: {

@@ -27,6 +27,7 @@ import {
   getOrgFromContext,
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
+import { auditOrgAction } from "~/domain/org/audit.server";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { redirectWithSuccess } from "remix-toast";
 import { getAdminT } from "~/lib/t.server";
@@ -248,6 +249,17 @@ export async function action({ request, context }: Route.ActionArgs) {
             updated: summary.updated,
           });
 
+    await auditOrgAction(context, request, {
+      action: "roster.import.applied",
+      targetType: "org",
+      targetId: org.id,
+      always: true,
+      payload: {
+        created: summary.created,
+        updated: summary.updated,
+        newHomerooms: summary.newHomerooms,
+      },
+    });
     return redirectWithSuccess("/admin/children", { message });
   }
 

@@ -50,6 +50,10 @@ export async function loader({ context, params }: Route.LoaderArgs) {
     createdAt: Date | string;
     actorEmail?: string | null;
     onBehalfOfEmail?: string | null;
+    targetType?: string | null;
+    targetId?: string | null;
+    ipAddress?: string | null;
+    userAgent?: string | null;
   }> = [];
   try {
     const rawLogs = await (db as any).orgAuditLog.findMany({
@@ -75,10 +79,18 @@ export async function loader({ context, params }: Route.LoaderArgs) {
     auditLogs = rawLogs.map((l: any) => ({
       ...l,
       onBehalfOfUserId: l.onBehalfOfUserId ?? null,
-      actorEmail: l.actorUserId ? (userMap[l.actorUserId] ?? null) : null,
+      // Prefer the persisted email snapshot (survives a later user deletion),
+      // fall back to the live lookup for older rows.
+      actorEmail:
+        (l.actorEmail ?? null) ??
+        (l.actorUserId ? (userMap[l.actorUserId] ?? null) : null),
       onBehalfOfEmail: l.onBehalfOfUserId
         ? (userMap[l.onBehalfOfUserId] ?? null)
         : null,
+      targetType: l.targetType ?? null,
+      targetId: l.targetId ?? null,
+      ipAddress: l.ipAddress ?? null,
+      userAgent: l.userAgent ?? null,
     }));
   } catch {
     // OrgAuditLog table may not exist yet in this environment — safe to ignore
@@ -1053,6 +1065,8 @@ export default function PlatformOrgDetail({
                   <th className="px-3 py-2 font-semibold">Timestamp</th>
                   <th className="px-3 py-2 font-semibold">Actor</th>
                   <th className="px-3 py-2 font-semibold">Action</th>
+                  <th className="px-3 py-2 font-semibold">Target</th>
+                  <th className="px-3 py-2 font-semibold">Source</th>
                   <th className="px-3 py-2 font-semibold">Payload</th>
                 </tr>
               </thead>
@@ -1085,6 +1099,29 @@ export default function PlatformOrgDetail({
                         ) : null}
                       </td>
                       <td className="px-3 py-2 font-mono text-xs">{log.action}</td>
+                      <td className="px-3 py-2 font-mono text-[10px] text-white/50">
+                        {log.targetType ? (
+                          <>
+                            {log.targetType}
+                            {log.targetId ? (
+                              <span className="text-white/30">:{log.targetId}</span>
+                            ) : null}
+                          </>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-[10px] text-white/40">
+                        {log.ipAddress ?? "—"}
+                        {log.userAgent ? (
+                          <span
+                            className="block max-w-[140px] truncate text-white/25"
+                            title={log.userAgent}
+                          >
+                            {log.userAgent}
+                          </span>
+                        ) : null}
+                      </td>
                       <td className="px-3 py-2 font-mono text-[10px] text-white/50 max-w-xs truncate">
                         {log.payload ? JSON.stringify(log.payload) : "—"}
                       </td>

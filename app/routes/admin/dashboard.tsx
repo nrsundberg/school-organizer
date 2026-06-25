@@ -43,6 +43,7 @@ import { broadcastBoardReset } from "~/lib/broadcast.server";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
 import { buildBoardResetBatch } from "~/domain/admin/board-reset.server";
+import { auditOrgAction } from "~/domain/org/audit.server";
 import {
   endOfUtcDay,
   exceptionActiveOn,
@@ -343,6 +344,13 @@ export async function action({ request, context }: Route.ActionArgs) {
       create: { viewerDrawingEnabled: enabled },
       update: { viewerDrawingEnabled: enabled },
     });
+    await auditOrgAction(context, request, {
+      action: "settings.update",
+      targetType: "appSettings",
+      targetId: org.id,
+      always: true,
+      payload: { setting: "viewerDrawingEnabled", enabled },
+    });
     return dataWithSuccess(
       null,
       enabled
@@ -369,11 +377,24 @@ export async function action({ request, context }: Route.ActionArgs) {
     } catch {
       // Broadcast failure should not break the action
     }
+    await auditOrgAction(context, request, {
+      action: "settings.board.reset",
+      targetType: "org",
+      targetId: org.id,
+      always: true,
+    });
     return dataWithInfo(null, t("dashboard.actions.resetGrid"));
   }
 
   if (action === "deleteStudents") {
-    await prisma.student.deleteMany();
+    const removed = await prisma.student.deleteMany();
+    await auditOrgAction(context, request, {
+      action: "settings.update",
+      targetType: "org",
+      targetId: org.id,
+      always: true,
+      payload: { operation: "deleteAllStudents", count: removed.count },
+    });
     return dataWithWarning(null, t("dashboard.actions.deletedAll"));
   }
 

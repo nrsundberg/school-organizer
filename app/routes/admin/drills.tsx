@@ -9,6 +9,7 @@ import {
   getOrgFromContext,
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
+import { auditOrgAction } from "~/domain/org/audit.server";
 import {
   defaultTemplateDefinition,
   parseDrillAudience,
@@ -146,6 +147,13 @@ export async function action({ request, context }: Route.ActionArgs) {
         definition: defaultTemplateDefinition() as object,
       },
     });
+    await auditOrgAction(context, request, {
+      action: "drill.template.created",
+      targetType: "drillTemplate",
+      targetId: created.id,
+      always: true,
+      payload: { name: created.name },
+    });
     throw redirect(`/admin/drills/${created.id}`);
   }
 
@@ -159,6 +167,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     await prisma.drillTemplate.update({
       where: { id },
       data: { deletedAt: new Date() },
+    });
+    await auditOrgAction(context, request, {
+      action: "drill.template.deleted",
+      targetType: "drillTemplate",
+      targetId: id,
+      always: true,
     });
     return dataWithSuccess(null, t("drills.list.errors.deleted"));
   }

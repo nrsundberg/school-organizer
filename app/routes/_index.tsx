@@ -1,6 +1,6 @@
 import { MarketingLanding } from "~/components/marketing/MarketingLanding";
 import { Page } from "~/components/Page";
-import { useFetcher, useSearchParams, redirect } from "react-router";
+import { useFetcher, useSearchParams, redirect, type ShouldRevalidateFunctionArgs } from "react-router";
 import { useTranslation } from "react-i18next";
 import { type Space, Status } from "~/db/browser";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -17,10 +17,19 @@ export const handle = { i18n: ["roster"] };
 // React Router auto-revalidates this loader after every fetcher.submit
 // (tile click → /update/:n or /empty/:n) and on every focus, which would
 // re-fire 5 D1 queries we don't need: the WS already carries the state
-// change. Skipping revalidation removes the post-tap round-trip from the
-// perceived UX. Initial nav still runs the loader normally.
-export function shouldRevalidate() {
-  return false;
+// change. Skipping that revalidation removes the post-tap round-trip from the
+// perceived UX.
+//
+// EXCEPTION: the homeroom filter for recent calls is applied server-side
+// (loader queries callEvent with `homeRoomSnapshot in ?room=`), so when the
+// `room` search param changes we DO need the loader to re-run — otherwise the
+// filter silently does nothing. Revalidate iff `room` changed; skip every
+// other trigger (tile-tap fetchers, focus). Initial nav always runs normally.
+export function shouldRevalidate({
+  currentUrl,
+  nextUrl,
+}: ShouldRevalidateFunctionArgs) {
+  return currentUrl.searchParams.get("room") !== nextUrl.searchParams.get("room");
 }
 import { isMarketingHost } from "~/domain/utils/host.server";
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
@@ -225,6 +234,22 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
     },
     onCallEvent: ({ event }) => {
       if (event.studentId == null) {
+        return;
+      }
+      // Respect the active homeroom filter. recentCars is filtered server-side
+      // via ?room=, so live events for other homerooms must be dropped here
+      // too — otherwise a filtered list repopulates with non-matching calls as
+      // new pickups stream in. Parse the param exactly like the loader does.
+      const activeRooms =
+        searchParams
+          .get("room")
+          ?.split(",")
+          .map((s) => s.trim())
+          .filter(Boolean) ?? [];
+      if (
+        activeRooms.length > 0 &&
+        !activeRooms.includes(event.homeRoomSnapshot ?? "")
+      ) {
         return;
       }
       setRecentCars((prev) => [{

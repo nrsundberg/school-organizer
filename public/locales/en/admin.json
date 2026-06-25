@@ -405,7 +405,8 @@
         "nameRequired": "Name is required.",
         "nameTooLong": "Name is too long.",
         "unexpectedSave": "Unexpected error saving.",
-        "unknown": "Unknown action."
+        "unknown": "Unknown action.",
+        "nameRequiredInline": "Enter a name — changes save automatically once it's filled in."
       },
       "intro": "Toggle columns show a check on the run screen. Text columns store labels (grade, teacher name, etc.).",
       "kindText": "Text",
@@ -460,7 +461,13 @@
         "empty": "No default follow-up items yet.",
         "itemPlaceholder": "e.g. Email district safety officer the drill log",
         "itemLabel": "Default follow-up item {{n}}",
-        "savedWithLayout": "Saved when you click Save layout above."
+        "savedWithLayout": "Saved when you click Save layout above.",
+        "autosaveNote": "Changes save automatically."
+      },
+      "autosave": {
+        "saving": "Saving…",
+        "saved": "Saved",
+        "idle": "All changes saved"
       }
     },
     "library": {

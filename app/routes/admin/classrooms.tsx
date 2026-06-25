@@ -18,6 +18,7 @@ import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
+import { auditOrgAction } from "~/domain/org/audit.server";
 import {
   DEFAULT_CLASSROOM_CAPACITY,
   GRADE_LEVELS,
@@ -312,9 +313,18 @@ export async function action({ request, context }: Route.ActionArgs) {
       if (!existing || existing.orgId !== org.id) {
         return dataWithError(null, t("children.classroomActions.classroomNotFound"));
       }
+      const nextGrade = grade ? (grade as GradeLevel) : null;
       await prisma.teacher.update({
         where: { id: classroomId },
-        data: { gradeLevel: grade ? (grade as GradeLevel) : null },
+        data: { gradeLevel: nextGrade },
+      });
+      await auditOrgAction(context, request, {
+        action: "classroom.update",
+        targetType: "classroom",
+        targetId: String(classroomId),
+        before: { gradeLevel: existing.gradeLevel },
+        after: { gradeLevel: nextGrade },
+        keys: ["gradeLevel"],
       });
       return dataWithSuccess(null, t("children.classroomActions.gradeUpdated"));
     }
