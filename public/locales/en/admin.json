@@ -124,6 +124,7 @@
       "viewDetail": "View student"
     },
     "header": {
+      "findDuplicates": "Find duplicates",
       "subtitle": "Search by name or classroom and open a student record.",
       "title": "Children"
     },

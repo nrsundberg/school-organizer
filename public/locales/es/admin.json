@@ -124,6 +124,7 @@
       "viewDetail": "Ver estudiante"
     },
     "header": {
+      "findDuplicates": "Buscar duplicados",
       "subtitle": "Busca por nombre o aula y abre el registro de un estudiante.",
       "title": "Niños"
     },

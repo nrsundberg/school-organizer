@@ -138,6 +138,13 @@ export default function AdminChildrenList({ loaderData }: Route.ComponentProps) 
             {t("childrenList.header.subtitle")}
           </p>
         </div>
+        <Link
+          to="/admin/students/duplicates"
+          className="inline-flex items-center gap-1.5 self-start rounded-lg border border-white/15 px-3 py-2 text-sm font-medium text-white/70 hover:border-white/30 hover:text-white"
+        >
+          <Users className="h-4 w-4" />
+          {t("childrenList.header.findDuplicates")}
+        </Link>
       </div>
 
       {/* Stats row */}
