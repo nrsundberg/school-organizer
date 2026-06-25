@@ -246,7 +246,7 @@
       "VIEWER_DRAWING_ENABLED": "Habilitó el dibujo del visor"
     },
     "actions": {
-      "addedSpaces":"Se agregaron los espacios {{from}}–{{to}}",
+      "addedSpaces": "Se agregaron los espacios {{from}}–{{to}}",
       "createdGrid": "Cuadrícula creada ({{n}} espacios)",
       "deletedAll": "Se eliminaron todos los registros de estudiantes",
       "extendError": "El objetivo debe ser mayor que el número máximo de espacio actual.",
@@ -405,7 +405,8 @@
         "nameRequired": "El nombre es obligatorio.",
         "nameTooLong": "El nombre es demasiado largo.",
         "unexpectedSave": "Error inesperado al guardar.",
-        "unknown": "Acción desconocida."
+        "unknown": "Acción desconocida.",
+        "nameRequiredInline": "Ingresa un nombre: los cambios se guardan automáticamente una vez completado."
       },
       "intro": "Las columnas de marcar muestran una verificación en la pantalla de ejecución. Las columnas de texto guardan etiquetas (grado, nombre del maestro, etc.).",
       "kindText": "Texto",
@@ -460,7 +461,13 @@
         "empty": "Aún no hay tareas de seguimiento por defecto.",
         "itemPlaceholder": "p. ej. Enviar al oficial de seguridad del distrito el registro del simulacro",
         "itemLabel": "Tarea de seguimiento {{n}}",
-        "savedWithLayout": "Se guarda al pulsar Guardar diseño arriba."
+        "savedWithLayout": "Se guarda al pulsar Guardar diseño arriba.",
+        "autosaveNote": "Los cambios se guardan automáticamente."
+      },
+      "autosave": {
+        "saving": "Guardando…",
+        "saved": "Guardado",
+        "idle": "Todos los cambios guardados"
       }
     },
     "library": {
