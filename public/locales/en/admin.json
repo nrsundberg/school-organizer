@@ -248,7 +248,7 @@
     "actions": {
       "addedSpaces": "Added spaces {{from}}–{{to}}",
       "createdGrid": "Created grid ({{n}} spaces)",
-      "deletedAll": "Deleted all student records",
+      "deletedAll": "Deleted all {{count}} student records",
       "extendError": "Target must be greater than current max space number.",
       "reducedGrid": "Reduced grid to spaces 1–{{to}}",
       "reduceError": "Reduce target must be lower than current max space number.",
@@ -260,7 +260,9 @@
     "danger": {
       "deleteAll": "Delete All Student Records",
       "heading": "Danger Zone",
-      "subtitle": "Permanently delete every student record in this org. Households and classrooms are kept."
+      "subtitle": "Permanently delete every student record in this org. Households and classrooms are kept.",
+      "notice": "When you do this, all admins and the Pickup Roster team are emailed. Deleted records can still be recovered from database backups for a limited time — contact support if this was a mistake.",
+      "unknownActor": "An administrator"
     },
     "grid": {
       "addSpaces": "Add Spaces",
@@ -468,7 +470,15 @@
         "saving": "Saving…",
         "saved": "Saved",
         "idle": "All changes saved"
-      }
+      },
+      "addSelection": "Add selection",
+      "kindSelection": "Selection",
+      "autofillColumnLabel": "Auto-fill column",
+      "autofillNone": "Auto-fill: none",
+      "autofillInto": "Auto-fill → {{label}}",
+      "selectClassroom": "Select classroom…",
+      "overridden": "Overridden",
+      "resetAutofill": "Reset"
     },
     "library": {
       "alreadyCloned": "Already cloned",

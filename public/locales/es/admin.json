@@ -248,7 +248,7 @@
     "actions": {
       "addedSpaces": "Se agregaron los espacios {{from}}–{{to}}",
       "createdGrid": "Cuadrícula creada ({{n}} espacios)",
-      "deletedAll": "Se eliminaron todos los registros de estudiantes",
+      "deletedAll": "Se eliminaron los {{count}} registros de estudiantes",
       "extendError": "El objetivo debe ser mayor que el número máximo de espacio actual.",
       "reducedGrid": "Cuadrícula reducida a los espacios 1–{{to}}",
       "reduceError": "El objetivo de reducción debe ser menor que el número máximo de espacio actual.",
@@ -260,7 +260,9 @@
     "danger": {
       "deleteAll": "Eliminar todos los registros de estudiantes",
       "heading": "Zona de peligro",
-      "subtitle": "Elimina permanentemente todos los registros de estudiantes de esta organización. Se conservan los hogares y las aulas."
+      "subtitle": "Elimina permanentemente todos los registros de estudiantes de esta organización. Se conservan los hogares y las aulas.",
+      "notice": "Al hacerlo, se notifica por correo a todos los administradores y al equipo de Pickup Roster. Los registros eliminados aún se pueden recuperar desde las copias de seguridad durante un tiempo limitado: contacta con soporte si fue un error.",
+      "unknownActor": "Un administrador"
     },
     "grid": {
       "addSpaces": "Agregar espacios",
@@ -468,7 +470,15 @@
         "saving": "Guardando…",
         "saved": "Guardado",
         "idle": "Todos los cambios guardados"
-      }
+      },
+      "addSelection": "Agregar selección",
+      "kindSelection": "Selección",
+      "autofillColumnLabel": "Columna de autocompletado",
+      "autofillNone": "Autocompletar: ninguno",
+      "autofillInto": "Autocompletar → {{label}}",
+      "selectClassroom": "Seleccionar aula…",
+      "overridden": "Modificado",
+      "resetAutofill": "Restablecer"
     },
     "library": {
       "alreadyCloned": "Ya clonada",

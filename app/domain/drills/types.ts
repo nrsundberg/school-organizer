@@ -1,19 +1,39 @@
 import type { Prisma } from "~/db";
 
-export type ColumnKind = "text" | "toggle";
+export type ColumnKind = "text" | "toggle" | "selection";
+
+/**
+ * Configures a "selection" column: a dropdown the author fills from a known
+ * data source while editing the template. Picking a value can auto-fill a
+ * sibling column (e.g. choose a homeroom → fill the teacher column).
+ */
+export interface SelectionSource {
+  /** Only "classrooms" today (homeroom list for the org). */
+  type: "classrooms";
+  /** Column id whose cell is auto-filled when a selection is made. */
+  autoFillColumnId?: string;
+}
 
 export interface ColumnDef {
   id: string;
   label: string;
   kind: ColumnKind;
+  /** Present only when `kind === "selection"`. */
+  selectionSource?: SelectionSource;
 }
 
 export interface RowDef {
   id: string;
-  /** Values for text columns only; keys are column ids */
+  /** Values for text + selection columns; keys are column ids */
   cells: Record<string, string>;
   /** Optional grouping — matches SectionDef.id */
   sectionId?: string;
+  /**
+   * Column ids whose auto-filled value the author manually overrode. Used to
+   * surface an "overridden" badge and to stop a later selection change from
+   * clobbering a hand-edited cell.
+   */
+  overrides?: string[];
 }
 
 export interface SectionDef {
@@ -303,11 +323,26 @@ export function parseTemplateDefinition(raw: Prisma.JsonValue): TemplateDefiniti
   const columns = Array.isArray(def.columns)
     ? def.columns
         .filter((c): c is ColumnDef => !!c && typeof c === "object" && typeof (c as ColumnDef).id === "string")
-        .map((c) => ({
-          id: c.id,
-          label: typeof c.label === "string" ? c.label : "Column",
-          kind: (c.kind === "toggle" ? "toggle" : "text") as ColumnKind,
-        }))
+        .map((c) => {
+          const kind: ColumnKind =
+            c.kind === "toggle" ? "toggle" : c.kind === "selection" ? "selection" : "text";
+          const col: ColumnDef = {
+            id: c.id,
+            label: typeof c.label === "string" ? c.label : "Column",
+            kind,
+          };
+          if (kind === "selection") {
+            const src = (c as ColumnDef).selectionSource;
+            col.selectionSource = {
+              type: "classrooms",
+              autoFillColumnId:
+                src && typeof src.autoFillColumnId === "string"
+                  ? src.autoFillColumnId
+                  : undefined,
+            };
+          }
+          return col;
+        })
     : [];
   const sections = Array.isArray(def.sections)
     ? def.sections
@@ -333,6 +368,10 @@ export function parseTemplateDefinition(raw: Prisma.JsonValue): TemplateDefiniti
           if (typeof r.sectionId === "string" && validSectionIds.has(r.sectionId)) {
             row.sectionId = r.sectionId;
           }
+          if (Array.isArray(r.overrides)) {
+            const ov = r.overrides.filter((o): o is string => typeof o === "string");
+            if (ov.length > 0) row.overrides = ov;
+          }
           return row;
         })
     : [];
@@ -341,9 +380,13 @@ export function parseTemplateDefinition(raw: Prisma.JsonValue): TemplateDefiniti
     return defaultTemplateDefinition();
   }
 
-  const textColIds = new Set(columns.filter((c) => c.kind === "text").map((c) => c.id));
+  // Text + selection columns both store a string value per row; backfill any
+  // missing cells so the table renders an editable/empty cell for every one.
+  const valueColIds = new Set(
+    columns.filter((c) => c.kind === "text" || c.kind === "selection").map((c) => c.id),
+  );
   for (const row of rows) {
-    for (const cid of textColIds) {
+    for (const cid of valueColIds) {
       if (row.cells[cid] === undefined) {
         row.cells[cid] = "";
       }
