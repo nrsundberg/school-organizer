@@ -92,6 +92,13 @@
     "rangeReversed": "El rango de fechas del ROI no puede terminar antes de empezar.",
     "snapshotFailed": "No se pudo cargar el resumen de ROI. {{detail}}"
   },
+  "teacherImport": {
+    "duplicateEmail": "Correo duplicado en este archivo. Cada docente necesita un correo único.",
+    "emailInvalid": "Se requiere una dirección de correo válida.",
+    "homeRoomRequired": "El aula es obligatoria.",
+    "missingColumns": "Faltan columnas obligatorias: {{columns}}. Asigna nombre, correo y aula.",
+    "nameRequired": "El nombre del docente es obligatorio."
+  },
   "zod": {
     "custom": "Entrada inválida.",
     "fallback": "Entrada inválida.",

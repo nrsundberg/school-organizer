@@ -96,6 +96,7 @@
     "noChildren": "No hay niños en esta clase.",
     "pageHeader": {
       "eyebrow": "Lista",
+      "importTeachers": "Importar docentes",
       "subtitle": "Explora aulas por grado, asigna niveles de grado y accede a registros de estudiantes.",
       "title": "Aulas"
     },
@@ -1256,6 +1257,92 @@
     },
     "toasts": {
       "saved": "Estudiante guardado."
+    }
+  },
+  "teacherImport": {
+    "metaTitle": "Admin – Importar docentes",
+    "hero": {
+      "eyebrow": "Configuración del personal",
+      "heading": "Importar docentes",
+      "intro": "Sube un archivo CSV o Excel de tus docentes. Crearemos un aula para cada homeroom y enviaremos a cada docente una invitación para establecer su contraseña e iniciar sesión.",
+      "currentCount_one": "{{count}} aula registrada.",
+      "currentCount_other": "{{count}} aulas registradas."
+    },
+    "upload": {
+      "heading": "Subir un archivo de docentes",
+      "subtitle": "Incluye el nombre, correo y aula de cada docente. Asignarás columnas y revisarás antes de enviar invitaciones.",
+      "fileLabel": "Archivo de docentes (CSV o Excel)",
+      "selected": "Seleccionado: {{name}}",
+      "submit": "Subir archivo"
+    },
+    "mapping": {
+      "eyebrow": "Paso 2 · Asignar columnas",
+      "heading": "Asigna tus columnas",
+      "intro": "Relaciona cada campo del docente con una columna de tu archivo. Hicimos una sugerencia según tus encabezados; cambia las que no coincidan.",
+      "field": {
+        "name": "Nombre del docente",
+        "email": "Correo",
+        "homeRoom": "Aula",
+        "role": "Rol"
+      },
+      "required": "obligatorio",
+      "optional": "opcional",
+      "selectColumn": "— Selecciona una columna —",
+      "notImported": "— No importar —",
+      "defaultRole": "Rol predeterminado para estos docentes",
+      "defaultRoleHint": "Se usa para cualquier fila sin columna de rol. Una columna de Rol en tu archivo lo anula por docente.",
+      "submit": "Previsualizar invitaciones",
+      "uploadDifferent": "Subir otro archivo"
+    },
+    "roles": {
+      "VIEWER": "Lector (tablero de solo lectura)",
+      "CONTROLLER": "Operador (controlar el tablero)"
+    },
+    "status": {
+      "invite": "Se invitará",
+      "existing": "Tiene cuenta"
+    },
+    "preview": {
+      "eyebrow": "Vista previa",
+      "heading_one": "Listo para invitar a {{count}} docente",
+      "heading_other": "Listo para invitar a {{count}} docentes",
+      "intro": "Aún no se ha enviado ningún correo. Al confirmar se crean las aulas faltantes y se envía una invitación a cada docente nuevo. Los docentes que ya tienen cuenta la conservan.",
+      "ready": "Listo para enviar",
+      "fixRequired": "Corrección necesaria",
+      "summary": {
+        "total": "Filas",
+        "toInvite": "Por invitar",
+        "existing": "Ya tienen cuenta",
+        "newClassrooms": "Aulas nuevas",
+        "errors": "Errores"
+      },
+      "skippedBlank_one": "Se omitió {{count}} fila en blanco.",
+      "skippedBlank_other": "Se omitieron {{count}} filas en blanco.",
+      "rowsToFix": "Filas por corregir",
+      "downloadErrors": "Descargar informe de errores (CSV)",
+      "rowError": "Fila {{row}}: {{message}}",
+      "skipInvalid_one": "Omitir {{count}} fila no válida e importar el resto",
+      "skipInvalid_other": "Omitir {{count}} filas no válidas e importar el resto",
+      "table": {
+        "status": "Estado",
+        "name": "Nombre",
+        "email": "Correo",
+        "homeroom": "Aula",
+        "role": "Rol",
+        "newTag": "nueva"
+      },
+      "showingFirstRows": "Mostrando las primeras {{shown}} filas de {{total}}.",
+      "invite_one": "Invitar a {{count}} docente",
+      "invite_other": "Invitar a {{count}} docentes",
+      "uploadDifferent": "Subir otro archivo"
+    },
+    "actions": {
+      "imported": "Se invitó a {{invited}} docente(s), {{existing}} ya tenían cuenta, se crearon {{classrooms}} aula(s). {{failed}} fallaron."
+    },
+    "errors": {
+      "chooseFile": "Elige un archivo CSV o Excel para continuar.",
+      "previewAgain": "Sube el archivo de nuevo.",
+      "unknown": "Acción de importación de docentes desconocida."
     }
   },
   "usageBanner": {

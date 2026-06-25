@@ -92,6 +92,13 @@
     "rangeReversed": "ROI date range cannot end before it starts.",
     "snapshotFailed": "Could not load the ROI snapshot. {{detail}}"
   },
+  "teacherImport": {
+    "duplicateEmail": "Duplicate email in this file. Each teacher needs a unique email.",
+    "emailInvalid": "A valid email address is required.",
+    "homeRoomRequired": "Homeroom is required.",
+    "missingColumns": "Missing required column(s): {{columns}}. Map name, email, and homeroom.",
+    "nameRequired": "Teacher name is required."
+  },
   "zod": {
     "custom": "Invalid input.",
     "fallback": "Invalid input.",

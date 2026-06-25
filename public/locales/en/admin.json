@@ -96,6 +96,7 @@
     "noChildren": "No children in this class.",
     "pageHeader": {
       "eyebrow": "Roster",
+      "importTeachers": "Import teachers",
       "subtitle": "Browse classrooms by grade, set grade levels, and jump into student records.",
       "title": "Classrooms"
     },
@@ -1256,6 +1257,92 @@
     },
     "toasts": {
       "saved": "Student saved."
+    }
+  },
+  "teacherImport": {
+    "metaTitle": "Admin – Import Teachers",
+    "hero": {
+      "eyebrow": "Staff setup",
+      "heading": "Import teachers",
+      "intro": "Upload a CSV or Excel file of your teachers. We'll create a classroom for each homeroom and email every teacher an invite to set their password and sign in.",
+      "currentCount_one": "{{count}} classroom on record.",
+      "currentCount_other": "{{count}} classrooms on record."
+    },
+    "upload": {
+      "heading": "Upload a teacher file",
+      "subtitle": "Include each teacher's name, email, and homeroom. You'll map columns and review before any invites are sent.",
+      "fileLabel": "Teacher file (CSV or Excel)",
+      "selected": "Selected: {{name}}",
+      "submit": "Upload file"
+    },
+    "mapping": {
+      "eyebrow": "Step 2 · Map columns",
+      "heading": "Map your columns",
+      "intro": "Match each teacher field to a column from your file. We've guessed based on your headers — change any that look wrong.",
+      "field": {
+        "name": "Teacher name",
+        "email": "Email",
+        "homeRoom": "Homeroom",
+        "role": "Role"
+      },
+      "required": "required",
+      "optional": "optional",
+      "selectColumn": "— Select a column —",
+      "notImported": "— Not imported —",
+      "defaultRole": "Default role for these teachers",
+      "defaultRoleHint": "Used for any row without a role column. A Role column in your file overrides this per teacher.",
+      "submit": "Preview invites",
+      "uploadDifferent": "Upload a different file"
+    },
+    "roles": {
+      "VIEWER": "Viewer (read-only board)",
+      "CONTROLLER": "Controller (operate board)"
+    },
+    "status": {
+      "invite": "Will invite",
+      "existing": "Has account"
+    },
+    "preview": {
+      "eyebrow": "Preview",
+      "heading_one": "Ready to invite {{count}} teacher",
+      "heading_other": "Ready to invite {{count}} teachers",
+      "intro": "No emails have been sent yet. Confirming creates any missing classrooms and emails each new teacher an invite. Teachers who already have an account keep it.",
+      "ready": "Ready to send",
+      "fixRequired": "Fix required",
+      "summary": {
+        "total": "Rows",
+        "toInvite": "To invite",
+        "existing": "Already have accounts",
+        "newClassrooms": "New classrooms",
+        "errors": "Errors"
+      },
+      "skippedBlank_one": "Skipped {{count}} blank row.",
+      "skippedBlank_other": "Skipped {{count}} blank rows.",
+      "rowsToFix": "Rows to fix",
+      "downloadErrors": "Download error report (CSV)",
+      "rowError": "Row {{row}}: {{message}}",
+      "skipInvalid_one": "Skip {{count}} invalid row and import the rest",
+      "skipInvalid_other": "Skip {{count}} invalid rows and import the rest",
+      "table": {
+        "status": "Status",
+        "name": "Name",
+        "email": "Email",
+        "homeroom": "Homeroom",
+        "role": "Role",
+        "newTag": "new"
+      },
+      "showingFirstRows": "Showing first {{shown}} rows of {{total}}.",
+      "invite_one": "Invite {{count}} teacher",
+      "invite_other": "Invite {{count}} teachers",
+      "uploadDifferent": "Upload a different file"
+    },
+    "actions": {
+      "imported": "Invited {{invited}} teacher(s), {{existing}} already had accounts, created {{classrooms}} classroom(s). {{failed}} failed."
+    },
+    "errors": {
+      "chooseFile": "Choose a CSV or Excel file to continue.",
+      "previewAgain": "Upload the file again.",
+      "unknown": "Unknown teacher import action."
     }
   },
   "usageBanner": {
