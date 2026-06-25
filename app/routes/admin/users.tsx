@@ -334,8 +334,8 @@ export async function action({ request, context }: Route.ActionArgs) {
 function inviteErrorMessage(error: InviteUserError, t: TFunction): string {
   if (error === "user-exists") return t("admin:users.errors.emailExists");
   if (error === "create-failed") return t("admin:users.errors.createUserFailed");
-  if (error === "invalid-email") return "Enter a valid email address.";
-  if (error === "invalid-name") return "Name is required.";
+  if (error === "invalid-email") return t("admin:users.errors.invalidEmail");
+  if (error === "invalid-name") return t("admin:users.errors.invalidName");
   return t("admin:users.errors.createUserFailed");
 }
 
@@ -1432,7 +1432,7 @@ function ViewerAccessSection({
     <section className="rounded-xl border border-white/[0.08] bg-white/[0.04] p-5">
       <header className="mb-4">
         <p className="text-[11px] font-medium uppercase tracking-[0.9px] text-white/45">
-          Viewer privacy
+          {t("users.viewer.eyebrow")}
         </p>
         <h2 className="mt-1 text-base font-semibold text-white">
           {t("users.viewer.heading")}

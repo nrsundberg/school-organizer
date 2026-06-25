@@ -145,6 +145,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     recentCancellations,
     studentsAssignedCount,
     allActiveExceptions,
+    householdsMissingContactCount,
+    householdsWithSpace,
     t,
   ] = await Promise.all([
     prisma.household.findMany({
@@ -209,6 +211,23 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         endsOn: true,
         householdId: true,
       },
+    }),
+    // Two org-wide aggregates for the page chrome: the "missing contact" stat
+    // count and the set of space-assigned households used to detect duplicates.
+    // Both are independent of the paginated data, so fetch them in this batch.
+    prisma.household.count({
+      where: {
+        OR: [
+          { primaryContactName: null },
+          { primaryContactName: "" },
+          { primaryContactPhone: null },
+          { primaryContactPhone: "" },
+        ],
+      },
+    }),
+    prisma.household.findMany({
+      where: { spaceNumber: { not: null } },
+      select: { id: true, spaceNumber: true, createdAt: true },
     }),
     // Locale/translations are independent of every query above; resolve them
     // in the same concurrent batch (the locale→getFixedT chain stays ordered).
@@ -360,31 +379,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       household: householdId ? householdLookup.get(householdId) ?? null : null,
     }),
   );
-
-  // Two org-wide aggregates for the page chrome: the "missing contact" stat
-  // count and the set of space-assigned households used to detect duplicates.
-  // They're independent of each other (and of the paginated data above), so
-  // fetch them concurrently within this request.
-  const [householdsMissingContactCount, householdsWithSpace] =
-    await Promise.all([
-      // Stats row aggregate — totals are org-wide (not paginated).
-      prisma.household.count({
-        where: {
-          OR: [
-            { primaryContactName: null },
-            { primaryContactName: "" },
-            { primaryContactPhone: null },
-            { primaryContactPhone: "" },
-          ],
-        },
-      }),
-      // Count pickup spaces that have more than one household (duplicates
-      // created by the pre-fix importer). Drives the dismissible banner.
-      prisma.household.findMany({
-        where: { spaceNumber: { not: null } },
-        select: { id: true, spaceNumber: true, createdAt: true },
-      }),
-    ]);
 
   const totalPages = Math.max(
     1,

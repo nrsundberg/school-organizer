@@ -78,8 +78,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
 
+  // Optional ?templateId= scopes the list to a single drill (linked from the
+  // per-drill "History" button on /admin/drills). The FK is indexed.
+  const url = new URL(request.url);
+  const templateId = url.searchParams.get("templateId") || null;
+
   // Fetch ROW_CAP + 1 to detect truncation without a second count query.
   const fetched = await prisma.drillRun.findMany({
+    where: templateId ? { templateId } : undefined,
     orderBy: { createdAt: "desc" },
     take: ROW_CAP + 1,
     include: { template: { select: { id: true, name: true } } },
@@ -141,6 +147,19 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     };
   });
 
+  // Resolve the filtered drill's name for the heading. Prefer a row's template
+  // (already loaded); fall back to a direct lookup when the drill has no runs.
+  let filterTemplateName: string | null = null;
+  if (templateId) {
+    filterTemplateName =
+      (slice[0] as any)?.template?.name ??
+      (await prisma.drillTemplate.findUnique({
+        where: { id: templateId },
+        select: { name: true },
+      }))?.name ??
+      null;
+  }
+
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "admin");
 
@@ -148,6 +167,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     rows,
     truncated,
     rowCap: ROW_CAP,
+    filterTemplateId: templateId,
+    filterTemplateName,
     metaTitle: t("drillsHistory.metaTitle"),
   };
 }
@@ -184,7 +205,8 @@ export function formatDurationSeconds(secs: number | null): string {
 export default function AdminDrillsHistory({
   loaderData,
 }: Route.ComponentProps) {
-  const { rows, truncated, rowCap } = loaderData;
+  const { rows, truncated, rowCap, filterTemplateId, filterTemplateName } =
+    loaderData;
   const { t, i18n } = useTranslation("admin");
 
   return (
@@ -196,8 +218,20 @@ export default function AdminDrillsHistory({
             {t("drillsHistory.heading")}
           </h1>
           <p className="text-white/50 text-sm mt-1">
-            {t("drillsHistory.subtitle")}
+            {filterTemplateId
+              ? t("drillsHistory.filteredSubtitle", {
+                  name: filterTemplateName ?? filterTemplateId,
+                })
+              : t("drillsHistory.subtitle")}
           </p>
+          {filterTemplateId ? (
+            <Link
+              to="/admin/drills/history"
+              className="mt-2 inline-flex items-center rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/10"
+            >
+              {t("drillsHistory.clearFilter")}
+            </Link>
+          ) : null}
         </div>
       </div>
 

@@ -89,8 +89,46 @@
     },
     "child_one": "niño",
     "child_other": "niños",
+    "card": {
+      "addClassroomTo": "Agregar aula a {{grade}}",
+      "bulkMove": "Mover en lote",
+      "household": "Hogar",
+      "noHousehold": "Sin hogar",
+      "noStudents": "Aún no hay estudiantes en esta aula.",
+      "pickGrade": "Elegir…",
+      "printRoster": "Imprimir lista",
+      "save": "Guardar",
+      "selectAll": "Seleccionar todos",
+      "selectAllAria": "Seleccionar todos los estudiantes",
+      "setGrade": "Asignar grado:",
+      "spaceLabel": "Espacio",
+      "studentsLabel": "estudiantes",
+      "teacherNotSet": "Maestro sin asignar",
+      "ungraded": "Sin grado"
+    },
+    "classroomActions": {
+      "classroomNotFound": "Aula no encontrada.",
+      "gradeUpdated": "Grado actualizado.",
+      "invalidClassroom": "Aula inválida.",
+      "invalidGrade": "Nivel de grado inválido.",
+      "unknownAction": "Acción desconocida.",
+      "updateFailed": "Error al actualizar."
+    },
     "edit": "Editar",
     "empty": "Aún no hay clases. Agrega una clase para comenzar.",
+    "emptyClassrooms": "Aún no hay aulas. Agrega un aula para comenzar.",
+    "emptyFiltered": "Ninguna aula coincide con los filtros actuales.",
+    "gradePill": {
+      "all": "Todos"
+    },
+    "groups": {
+      "classroomCount_one": "{{count}} aula",
+      "classroomCount_other": "{{count}} aulas",
+      "classroomCount": "{{count}} aulas",
+      "studentCount_one": "{{count}} estudiante",
+      "studentCount_other": "{{count}} estudiantes",
+      "studentCount": "{{count}} estudiantes"
+    },
     "heading": "Niños y clases",
     "metaTitle": "Administración – Niños y clases",
     "noChildren": "No hay niños en esta clase.",
@@ -222,7 +260,7 @@
     "danger": {
       "deleteAll": "Eliminar todos los registros de estudiantes",
       "heading": "Zona de peligro",
-      "subtitle": "Permanently delete every student record in this org. Households and classrooms are kept."
+      "subtitle": "Elimina permanentemente todos los registros de estudiantes de esta organización. Se conservan los hogares y las aulas."
     },
     "grid": {
       "addSpaces": "Agregar espacios",
@@ -246,8 +284,8 @@
     "import": {
       "createRecords": "Crear registros",
       "heading": "Importar estudiantes",
-      "subtitle": "Quickly add students from a simple CSV. For full control (preview, household linking, classroom mapping) use the full roster import.",
-      "openFullImport": "Open full roster import →"
+      "subtitle": "Agrega estudiantes rápidamente desde un CSV simple. Para tener control total (vista previa, vinculación de hogares, asignación de aulas) usa la importación completa de la lista.",
+      "openFullImport": "Abrir importación completa de la lista →"
     },
     "metaTitle": "Panel de administración",
     "planUsage": {
@@ -275,19 +313,19 @@
     "stats": {
       "gridSpaces": "Espacios de la cuadrícula",
       "students": "Estudiantes",
-      "boardState": "Board state",
-      "boardStateReady": "Ready",
-      "boardStateStale": "Not reset",
-      "pickupsToday": "Pickups today",
-      "pickupsTodayCaption_one": "{{count}} student currently called",
-      "pickupsTodayCaption_other": "{{count}} students currently called",
-      "pickupsTodayCaption": "{{count}} students currently called",
-      "exceptionsToday": "Exceptions today",
-      "exceptionsTodayCaption": "Different dismissal plan today",
-      "roster": "Roster",
-      "rosterCaption_one": "{{households}} household",
-      "rosterCaption_other": "{{households}} households",
-      "rosterCaption": "{{households}} households"
+      "boardState": "Estado del tablero",
+      "boardStateReady": "Listo",
+      "boardStateStale": "Sin reiniciar",
+      "pickupsToday": "Recogidas de hoy",
+      "pickupsTodayCaption_one": "{{count}} estudiante llamado actualmente",
+      "pickupsTodayCaption_other": "{{count}} estudiantes llamados actualmente",
+      "pickupsTodayCaption": "{{count}} estudiantes llamados actualmente",
+      "exceptionsToday": "Excepciones de hoy",
+      "exceptionsTodayCaption": "Plan de salida diferente hoy",
+      "roster": "Lista",
+      "rosterCaption_one": "{{households}} hogar",
+      "rosterCaption_other": "{{households}} hogares",
+      "rosterCaption": "{{households}} hogares"
     },
     "viewerDrawing": {
       "body": "Cuando se habilita, los observadores pueden dibujar líneas suaves en el tablero público (almacenadas solo en su dispositivo).",
@@ -299,18 +337,18 @@
       "nonAdmin": "Solo los administradores pueden cambiar este ajuste. Pídele a un administrador que habilite o deshabilite el dibujo del observador.",
       "subtle": "Esto afecta el tablero que ven las cuentas de observador y los visitantes sin sesión iniciada en la página principal."
     },
-    "subtitle": "Today's pickup operations at a glance.",
+    "subtitle": "Las operaciones de recogida de hoy de un vistazo.",
     "header": {
-      "resetForToday": "Reset board for today",
-      "resetAgain": "Reset again"
+      "resetForToday": "Reiniciar el tablero para hoy",
+      "resetAgain": "Reiniciar de nuevo"
     },
     "overview": {
-      "heading": "Today's snapshot"
+      "heading": "Resumen de hoy"
     },
     "boardReset": {
-      "never": "The board has never been reset.",
-      "todayAt": "Reset {{time}} today",
-      "staleSince": "Last reset {{date}}"
+      "never": "El tablero nunca se ha reiniciado.",
+      "todayAt": "Reiniciado a las {{time}} hoy",
+      "staleSince": "Último reinicio {{date}}"
     },
     "activity": {
       "heading": "Actividad reciente",
@@ -330,15 +368,15 @@
       "viewDrills": "Todo el historial de simulacros"
     },
     "setup": {
-      "heading": "Setup & maintenance",
-      "subtitle": "Less-frequent admin tasks: configure the pickup board, viewer drawing, imports, and printable backups."
+      "heading": "Configuración y mantenimiento",
+      "subtitle": "Tareas administrativas menos frecuentes: configura el tablero de recogida, el dibujo del observador, las importaciones y los respaldos para impresión."
     },
     "printables": {
-      "heading": "Printables",
-      "subtitle_one": "PDF backups for the board, master roster, and {{homerooms}} homeroom. Open the print page to see all options.",
-      "subtitle_other": "PDF backups for the board, master roster, and {{homerooms}} homerooms. Open the print page to see all options.",
-      "subtitle": "PDF backups for the board, master roster, and {{homerooms}} homerooms. Open the print page to see all options.",
-      "open": "Open print page"
+      "heading": "Impresiones",
+      "subtitle_one": "Respaldos en PDF para el tablero, la lista maestra y {{homerooms}} salón principal. Abre la página de impresión para ver todas las opciones.",
+      "subtitle_other": "Respaldos en PDF para el tablero, la lista maestra y {{homerooms}} salones principales. Abre la página de impresión para ver todas las opciones.",
+      "subtitle": "Respaldos en PDF para el tablero, la lista maestra y {{homerooms}} salones principales. Abre la página de impresión para ver todas las opciones.",
+      "open": "Abrir página de impresión"
     }
   },
   "drills": {
@@ -490,7 +528,7 @@
         "dueIn": "Vence en {{days}}d",
         "dueTitle": "Dentro de la ventana de cadencia requerida."
       },
-      "viewHistory": "View history"
+      "viewHistory": "Ver historial"
     },
     "metaEdit": "Editar – {{name}}",
     "metaEditFallback": "Editar lista",
@@ -508,6 +546,16 @@
       "yes": "Sí"
     },
     "run": {
+      "attest": {
+        "attest": "Todo en orden",
+        "attestedBy": "{{name}} · {{time}}",
+        "columnHeader": "Confirmación del aula",
+        "issue": "Reportar problema",
+        "issueNotePlaceholder": "Describe el problema (opcional)",
+        "issueNoteSave": "Guardar problema",
+        "summary": "{{attested}} de {{total}} aulas confirmadas · {{issues}} con problemas",
+        "undo": "Deshacer"
+      },
       "addItem": "Agregar",
       "back": "Editar diseño",
       "clearAll": "Limpiar todo",
@@ -575,31 +623,31 @@
         "speed": "{{x}}x",
         "trackAriaLabel": "Haga clic para buscar"
       },
-      "actionDone": "Done",
-      "actionEmpty": "(empty item)",
-      "actionPending": "Not done",
-      "back": "Back to drill history",
-      "followUpHeading": "Follow-up items",
-      "lastActor": "Last actor: {{actor}}",
-      "metaTitle": "Replay – {{name}}",
-      "noItems": "No follow-up items recorded.",
-      "noNotes": "No notes recorded.",
-      "notesHeading": "Notes",
-      "print": "Print",
-      "subhead": "Run on {{started}} · {{duration}}"
+      "actionDone": "Hecho",
+      "actionEmpty": "(elemento vacío)",
+      "actionPending": "No hecho",
+      "back": "Volver al historial de simulacros",
+      "followUpHeading": "Tareas de seguimiento",
+      "lastActor": "Último responsable: {{actor}}",
+      "metaTitle": "Reproducción – {{name}}",
+      "noItems": "No se registraron tareas de seguimiento.",
+      "noNotes": "No se registraron notas.",
+      "notesHeading": "Notas",
+      "print": "Imprimir",
+      "subhead": "Ejecutado el {{started}} · {{duration}}"
     },
     "table": {
       "mode": "Modo",
       "signoff": "Firma",
-      "actor": "Actor",
-      "ariaLabel": "Drill run history",
-      "audience": "Audience",
-      "duration": "Duration",
-      "ended": "Ended",
-      "started": "Started",
-      "status": "Status",
-      "template": "Template",
-      "truncated": "Showing the most recent {{cap}} runs."
+      "actor": "Responsable",
+      "ariaLabel": "Historial de ejecuciones de simulacros",
+      "audience": "Audiencia",
+      "duration": "Duración",
+      "ended": "Finalizado",
+      "started": "Iniciado",
+      "status": "Estado",
+      "template": "Plantilla",
+      "truncated": "Mostrando las {{cap}} ejecuciones más recientes."
     },
     "signoff": {
       "button": "Firmar",
@@ -619,18 +667,20 @@
       }
     },
     "empty": {
-      "body": "No drills have been run yet. Start one from the Drill checklists page.",
-      "cta": "Go to drill checklists"
+      "body": "Aún no se ha ejecutado ningún simulacro. Inicia uno desde la página de Listas de simulacros.",
+      "cta": "Ir a las listas de simulacros"
     },
-    "heading": "Drill history",
-    "metaTitle": "Admin – Drill history",
+    "heading": "Historial de simulacros",
+    "metaTitle": "Administración – Historial de simulacros",
+    "clearFilter": "Mostrar todos los simulacros",
+    "filteredSubtitle": "Mostrando ejecuciones de «{{name}}». Haz clic en una fila para reproducir la lista, las notas y los elementos de seguimiento guardados.",
     "status": {
-      "DRAFT": "Draft",
-      "ENDED": "Ended",
-      "LIVE": "Live",
-      "PAUSED": "Paused"
+      "DRAFT": "Borrador",
+      "ENDED": "Finalizado",
+      "LIVE": "En vivo",
+      "PAUSED": "En pausa"
     },
-    "subtitle": "Past drill runs are archived here. Click a row to replay the saved checklist, notes, and follow-up items."
+    "subtitle": "Las ejecuciones de simulacros anteriores se archivan aquí. Haz clic en una fila para reproducir la lista, las notas y las tareas de seguimiento guardadas."
   },
   "edit": {
     "homeroom": {
@@ -794,6 +844,8 @@
       "chooseStudent": "Elige al menos un estudiante para agrupar.",
       "chooseWeekday": "Elige un día de la semana para las excepciones recurrentes.",
       "endsBeforeStart": "Las excepciones recurrentes no pueden terminar antes de empezar.",
+      "exceptionDateRequired": "Elige una fecha para la excepción.",
+      "invalidDate": "Ingresa las fechas en formato AAAA-MM-DD.",
       "invalidException": "Excepción inválida.",
       "invalidHousehold": "Hogar inválido.",
       "invalidStudent": "Estudiante inválido.",
@@ -1138,11 +1190,18 @@
     "children": "Niños",
     "classrooms": "Aulas",
     "dashboard": "Panel",
+    "drillHistory": "Historial de simulacros",
     "drills": "Simulacros",
-    "history": "Historial",
+    "history": "Historial de llamadas",
     "households": "Hogares",
     "panelTitle": "Panel de administración",
     "rosterImport": "Importar lista",
+    "sections": {
+      "board": "Tablero",
+      "drills": "Simulacros",
+      "settings": "Configuración",
+      "studentsHouseholds": "Estudiantes y hogares"
+    },
     "users": "Usuarios",
     "print": "Respaldos para impresión"
   },
@@ -1392,6 +1451,8 @@
     "errors": {
       "createUserFailed": "No se pudo crear el usuario.",
       "emailExists": "Ya existe una cuenta con ese correo.",
+      "invalidEmail": "Ingresa una dirección de correo electrónico válida.",
+      "invalidName": "El nombre es obligatorio.",
       "missingId": "Falta el ID del usuario.",
       "noCredential": "No se encontró ninguna cuenta con credenciales.",
       "onlyAdmins": "Solo los administradores pueden cambiar este ajuste.",
@@ -1443,6 +1504,7 @@
       "adminResetRequired": "Se requiere restablecimiento del administrador",
       "createMagicLink": "Crear enlace mágico de observador",
       "daysValidPlaceholder": "Días de validez (predeterminado 7)",
+      "eyebrow": "Privacidad del observador",
       "generateLink": "Generar enlace",
       "heading": "Acceso privado de observador",
       "linkValid": "Este enlace será válido por {{days}} día(s).",
@@ -1460,24 +1522,24 @@
     }
   },
   "printables": {
-    "metaTitle": "Admin – Printables",
-    "heading": "Print backups",
-    "subtitle": "Browser-based PDFs you can print on demand for board backups, roster lists, and drill checklists.",
-    "backToDashboard": "Back to dashboard",
+    "metaTitle": "Administración – Impresiones",
+    "heading": "Respaldos para impresión",
+    "subtitle": "PDF en el navegador que puedes imprimir cuando lo necesites para respaldos del tablero, listas de estudiantes y listas de simulacros.",
+    "backToDashboard": "Volver al panel",
     "board": {
-      "heading": "Pickup board",
-      "subtitle": "A printable copy of the current board, in case the screen goes down or you need a paper handoff.",
-      "fitPageHint": "one page",
-      "naturalSizeHint": "may span multiple pages"
+      "heading": "Tablero de recogida",
+      "subtitle": "Una copia imprimible del tablero actual, por si la pantalla se cae o necesitas un traspaso en papel.",
+      "fitPageHint": "una página",
+      "naturalSizeHint": "puede abarcar varias páginas"
     },
     "roster": {
-      "heading": "Roster lists",
-      "subtitle": "Master list of all students plus per-homeroom breakdowns sorted by name or car-space number.",
-      "emptyHomerooms": "No homerooms on file yet — once a roster is imported, per-homeroom prints will appear here."
+      "heading": "Listas de estudiantes",
+      "subtitle": "Lista maestra de todos los estudiantes más desgloses por salón principal ordenados por nombre o número de espacio.",
+      "emptyHomerooms": "Aún no hay salones principales registrados — una vez que se importe una lista, aquí aparecerán las impresiones por salón principal."
     },
     "drills": {
-      "heading": "Drill checklists",
-      "subtitle": "Printable drill plan for use during practice and actual events."
+      "heading": "Listas de simulacros",
+      "subtitle": "Plan de simulacro imprimible para usar durante prácticas y eventos reales."
     }
   }
 }

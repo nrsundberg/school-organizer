@@ -167,12 +167,24 @@ model OrgAuditLog {
   org              Org      @relation(fields: [orgId], references: [id], onDelete: Cascade)
   actorUserId      String?
   onBehalfOfUserId String?
+  // Snapshot of the acting human's email at the time of the action, so the log
+  // stays readable even after the user is later deleted.
+  actorEmail       String?
+  ipAddress        String?
+  userAgent        String?
+  // Optional pointer at the mutated entity (e.g. "student" / "household" / "user")
+  // so the platform views can group/link by target.
+  targetType       String?
+  targetId         String?
   action           String
+  // For mutations, holds a minimal before/after diff: { before, after } with
+  // only the fields that actually changed.
   payload          Json?
   createdAt        DateTime @default(now())
 
   @@index([orgId])
   @@index([orgId, createdAt])
+  @@index([orgId, action])
 }
 
 model District {

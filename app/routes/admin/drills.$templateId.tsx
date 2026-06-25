@@ -1,4 +1,4 @@
-import { Form, Link, redirect, useFetcher } from "react-router";
+import { Link, data, redirect, useFetcher } from "react-router";
 import {
   ArrowDown,
   ArrowLeft,
@@ -12,10 +12,9 @@ import {
   Users,
 } from "lucide-react";
 import { StartLivePopover } from "~/domain/drills/StartLivePopover";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
-import { getFormProps, getInputProps } from "@conform-to/react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills.$templateId";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
@@ -35,7 +34,7 @@ import {
 import { ChecklistPreview } from "~/domain/drills/ChecklistTable";
 import { startDrillRun } from "~/domain/drills/live.server";
 import { parseIntent } from "~/lib/forms.server";
-import { formClasses, getFieldError, useAppForm } from "~/lib/forms";
+import { formClasses } from "~/lib/forms";
 import { dataWithError, dataWithSuccess } from "remix-toast";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
@@ -56,9 +55,13 @@ export const meta: Route.MetaFunction = ({ data }) => [
 // English messages used as the static schema source. The action wraps these
 // with translated dataWithError(...) toasts where it surfaces validation
 // failures to the user.
+// `autosave` is an optional flag the client sets on debounced background saves
+// so the action can suppress the success toast (the editor shows a quiet inline
+// "Saved" indicator instead). Absent on any explicit/manual submit.
 const renameSchema = z.object({
   intent: z.literal("rename"),
   name: z.string().trim().min(1, "Name is required.").max(120, "Name is too long."),
+  autosave: z.string().optional(),
 });
 
 const startLiveWithAudienceSchema = z.object({
@@ -72,11 +75,13 @@ const startLiveWithAudienceSchema = z.object({
 const setDefaultAudienceSchema = z.object({
   intent: z.literal("setDefaultAudience"),
   audience: z.enum(["STAFF_ONLY", "EVERYONE"]),
+  autosave: z.string().optional(),
 });
 
 const saveInstructionsSchema = z.object({
   intent: z.literal("saveInstructions"),
   instructions: z.string().max(8000, "Instructions are too long.").default(""),
+  autosave: z.string().optional(),
 });
 
 // Cadence target. Empty input clears the column (no cadence tracking).
@@ -88,10 +93,12 @@ const setCadenceSchema = z.object({
   requiredPerYear: z
     .union([z.literal(""), z.coerce.number().int().min(1).max(365)])
     .transform((v) => (v === "" ? null : v)),
+  autosave: z.string().optional(),
 });
 
 const saveDefinitionSchema = zfd.formData({
   intent: zfd.text(z.literal("saveDefinition")),
+  autosave: zfd.text(z.string().optional()),
   /** The template layout JSON — parsed and structurally validated. */
   definition: zfd.text(
     z
@@ -168,13 +175,21 @@ export async function action({ request, context, params }: Route.ActionArgs) {
   });
   if (!result.success) return result.response;
 
+  // Background autosaves return a quiet success (truthy, non-error data so the
+  // editor's inline "Saved" indicator lights up) WITHOUT a toast. Explicit
+  // submits (no `autosave` flag) keep the visible success toast.
+  const saved = (msg: string) =>
+    "autosave" in result.data && result.data.autosave
+      ? data({ ok: true })
+      : dataWithSuccess(null, msg);
+
   try {
     if (result.intent === "rename") {
       await prisma.drillTemplate.update({
         where: { id },
         data: { name: result.data.name },
       });
-      return dataWithSuccess(null, t("drills.edit.toasts.nameSaved"));
+      return saved(t("drills.edit.toasts.nameSaved"));
     }
 
     if (result.intent === "setDefaultAudience") {
@@ -182,7 +197,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         where: { id },
         data: { defaultAudience: result.data.audience },
       });
-      return dataWithSuccess(null, t("drills.edit.defaultAudience.saved"));
+      return saved(t("drills.edit.defaultAudience.saved"));
     }
 
     if (result.intent === "start-live") {
@@ -224,7 +239,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         where: { id },
         data: { definition: result.data.definition as unknown as Prisma.InputJsonValue },
       });
-      return dataWithSuccess(null, t("drills.edit.toasts.layoutSaved"));
+      return saved(t("drills.edit.toasts.layoutSaved"));
     }
 
     if (result.intent === "setCadence") {
@@ -232,7 +247,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         where: { id },
         data: { requiredPerYear: result.data.requiredPerYear },
       });
-      return dataWithSuccess(null, t("drills.edit.cadence.saved"));
+      return saved(t("drills.edit.cadence.saved"));
     }
 
     if (result.intent === "saveInstructions") {
@@ -241,7 +256,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         where: { id },
         data: { instructions: trimmed.length > 0 ? trimmed : null },
       });
-      return dataWithSuccess(null, t("drills.edit.toasts.instructionsSaved"));
+      return saved(t("drills.edit.toasts.instructionsSaved"));
     }
   } catch (err) {
     // A redirect from start-live must propagate — React Router surfaces
@@ -282,6 +297,69 @@ function cloneDefinition(def: TemplateDefinition): TemplateDefinition {
     cloned.defaultActionItems = [...def.defaultActionItems];
   }
   return cloned;
+}
+
+// Debounce window for background autosaves — matches the live drill screen
+// (`drills.live.tsx`) so the editor feels consistent.
+const AUTOSAVE_DEBOUNCE_MS = 1000;
+
+type SaveStatus = "idle" | "saving" | "saved";
+
+/**
+ * One self-contained autosave channel: a dedicated fetcher + a debounce timer.
+ * `schedule(fd)` stamps the `autosave` flag and debounces the submit;
+ * `flush()` fires any pending save immediately (used on blur / before leaving).
+ * Each editable section gets its own instance so concurrent edits to different
+ * fields never cancel each other's in-flight save.
+ */
+function useAutosaver() {
+  const fetcher = useFetcher();
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pending = useRef<FormData | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  const flush = useCallback(() => {
+    if (timer.current !== null) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    if (pending.current) {
+      fetcher.submit(pending.current, { method: "post" });
+      pending.current = null;
+    }
+  }, [fetcher]);
+
+  const schedule = useCallback(
+    (fd: FormData, delay = AUTOSAVE_DEBOUNCE_MS) => {
+      fd.set("autosave", "1");
+      pending.current = fd;
+      if (timer.current !== null) clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        timer.current = null;
+        flush();
+      }, delay);
+    },
+    [flush],
+  );
+
+  // Stamp "Saved" when a background save lands without error.
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data && !("error" in (fetcher.data as object))) {
+      setSavedAt(Date.now());
+    }
+  }, [fetcher.state, fetcher.data]);
+
+  // Auto-clear the indicator after a moment.
+  useEffect(() => {
+    if (savedAt === null) return;
+    const id = setTimeout(() => setSavedAt(null), 1500);
+    return () => clearTimeout(id);
+  }, [savedAt]);
+
+  const status: SaveStatus =
+    fetcher.state !== "idle" ? "saving" : savedAt !== null ? "saved" : "idle";
+
+  return { schedule, flush, status };
 }
 
 export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) {

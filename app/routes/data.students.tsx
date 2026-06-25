@@ -1,5 +1,6 @@
 import invariant from "tiny-invariant";
 import type { Route } from "./+types/data.students";
+import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import {
   getOrgFromContext,
   getTenantPrisma,
@@ -16,6 +17,10 @@ import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
 
 export async function action({ request, context }: Route.ActionArgs) {
+  // CSV roster import creates students in bulk — restrict to ADMIN/CONTROLLER,
+  // matching roster-import.tsx. Without this guard any authenticated org user
+  // (e.g. VIEWER) could POST directly to this endpoint.
+  await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const org = getOrgFromContext(context);
 

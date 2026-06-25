@@ -89,8 +89,46 @@
     },
     "child_one": "child",
     "child_other": "children",
+    "card": {
+      "addClassroomTo": "Add classroom to {{grade}}",
+      "bulkMove": "Bulk move",
+      "household": "Household",
+      "noHousehold": "No household",
+      "noStudents": "No students in this classroom yet.",
+      "pickGrade": "Pick…",
+      "printRoster": "Print roster",
+      "save": "Save",
+      "selectAll": "Select all",
+      "selectAllAria": "Select all students",
+      "setGrade": "Set grade:",
+      "spaceLabel": "Space",
+      "studentsLabel": "students",
+      "teacherNotSet": "Teacher not set",
+      "ungraded": "Ungraded"
+    },
+    "classroomActions": {
+      "classroomNotFound": "Classroom not found.",
+      "gradeUpdated": "Grade updated.",
+      "invalidClassroom": "Invalid classroom.",
+      "invalidGrade": "Invalid grade level.",
+      "unknownAction": "Unknown action.",
+      "updateFailed": "Update failed."
+    },
     "edit": "Edit",
     "empty": "No classes yet. Add a class to get started.",
+    "emptyClassrooms": "No classrooms yet. Add a classroom to get started.",
+    "emptyFiltered": "No classrooms match the current filters.",
+    "gradePill": {
+      "all": "All"
+    },
+    "groups": {
+      "classroomCount_one": "{{count}} classroom",
+      "classroomCount_other": "{{count}} classrooms",
+      "classroomCount": "{{count}} classrooms",
+      "studentCount_one": "{{count}} student",
+      "studentCount_other": "{{count}} students",
+      "studentCount": "{{count}} students"
+    },
     "heading": "Children & Classes",
     "metaTitle": "Admin – Children & Classes",
     "noChildren": "No children in this class.",
@@ -508,6 +546,16 @@
       "yes": "Yes"
     },
     "run": {
+      "attest": {
+        "attest": "All clear",
+        "attestedBy": "{{name}} · {{time}}",
+        "columnHeader": "Classroom sign-off",
+        "issue": "Report issue",
+        "issueNotePlaceholder": "Describe the issue (optional)",
+        "issueNoteSave": "Save issue",
+        "summary": "{{attested}} of {{total}} classrooms signed off · {{issues}} with issues",
+        "undo": "Undo"
+      },
       "addItem": "Add",
       "back": "Edit layout",
       "clearAll": "Clear all",
@@ -545,6 +593,8 @@
     },
     "heading": "Drill history",
     "metaTitle": "Admin – Drill history",
+    "clearFilter": "Show all drills",
+    "filteredSubtitle": "Showing runs for “{{name}}”. Click a row to replay the saved checklist, notes, and follow-up items.",
     "replay": {
       "actionDone": "Done",
       "actionEmpty": "(empty item)",
@@ -794,6 +844,8 @@
       "chooseStudent": "Choose at least one student to group.",
       "chooseWeekday": "Choose a weekday for recurring exceptions.",
       "endsBeforeStart": "Recurring exceptions cannot end before they start.",
+      "exceptionDateRequired": "Choose a date for the exception.",
+      "invalidDate": "Enter dates in YYYY-MM-DD format.",
       "invalidException": "Invalid exception.",
       "invalidHousehold": "Invalid household.",
       "invalidStudent": "Invalid student.",
@@ -1138,11 +1190,18 @@
     "children": "Children",
     "classrooms": "Classrooms",
     "dashboard": "Dashboard",
+    "drillHistory": "Drill History",
     "drills": "Drills",
-    "history": "History",
+    "history": "Board Call History",
     "households": "Households",
     "panelTitle": "Admin Panel",
     "rosterImport": "Roster Import",
+    "sections": {
+      "board": "Board",
+      "drills": "Drills",
+      "settings": "Settings",
+      "studentsHouseholds": "Students & Households"
+    },
     "users": "Users",
     "print": "Print backups"
   },
@@ -1392,6 +1451,8 @@
     "errors": {
       "createUserFailed": "Failed to create user.",
       "emailExists": "An account with that email already exists.",
+      "invalidEmail": "Enter a valid email address.",
+      "invalidName": "Name is required.",
       "missingId": "Missing user id.",
       "noCredential": "No credential account found.",
       "onlyAdmins": "Only admins can change this setting.",
@@ -1443,6 +1504,7 @@
       "adminResetRequired": "Admin reset required",
       "createMagicLink": "Create Viewer Magic Link",
       "daysValidPlaceholder": "Days valid (default 7)",
+      "eyebrow": "Viewer privacy",
       "generateLink": "Generate Link",
       "heading": "Viewer Privacy Access",
       "linkValid": "This link will be valid for {{days}} day(s).",

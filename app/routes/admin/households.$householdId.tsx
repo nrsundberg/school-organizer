@@ -197,23 +197,32 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       let startsOn: Date | null = null;
       let endsOn: Date | null = null;
       if (scheduleKind === "DATE") {
-        exceptionDate = parseDateOnly(
-          String(formData.get("exceptionDate") ?? ""),
-          "Exception date",
-        );
+        const rawExceptionDate = String(formData.get("exceptionDate") ?? "").trim();
+        if (!rawExceptionDate) {
+          return dataWithError(null, t("households.errors.exceptionDateRequired"));
+        }
+        try {
+          exceptionDate = parseDateOnly(rawExceptionDate, "Exception date");
+        } catch {
+          return dataWithError(null, t("households.errors.invalidDate"));
+        }
       } else {
         dayOfWeek = Number(formData.get("dayOfWeek"));
         if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
           return dataWithError(null, t("households.errors.chooseWeekday"));
         }
-        startsOn = parseOptionalDateOnly(
-          String(formData.get("startsOn") ?? ""),
-          "Starts on",
-        );
-        endsOn = parseOptionalDateOnly(
-          String(formData.get("endsOn") ?? ""),
-          "Ends on",
-        );
+        try {
+          startsOn = parseOptionalDateOnly(
+            String(formData.get("startsOn") ?? ""),
+            "Starts on",
+          );
+          endsOn = parseOptionalDateOnly(
+            String(formData.get("endsOn") ?? ""),
+            "Ends on",
+          );
+        } catch {
+          return dataWithError(null, t("households.errors.invalidDate"));
+        }
         if (
           startsOn &&
           endsOn &&
