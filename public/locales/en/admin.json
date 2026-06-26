@@ -243,7 +243,58 @@
       "USER_REMOVED": "Removed a user",
       "USER_ROLE_CHANGED": "Changed a user's role",
       "VIEWER_DRAWING_DISABLED": "Disabled viewer drawing",
-      "VIEWER_DRAWING_ENABLED": "Enabled viewer drawing"
+      "VIEWER_DRAWING_ENABLED": "Enabled viewer drawing",
+      "branding": { "update": "Updated branding" },
+      "student": {
+        "create": "Added a student",
+        "update": "Updated a student",
+        "move": "Moved a student to another classroom",
+        "delete": "Deleted a student"
+      },
+      "household": {
+        "create": "Created a household",
+        "update": "Updated a household",
+        "delete": "Deleted a household",
+        "merge": "Merged households",
+        "assign": "Assigned students to a household",
+        "detachStudent": "Detached a student from a household"
+      },
+      "exception": {
+        "create": "Created a dismissal exception",
+        "deactivate": "Archived a dismissal exception"
+      },
+      "cancellation": { "broadcast": "Broadcast a program cancellation" },
+      "user": {
+        "invite": "Invited a user",
+        "role": { "changed": "Changed a user's role" },
+        "password": { "reset": "Reset a user's password" },
+        "passwordReset": { "policy": "Changed the password-reset policy" },
+        "banned": "Banned a user",
+        "unbanned": "Unbanned a user",
+        "deleted": "Deleted a user",
+        "sessions": { "revoked": "Revoked a user's sessions" },
+        "impersonate": { "start": "Started impersonating a user" }
+      },
+      "viewer": {
+        "pin": { "changed": "Changed the viewer PIN" },
+        "magiclink": { "created": "Created a viewer magic link" },
+        "lock": { "reset": "Reset a viewer lockout" },
+        "access": { "revoked": "Revoked viewer access" }
+      },
+      "classroom": { "update": "Updated a classroom" },
+      "drill": {
+        "template": {
+          "created": "Created a drill template",
+          "updated": "Updated a drill template",
+          "deleted": "Deleted a drill template"
+        }
+      },
+      "roster": { "import": { "applied": "Imported a roster" } },
+      "settings": {
+        "update": "Updated settings",
+        "board": { "reset": "Reset the board" },
+        "retention": { "changed": "Changed history retention" }
+      }
     },
     "actions": {
       "addedSpaces": "Added spaces {{from}}–{{to}}",

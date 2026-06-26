@@ -243,7 +243,58 @@
       "USER_REMOVED": "Eliminó a un usuario",
       "USER_ROLE_CHANGED": "Cambió el rol de un usuario",
       "VIEWER_DRAWING_DISABLED": "Deshabilitó el dibujo del visor",
-      "VIEWER_DRAWING_ENABLED": "Habilitó el dibujo del visor"
+      "VIEWER_DRAWING_ENABLED": "Habilitó el dibujo del visor",
+      "branding": { "update": "Actualizó la marca" },
+      "student": {
+        "create": "Agregó un estudiante",
+        "update": "Actualizó un estudiante",
+        "move": "Movió un estudiante a otra aula",
+        "delete": "Eliminó un estudiante"
+      },
+      "household": {
+        "create": "Creó una familia",
+        "update": "Actualizó una familia",
+        "delete": "Eliminó una familia",
+        "merge": "Combinó familias",
+        "assign": "Asignó estudiantes a una familia",
+        "detachStudent": "Desvinculó a un estudiante de una familia"
+      },
+      "exception": {
+        "create": "Creó una excepción de salida",
+        "deactivate": "Archivó una excepción de salida"
+      },
+      "cancellation": { "broadcast": "Transmitió una cancelación de programa" },
+      "user": {
+        "invite": "Invitó a un usuario",
+        "role": { "changed": "Cambió el rol de un usuario" },
+        "password": { "reset": "Restableció la contraseña de un usuario" },
+        "passwordReset": { "policy": "Cambió la política de restablecimiento de contraseña" },
+        "banned": "Bloqueó a un usuario",
+        "unbanned": "Desbloqueó a un usuario",
+        "deleted": "Eliminó a un usuario",
+        "sessions": { "revoked": "Revocó las sesiones de un usuario" },
+        "impersonate": { "start": "Comenzó a suplantar a un usuario" }
+      },
+      "viewer": {
+        "pin": { "changed": "Cambió el PIN del visor" },
+        "magiclink": { "created": "Creó un enlace mágico de visor" },
+        "lock": { "reset": "Restableció el bloqueo del visor" },
+        "access": { "revoked": "Revocó el acceso del visor" }
+      },
+      "classroom": { "update": "Actualizó un aula" },
+      "drill": {
+        "template": {
+          "created": "Creó una plantilla de simulacro",
+          "updated": "Actualizó una plantilla de simulacro",
+          "deleted": "Eliminó una plantilla de simulacro"
+        }
+      },
+      "roster": { "import": { "applied": "Importó una lista" } },
+      "settings": {
+        "update": "Actualizó la configuración",
+        "board": { "reset": "Reinició el tablero" },
+        "retention": { "changed": "Cambió la retención del historial" }
+      }
     },
     "actions": {
       "addedSpaces": "Se agregaron los espacios {{from}}–{{to}}",
