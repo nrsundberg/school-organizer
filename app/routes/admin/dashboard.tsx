@@ -406,9 +406,11 @@ export async function action({ request, context }: Route.ActionArgs) {
 
     // Notify every org admin + Pickup Roster ops that the roster was wiped, so
     // a surprise/accidental deletion is caught while it's still recoverable
-    // from database backups.
+    // from database backups. NOTE: User is NOT a tenant-scoped model (see
+    // tenant-extension.ts), so orgId MUST be filtered explicitly — otherwise
+    // this would email admins of every org.
     const admins = await prisma.user.findMany({
-      where: { role: "ADMIN" },
+      where: { orgId: org.id, role: "ADMIN" },
       select: { email: true, locale: true },
     });
     const actorLabel =

@@ -37,6 +37,9 @@ model User {
   accounts                   Account[]
   passwordResetTokens        PasswordResetToken[]
   userInviteTokens           UserInviteToken[]
+  /// Classrooms this user teaches (role "TEACHER"). Usually 0 or 1, but a user
+  /// may run multiple homerooms.
+  teacherClassrooms          Teacher[]
   createdAt                  DateTime  @default(now())
   updatedAt                  DateTime  @updatedAt
 
@@ -550,14 +553,22 @@ model Teacher {
   /// do not currently enforce it on assignment.
   capacity Int?
   /// Display name of the teacher who runs this classroom. Optional so the
-  /// existing `homeRoom` label keeps working as a fallback. Stored verbatim
-  /// (no User row required) since teachers are not always staff users.
+  /// existing `homeRoom` label keeps working as a fallback. Kept in sync with
+  /// `user.name` when a User is linked; still usable on its own for classrooms
+  /// whose teacher has no account yet.
   teacherName String?
+  /// Optional link to the teacher's User account (role "TEACHER"). Nullable so
+  /// existing classrooms need no backfill and teachers without a login still
+  /// work via `teacherName`. SetNull on delete detaches the classroom rather
+  /// than cascading the delete.
+  userId   String?
+  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   students Student[]
 
   @@unique([orgId, homeRoom])
   @@index([orgId])
   @@index([orgId, gradeLevel])
+  @@index([userId])
 }
 
 model Student {

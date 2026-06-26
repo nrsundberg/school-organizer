@@ -104,7 +104,8 @@
       "spaceLabel": "Space",
       "studentsLabel": "students",
       "teacherNotSet": "Teacher not set",
-      "ungraded": "Ungraded"
+      "ungraded": "Ungraded",
+      "manageClassroom": "Manage classroom"
     },
     "classroomActions": {
       "classroomNotFound": "Classroom not found.",
@@ -1557,6 +1558,51 @@
     "drills": {
       "heading": "Drill checklists",
       "subtitle": "Printable drill plan for use during practice and actual events."
+    }
+  },
+  "classroomDetail": {
+    "metaTitle": "Classroom {{name}} — Admin",
+    "back": "All classrooms",
+    "studentCount_one": "{{count}} student",
+    "studentCount_other": "{{count}} students",
+    "teacher": {
+      "heading": "Teacher",
+      "none": "No teacher assigned yet.",
+      "unlinkedNamed": "Current teacher: {{name}} (no account linked).",
+      "unlink": "Unlink",
+      "assignExisting": "Assign an existing teacher",
+      "selectPlaceholder": "Choose a teacher…",
+      "assignButton": "Assign",
+      "inviteHeading": "Invite a new teacher",
+      "inviteHelp": "Creates a teacher account and emails them a link to set a password. They can join live drills but cannot access the admin panel.",
+      "nameLabel": "Name",
+      "emailLabel": "Email",
+      "inviteButton": "Send invite"
+    },
+    "details": {
+      "heading": "Classroom details",
+      "grade": "Grade",
+      "capacity": "Capacity",
+      "save": "Save details"
+    },
+    "roster": {
+      "heading": "Students",
+      "empty": "No students assigned to this classroom yet."
+    },
+    "toasts": {
+      "teacherAssigned": "Teacher assigned.",
+      "teacherInvited": "Invite sent to {{email}}.",
+      "teacherUnlinked": "Teacher unlinked.",
+      "detailsSaved": "Classroom details saved."
+    },
+    "errors": {
+      "notFound": "Classroom not found.",
+      "invalidTeacher": "That teacher account is not valid for this school.",
+      "userExists": "Someone with that email already has an account.",
+      "invalidEmail": "Enter a valid email address.",
+      "invalidName": "Enter the teacher's name.",
+      "inviteFailed": "Could not send the invite. Please try again.",
+      "invalidCapacity": "Capacity must be a number between 1 and 200."
     }
   }
 }

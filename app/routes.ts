@@ -17,6 +17,7 @@ export default [
     route("households/:householdId", "routes/admin/households.$householdId.tsx"),
     route("children", "routes/admin/children.tsx"),
     route("classrooms", "routes/admin/classrooms.tsx"),
+    route("classrooms/:classroomId", "routes/admin/classrooms.$classroomId.tsx"),
     route("students/:studentId", "routes/admin/students.$studentId.tsx"),
     route("roster-import", "routes/admin/roster-import.tsx"),
     route("billing", "routes/admin/billing.tsx"),

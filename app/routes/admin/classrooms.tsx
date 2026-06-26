@@ -6,6 +6,7 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronRight,
+  GraduationCap,
   Plus,
   Printer,
   Search,
@@ -916,6 +917,13 @@ function ExpandedClassroom({
           >
             <Printer className="h-3.5 w-3.5" />
             {t("children.card.printRoster")}
+          </Link>
+          <Link
+            to={`/admin/classrooms/${classroom.id}`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs text-white/80 hover:border-white/20 hover:text-white"
+          >
+            <GraduationCap className="h-3.5 w-3.5" />
+            {t("children.card.manageClassroom")}
           </Link>
         </div>
       </div>
