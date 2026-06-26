@@ -25,7 +25,6 @@ import {
   parseSerializedTeacherRows,
   serializeTeacherRows,
   suggestTeacherMapping,
-  TEACHER_FIELDS,
   type InviteTeacherFn,
   type TeacherColumnMapping,
   type TeacherField,
@@ -53,6 +52,9 @@ export const meta: Route.MetaFunction = ({ data }) => [
 ];
 
 const ROLES: TeacherRole[] = ["VIEWER", "CONTROLLER"];
+// Defined here (not imported from the .server module) so the client bundle
+// never references server-only code. See React Router code-splitting.
+const TEACHER_FIELDS: TeacherField[] = ["name", "email", "homeRoom", "role"];
 const REQUIRED_FIELDS: TeacherField[] = ["name", "email", "homeRoom"];
 
 type LocalizedRowError = { row: number; message: string };

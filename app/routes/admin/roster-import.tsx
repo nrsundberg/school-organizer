@@ -18,7 +18,6 @@ import {
   buildRosterImportPlanFromDatabase,
   parseSerializedGrid,
   parseSerializedRosterRows,
-  ROSTER_FIELDS,
   RosterImportError,
   serializeGrid,
   serializeRosterRows,
@@ -351,6 +350,9 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
   );
 }
 
+// Field lists live here (not imported from the .server module) so the client
+// bundle never has to reference server-only code. See React Router code-splitting.
+const ROSTER_FIELDS: RosterField[] = ["firstName", "lastName", "homeRoom", "spaceNumber"];
 const REQUIRED_FIELDS: RosterField[] = ["firstName", "lastName", "homeRoom"];
 
 function MappingPanel({ map }: { map: MapActionData }) {
