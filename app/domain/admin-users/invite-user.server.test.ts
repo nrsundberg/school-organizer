@@ -21,8 +21,8 @@ describe("validateScopeAndRole", () => {
     );
   });
 
-  it("accepts ADMIN/CONTROLLER/VIEWER at org scope only", () => {
-    for (const role of ["ADMIN", "CONTROLLER", "VIEWER"]) {
+  it("accepts ADMIN/CONTROLLER/VIEWER/TEACHER at org scope only", () => {
+    for (const role of ["ADMIN", "CONTROLLER", "VIEWER", "TEACHER"]) {
       assert.equal(
         validateScopeAndRole({ kind: "org", id: "org-1" }, role),
         true,

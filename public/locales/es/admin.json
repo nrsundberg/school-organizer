@@ -104,7 +104,8 @@
       "spaceLabel": "Espacio",
       "studentsLabel": "estudiantes",
       "teacherNotSet": "Maestro sin asignar",
-      "ungraded": "Sin grado"
+      "ungraded": "Sin grado",
+      "manageClassroom": "Gestionar aula"
     },
     "classroomActions": {
       "classroomNotFound": "Aula no encontrada.",
@@ -1717,6 +1718,51 @@
     "drills": {
       "heading": "Listas de simulacros",
       "subtitle": "Plan de simulacro imprimible para usar durante prácticas y eventos reales."
+    }
+  },
+  "classroomDetail": {
+    "metaTitle": "Aula {{name}} — Administración",
+    "back": "Todas las aulas",
+    "studentCount_one": "{{count}} estudiante",
+    "studentCount_other": "{{count}} estudiantes",
+    "teacher": {
+      "heading": "Docente",
+      "none": "Aún no hay docente asignado.",
+      "unlinkedNamed": "Docente actual: {{name}} (sin cuenta vinculada).",
+      "unlink": "Desvincular",
+      "assignExisting": "Asignar un docente existente",
+      "selectPlaceholder": "Elige un docente…",
+      "assignButton": "Asignar",
+      "inviteHeading": "Invitar a un nuevo docente",
+      "inviteHelp": "Crea una cuenta de docente y le envía un enlace para establecer una contraseña. Puede unirse a los simulacros en vivo pero no puede acceder al panel de administración.",
+      "nameLabel": "Nombre",
+      "emailLabel": "Correo electrónico",
+      "inviteButton": "Enviar invitación"
+    },
+    "details": {
+      "heading": "Detalles del aula",
+      "grade": "Grado",
+      "capacity": "Capacidad",
+      "save": "Guardar detalles"
+    },
+    "roster": {
+      "heading": "Estudiantes",
+      "empty": "Aún no hay estudiantes asignados a esta aula."
+    },
+    "toasts": {
+      "teacherAssigned": "Docente asignado.",
+      "teacherInvited": "Invitación enviada a {{email}}.",
+      "teacherUnlinked": "Docente desvinculado.",
+      "detailsSaved": "Detalles del aula guardados."
+    },
+    "errors": {
+      "notFound": "Aula no encontrada.",
+      "invalidTeacher": "Esa cuenta de docente no es válida para esta escuela.",
+      "invalidEmail": "Ingresa un correo electrónico válido.",
+      "userExists": "Alguien con ese correo ya tiene una cuenta.",
+      "invalidName": "Ingresa el nombre del docente.",
+      "inviteFailed": "No se pudo enviar la invitación. Inténtalo de nuevo.",
+      "invalidCapacity": "La capacidad debe ser un número entre 1 y 200."
     }
   }
 }

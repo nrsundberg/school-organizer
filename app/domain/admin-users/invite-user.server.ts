@@ -73,7 +73,7 @@ export type InviteUserError =
   | "user-exists"
   | "create-failed";
 
-const VALID_ORG_ROLES = new Set(["ADMIN", "CONTROLLER", "VIEWER"]);
+const VALID_ORG_ROLES = new Set(["ADMIN", "CONTROLLER", "VIEWER", "TEACHER"]);
 const VALID_DISTRICT_ROLES = new Set(["ADMIN"]);
 const VALID_PLATFORM_ROLES = new Set(["PLATFORM_ADMIN"]);
 

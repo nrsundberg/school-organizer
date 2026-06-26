@@ -17,6 +17,7 @@ export default [
     route("households/:householdId", "routes/admin/households.$householdId.tsx"),
     route("children", "routes/admin/children.tsx"),
     route("classrooms", "routes/admin/classrooms.tsx"),
+    route("classrooms/:classroomId", "routes/admin/classrooms.$classroomId.tsx"),
     route("teachers/import", "routes/admin/teachers.import.tsx"),
     // Static before the :studentId param route so it can't be swallowed.
     route("students/duplicates", "routes/admin/students.duplicates.tsx"),
