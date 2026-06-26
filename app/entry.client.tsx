@@ -6,6 +6,7 @@ import { I18nextProvider } from "react-i18next";
 import i18next from "i18next";
 import type { Resource } from "i18next";
 import { initI18nClient } from "~/i18n";
+import { scrubSentryEvent } from "~/lib/sentry-scrub";
 
 declare const __SENTRY_RELEASE__: string;
 
@@ -23,7 +24,12 @@ Sentry.init({
   release:
     typeof __SENTRY_RELEASE__ !== "undefined" ? __SENTRY_RELEASE__ : undefined,
   integrations: [Sentry.browserTracingIntegration()],
-  tracesSampleRate: 0.1
+  tracesSampleRate: 0.1,
+  // Strip session tokens and the viewer magic-link `?token=` (which shows up
+  // in the browser URL) before any event leaves the client. See
+  // app/lib/sentry-scrub.ts.
+  sendDefaultPii: false,
+  beforeSend: (event) => scrubSentryEvent(event)
 });
 
 /**
