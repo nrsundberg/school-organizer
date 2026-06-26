@@ -210,6 +210,22 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
     setHomeroomFilter(searchParams.get("room") ?? "");
   }, [searchParams]);
 
+  // Aging safety tick. A called tile shows "fresh" yellow for the first 30s,
+  // then ages to green (see isTimedOut/TIMEOUT_MS). Each tile schedules its own
+  // one-shot timer for that single flip — but a one-shot timer has no recovery:
+  // if it's ever dropped or coalesced while the board sits idle, the tile stays
+  // yellow until the next render, which today only happens on a manual refresh.
+  // A low-frequency board tick re-renders the grid so every tile re-evaluates
+  // its age and self-heals, with no server round-trip. Runs only while at least
+  // one tile is ACTIVE; the per-tile effects don't re-run (their deps are
+  // unchanged), so this adds a cheap recompute, not timer churn.
+  const [, setAgingTick] = useState(0);
+  useEffect(() => {
+    if (!spaces.some((s) => s.status === Status.ACTIVE)) return;
+    const id = setInterval(() => setAgingTick((n) => n + 1), 5000);
+    return () => clearInterval(id);
+  }, [spaces]);
+
   useBingoWebSocket({
     onSpaceUpdate: ({ spaceNumber, status, timestamp }) => {
       setSpaces((prev) =>

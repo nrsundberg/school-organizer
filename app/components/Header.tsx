@@ -85,7 +85,7 @@ export default function ({
   const closeMenu = () => setMenuOpen(false);
 
   return user ? (
-    <div className="h-10 w-full flex items-center justify-center" style={{ backgroundColor: headerColor }}>
+    <div className="relative h-10 w-full flex items-center justify-center" style={{ backgroundColor: headerColor }}>
       <Link to="/" className={`${fgText} font-bold inline-flex items-center`}>
         {tenantLogo ? (
           <>
@@ -146,7 +146,7 @@ export default function ({
       </div>
     </div>
   ) : (
-    <div className="h-10 w-full flex items-center justify-center" style={{ backgroundColor: headerColor }}>
+    <div className="relative h-10 w-full flex items-center justify-center" style={{ backgroundColor: headerColor }}>
       <Link to="/" className={`${fgText} font-bold inline-flex items-center`}>
         {tenantLogo ? (
           <>
