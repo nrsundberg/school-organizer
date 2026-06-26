@@ -15,6 +15,7 @@ import {
 } from "../app/domain/utils/host.server";
 import { applySecurityHeaders } from "../app/lib/security-headers.server";
 import { createCspNonce, CSP_NONCE_HEADER } from "../app/lib/csp";
+import { scrubSentryEvent } from "../app/lib/sentry-scrub";
 export { BingoBoardDO } from "./bingo-board";
 
 /**
@@ -70,7 +71,12 @@ export default withSentry(
     dsn: (env as any).SENTRY_DSN,
     release: (env as any).SENTRY_RELEASE,
     environment: (env as any).ENVIRONMENT ?? "production",
-    tracesSampleRate: 0.1
+    tracesSampleRate: 0.1,
+    // Never attach client IP / cookies by default, and strip session tokens,
+    // request bodies, and magic-link / reset tokens before sending. See
+    // app/lib/sentry-scrub.ts.
+    sendDefaultPii: false,
+    beforeSend: (event) => scrubSentryEvent(event)
   }),
   {
     async fetch(

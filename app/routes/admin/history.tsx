@@ -156,7 +156,15 @@ async function fetchCallEvents(
 
 function csvEscape(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return "";
-  const s = String(value);
+  let s = String(value);
+  // Neutralize spreadsheet formula injection: a cell beginning with one of
+  // these metacharacters is evaluated as a formula when an admin opens the
+  // export in Excel/Sheets. Student/teacher names are admin-supplied, so a
+  // name like `=HYPERLINK(...)` could exfiltrate data or run a payload.
+  // Prefixing with an apostrophe forces the cell to be treated as text.
+  if (/^[=+\-@\t\r]/.test(s)) {
+    s = `'${s}`;
+  }
   if (/[",\n\r]/.test(s)) {
     return `"${s.replace(/"/g, '""')}"`;
   }
