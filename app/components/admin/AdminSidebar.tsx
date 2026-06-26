@@ -20,24 +20,63 @@ type NavItem = {
   end?: boolean;
 };
 
-const baseNavItems: NavItem[] = [
-  { to: "/admin", labelKey: "sidebar.dashboard", icon: LayoutDashboard, end: true },
-  { to: "/admin/users", labelKey: "sidebar.users", icon: Users },
-  { to: "/admin/households", labelKey: "sidebar.households", icon: Home },
-  { to: "/admin/classrooms", labelKey: "sidebar.classrooms", icon: GraduationCap },
-  { to: "/admin/children", labelKey: "sidebar.children", icon: Users },
-  { to: "/admin/roster-import", labelKey: "sidebar.rosterImport", icon: FileSpreadsheet },
-  { to: "/admin/drills", labelKey: "sidebar.drills", icon: ClipboardList },
-  { to: "/admin/history", labelKey: "sidebar.history", icon: History },
-  { to: "/admin/print", labelKey: "sidebar.print", icon: Printer },
-  { to: "/admin/branding", labelKey: "sidebar.branding", icon: Palette },
-];
+type NavSection = {
+  titleKey: string;
+  items: NavItem[];
+};
+
+const dashboardNavItem: NavItem = {
+  to: "/admin",
+  labelKey: "sidebar.dashboard",
+  icon: LayoutDashboard,
+  end: true,
+};
 
 const billingNavItem: NavItem = {
   to: "/admin/billing",
   labelKey: "sidebar.billing",
   icon: CreditCard,
 };
+
+/**
+ * Build the grouped sidebar sections. Billing is appended to Settings only when
+ * shown (hidden for orgs whose billing is managed by a district).
+ */
+function buildSections(showBilling: boolean): NavSection[] {
+  return [
+    {
+      titleKey: "sidebar.sections.board",
+      items: [
+        { to: "/admin/history", labelKey: "sidebar.history", icon: History },
+        { to: "/admin/print", labelKey: "sidebar.print", icon: Printer },
+      ],
+    },
+    {
+      titleKey: "sidebar.sections.studentsHouseholds",
+      items: [
+        { to: "/admin/households", labelKey: "sidebar.households", icon: Home },
+        { to: "/admin/children", labelKey: "sidebar.children", icon: Users },
+        { to: "/admin/classrooms", labelKey: "sidebar.classrooms", icon: GraduationCap },
+        { to: "/admin/roster-import", labelKey: "sidebar.rosterImport", icon: FileSpreadsheet },
+      ],
+    },
+    {
+      titleKey: "sidebar.sections.drills",
+      items: [
+        { to: "/admin/drills", labelKey: "sidebar.drills", icon: ClipboardList, end: true },
+        { to: "/admin/drills/history", labelKey: "sidebar.drillHistory", icon: History },
+      ],
+    },
+    {
+      titleKey: "sidebar.sections.settings",
+      items: [
+        { to: "/admin/users", labelKey: "sidebar.users", icon: Users },
+        { to: "/admin/branding", labelKey: "sidebar.branding", icon: Palette },
+        ...(showBilling ? [billingNavItem] : []),
+      ],
+    },
+  ];
+}
 
 export default function AdminSidebar({
   onLinkClick,
@@ -51,29 +90,40 @@ export default function AdminSidebar({
   showBilling?: boolean;
 }) {
   const { t } = useTranslation("admin");
-  const navItems = showBilling ? [...baseNavItems, billingNavItem] : baseNavItems;
+  const sections = buildSections(showBilling);
+
+  const renderItem = ({ to, labelKey, icon: Icon, end }: NavItem) => (
+    <NavLink
+      key={to}
+      to={to}
+      end={end}
+      onClick={onLinkClick}
+      className={({ isActive }: { isActive: boolean }) =>
+        `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+          isActive
+            ? "bg-blue-600 text-white"
+            : "text-white/60 hover:bg-white/10 hover:text-white"
+        }`
+      }
+    >
+      <Icon className="w-4 h-4 flex-shrink-0" />
+      {t(labelKey)}
+    </NavLink>
+  );
+
   return (
     <nav className="flex flex-col gap-1 p-4">
       <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-2 px-2">
         {t("sidebar.panelTitle")}
       </p>
-      {navItems.map(({ to, labelKey, icon: Icon, end }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={end}
-          onClick={onLinkClick}
-          className={({ isActive }: { isActive: boolean }) =>
-            `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-              isActive
-                ? "bg-blue-600 text-white"
-                : "text-white/60 hover:bg-white/10 hover:text-white"
-            }`
-          }
-        >
-          <Icon className="w-4 h-4 flex-shrink-0" />
-          {t(labelKey)}
-        </NavLink>
+      {renderItem(dashboardNavItem)}
+      {sections.map((section) => (
+        <div key={section.titleKey} className="mt-4 flex flex-col gap-1">
+          <p className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-1 px-2">
+            {t(section.titleKey)}
+          </p>
+          {section.items.map(renderItem)}
+        </div>
       ))}
     </nav>
   );

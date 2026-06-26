@@ -5,6 +5,7 @@ import type { Route } from "./+types/drills.library";
 import { btnPrimary } from "~/lib/button-classes";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
+import { auditOrgAction } from "~/domain/org/audit.server";
 import { GLOBAL_TEMPLATES, getGlobalTemplate } from "~/domain/drills/library";
 import { DRILL_TYPE_LABELS, type DrillType } from "~/domain/drills/types";
 import { cloneGlobalTemplateToOrg } from "~/domain/drills/clone.server";
@@ -74,6 +75,13 @@ export async function action({ request, context }: Route.ActionArgs) {
       return dataWithError(null, t("drills.library.errors.alreadyCloned"));
     }
     const created = await cloneGlobalTemplateToOrg(prisma, orgId, globalKey);
+    await auditOrgAction(context, request, {
+      action: "drill.template.created",
+      targetType: "drillTemplate",
+      targetId: created.id,
+      always: true,
+      payload: { clonedFrom: globalKey, name: created.name },
+    });
     throw redirect(`/admin/drills/${created.id}`);
   }
 

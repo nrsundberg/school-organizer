@@ -89,8 +89,46 @@
     },
     "child_one": "child",
     "child_other": "children",
+    "card": {
+      "addClassroomTo": "Add classroom to {{grade}}",
+      "bulkMove": "Bulk move",
+      "household": "Household",
+      "noHousehold": "No household",
+      "noStudents": "No students in this classroom yet.",
+      "pickGrade": "Pick…",
+      "printRoster": "Print roster",
+      "save": "Save",
+      "selectAll": "Select all",
+      "selectAllAria": "Select all students",
+      "setGrade": "Set grade:",
+      "spaceLabel": "Space",
+      "studentsLabel": "students",
+      "teacherNotSet": "Teacher not set",
+      "ungraded": "Ungraded"
+    },
+    "classroomActions": {
+      "classroomNotFound": "Classroom not found.",
+      "gradeUpdated": "Grade updated.",
+      "invalidClassroom": "Invalid classroom.",
+      "invalidGrade": "Invalid grade level.",
+      "unknownAction": "Unknown action.",
+      "updateFailed": "Update failed."
+    },
     "edit": "Edit",
     "empty": "No classes yet. Add a class to get started.",
+    "emptyClassrooms": "No classrooms yet. Add a classroom to get started.",
+    "emptyFiltered": "No classrooms match the current filters.",
+    "gradePill": {
+      "all": "All"
+    },
+    "groups": {
+      "classroomCount_one": "{{count}} classroom",
+      "classroomCount_other": "{{count}} classrooms",
+      "classroomCount": "{{count}} classrooms",
+      "studentCount_one": "{{count}} student",
+      "studentCount_other": "{{count}} students",
+      "studentCount": "{{count}} students"
+    },
     "heading": "Children & Classes",
     "metaTitle": "Admin – Children & Classes",
     "noChildren": "No children in this class.",
@@ -207,12 +245,63 @@
       "USER_REMOVED": "Removed a user",
       "USER_ROLE_CHANGED": "Changed a user's role",
       "VIEWER_DRAWING_DISABLED": "Disabled viewer drawing",
-      "VIEWER_DRAWING_ENABLED": "Enabled viewer drawing"
+      "VIEWER_DRAWING_ENABLED": "Enabled viewer drawing",
+      "branding": { "update": "Updated branding" },
+      "student": {
+        "create": "Added a student",
+        "update": "Updated a student",
+        "move": "Moved a student to another classroom",
+        "delete": "Deleted a student"
+      },
+      "household": {
+        "create": "Created a household",
+        "update": "Updated a household",
+        "delete": "Deleted a household",
+        "merge": "Merged households",
+        "assign": "Assigned students to a household",
+        "detachStudent": "Detached a student from a household"
+      },
+      "exception": {
+        "create": "Created a dismissal exception",
+        "deactivate": "Archived a dismissal exception"
+      },
+      "cancellation": { "broadcast": "Broadcast a program cancellation" },
+      "user": {
+        "invite": "Invited a user",
+        "role": { "changed": "Changed a user's role" },
+        "password": { "reset": "Reset a user's password" },
+        "passwordReset": { "policy": "Changed the password-reset policy" },
+        "banned": "Banned a user",
+        "unbanned": "Unbanned a user",
+        "deleted": "Deleted a user",
+        "sessions": { "revoked": "Revoked a user's sessions" },
+        "impersonate": { "start": "Started impersonating a user" }
+      },
+      "viewer": {
+        "pin": { "changed": "Changed the viewer PIN" },
+        "magiclink": { "created": "Created a viewer magic link" },
+        "lock": { "reset": "Reset a viewer lockout" },
+        "access": { "revoked": "Revoked viewer access" }
+      },
+      "classroom": { "update": "Updated a classroom" },
+      "drill": {
+        "template": {
+          "created": "Created a drill template",
+          "updated": "Updated a drill template",
+          "deleted": "Deleted a drill template"
+        }
+      },
+      "roster": { "import": { "applied": "Imported a roster" } },
+      "settings": {
+        "update": "Updated settings",
+        "board": { "reset": "Reset the board" },
+        "retention": { "changed": "Changed history retention" }
+      }
     },
     "actions": {
       "addedSpaces": "Added spaces {{from}}–{{to}}",
       "createdGrid": "Created grid ({{n}} spaces)",
-      "deletedAll": "Deleted all student records",
+      "deletedAll": "Deleted all {{count}} student records",
       "extendError": "Target must be greater than current max space number.",
       "reducedGrid": "Reduced grid to spaces 1–{{to}}",
       "reduceError": "Reduce target must be lower than current max space number.",
@@ -224,7 +313,9 @@
     "danger": {
       "deleteAll": "Delete All Student Records",
       "heading": "Danger Zone",
-      "subtitle": "Permanently delete every student record in this org. Households and classrooms are kept."
+      "subtitle": "Permanently delete every student record in this org. Households and classrooms are kept.",
+      "notice": "When you do this, all admins and the Pickup Roster team are emailed. Deleted records can still be recovered from database backups for a limited time — contact support if this was a mistake.",
+      "unknownActor": "An administrator"
     },
     "grid": {
       "addSpaces": "Add Spaces",
@@ -369,7 +460,8 @@
         "nameRequired": "Name is required.",
         "nameTooLong": "Name is too long.",
         "unexpectedSave": "Unexpected error saving.",
-        "unknown": "Unknown action."
+        "unknown": "Unknown action.",
+        "nameRequiredInline": "Enter a name — changes save automatically once it's filled in."
       },
       "intro": "Toggle columns show a check on the run screen. Text columns store labels (grade, teacher name, etc.).",
       "kindText": "Text",
@@ -424,8 +516,22 @@
         "empty": "No default follow-up items yet.",
         "itemPlaceholder": "e.g. Email district safety officer the drill log",
         "itemLabel": "Default follow-up item {{n}}",
-        "savedWithLayout": "Saved when you click Save layout above."
-      }
+        "savedWithLayout": "Saved when you click Save layout above.",
+        "autosaveNote": "Changes save automatically."
+      },
+      "autosave": {
+        "saving": "Saving…",
+        "saved": "Saved",
+        "idle": "All changes saved"
+      },
+      "addSelection": "Add selection",
+      "kindSelection": "Selection",
+      "autofillColumnLabel": "Auto-fill column",
+      "autofillNone": "Auto-fill: none",
+      "autofillInto": "Auto-fill → {{label}}",
+      "selectClassroom": "Select classroom…",
+      "overridden": "Overridden",
+      "resetAutofill": "Reset"
     },
     "library": {
       "alreadyCloned": "Already cloned",
@@ -510,6 +616,16 @@
       "yes": "Yes"
     },
     "run": {
+      "attest": {
+        "attest": "All clear",
+        "attestedBy": "{{name}} · {{time}}",
+        "columnHeader": "Classroom sign-off",
+        "issue": "Report issue",
+        "issueNotePlaceholder": "Describe the issue (optional)",
+        "issueNoteSave": "Save issue",
+        "summary": "{{attested}} of {{total}} classrooms signed off · {{issues}} with issues",
+        "undo": "Undo"
+      },
       "addItem": "Add",
       "back": "Edit layout",
       "clearAll": "Clear all",
@@ -547,6 +663,8 @@
     },
     "heading": "Drill history",
     "metaTitle": "Admin – Drill history",
+    "clearFilter": "Show all drills",
+    "filteredSubtitle": "Showing runs for “{{name}}”. Click a row to replay the saved checklist, notes, and follow-up items.",
     "replay": {
       "actionDone": "Done",
       "actionEmpty": "(empty item)",
@@ -796,6 +914,8 @@
       "chooseStudent": "Choose at least one student to group.",
       "chooseWeekday": "Choose a weekday for recurring exceptions.",
       "endsBeforeStart": "Recurring exceptions cannot end before they start.",
+      "exceptionDateRequired": "Choose a date for the exception.",
+      "invalidDate": "Enter dates in YYYY-MM-DD format.",
       "invalidException": "Invalid exception.",
       "invalidHousehold": "Invalid household.",
       "invalidStudent": "Invalid student.",
@@ -1161,11 +1281,18 @@
     "children": "Children",
     "classrooms": "Classrooms",
     "dashboard": "Dashboard",
+    "drillHistory": "Drill History",
     "drills": "Drills",
-    "history": "History",
+    "history": "Board Call History",
     "households": "Households",
     "panelTitle": "Admin Panel",
     "rosterImport": "Roster Import",
+    "sections": {
+      "board": "Board",
+      "drills": "Drills",
+      "settings": "Settings",
+      "studentsHouseholds": "Students & Households"
+    },
     "users": "Users",
     "print": "Print backups"
   },
@@ -1501,6 +1628,8 @@
     "errors": {
       "createUserFailed": "Failed to create user.",
       "emailExists": "An account with that email already exists.",
+      "invalidEmail": "Enter a valid email address.",
+      "invalidName": "Name is required.",
       "missingId": "Missing user id.",
       "noCredential": "No credential account found.",
       "onlyAdmins": "Only admins can change this setting.",
@@ -1552,6 +1681,7 @@
       "adminResetRequired": "Admin reset required",
       "createMagicLink": "Create Viewer Magic Link",
       "daysValidPlaceholder": "Days valid (default 7)",
+      "eyebrow": "Viewer privacy",
       "generateLink": "Generate Link",
       "heading": "Viewer Privacy Access",
       "linkValid": "This link will be valid for {{days}} day(s).",

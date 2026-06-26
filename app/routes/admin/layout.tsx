@@ -5,6 +5,7 @@ import {
   useLoaderData,
   useRouteError,
   useRouteLoaderData,
+  type ShouldRevalidateFunctionArgs,
 } from "react-router";
 import { Menu, X, ShieldAlert, LogIn } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -75,6 +76,19 @@ export async function loader({ context }: Route.LoaderArgs) {
     // sidebar Billing link.
     orgIsInDistrict: !!org.districtId,
   };
+}
+
+// This layout only renders billing/usage chrome, which changes after a
+// mutation — never from navigating between admin pages. By default React
+// Router re-runs every active loader on each navigation, so without this the
+// usage recount (several aggregate COUNT queries) would fire on every admin
+// hop. Skip it on plain GET navigations; still revalidate after any submission
+// (including child-route and fetcher mutations) so the usage banner stays
+// accurate.
+export function shouldRevalidate({
+  formMethod,
+}: ShouldRevalidateFunctionArgs) {
+  return !!formMethod && formMethod.toUpperCase() !== "GET";
 }
 
 export function ErrorBoundary() {

@@ -48,21 +48,27 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }),
   ]);
 
-  // Resolve actor emails: collect unique actorUserIds then batch-fetch
-  const actorIds: string[] = [
+  // Resolve actor/on-behalf emails for rows that predate the actorEmail
+  // snapshot (or where it wasn't captured). Newer rows carry the email inline,
+  // so this lookup only fills gaps. Collect both halves of the audit pair.
+  const lookupIds: string[] = [
     ...new Set(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (logs as any[]).map((l: any) => l.actorUserId).filter(Boolean) as string[],
+      (logs as any[])
+        .flatMap((l: any) => [l.actorUserId, l.onBehalfOfUserId])
+        .filter(Boolean) as string[],
     ),
   ];
-  const actorUsers =
-    actorIds.length > 0
+  const lookupUsers =
+    lookupIds.length > 0
       ? await db.user.findMany({
-          where: { id: { in: actorIds } },
+          where: { id: { in: lookupIds } },
           select: { id: true, email: true },
         })
       : [];
-  const actorEmailMap = Object.fromEntries(actorUsers.map((u) => [u.id, u.email]));
+  const emailMap = Object.fromEntries(lookupUsers.map((u) => [u.id, u.email]));
+  const emailFor = (id: string | null): string | null =>
+    id ? (emailMap[id] ?? id) : null;
 
   return {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -72,8 +78,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       orgName: (l.org?.name ?? l.orgId) as string,
       orgSlug: (l.org?.slug ?? "") as string,
       actorUserId: l.actorUserId as string | null,
-      actorEmail: l.actorUserId ? (actorEmailMap[l.actorUserId] ?? l.actorUserId) : null,
+      // Prefer the persisted email snapshot (survives a later user deletion),
+      // fall back to a live lookup for older rows.
+      actorEmail: (l.actorEmail as string | null) ?? emailFor(l.actorUserId),
+      onBehalfOfEmail: emailFor(l.onBehalfOfUserId as string | null),
       action: l.action as string,
+      targetType: (l.targetType as string | null) ?? null,
+      targetId: (l.targetId as string | null) ?? null,
+      ipAddress: (l.ipAddress as string | null) ?? null,
+      userAgent: (l.userAgent as string | null) ?? null,
       payload: l.payload,
       createdAt: (l.createdAt as Date).toISOString(),
     })),
@@ -163,6 +176,8 @@ export default function PlatformAudit({ loaderData }: Route.ComponentProps) {
               <th className="px-3 py-2 font-semibold">Org</th>
               <th className="px-3 py-2 font-semibold">Actor</th>
               <th className="px-3 py-2 font-semibold">Action</th>
+              <th className="px-3 py-2 font-semibold">Target</th>
+              <th className="px-3 py-2 font-semibold">Source</th>
               <th className="px-3 py-2 font-semibold">Payload</th>
             </tr>
           </thead>
@@ -180,8 +195,36 @@ export default function PlatformAudit({ loaderData }: Route.ComponentProps) {
                 </td>
                 <td className="px-3 py-2 font-mono text-xs text-white/70">
                   {log.actorEmail ?? "—"}
+                  {log.onBehalfOfEmail && (
+                    <span className="block text-white/40">
+                      on behalf of {log.onBehalfOfEmail}
+                    </span>
+                  )}
                 </td>
                 <td className="px-3 py-2 font-mono text-xs">{log.action}</td>
+                <td className="px-3 py-2 text-xs text-white/60">
+                  {log.targetType ? (
+                    <span className="font-mono">
+                      {log.targetType}
+                      {log.targetId ? (
+                        <span className="text-white/40">:{log.targetId}</span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td className="px-3 py-2 text-xs text-white/50">
+                  {log.ipAddress ?? "—"}
+                  {log.userAgent && (
+                    <span
+                      className="block max-w-[160px] truncate text-white/30"
+                      title={log.userAgent}
+                    >
+                      {log.userAgent}
+                    </span>
+                  )}
+                </td>
                 <td className="px-3 py-2 text-xs text-white/60">
                   {log.payload ? (
                     <details>
@@ -201,7 +244,7 @@ export default function PlatformAudit({ loaderData }: Route.ComponentProps) {
             ))}
             {logs.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-white/40">
+                <td colSpan={7} className="px-3 py-6 text-center text-white/40">
                   No audit entries match the current filters.
                 </td>
               </tr>

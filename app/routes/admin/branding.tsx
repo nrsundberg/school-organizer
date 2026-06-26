@@ -21,6 +21,7 @@ import {
 } from "~/domain/org/branding.server";
 import { planAllowsAdvancedBranding } from "~/lib/plan-limits";
 import { getAdminT } from "~/lib/t.server";
+import { auditOrgAction } from "~/domain/org/audit.server";
 
 export const handle = { i18n: ["admin", "common"] };
 
@@ -167,6 +168,38 @@ export async function action({ request, context }: Route.ActionArgs) {
     // primaryColor / secondaryColor columns from migration 0016. Once
     // `prisma generate` runs in CI the cast is a harmless no-op.
     data: updateData as unknown as Parameters<typeof db.org.update>[0]["data"],
+  });
+
+  // Audit the change off the response path. `before` is the org snapshot we
+  // already hold; `after` overlays the fields this submit actually set. Only
+  // changed fields are recorded, so a no-op save writes nothing. Awaited, but on
+  // Workers this resolves immediately (the write is handed to ctx.waitUntil).
+  const orgBefore = org as typeof org & {
+    primaryColor?: string | null;
+    secondaryColor?: string | null;
+  };
+  const before = {
+    brandColor: orgBefore.brandColor ?? null,
+    brandAccentColor: orgBefore.brandAccentColor ?? null,
+    primaryColor: orgBefore.primaryColor ?? null,
+    secondaryColor: orgBefore.secondaryColor ?? null,
+    logoObjectKey: orgBefore.logoObjectKey ?? null,
+    logoUrl: orgBefore.logoUrl ?? null,
+  };
+  await auditOrgAction(context, request, {
+    action: "branding.update",
+    targetType: "org",
+    targetId: org.id,
+    before,
+    after: { ...before, ...updateData },
+    keys: [
+      "brandColor",
+      "brandAccentColor",
+      "primaryColor",
+      "secondaryColor",
+      "logoObjectKey",
+      "logoUrl",
+    ],
   });
 
   // Redirect, not data: under single-fetch, action+loader share one request, so

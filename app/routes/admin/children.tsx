@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Search, Users, GraduationCap } from "lucide-react";
 import type { Route } from "./+types/children";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 import { getTenantPrisma } from "~/domain/utils/global-context.server";
 import { gradeLabel, type GradeLevel } from "~/domain/children/grade";
 import { chunkedFindMany } from "~/db/chunked-in";
@@ -111,8 +113,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       })
     : students;
 
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+
   return {
-    metaTitle: "Children",
+    metaTitle: t("childrenList.header.title"),
     students: filtered,
     totalStudents: students.length,
     filter: { q },

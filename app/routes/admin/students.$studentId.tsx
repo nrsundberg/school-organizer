@@ -24,6 +24,7 @@ import {
   getOrgFromContext,
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
+import { auditOrgAction } from "~/domain/org/audit.server";
 import {
   GRADE_LEVELS,
   gradeLabel,
@@ -200,14 +201,28 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         }
       }
 
+      const after = {
+        firstName,
+        lastName,
+        suffix,
+        homeRoom: homeRoom || null,
+      };
       await prisma.student.update({
         where: { id: studentId },
-        data: {
-          firstName,
-          lastName,
-          suffix,
-          homeRoom: homeRoom || null,
+        data: after,
+      });
+      await auditOrgAction(context, request, {
+        action: "student.update",
+        targetType: "student",
+        targetId: String(studentId),
+        before: {
+          firstName: existing.firstName,
+          lastName: existing.lastName,
+          suffix: existing.suffix,
+          homeRoom: existing.homeRoom,
         },
+        after,
+        keys: ["firstName", "lastName", "suffix", "homeRoom"],
       });
       return dataWithSuccess(null, t("students.toasts.saved"));
     }
@@ -225,11 +240,31 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         where: { id: studentId },
         data: { homeRoom },
       });
+      await auditOrgAction(context, request, {
+        action: "student.move",
+        targetType: "student",
+        targetId: String(studentId),
+        before: { homeRoom: existing.homeRoom },
+        after: { homeRoom },
+        keys: ["homeRoom"],
+      });
       return dataWithSuccess(null, t("students.toasts.saved"));
     }
 
     if (intent === "delete") {
       await prisma.student.delete({ where: { id: studentId } });
+      await auditOrgAction(context, request, {
+        action: "student.delete",
+        targetType: "student",
+        targetId: String(studentId),
+        always: true,
+        payload: {
+          firstName: existing.firstName,
+          lastName: existing.lastName,
+          suffix: existing.suffix,
+          homeRoom: existing.homeRoom,
+        },
+      });
       return redirect("/admin/children");
     }
   } catch (error) {

@@ -24,6 +24,7 @@ import {
   getOrgFromContext,
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
+import { auditOrgAction } from "~/domain/org/audit.server";
 import {
   DISMISSAL_PLANS,
   WEEKDAYS,
@@ -142,17 +143,42 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         parsedSpace != null && Number.isInteger(parsedSpace) && parsedSpace > 0
           ? parsedSpace
           : null;
+      const before = await prisma.household.findUnique({
+        where: { id: householdId },
+        select: {
+          name: true,
+          pickupNotes: true,
+          primaryContactName: true,
+          primaryContactPhone: true,
+          spaceNumber: true,
+        },
+      });
+      const after = {
+        name,
+        pickupNotes: String(formData.get("pickupNotes") ?? "").trim() || null,
+        primaryContactName:
+          String(formData.get("primaryContactName") ?? "").trim() || null,
+        primaryContactPhone:
+          String(formData.get("primaryContactPhone") ?? "").trim() || null,
+        spaceNumber,
+      };
       await prisma.household.update({
         where: { id: householdId },
-        data: {
-          name,
-          pickupNotes: String(formData.get("pickupNotes") ?? "").trim() || null,
-          primaryContactName:
-            String(formData.get("primaryContactName") ?? "").trim() || null,
-          primaryContactPhone:
-            String(formData.get("primaryContactPhone") ?? "").trim() || null,
-          spaceNumber,
-        },
+        data: after,
+      });
+      await auditOrgAction(context, request, {
+        action: "household.update",
+        targetType: "household",
+        targetId: householdId,
+        before: before ?? {},
+        after,
+        keys: [
+          "name",
+          "pickupNotes",
+          "primaryContactName",
+          "primaryContactPhone",
+          "spaceNumber",
+        ],
       });
       return dataWithSuccess(null, t("households.actions.pickupContextUpdated"));
     }
@@ -166,15 +192,33 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         where: { id: studentId },
         data: { householdId: null },
       });
+      await auditOrgAction(context, request, {
+        action: "household.detachStudent",
+        targetType: "student",
+        targetId: String(studentId),
+        always: true,
+        payload: { studentId, householdId },
+      });
       return dataWithWarning(null, t("households.actions.studentDetached"));
     }
 
     if (intent === "delete") {
+      const deleted = await prisma.household.findUnique({
+        where: { id: householdId },
+        select: { name: true },
+      });
       await prisma.student.updateMany({
         where: { householdId },
         data: { householdId: null },
       });
       await prisma.household.delete({ where: { id: householdId } });
+      await auditOrgAction(context, request, {
+        action: "household.delete",
+        targetType: "household",
+        targetId: householdId,
+        always: true,
+        payload: { name: deleted?.name ?? null },
+      });
       // After delete the household no longer exists — bounce back to the list.
       throw redirect("/admin/households");
     }
@@ -197,23 +241,32 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       let startsOn: Date | null = null;
       let endsOn: Date | null = null;
       if (scheduleKind === "DATE") {
-        exceptionDate = parseDateOnly(
-          String(formData.get("exceptionDate") ?? ""),
-          "Exception date",
-        );
+        const rawExceptionDate = String(formData.get("exceptionDate") ?? "").trim();
+        if (!rawExceptionDate) {
+          return dataWithError(null, t("households.errors.exceptionDateRequired"));
+        }
+        try {
+          exceptionDate = parseDateOnly(rawExceptionDate, "Exception date");
+        } catch {
+          return dataWithError(null, t("households.errors.invalidDate"));
+        }
       } else {
         dayOfWeek = Number(formData.get("dayOfWeek"));
         if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
           return dataWithError(null, t("households.errors.chooseWeekday"));
         }
-        startsOn = parseOptionalDateOnly(
-          String(formData.get("startsOn") ?? ""),
-          "Starts on",
-        );
-        endsOn = parseOptionalDateOnly(
-          String(formData.get("endsOn") ?? ""),
-          "Ends on",
-        );
+        try {
+          startsOn = parseOptionalDateOnly(
+            String(formData.get("startsOn") ?? ""),
+            "Starts on",
+          );
+          endsOn = parseOptionalDateOnly(
+            String(formData.get("endsOn") ?? ""),
+            "Ends on",
+          );
+        } catch {
+          return dataWithError(null, t("households.errors.invalidDate"));
+        }
         if (
           startsOn &&
           endsOn &&
@@ -223,7 +276,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         }
       }
 
-      await prisma.dismissalException.create({
+      const exception = await prisma.dismissalException.create({
         data: {
           orgId: org.id,
           householdId,
@@ -238,6 +291,14 @@ export async function action({ request, context, params }: Route.ActionArgs) {
           notes: String(formData.get("notes") ?? "").trim() || null,
           isActive: true,
         },
+        select: { id: true },
+      });
+      await auditOrgAction(context, request, {
+        action: "exception.create",
+        targetType: "dismissalException",
+        targetId: exception.id,
+        always: true,
+        payload: { householdId, scheduleKind, dismissalPlan },
       });
       return dataWithSuccess(null, t("households.actions.exceptionSaved"));
     }
@@ -250,6 +311,13 @@ export async function action({ request, context, params }: Route.ActionArgs) {
       await prisma.dismissalException.update({
         where: { id: exceptionId },
         data: { isActive: false },
+      });
+      await auditOrgAction(context, request, {
+        action: "exception.deactivate",
+        targetType: "dismissalException",
+        targetId: exceptionId,
+        always: true,
+        payload: { householdId },
       });
       return dataWithWarning(null, t("households.actions.exceptionArchived"));
     }

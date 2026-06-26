@@ -4,6 +4,7 @@ import { renderTrialExpiring } from "./trial-expiring";
 import { renderMidTrialCheckin } from "./mid-trial-checkin";
 import { renderPasswordReset } from "./password-reset";
 import { renderUserInvite } from "./user-invite";
+import { renderStudentsDeleted } from "./students-deleted";
 
 /**
  * Map an EmailMessage to a {subject, html, text} payload.
@@ -38,6 +39,8 @@ export async function renderEmail(
       return renderPasswordReset(msg);
     case "user_invite":
       return renderUserInvite(msg);
+    case "students_deleted":
+      return renderStudentsDeleted(msg);
     case "probe":
       // Probes are drained by the queue consumer before they reach here;
       // if one slips through, fail loudly rather than silently drop.

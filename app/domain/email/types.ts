@@ -94,6 +94,28 @@ export type UserInviteMessage = {
 };
 
 /**
+ * Sent to every org admin (and the Pickup Roster ops address) when an admin
+ * uses the dashboard "Danger Zone" to delete all student records. Purely
+ * informational — it names who did it, how many records, and reassures that the
+ * data is recoverable from backups for a limited window.
+ */
+export type StudentsDeletedMessage = {
+  kind: "students_deleted";
+  to: string;
+  orgName: string;
+  /** Who triggered the deletion (display name or email). */
+  actorLabel: string;
+  /** Number of student records removed. */
+  deletedCount: number;
+  /** Pre-formatted timestamp for the body copy. */
+  deletedAt: string;
+  /** True for the internal ops recipient (slightly different framing). */
+  isOps?: boolean;
+  /** Recipient locale. Optional; defaults to "en". */
+  locale?: EmailLocale;
+};
+
+/**
  * Queue-heartbeat probe. Enqueued by the 2-minute status cron; dropped by the
  * consumer before reaching Resend. No template or email send is associated.
  */
@@ -110,7 +132,8 @@ export type SendableEmailMessage =
   | TrialExpiringMessage
   | MidTrialCheckinMessage
   | PasswordResetMessage
-  | UserInviteMessage;
+  | UserInviteMessage
+  | StudentsDeletedMessage;
 
 export type EmailMessage = SendableEmailMessage | ProbeMessage;
 

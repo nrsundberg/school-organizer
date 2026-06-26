@@ -9,6 +9,7 @@ import {
   getOrgFromContext,
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
+import { auditOrgAction } from "~/domain/org/audit.server";
 import {
   defaultTemplateDefinition,
   parseDrillAudience,
@@ -73,37 +74,34 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   ]);
 
   // Compute "next due / overdue" per template that has a cadence configured.
-  // We pull the most recent ENDED run per template — `findFirst` with desc
-  // order is a single query per template; with the typical N=10–20 templates
-  // this is fine. If we ever exceed that, switch to a single GROUP BY query.
-  // The per-template lookups are independent, so we issue them concurrently —
-  // one Prisma client per request makes the parallel reads safe.
+  // We need the most recent ENDED run per template. Pull all ENDED runs in one
+  // query (just templateId + endedAt) and reduce in JS, instead of a
+  // `findFirst` per template, which was an N+1 across the org's templates.
+  // ENDED runs are few (a handful per template per year), so the row count is
+  // small. Ordered endedAt desc so the first row seen per template is its most
+  // recent (SQLite sorts NULLs last under DESC, matching the old findFirst).
   const now = new Date();
-  const cadenceById = new Map<string, CadenceStatus>();
-  await Promise.all(
-    templates.map(async (tpl: (typeof templates)[number]) => {
-      if (tpl.requiredPerYear == null) {
-        cadenceById.set(tpl.id, { state: "none" });
-        return;
-      }
-      const lastEnded = await prisma.drillRun.findFirst({
-        where: { templateId: tpl.id, status: "ENDED" },
-        orderBy: { endedAt: "desc" },
-        select: { endedAt: true },
-      });
-      cadenceById.set(
-        tpl.id,
-        computeCadenceStatus(
-          tpl.requiredPerYear,
-          lastEnded?.endedAt ?? null,
-          now,
-        ),
-      );
-    }),
-  );
+  const endedRuns = await prisma.drillRun.findMany({
+    where: { status: "ENDED" },
+    orderBy: { endedAt: "desc" },
+    select: { templateId: true, endedAt: true },
+  });
+  const lastEndedByTemplate = new Map<string, Date | null>();
+  for (const run of endedRuns) {
+    if (!lastEndedByTemplate.has(run.templateId)) {
+      lastEndedByTemplate.set(run.templateId, run.endedAt ?? null);
+    }
+  }
   const templatesWithCadence = templates.map((tpl) => ({
     ...tpl,
-    cadence: cadenceById.get(tpl.id) ?? ({ state: "none" } as CadenceStatus),
+    cadence:
+      tpl.requiredPerYear == null
+        ? ({ state: "none" } as CadenceStatus)
+        : computeCadenceStatus(
+            tpl.requiredPerYear,
+            lastEndedByTemplate.get(tpl.id) ?? null,
+            now,
+          ),
   }));
 
   const activeRun = activeRunRow
@@ -149,6 +147,13 @@ export async function action({ request, context }: Route.ActionArgs) {
         definition: defaultTemplateDefinition() as object,
       },
     });
+    await auditOrgAction(context, request, {
+      action: "drill.template.created",
+      targetType: "drillTemplate",
+      targetId: created.id,
+      always: true,
+      payload: { name: created.name },
+    });
     throw redirect(`/admin/drills/${created.id}`);
   }
 
@@ -162,6 +167,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     await prisma.drillTemplate.update({
       where: { id },
       data: { deletedAt: new Date() },
+    });
+    await auditOrgAction(context, request, {
+      action: "drill.template.deleted",
+      targetType: "drillTemplate",
+      targetId: id,
+      always: true,
     });
     return dataWithSuccess(null, t("drills.list.errors.deleted"));
   }
@@ -426,6 +437,13 @@ export default function AdminDrillList({ loaderData }: Route.ComponentProps) {
                     templateName={tpl.name}
                     defaultAudience={(tpl.defaultAudience ?? "EVERYONE") as DrillAudience}
                   />
+                  <Link
+                    to={`/admin/drills/history?templateId=${tpl.id}`}
+                    className={`${btnSecondary} text-xs`}
+                  >
+                    <History className="w-3.5 h-3.5 mr-1.5 inline" />
+                    {t("drills.list.viewHistory")}
+                  </Link>
                   <Link
                     to={`/admin/drills/${tpl.id}`}
                     className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors"

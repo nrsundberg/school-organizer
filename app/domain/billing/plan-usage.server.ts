@@ -68,21 +68,23 @@ export async function countOrgUsage(
   prisma: PrismaClient,
   orgId: string,
 ): Promise<UsageCounts> {
-  const [studentRows, classroomCount] = await Promise.all([
-    prisma.student.findMany({
-      where: { orgId },
-      select: { id: true, householdId: true },
-    }),
-    prisma.teacher.count({ where: { orgId } }),
-  ]);
-
-  const familyKeys = new Set(
-    studentRows.map((s) => s.householdId ?? `singleton:${s.id}`),
-  );
+  // `families` = households that have at least one student (siblings share a
+  // `householdId`) + one family per student with no household. Compute it with
+  // aggregate counts instead of pulling every student row across the wire:
+  // total students, unassigned (singleton) students, and households that have
+  // any student via a relation filter — the latter is exactly the number of
+  // distinct non-null household ids referenced by the roster.
+  const [studentCount, singletonStudentCount, householdsWithStudents, classroomCount] =
+    await Promise.all([
+      prisma.student.count({ where: { orgId } }),
+      prisma.student.count({ where: { orgId, householdId: null } }),
+      prisma.household.count({ where: { orgId, students: { some: {} } } }),
+      prisma.teacher.count({ where: { orgId } }),
+    ]);
 
   return {
-    students: studentRows.length,
-    families: familyKeys.size,
+    students: studentCount,
+    families: singletonStudentCount + householdsWithStudents,
     classrooms: classroomCount,
   };
 }

@@ -82,7 +82,7 @@ export function ChecklistTable({
             <tr key={row.id} className="border-b border-white/5">
               {definition.columns.map((col) => (
                 <td key={col.id} className="px-3 py-2 align-middle">
-                  {col.kind === "text" ? (
+                  {col.kind === "text" || col.kind === "selection" ? (
                     <span className="text-white">{row.cells[col.id] ?? ""}</span>
                   ) : (
                     <ToggleCell

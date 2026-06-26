@@ -62,5 +62,14 @@
       "para1": "Tu prueba termina mañana. Para que PickupRoster siga funcionando en {{orgName}} sin interrupción, mejora tu plan aquí: {{appLink}}",
       "para1Html": "Tu prueba termina mañana. Para que PickupRoster siga funcionando en {{orgName}} sin interrupción, mejora tu plan aquí: <a href=\"{{appLink}}\">{{appLink}}</a>"
     }
+  },
+  "studentsDeleted": {
+    "subject": "Se eliminaron todos los registros de estudiantes de {{orgName}}",
+    "preview": "{{actor}} eliminó {{count}} registros de estudiantes.",
+    "heading": "Se eliminaron registros de estudiantes",
+    "para1": "{{actor}} eliminó todos los registros de estudiantes de {{orgName}} el {{when}}: {{count}} registros en total. Se conservaron los hogares y las aulas.",
+    "para1Ops": "Aviso: {{actor}} eliminó los {{count}} registros de estudiantes de {{orgName}} el {{when}} desde la Zona de peligro del panel. Se conservaron los hogares y las aulas.",
+    "para2": "Si esperabas esto, no es necesario hacer nada.",
+    "recovery": "Si fue un error, los datos aún se pueden recuperar desde las copias de seguridad durante un tiempo limitado. Responde a este correo o contacta con support@pickuproster.com lo antes posible."
   }
 }

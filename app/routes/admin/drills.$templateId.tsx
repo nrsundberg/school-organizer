@@ -1,4 +1,4 @@
-import { Form, Link, redirect, useFetcher } from "react-router";
+import { Link, data, redirect, useFetcher } from "react-router";
 import {
   ArrowDown,
   ArrowLeft,
@@ -12,10 +12,9 @@ import {
   Users,
 } from "lucide-react";
 import { StartLivePopover } from "~/domain/drills/StartLivePopover";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
-import { getFormProps, getInputProps } from "@conform-to/react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/drills.$templateId";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
@@ -24,6 +23,7 @@ import {
   getOrgFromContext,
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
+import { auditOrgAction } from "~/domain/org/audit.server";
 import type { Prisma } from "~/db";
 import {
   type ColumnDef,
@@ -35,7 +35,7 @@ import {
 import { ChecklistPreview } from "~/domain/drills/ChecklistTable";
 import { startDrillRun } from "~/domain/drills/live.server";
 import { parseIntent } from "~/lib/forms.server";
-import { formClasses, getFieldError, useAppForm } from "~/lib/forms";
+import { formClasses } from "~/lib/forms";
 import { dataWithError, dataWithSuccess } from "remix-toast";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
@@ -56,9 +56,13 @@ export const meta: Route.MetaFunction = ({ data }) => [
 // English messages used as the static schema source. The action wraps these
 // with translated dataWithError(...) toasts where it surfaces validation
 // failures to the user.
+// `autosave` is an optional flag the client sets on debounced background saves
+// so the action can suppress the success toast (the editor shows a quiet inline
+// "Saved" indicator instead). Absent on any explicit/manual submit.
 const renameSchema = z.object({
   intent: z.literal("rename"),
   name: z.string().trim().min(1, "Name is required.").max(120, "Name is too long."),
+  autosave: z.string().optional(),
 });
 
 const startLiveWithAudienceSchema = z.object({
@@ -72,11 +76,13 @@ const startLiveWithAudienceSchema = z.object({
 const setDefaultAudienceSchema = z.object({
   intent: z.literal("setDefaultAudience"),
   audience: z.enum(["STAFF_ONLY", "EVERYONE"]),
+  autosave: z.string().optional(),
 });
 
 const saveInstructionsSchema = z.object({
   intent: z.literal("saveInstructions"),
   instructions: z.string().max(8000, "Instructions are too long.").default(""),
+  autosave: z.string().optional(),
 });
 
 // Cadence target. Empty input clears the column (no cadence tracking).
@@ -88,10 +94,12 @@ const setCadenceSchema = z.object({
   requiredPerYear: z
     .union([z.literal(""), z.coerce.number().int().min(1).max(365)])
     .transform((v) => (v === "" ? null : v)),
+  autosave: z.string().optional(),
 });
 
 const saveDefinitionSchema = zfd.formData({
   intent: zfd.text(z.literal("saveDefinition")),
+  autosave: zfd.text(z.string().optional()),
   /** The template layout JSON — parsed and structurally validated. */
   definition: zfd.text(
     z
@@ -124,9 +132,10 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   if (!id) {
     throw new Response("Not found", { status: 404 });
   }
-  // The template lookup and the locale resolution share no data dependency,
-  // so run them concurrently (one Prisma client per request makes this safe).
-  const [template, locale] = await Promise.all([
+  // The template lookup, the classroom list (the data source for "selection"
+  // columns), and the locale resolution share no data dependency, so run them
+  // concurrently (one Prisma client per request makes this safe).
+  const [template, classroomRows, locale] = await Promise.all([
     prisma.drillTemplate.findFirst({
       where: { id, deletedAt: null },
       select: {
@@ -139,13 +148,25 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
         instructions: true,
       },
     }),
+    prisma.teacher.findMany({
+      select: { homeRoom: true, teacherName: true },
+      orderBy: [{ gradeLevel: "asc" }, { homeRoom: "asc" }],
+    }),
     detectLocale(request, context),
   ]);
   if (!template) {
     throw new Response("Not found", { status: 404 });
   }
+  // Shape for the editor: each classroom's homeroom label + its teacher name
+  // (so picking a homeroom can auto-fill a teacher column).
+  const classrooms = classroomRows.map(
+    (c: { homeRoom: string; teacherName: string | null }) => ({
+      homeRoom: c.homeRoom,
+      teacherName: c.teacherName ?? "",
+    }),
+  );
   const t = await getFixedT(locale, "admin");
-  return { template, metaTitle: t("drills.metaEdit", { name: template.name }) };
+  return { template, classrooms, metaTitle: t("drills.metaEdit", { name: template.name }) };
 }
 
 export async function action({ request, context, params }: Route.ActionArgs) {
@@ -168,13 +189,35 @@ export async function action({ request, context, params }: Route.ActionArgs) {
   });
   if (!result.success) return result.response;
 
+  // Background autosaves return a quiet success (truthy, non-error data so the
+  // editor's inline "Saved" indicator lights up) WITHOUT a toast. Explicit
+  // submits (no `autosave` flag) keep the visible success toast.
+  const saved = (msg: string) =>
+    "autosave" in result.data && result.data.autosave
+      ? data({ ok: true })
+      : dataWithSuccess(null, msg);
+
+  // Audit a template edit off the response path. `aspect` records which facet
+  // changed (name / audience / layout / cadence / instructions) since the
+  // payloads themselves can be large; like CloudTrail, every mutating save is
+  // logged (including autosaves).
+  const auditTpl = (aspect: string, extra?: Record<string, unknown>) =>
+    auditOrgAction(context, request, {
+      action: "drill.template.updated",
+      targetType: "drillTemplate",
+      targetId: id,
+      always: true,
+      payload: { aspect, ...extra },
+    });
+
   try {
     if (result.intent === "rename") {
       await prisma.drillTemplate.update({
         where: { id },
         data: { name: result.data.name },
       });
-      return dataWithSuccess(null, t("drills.edit.toasts.nameSaved"));
+      await auditTpl("name", { name: result.data.name });
+      return saved(t("drills.edit.toasts.nameSaved"));
     }
 
     if (result.intent === "setDefaultAudience") {
@@ -182,7 +225,8 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         where: { id },
         data: { defaultAudience: result.data.audience },
       });
-      return dataWithSuccess(null, t("drills.edit.defaultAudience.saved"));
+      await auditTpl("defaultAudience", { audience: result.data.audience });
+      return saved(t("drills.edit.defaultAudience.saved"));
     }
 
     if (result.intent === "start-live") {
@@ -224,7 +268,8 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         where: { id },
         data: { definition: result.data.definition as unknown as Prisma.InputJsonValue },
       });
-      return dataWithSuccess(null, t("drills.edit.toasts.layoutSaved"));
+      await auditTpl("definition");
+      return saved(t("drills.edit.toasts.layoutSaved"));
     }
 
     if (result.intent === "setCadence") {
@@ -232,7 +277,8 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         where: { id },
         data: { requiredPerYear: result.data.requiredPerYear },
       });
-      return dataWithSuccess(null, t("drills.edit.cadence.saved"));
+      await auditTpl("cadence", { requiredPerYear: result.data.requiredPerYear });
+      return saved(t("drills.edit.cadence.saved"));
     }
 
     if (result.intent === "saveInstructions") {
@@ -241,7 +287,8 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         where: { id },
         data: { instructions: trimmed.length > 0 ? trimmed : null },
       });
-      return dataWithSuccess(null, t("drills.edit.toasts.instructionsSaved"));
+      await auditTpl("instructions");
+      return saved(t("drills.edit.toasts.instructionsSaved"));
     }
   } catch (err) {
     // A redirect from start-live must propagate — React Router surfaces
@@ -268,10 +315,14 @@ function newId(): string {
 
 function cloneDefinition(def: TemplateDefinition): TemplateDefinition {
   const cloned: TemplateDefinition = {
-    columns: def.columns.map((c) => ({ ...c })),
+    columns: def.columns.map((c) => ({
+      ...c,
+      ...(c.selectionSource ? { selectionSource: { ...c.selectionSource } } : {}),
+    })),
     rows: def.rows.map((r) => {
       const row: typeof r = { id: r.id, cells: { ...r.cells } };
       if (r.sectionId !== undefined) row.sectionId = r.sectionId;
+      if (r.overrides && r.overrides.length > 0) row.overrides = [...r.overrides];
       return row;
     }),
   };
@@ -284,25 +335,227 @@ function cloneDefinition(def: TemplateDefinition): TemplateDefinition {
   return cloned;
 }
 
+// Debounce window for background autosaves — matches the live drill screen
+// (`drills.live.tsx`) so the editor feels consistent.
+const AUTOSAVE_DEBOUNCE_MS = 1000;
+
+type SaveStatus = "idle" | "saving" | "saved";
+
+/**
+ * One self-contained autosave channel: a dedicated fetcher + a debounce timer.
+ * `schedule(fd)` stamps the `autosave` flag and debounces the submit;
+ * `flush()` fires any pending save immediately (used on blur / before leaving).
+ * Each editable section gets its own instance so concurrent edits to different
+ * fields never cancel each other's in-flight save.
+ */
+function useAutosaver() {
+  const fetcher = useFetcher();
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pending = useRef<FormData | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  const flush = useCallback(() => {
+    if (timer.current !== null) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    if (pending.current) {
+      fetcher.submit(pending.current, { method: "post" });
+      pending.current = null;
+    }
+  }, [fetcher]);
+
+  const schedule = useCallback(
+    (fd: FormData, delay = AUTOSAVE_DEBOUNCE_MS) => {
+      fd.set("autosave", "1");
+      pending.current = fd;
+      if (timer.current !== null) clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        timer.current = null;
+        flush();
+      }, delay);
+    },
+    [flush],
+  );
+
+  // Stamp "Saved" when a background save lands without error.
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data && !("error" in (fetcher.data as object))) {
+      setSavedAt(Date.now());
+    }
+  }, [fetcher.state, fetcher.data]);
+
+  // Auto-clear the indicator after a moment.
+  useEffect(() => {
+    if (savedAt === null) return;
+    const id = setTimeout(() => setSavedAt(null), 1500);
+    return () => clearTimeout(id);
+  }, [savedAt]);
+
+  const status: SaveStatus =
+    fetcher.state !== "idle" ? "saving" : savedAt !== null ? "saved" : "idle";
+
+  return { schedule, flush, status };
+}
+
 export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) {
-  const { template } = loaderData;
+  const { template, classrooms } = loaderData;
   const { t } = useTranslation("admin");
   const [definition, setDefinition] = useState<TemplateDefinition>(() =>
     cloneDefinition(parseTemplateDefinition(template.definition)),
   );
-  const saveFetcher = useFetcher();
 
-  // Conform-managed rename form. `useAppForm` wires up zod validation + the
-  // action's `lastResult` automatically. We keep the intent as a hidden input
-  // so the same action signature works for progressive enhancement.
-  const [renameForm, renameFields] = useAppForm(renameSchema, {
-    id: `rename-${template.id}`,
-    defaultValue: { intent: "rename", name: template.name },
-  });
+  // Homeroom → teacher-name lookup, the data source for "selection" columns.
+  const teacherByHomeroom = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of classrooms) m.set(c.homeRoom, c.teacherName);
+    return m;
+  }, [classrooms]);
+  // Column ids that are the auto-fill target of some selection column.
+  const autoFillTargetIds = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of definition.columns) {
+      if (c.kind === "selection" && c.selectionSource?.autoFillColumnId) {
+        s.add(c.selectionSource.autoFillColumnId);
+      }
+    }
+    return s;
+  }, [definition.columns]);
 
+  // One autosave channel per editable section.
+  const nameSaver = useAutosaver();
+  const audienceSaver = useAutosaver();
+  const cadenceSaver = useAutosaver();
+  const instructionsSaver = useAutosaver();
+  const definitionSaver = useAutosaver();
+
+  // Controlled field state (replaces the per-section Save buttons). Server-side
+  // validation still runs via the zod schemas; the client gates obviously
+  // invalid values so we don't fire doomed autosaves.
+  const [name, setName] = useState(template.name);
+  const [audience, setAudience] = useState<DrillAudience>(
+    template.defaultAudience === "STAFF_ONLY" ? "STAFF_ONLY" : "EVERYONE",
+  );
+  const [cadence, setCadence] = useState(
+    template.requiredPerYear != null ? String(template.requiredPerYear) : "",
+  );
+  const [instructions, setInstructions] = useState(template.instructions ?? "");
+
+  // Tracks the last definition JSON we synced from the loader or autosaved, so
+  // the autosave effect can tell a real user edit apart from a loader sync /
+  // no-op re-render and skip redundant saves.
+  const lastDefinitionJson = useRef(JSON.stringify(definition));
+
+  // Re-sync local state when the loaded template changes (navigation, external
+  // revalidation). Stamp lastDefinitionJson so the autosave effect won't echo
+  // the sync straight back to the server.
   useEffect(() => {
-    setDefinition(cloneDefinition(parseTemplateDefinition(template.definition)));
-  }, [template.id, template.updatedAt, template.definition]);
+    const synced = cloneDefinition(parseTemplateDefinition(template.definition));
+    setDefinition(synced);
+    lastDefinitionJson.current = JSON.stringify(synced);
+    setName(template.name);
+    setAudience(template.defaultAudience === "STAFF_ONLY" ? "STAFF_ONLY" : "EVERYONE");
+    setCadence(template.requiredPerYear != null ? String(template.requiredPerYear) : "");
+    setInstructions(template.instructions ?? "");
+  }, [template.id, template.updatedAt, template.definition, template.name, template.defaultAudience, template.requiredPerYear, template.instructions]);
+
+  // Autosave the layout/follow-up whenever the definition changes (debounced),
+  // but never for loader syncs or while the structure is invalid (the server
+  // rejects a definition with no toggle column, which would spam error toasts).
+  useEffect(() => {
+    const json = JSON.stringify(definition);
+    if (json === lastDefinitionJson.current) return;
+    lastDefinitionJson.current = json;
+    const hasToggle = definition.columns.some((c) => c.kind === "toggle");
+    if (!hasToggle) return;
+    const fd = new FormData();
+    fd.set("intent", "saveDefinition");
+    fd.set("definition", json);
+    definitionSaver.schedule(fd);
+  }, [definition, definitionSaver]);
+
+  const scheduleNameSave = useCallback(
+    (value: string) => {
+      const trimmed = value.trim();
+      if (trimmed.length === 0 || trimmed.length > 120) return;
+      const fd = new FormData();
+      fd.set("intent", "rename");
+      fd.set("name", trimmed);
+      nameSaver.schedule(fd);
+    },
+    [nameSaver],
+  );
+
+  const saveAudience = useCallback(
+    (value: DrillAudience) => {
+      const fd = new FormData();
+      fd.set("intent", "setDefaultAudience");
+      fd.set("audience", value);
+      // Discrete choice — save right away rather than waiting out the debounce.
+      audienceSaver.schedule(fd, 0);
+      audienceSaver.flush();
+    },
+    [audienceSaver],
+  );
+
+  const scheduleCadenceSave = useCallback(
+    (value: string) => {
+      const n = Number(value);
+      if (value !== "" && !(Number.isInteger(n) && n >= 1 && n <= 365)) return;
+      const fd = new FormData();
+      fd.set("intent", "setCadence");
+      fd.set("requiredPerYear", value);
+      cadenceSaver.schedule(fd);
+    },
+    [cadenceSaver],
+  );
+
+  const scheduleInstructionsSave = useCallback(
+    (value: string) => {
+      if (value.length > 8000) return;
+      const fd = new FormData();
+      fd.set("intent", "saveInstructions");
+      fd.set("instructions", value);
+      instructionsSaver.schedule(fd);
+    },
+    [instructionsSaver],
+  );
+
+  const flushAll = useCallback(() => {
+    nameSaver.flush();
+    audienceSaver.flush();
+    cadenceSaver.flush();
+    instructionsSaver.flush();
+    definitionSaver.flush();
+  }, [nameSaver, audienceSaver, cadenceSaver, instructionsSaver, definitionSaver]);
+
+  // Flush pending debounced saves on unmount only. `flushAll` is recreated each
+  // render (the savers return fresh objects), so we read the latest via a ref
+  // and keep the effect's deps empty — otherwise the cleanup would fire on
+  // every render and flush prematurely, defeating the debounce.
+  const flushAllRef = useRef(flushAll);
+  flushAllRef.current = flushAll;
+  useEffect(() => () => flushAllRef.current(), []);
+
+  const saveStatus: SaveStatus = [
+    nameSaver.status,
+    audienceSaver.status,
+    cadenceSaver.status,
+    instructionsSaver.status,
+    definitionSaver.status,
+  ].includes("saving")
+    ? "saving"
+    : [
+          nameSaver.status,
+          audienceSaver.status,
+          cadenceSaver.status,
+          instructionsSaver.status,
+          definitionSaver.status,
+        ].includes("saved")
+      ? "saved"
+      : "idle";
+
+  const nameError = name.trim().length === 0;
 
   const updateColumn = useCallback((index: number, patch: Partial<ColumnDef>) => {
     setDefinition((d) => {
@@ -317,9 +570,16 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
             delete row.cells[merged.id];
           }
         } else {
+          // text + selection both carry a per-row string value.
           for (const row of next.rows) {
             row.cells[merged.id] = row.cells[merged.id] ?? "";
           }
+        }
+        // Manage the selection config alongside the kind.
+        if (merged.kind === "selection") {
+          merged.selectionSource = merged.selectionSource ?? { type: "classrooms" };
+        } else {
+          delete merged.selectionSource;
         }
       }
       return next;
@@ -354,9 +614,11 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
     setDefinition((d) => {
       const next = cloneDefinition(d);
       const id = newId();
-      const label = kind === "toggle" ? "Check" : "Column";
-      next.columns.push({ id, label, kind });
-      if (kind === "text") {
+      const label = kind === "toggle" ? "Check" : kind === "selection" ? "Classroom" : "Column";
+      const col: ColumnDef = { id, label, kind };
+      if (kind === "selection") col.selectionSource = { type: "classrooms" };
+      next.columns.push(col);
+      if (kind === "text" || kind === "selection") {
         for (const row of next.rows) {
           row.cells[id] = "";
         }
@@ -371,7 +633,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
       const id = newId();
       const cells: Record<string, string> = {};
       for (const c of next.columns) {
-        if (c.kind === "text") {
+        if (c.kind === "text" || c.kind === "selection") {
           cells[c.id] = "";
         }
       }
@@ -380,15 +642,68 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
     });
   }, []);
 
-  const updateRowCell = useCallback((rowIndex: number, colId: string, value: string) => {
-    setDefinition((d) => {
-      const next = cloneDefinition(d);
-      const row = next.rows[rowIndex];
-      if (!row) return d;
-      row.cells[colId] = value;
-      return next;
-    });
-  }, []);
+  // Edit a text cell. When the cell is the auto-fill target of a selection
+  // column, a manual edit marks it overridden so later selection changes won't
+  // clobber the hand-typed value (and we can show an "overridden" badge).
+  const updateRowCell = useCallback(
+    (rowIndex: number, colId: string, value: string, isAutoFillTarget = false) => {
+      setDefinition((d) => {
+        const next = cloneDefinition(d);
+        const row = next.rows[rowIndex];
+        if (!row) return d;
+        row.cells[colId] = value;
+        if (isAutoFillTarget) {
+          const set = new Set(row.overrides ?? []);
+          set.add(colId);
+          row.overrides = [...set];
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  // Pick a value in a selection cell. If the column auto-fills another column
+  // and that target hasn't been manually overridden, fill it from the chosen
+  // classroom's teacher name.
+  const selectRowCell = useCallback(
+    (rowIndex: number, col: ColumnDef, value: string) => {
+      setDefinition((d) => {
+        const next = cloneDefinition(d);
+        const row = next.rows[rowIndex];
+        if (!row) return d;
+        row.cells[col.id] = value;
+        const targetId = col.selectionSource?.autoFillColumnId;
+        if (targetId && !(row.overrides ?? []).includes(targetId)) {
+          row.cells[targetId] = teacherByHomeroom.get(value) ?? "";
+        }
+        return next;
+      });
+    },
+    [teacherByHomeroom],
+  );
+
+  // Clear an override so the target cell re-links to its selection column and
+  // refills from the current selection.
+  const clearOverride = useCallback(
+    (rowIndex: number, targetColId: string) => {
+      setDefinition((d) => {
+        const next = cloneDefinition(d);
+        const row = next.rows[rowIndex];
+        if (!row) return d;
+        row.overrides = (row.overrides ?? []).filter((c) => c !== targetColId);
+        if (row.overrides.length === 0) delete row.overrides;
+        const selCol = next.columns.find(
+          (c) => c.kind === "selection" && c.selectionSource?.autoFillColumnId === targetColId,
+        );
+        if (selCol) {
+          row.cells[targetColId] = teacherByHomeroom.get(row.cells[selCol.id] ?? "") ?? "";
+        }
+        return next;
+      });
+    },
+    [teacherByHomeroom],
+  );
 
   const removeRow = useCallback((index: number) => {
     setDefinition((d) => {
@@ -442,54 +757,52 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
     });
   }, []);
 
-  const saveDefinition = () => {
-    const fd = new FormData();
-    fd.set("intent", "saveDefinition");
-    fd.set("definition", JSON.stringify(definition));
-    saveFetcher.submit(fd, { method: "post" });
-  };
-
-  const renameError = getFieldError(renameFields.name);
-
   return (
     <div className="p-6 xl:flex xl:items-start xl:gap-8">
       <div className="flex flex-col gap-6 max-w-[min(100%,56rem)] xl:flex-1 xl:min-w-0">
       <div className="flex flex-wrap items-center gap-3">
         <Link
           to="/admin/drills"
+          onClick={flushAll}
           className="inline-flex items-center gap-1 text-sm text-white/50 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           {t("drills.edit.back")}
         </Link>
+        <span className="ml-auto inline-flex items-center h-5 text-xs" aria-live="polite">
+          {saveStatus === "saving" ? (
+            <span className="text-white/50 inline-flex items-center gap-1">
+              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-white/50 animate-pulse" />
+              {t("drills.edit.autosave.saving")}
+            </span>
+          ) : saveStatus === "saved" ? (
+            <span className="text-emerald-300/80">{t("drills.edit.autosave.saved")}</span>
+          ) : (
+            <span className="text-white/30">{t("drills.edit.autosave.idle")}</span>
+          )}
+        </span>
       </div>
 
-      <Form
-        method="post"
-        {...getFormProps(renameForm)}
-        className="flex flex-wrap items-end gap-3"
-      >
-        <input type="hidden" name="intent" value="rename" />
-        <label className={`${formClasses.labelStack} flex-1 max-w-md`}>
-          {t("drills.edit.templateName")}
-          <input
-            {...getInputProps(renameFields.name, { type: "text" })}
-            key={template.updatedAt.toISOString()}
-            defaultValue={template.name}
-            className={formClasses.input}
-            aria-invalid={renameError ? true : undefined}
-            aria-describedby={renameError ? `${renameFields.name.id}-error` : undefined}
-          />
-          {renameError ? (
-            <span id={`${renameFields.name.id}-error`} className={formClasses.fieldError}>
-              {renameError}
-            </span>
-          ) : null}
-        </label>
-        <button type="submit" className={formClasses.btnSecondary}>
-          {t("drills.edit.saveName")}
-        </button>
-      </Form>
+      <label className={`${formClasses.labelStack} flex-1 max-w-md`}>
+        {t("drills.edit.templateName")}
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            scheduleNameSave(e.target.value);
+          }}
+          onBlur={() => nameSaver.flush()}
+          className={formClasses.input}
+          aria-invalid={nameError ? true : undefined}
+          aria-describedby={nameError ? "drill-name-error" : undefined}
+        />
+        {nameError ? (
+          <span id="drill-name-error" className={formClasses.fieldError}>
+            {t("drills.edit.errors.nameRequiredInline")}
+          </span>
+        ) : null}
+      </label>
 
       <p className="text-xs text-white/40">
         {t("drills.edit.intro")}
@@ -507,14 +820,17 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
             </p>
           </div>
         </div>
-        <Form method="post" className="flex flex-col gap-2 mt-3">
-          <input type="hidden" name="intent" value="setDefaultAudience" />
+        <div className="flex flex-col gap-2 mt-3">
           <label className="flex items-start gap-2 text-sm">
             <input
               type="radio"
               name="audience"
               value="EVERYONE"
-              defaultChecked={template.defaultAudience !== "STAFF_ONLY"}
+              checked={audience === "EVERYONE"}
+              onChange={() => {
+                setAudience("EVERYONE");
+                saveAudience("EVERYONE");
+              }}
             />
             <span>{t("drills.edit.defaultAudience.everyone")}</span>
           </label>
@@ -523,17 +839,15 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
               type="radio"
               name="audience"
               value="STAFF_ONLY"
-              defaultChecked={template.defaultAudience === "STAFF_ONLY"}
+              checked={audience === "STAFF_ONLY"}
+              onChange={() => {
+                setAudience("STAFF_ONLY");
+                saveAudience("STAFF_ONLY");
+              }}
             />
             <span>{t("drills.edit.defaultAudience.staffOnly")}</span>
           </label>
-          <button
-            type="submit"
-            className={`${formClasses.btnSecondary} self-start mt-2`}
-          >
-            {t("drills.edit.defaultAudience.saveButton")}
-          </button>
-        </Form>
+        </div>
       </section>
 
       <section className="rounded-xl border border-white/10 bg-white/5 p-4">
@@ -548,26 +862,25 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
             </p>
           </div>
         </div>
-        <Form method="post" className="flex flex-wrap items-end gap-3 mt-3">
-          <input type="hidden" name="intent" value="setCadence" />
+        <div className="flex flex-wrap items-end gap-3 mt-3">
           <label className={`${formClasses.labelStack} flex-1 min-w-[12rem] max-w-xs`}>
             {t("drills.edit.cadence.fieldLabel")}
             <input
               type="number"
-              name="requiredPerYear"
               min={1}
               max={365}
               step={1}
-              key={`${template.id}-${template.updatedAt.toISOString()}-cadence`}
-              defaultValue={template.requiredPerYear ?? ""}
+              value={cadence}
+              onChange={(e) => {
+                setCadence(e.target.value);
+                scheduleCadenceSave(e.target.value);
+              }}
+              onBlur={() => cadenceSaver.flush()}
               placeholder={t("drills.edit.cadence.placeholder")}
               className={formClasses.input}
             />
           </label>
-          <button type="submit" className={formClasses.btnSecondary}>
-            {t("drills.edit.cadence.saveButton")}
-          </button>
-        </Form>
+        </div>
       </section>
 
       <section className="rounded-xl border border-white/10 bg-white/5 p-4">
@@ -582,23 +895,19 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
             </p>
           </div>
         </div>
-        <Form method="post" className="flex flex-col gap-2 mt-3">
-          <input type="hidden" name="intent" value="saveInstructions" />
+        <div className="flex flex-col gap-2 mt-3">
           <textarea
-            name="instructions"
-            key={`${template.id}-${template.updatedAt.toISOString()}-instructions`}
-            defaultValue={template.instructions ?? ""}
+            value={instructions}
+            onChange={(e) => {
+              setInstructions(e.target.value);
+              scheduleInstructionsSave(e.target.value);
+            }}
+            onBlur={() => instructionsSaver.flush()}
             rows={5}
             className="w-full app-field font-mono text-xs"
             placeholder={t("drills.edit.instructions.placeholder")}
           />
-          <button
-            type="submit"
-            className={`${formClasses.btnSecondary} self-start`}
-          >
-            {t("drills.edit.instructions.saveButton")}
-          </button>
-        </Form>
+        </div>
       </section>
 
       <section className="rounded-xl border border-white/10 bg-white/5 p-4">
@@ -622,6 +931,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                 <input
                   value={item}
                   onChange={(e) => updateDefaultActionItem(index, e.target.value)}
+                  onBlur={() => definitionSaver.flush()}
                   className="flex-1 min-w-[12rem] app-field text-sm"
                   placeholder={t("drills.edit.followUp.itemPlaceholder")}
                   aria-label={t("drills.edit.followUp.itemLabel", { n: index + 1 })}
@@ -648,7 +958,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
             {t("drills.edit.followUp.addItem")}
           </button>
           <p className="text-xs text-white/40 self-center">
-            {t("drills.edit.followUp.savedWithLayout")}
+            {t("drills.edit.followUp.autosaveNote")}
           </p>
         </div>
       </section>
@@ -662,13 +972,9 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
           <Plus className="w-4 h-4 mr-1 inline" />
           {t("drills.edit.addToggle")}
         </button>
-        <button
-          type="button"
-          className={formClasses.btnPrimary}
-          onClick={saveDefinition}
-          disabled={saveFetcher.state !== "idle"}
-        >
-          {saveFetcher.state !== "idle" ? t("drills.edit.saving") : t("drills.edit.saveLayout")}
+        <button type="button" className={formClasses.btnSecondary} onClick={() => addColumn("selection")}>
+          <Plus className="w-4 h-4 mr-1 inline" />
+          {t("drills.edit.addSelection")}
         </button>
       </div>
 
@@ -683,19 +989,49 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                     <input
                       value={col.label}
                       onChange={(e) => updateColumn(ci, { label: e.target.value })}
+                      onBlur={() => definitionSaver.flush()}
                       className="app-field text-xs font-semibold"
                       aria-label={t("drills.edit.columnLabel", { n: ci + 1 })}
                     />
                     <select
                       value={col.kind}
-                      onChange={(e) =>
-                        updateColumn(ci, { kind: e.target.value === "toggle" ? "toggle" : "text" })
-                      }
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        updateColumn(ci, {
+                          kind: v === "toggle" ? "toggle" : v === "selection" ? "selection" : "text",
+                        });
+                      }}
                       className="app-field text-xs"
                     >
                       <option value="text">{t("drills.edit.kindText")}</option>
                       <option value="toggle">{t("drills.edit.kindToggle")}</option>
+                      <option value="selection">{t("drills.edit.kindSelection")}</option>
                     </select>
+                    {col.kind === "selection" ? (
+                      <select
+                        value={col.selectionSource?.autoFillColumnId ?? ""}
+                        onChange={(e) =>
+                          updateColumn(ci, {
+                            selectionSource: {
+                              type: "classrooms",
+                              autoFillColumnId: e.target.value || undefined,
+                            },
+                          })
+                        }
+                        onBlur={() => definitionSaver.flush()}
+                        className="app-field text-xs"
+                        aria-label={t("drills.edit.autofillColumnLabel")}
+                      >
+                        <option value="">{t("drills.edit.autofillNone")}</option>
+                        {definition.columns
+                          .filter((c) => c.kind === "text")
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {t("drills.edit.autofillInto", { label: c.label })}
+                            </option>
+                          ))}
+                      </select>
+                    ) : null}
                     <div className="flex gap-1">
                       <button
                         type="button"
@@ -734,12 +1070,45 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
                 <td className="px-2 py-2 text-white/40 text-xs align-middle">{ri + 1}</td>
                 {definition.columns.map((col) => (
                   <td key={col.id} className="px-2 py-2 align-middle">
-                    {col.kind === "text" ? (
-                      <input
+                    {col.kind === "selection" ? (
+                      <select
                         value={row.cells[col.id] ?? ""}
-                        onChange={(e) => updateRowCell(ri, col.id, e.target.value)}
+                        onChange={(e) => selectRowCell(ri, col, e.target.value)}
+                        onBlur={() => definitionSaver.flush()}
                         className="w-full min-w-[6rem] app-field"
-                      />
+                        aria-label={t("drills.edit.selectClassroom")}
+                      >
+                        <option value="">{t("drills.edit.selectClassroom")}</option>
+                        {classrooms.map((c: { homeRoom: string; teacherName: string }) => (
+                          <option key={c.homeRoom} value={c.homeRoom}>
+                            {c.homeRoom}
+                          </option>
+                        ))}
+                      </select>
+                    ) : col.kind === "text" ? (
+                      <div className="flex flex-col gap-1">
+                        <input
+                          value={row.cells[col.id] ?? ""}
+                          onChange={(e) =>
+                            updateRowCell(ri, col.id, e.target.value, autoFillTargetIds.has(col.id))
+                          }
+                          onBlur={() => definitionSaver.flush()}
+                          className="w-full min-w-[6rem] app-field"
+                        />
+                        {autoFillTargetIds.has(col.id) &&
+                        (row.overrides ?? []).includes(col.id) ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-amber-300/80">
+                            {t("drills.edit.overridden")}
+                            <button
+                              type="button"
+                              className="underline hover:text-amber-200"
+                              onClick={() => clearOverride(ri, col.id)}
+                            >
+                              {t("drills.edit.resetAutofill")}
+                            </button>
+                          </span>
+                        ) : null}
+                      </div>
                     ) : (
                       <span className="text-white/30 text-xs">{t("drills.edit.checkOnRun")}</span>
                     )}
@@ -792,6 +1161,7 @@ export default function DrillTemplateEdit({ loaderData }: Route.ComponentProps) 
         />
         <Link
           to={`/admin/drills/${template.id}/run`}
+          onClick={flushAll}
           className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
         >
           {t("drills.edit.openRun")}

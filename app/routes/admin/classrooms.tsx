@@ -15,7 +15,10 @@ import {
 import { dataWithError, dataWithSuccess } from "remix-toast";
 import type { Route } from "./+types/classrooms";
 import { protectToAdminAndGetPermissions } from "~/sessions.server";
+import { getFixedT } from "~/lib/t.server";
+import { detectLocale } from "~/i18n.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
+import { auditOrgAction } from "~/domain/org/audit.server";
 import {
   DEFAULT_CLASSROOM_CAPACITY,
   GRADE_LEVELS,
@@ -112,7 +115,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         lastName: true,
         homeRoom: true,
         householdId: true,
-        household: { select: { spaceNumber: true } },
       },
     }),
     // Active exceptions for "today" so we can flag students with an override
@@ -138,31 +140,42 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   ]);
 
   const validHomeRooms = new Set(classrooms.map((c) => c.homeRoom));
+
+  // Resolve household name + pickup space in one extra query — used for the
+  // student.householdName/spaceNumber fields on the index and for resolving
+  // household-scoped exceptions back to the right student rows. We fetch these
+  // here rather than via a nested to-one `household` select on the student
+  // query above: Prisma resolves nested to-one relations with `WHERE id IN
+  // (…all distinct households…)`, which overflows D1's 100-bound-param cap once
+  // a roster spans enough households (the trap children.tsx / households.tsx
+  // also avoid). `householdIds` is distinct households across the whole roster,
+  // so it isn't statically bounded either — chunk the IN list.
+  const householdIds = Array.from(
+    new Set(
+      allStudentsRaw
+        .map((s) => s.householdId)
+        .filter((id): id is string => !!id),
+    ),
+  );
+  const households = await chunkedFindMany(householdIds, (idChunk) =>
+    prisma.household.findMany({
+      where: { id: { in: idChunk } },
+      select: { id: true, name: true, spaceNumber: true },
+    }),
+  );
+  const householdById = new Map(households.map((h) => [h.id, h]));
+  const householdNameById = new Map(households.map((h) => [h.id, h.name]));
+
   const allStudents = allStudentsRaw.map((s) => ({
     id: s.id,
     firstName: s.firstName,
     lastName: s.lastName,
     homeRoom: s.homeRoom,
     householdId: s.householdId,
-    spaceNumber: s.household?.spaceNumber ?? null,
+    spaceNumber: s.householdId
+      ? householdById.get(s.householdId)?.spaceNumber ?? null
+      : null,
   }));
-
-  // Resolve household names in one extra query — used both for the
-  // student.householdName field on the index and for resolving
-  // household-scoped exceptions back to the right student rows.
-  const householdIds = Array.from(
-    new Set(allStudents.map((s) => s.householdId).filter((id): id is string => !!id)),
-  );
-  // `householdIds` is distinct households across the whole roster, so it is not
-  // statically bounded — a direct `id: { in: householdIds }` overflows D1's
-  // 100-bound-param cap (the tenant extension adds orgId too). Chunk the IN.
-  const households = await chunkedFindMany(householdIds, (idChunk) =>
-    prisma.household.findMany({
-      where: { id: { in: idChunk } },
-      select: { id: true, name: true },
-    }),
-  );
-  const householdNameById = new Map(households.map((h) => [h.id, h.name]));
 
   // Index per-student exceptions. Household-scoped exceptions cascade to
   // every student in the household.
@@ -247,8 +260,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       ? Math.round((totalStudents / totalClassrooms) * 10) / 10
       : 0;
 
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+
   return {
-    metaTitle: "Classrooms",
+    metaTitle: t("children.pageHeader.title"),
     classrooms: classroomRows,
     gradePillCounts,
     studentsByRoom: Object.fromEntries(studentsByRoom),
@@ -278,36 +294,48 @@ export async function action({ request, context }: Route.ActionArgs) {
   const formData = await request.formData();
   const intent = String(formData.get("intent") ?? "");
 
+  const locale = await detectLocale(request, context);
+  const t = await getFixedT(locale, "admin");
+
   try {
     if (intent === "setClassroomGrade") {
       const classroomId = Number(formData.get("classroomId"));
       const grade = String(formData.get("grade") ?? "");
       if (!Number.isInteger(classroomId)) {
-        return dataWithError(null, "Invalid classroom.");
+        return dataWithError(null, t("children.classroomActions.invalidClassroom"));
       }
       if (grade && !isGradeLevel(grade)) {
-        return dataWithError(null, "Invalid grade level.");
+        return dataWithError(null, t("children.classroomActions.invalidGrade"));
       }
       // Belt and braces: tenant extension already filters by orgId, but
       // double-check that the row we're touching belongs to the request's org.
       const existing = await prisma.teacher.findUnique({ where: { id: classroomId } });
       if (!existing || existing.orgId !== org.id) {
-        return dataWithError(null, "Classroom not found.");
+        return dataWithError(null, t("children.classroomActions.classroomNotFound"));
       }
+      const nextGrade = grade ? (grade as GradeLevel) : null;
       await prisma.teacher.update({
         where: { id: classroomId },
-        data: { gradeLevel: grade ? (grade as GradeLevel) : null },
+        data: { gradeLevel: nextGrade },
       });
-      return dataWithSuccess(null, "Grade updated.");
+      await auditOrgAction(context, request, {
+        action: "classroom.update",
+        targetType: "classroom",
+        targetId: String(classroomId),
+        before: { gradeLevel: existing.gradeLevel },
+        after: { gradeLevel: nextGrade },
+        keys: ["gradeLevel"],
+      });
+      return dataWithSuccess(null, t("children.classroomActions.gradeUpdated"));
     }
   } catch (error) {
     console.error("children action failed", error);
     return dataWithError(
       null,
-      error instanceof Error ? error.message : "Update failed.",
+      error instanceof Error ? error.message : t("children.classroomActions.updateFailed"),
     );
   }
-  return dataWithError(null, "Unknown action.");
+  return dataWithError(null, t("children.classroomActions.unknownAction"));
 }
 
 type LoaderData = Route.ComponentProps["loaderData"];
@@ -600,6 +628,7 @@ function GradePillBar({
   active: GradeLevel | "ungraded" | null;
   onSelect: (grade: GradeLevel | null | "all") => void;
 }) {
+  const { t } = useTranslation("admin");
   // Sort `filterCounts` for the pill bar in the same canonical grade order.
   // We only render grades that actually have classrooms.
   const totalStudents = filterCounts.reduce((acc, f) => acc + f.studentCount, 0);
@@ -608,7 +637,7 @@ function GradePillBar({
     <div className="flex flex-wrap items-center gap-1.5">
       <GradePill
         active={active == null}
-        label="All"
+        label={t("children.gradePill.all")}
         count={totalStudents}
         onClick={() => onSelect("all")}
       />
@@ -683,6 +712,7 @@ function GradeGroup({
   expanded: Set<number>;
   toggleExpanded: (id: number) => void;
 }) {
+  const { t } = useTranslation("admin");
   const id =
     grade == null ? "grade-ungraded" : `grade-${grade.toLowerCase()}`;
   return (
@@ -690,8 +720,8 @@ function GradeGroup({
       <SectionHeader
         id={id}
         title={gradeLabel(grade)}
-        count={`${classrooms.length} classroom${classrooms.length === 1 ? "" : "s"}`}
-        caption={`${studentCount} student${studentCount === 1 ? "" : "s"}`}
+        count={t("children.groups.classroomCount", { count: classrooms.length })}
+        caption={t("children.groups.studentCount", { count: studentCount })}
       />
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {classrooms.map((c) => (
@@ -710,6 +740,7 @@ function GradeGroup({
 }
 
 function AddClassroomTile({ grade }: { grade: GradeLevel | null }) {
+  const { t } = useTranslation("admin");
   return (
     <Link
       to={`/create/homeroom${grade ? `?grade=${grade}` : ""}`}
@@ -717,7 +748,7 @@ function AddClassroomTile({ grade }: { grade: GradeLevel | null }) {
     >
       <span className="inline-flex items-center gap-2">
         <Plus className="h-4 w-4" />
-        Add classroom to {gradeLabel(grade)}
+        {t("children.card.addClassroomTo", { grade: gradeLabel(grade) })}
       </span>
     </Link>
   );
@@ -738,6 +769,7 @@ function ClassroomCard({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation("admin");
   const cap = classroom.capacity ?? DEFAULT_CLASSROOM_CAPACITY;
   const ratio = classroomFillRatio(classroom.studentCount, classroom.capacity);
   const fillState = classroomFillState(classroom.studentCount, classroom.capacity);
@@ -776,12 +808,12 @@ function ClassroomCard({
             </h3>
             {ungraded ? (
               <StatusPill tone="warning" dot>
-                Ungraded
+                {t("children.card.ungraded")}
               </StatusPill>
             ) : null}
           </div>
           <p className="mt-0.5 truncate text-xs text-white/55">
-            {classroom.teacherName ?? "Teacher not set"}
+            {classroom.teacherName ?? t("children.card.teacherNotSet")}
           </p>
           <div className="mt-2 flex items-center gap-2">
             <span className="text-xs tabular-nums text-white/70">
@@ -789,7 +821,7 @@ function ClassroomCard({
               <span className="text-white/40"> / {cap}</span>
             </span>
             <span className="text-[11px] uppercase tracking-wide text-white/40">
-              students
+              {t("children.card.studentsLabel")}
             </span>
           </div>
           <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
@@ -819,6 +851,7 @@ function ClassroomCard({
 }
 
 function UngradedPrompt({ classroomId }: { classroomId: number }) {
+  const { t } = useTranslation("admin");
   // Inline form to set the grade for this classroom. Kept compact — one
   // select + a save button — so the "ungraded" callout doesn't blow up the
   // card visually.
@@ -830,14 +863,14 @@ function UngradedPrompt({ classroomId }: { classroomId: number }) {
     >
       <input type="hidden" name="intent" value="setClassroomGrade" />
       <input type="hidden" name="classroomId" value={classroomId} />
-      <span className="font-medium">Set grade:</span>
+      <span className="font-medium">{t("children.card.setGrade")}</span>
       <select
         name="grade"
         defaultValue=""
         className="rounded border border-white/10 bg-black/30 px-2 py-1 text-xs text-white focus:border-blue-400/60 focus:outline-none"
       >
         <option value="" disabled>
-          Pick…
+          {t("children.card.pickGrade")}
         </option>
         {GRADE_LEVELS.map((g) => (
           <option key={g} value={g}>
@@ -849,7 +882,7 @@ function UngradedPrompt({ classroomId }: { classroomId: number }) {
         type="submit"
         className="rounded-full bg-amber-400/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-100 ring-1 ring-amber-400/40 hover:bg-amber-400/30"
       >
-        Save
+        {t("children.card.save")}
       </button>
     </Form>
   );
@@ -862,6 +895,7 @@ function ExpandedClassroom({
   classroom: ClassroomLoaderRow;
   students: StudentLoaderRow[];
 }) {
+  const { t } = useTranslation("admin");
   return (
     <div
       className="flex flex-col gap-3 border-t border-white/[0.08] bg-black/20 p-4"
@@ -871,15 +905,15 @@ function ExpandedClassroom({
         <div className="flex items-center gap-2">
           <input
             type="checkbox"
-            aria-label="Select all students"
+            aria-label={t("children.card.selectAllAria")}
             className="h-4 w-4 rounded border border-white/15 bg-black/30 text-blue-500 focus:ring-blue-500"
           />
-          <span className="text-xs text-white/55">Select all</span>
+          <span className="text-xs text-white/55">{t("children.card.selectAll")}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" size="sm" type="button" isDisabled>
             <Users className="mr-1 h-3.5 w-3.5" />
-            Bulk move
+            {t("children.card.bulkMove")}
           </Button>
           <Link
             to={`/admin/print/homeroom/${classroom.id}`}
@@ -888,14 +922,14 @@ function ExpandedClassroom({
             className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs text-white/80 hover:border-white/20 hover:text-white"
           >
             <Printer className="h-3.5 w-3.5" />
-            Print roster
+            {t("children.card.printRoster")}
           </Link>
         </div>
       </div>
 
       {students.length === 0 ? (
         <p className="rounded-lg bg-black/30 p-4 text-sm text-white/45">
-          No students in this classroom yet.
+          {t("children.card.noStudents")}
         </p>
       ) : (
         <ul className="grid gap-1.5 sm:grid-cols-2">
@@ -919,14 +953,15 @@ function ExpandedClassroom({
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-white/55">
                   {s.householdId ? (
                     <EntityLink to={`/admin/households/${s.householdId}`} arrow={false}>
-                      {s.householdName ?? "Household"}
+                      {s.householdName ?? t("children.card.household")}
                     </EntityLink>
                   ) : (
-                    <span className="text-white/30">No household</span>
+                    <span className="text-white/30">{t("children.card.noHousehold")}</span>
                   )}
                   <span className="text-white/30">·</span>
                   <span>
-                    Space {s.spaceNumber ?? <span className="text-white/30">—</span>}
+                    {t("children.card.spaceLabel")}{" "}
+                    {s.spaceNumber ?? <span className="text-white/30">—</span>}
                   </span>
                 </div>
               </div>
@@ -950,11 +985,12 @@ function ExpandedClassroom({
 /* --------------------------------------------------------------------- */
 
 function EmptyState({ searching }: { searching: boolean }) {
+  const { t } = useTranslation("admin");
   return (
     <div className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-8 text-center text-sm text-white/55">
       {searching
-        ? "No classrooms match the current filters."
-        : "No classrooms yet. Add a classroom to get started."}
+        ? t("children.emptyFiltered")
+        : t("children.emptyClassrooms")}
     </div>
   );
 }
