@@ -1,6 +1,7 @@
 import {
   ClipboardList,
   CreditCard,
+  Download,
   FileSpreadsheet,
   GraduationCap,
   History,
@@ -72,6 +73,7 @@ function buildSections(showBilling: boolean): NavSection[] {
       items: [
         { to: "/admin/users", labelKey: "sidebar.users", icon: Users },
         { to: "/admin/branding", labelKey: "sidebar.branding", icon: Palette },
+        { to: "/admin/data-export", labelKey: "sidebar.dataExport", icon: Download },
         ...(showBilling ? [billingNavItem] : []),
       ],
     },
