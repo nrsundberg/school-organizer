@@ -48,7 +48,7 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
   }
 
   // User is NOT tenant-scoped — filter orgId explicitly on every query below.
-  const [linkedUser, roster, teacherUsers] = await Promise.all([
+  const [linkedUser, roster, assignableUsers] = await Promise.all([
     classroom.userId
       ? prisma.user.findFirst({
           where: { id: classroom.userId, orgId: org.id },
@@ -60,8 +60,11 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
       select: { id: true, firstName: true, lastName: true },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     }),
+    // Any staff user in the org can be assigned as a classroom's teacher.
+    // (Parents/viewers authenticate via the org viewer PIN, not User rows, so
+    // this list is staff-sized — fine to ship to the client for the datalist.)
     prisma.user.findMany({
-      where: { orgId: org.id, role: "TEACHER" },
+      where: { orgId: org.id },
       select: { id: true, name: true, email: true },
       orderBy: { name: "asc" },
     }),
@@ -72,7 +75,7 @@ export async function loader({ context, params, request }: Route.LoaderArgs) {
     classroom,
     linkedUser,
     roster,
-    teacherUsers,
+    assignableUsers,
     metaTitle: t("classroomDetail.metaTitle", { name: classroom.homeRoom }),
   };
 }
@@ -102,13 +105,18 @@ export async function action({ context, params, request }: Route.ActionArgs) {
 
   try {
     if (intent === "assignExisting") {
-      const userId = String(formData.get("userId") ?? "");
-      // The selected user must be a TEACHER in THIS org (User is not
-      // tenant-scoped, so check orgId explicitly).
-      const user = await prisma.user.findFirst({
-        where: { id: userId, orgId: org.id, role: "TEACHER" },
-        select: { id: true, name: true },
-      });
+      const email = String(formData.get("userEmail") ?? "").trim();
+      // Any user in THIS org may be assigned as the classroom's teacher; role
+      // is intentionally not checked (a dedicated teacher/sub annotation is
+      // future work, and assigning does not change the user's role). The
+      // datalist submits the user's email — globally unique — so resolve by
+      // it. User is not tenant-scoped, so still pin orgId.
+      const user = email
+        ? await prisma.user.findFirst({
+            where: { email, orgId: org.id },
+            select: { id: true, name: true },
+          })
+        : null;
       if (!user) {
         return dataWithError(null, t("classroomDetail.errors.invalidTeacher"));
       }
@@ -216,7 +224,7 @@ export async function action({ context, params, request }: Route.ActionArgs) {
 }
 
 export default function ClassroomDetail({ loaderData }: Route.ComponentProps) {
-  const { classroom, linkedUser, roster, teacherUsers } = loaderData;
+  const { classroom, linkedUser, roster, assignableUsers } = loaderData;
   const { t } = useTranslation("admin");
 
   return (
@@ -268,22 +276,27 @@ export default function ClassroomDetail({ loaderData }: Route.ComponentProps) {
           </p>
         )}
 
-        {/* Assign an existing teacher account */}
-        {teacherUsers.length > 0 ? (
+        {/* Assign any existing user as this classroom's teacher */}
+        {assignableUsers.length > 0 ? (
           <Form method="post" className="flex flex-wrap items-end gap-2">
             <input type="hidden" name="intent" value="assignExisting" />
             <label className="flex flex-col gap-1 text-sm text-white/60 flex-1 min-w-[200px]">
               {t("classroomDetail.teacher.assignExisting")}
-              <select name="userId" required className="app-field" defaultValue="">
-                <option value="" disabled>
-                  {t("classroomDetail.teacher.selectPlaceholder")}
-                </option>
-                {teacherUsers.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name ? `${u.name} (${u.email})` : u.email}
+              <input
+                name="userEmail"
+                list="assignable-users"
+                required
+                autoComplete="off"
+                placeholder={t("classroomDetail.teacher.selectPlaceholder")}
+                className="app-field"
+              />
+              <datalist id="assignable-users">
+                {assignableUsers.map((u) => (
+                  <option key={u.id} value={u.email}>
+                    {u.name || u.email}
                   </option>
                 ))}
-              </select>
+              </datalist>
             </label>
             <button type="submit" className={btnSecondary}>
               {t("classroomDetail.teacher.assignButton")}
