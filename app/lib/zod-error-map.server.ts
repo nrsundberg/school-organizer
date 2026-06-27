@@ -28,6 +28,7 @@
 
 import type { TFunction } from "i18next";
 import type { z } from "zod";
+import { getFixedT } from "~/lib/t.server";
 
 type ErrorMap = z.core.$ZodErrorMap;
 
@@ -140,7 +141,10 @@ export function localizedErrorMap(t: TFunction): ErrorMap {
  * ready-to-use error map. Saves callers the two-line setup at every site.
  */
 export async function makeLocalizedErrorMap(lng: string): Promise<ErrorMap> {
-  const { getFixedT } = await import("~/lib/t.server");
+  // `t.server` is statically imported across the route tree, so a dynamic
+  // import here buys no code-splitting (Vite warns about exactly that) — and
+  // there is no circular dependency, since `t.server` doesn't import this
+  // module. Import it statically.
   const t = await getFixedT(lng, "errors");
   return localizedErrorMap(t);
 }
