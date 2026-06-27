@@ -292,7 +292,12 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
     },
   });
 
-  const handleSpaceChange = (spaceNumber: number, status: string) => {
+  // Stable identity is load-bearing: ParkingTile's optimistic-revert effect
+  // depends on `onSpaceChange`. If this function were recreated each render,
+  // that effect would re-fire on the optimistic re-render (and on the aging
+  // tick) while `fetcher.state` is still "idle", spuriously reverting a
+  // freshly-marked tile — the board would flick yellow → empty → yellow.
+  const handleSpaceChange = useCallback((spaceNumber: number, status: string) => {
     setSpaces((prev) =>
       prev.map((s) =>
         s.spaceNumber === spaceNumber
@@ -300,7 +305,7 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
           : s
       )
     );
-  };
+  }, []);
 
   const updateRoomFilter = (value: string) => {
     const normalized = value.trim();
