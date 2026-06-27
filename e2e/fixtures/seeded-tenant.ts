@@ -44,6 +44,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { test as base, expect, type Cookie } from "@playwright/test";
 import { createClient, type Client as LibsqlClient } from "@libsql/client";
+// Re-export so specs can `import { ..., type LibsqlClient } from "../fixtures/seeded-tenant"`
+// without reaching into @libsql/client directly.
+export type { Client as LibsqlClient } from "@libsql/client";
 import {
   generateId,
   hashPassword,
@@ -69,8 +72,17 @@ export type SeededTenant = {
   adminEmail: string;
   /** Admin user password. Plaintext so a test can exercise /login if it wants. */
   adminPassword: string;
-  /** Already-logged-in Better Auth session cookie. Add via page.context().addCookies([cookie]). */
+  /** Already-logged-in Better Auth session cookie for the ADMIN user. Add via page.context().addCookies([cookie]). */
   adminCookie: Cookie;
+  /** CONTROLLER (keypad) user id. Distinct from the admin user. */
+  controllerUserId: string;
+  /**
+   * Already-logged-in Better Auth session cookie for a CONTROLLER user.
+   * The dismissal endpoints (`/update/:space`, `/empty/:space`) are gated
+   * to CONTROLLER (ADMINs are intentionally excluded — see update.$space.tsx),
+   * so flows that record/clear dismissals must add THIS cookie, not adminCookie.
+   */
+  controllerCookie: Cookie;
   /** Plaintext viewer PIN. The hash is written to AppSettings for this org. */
   viewerPin: string;
   /** Pre-seeded homeroom name. */
@@ -78,14 +90,34 @@ export type SeededTenant = {
   /** Pre-seeded space number. */
   spaceNumber: number;
 
+  /**
+   * Live libsql client pointed at the same dev.db the worker reads/writes.
+   * Open for the duration of the test; the fixture closes it during teardown.
+   * Specs use it for authoritative D1 assertions (e.g. Space.status).
+   */
+  db: LibsqlClient;
+
   /** Build a `http://{slug}.localhost:<port>{path}` URL. Defaults to the Playwright baseURL port. */
   tenantUrl: (path: string) => string;
   /** Build a `http://localhost:<port>{path}` URL for marketing-host traffic on the same port. */
   marketingUrl: (path: string) => string;
+
+  /**
+   * Explicit per-spec cleanup of dismissal side-effects for a space:
+   * resets `Space.status` to EMPTY (and clears `timestamp`) and deletes the
+   * space's CallEvent rows. Idempotent; safe to call from afterEach.
+   */
+  resetBoardForSpace: (spaceNumber: number) => Promise<void>;
 };
 
 type Fixtures = {
   tenant: SeededTenant;
+  /**
+   * Per-test override for the seeded org's billing plan. Set via
+   * `test.use({ tenantBillingPlan: "CAMPUS" })`. Falls back to the
+   * project metadata `tenantBillingPlan`, then to "CAR_LINE".
+   */
+  tenantBillingPlan: SeedOptions["billingPlan"];
 };
 
 /* ------------------------------------------------------------------ */
@@ -161,6 +193,13 @@ type SeededState = {
   user: { id: string; email: string; password: string };
   account: { id: string };
   session: { id: string; token: string; expiresAt: Date };
+  controller: {
+    userId: string;
+    accountId: string;
+    sessionId: string;
+    token: string;
+    expiresAt: Date;
+  };
   appSettings: { viewerPin: string };
   teacher: { id: number; homeRoom: string };
   space: { id: number; spaceNumber: number };
@@ -176,6 +215,14 @@ async function insertSeedRows(
   const accountId = generateId();
   const sessionId = generateId();
 
+  // A second user with role CONTROLLER (keypad operator). The dismissal
+  // endpoints are CONTROLLER-gated, so flows that record dismissals
+  // authenticate as this user rather than the ADMIN.
+  const controllerUserId = generateId();
+  const controllerAccountId = generateId();
+  const controllerSessionId = generateId();
+  const controllerEmail = `controller-${slug}@e2e.pickuproster.test`;
+
   const adminEmail = `admin-${slug}@e2e.pickuproster.test`;
   const adminPassword = `Pw-${randomToken(8)}`;
   const viewerPin = `${Math.floor(100000 + Math.random() * 900000)}`;
@@ -188,6 +235,7 @@ async function insertSeedRows(
   const pwHash = await hashPassword(adminPassword);
   const pinHash = await hashPassword(viewerPin);
   const sessionToken = randomToken(32);
+  const controllerSessionToken = randomToken(32);
   const now = new Date();
   const nowIso = now.toISOString();
   const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
@@ -217,6 +265,21 @@ async function insertSeedRows(
         sql: `INSERT INTO "Session" (id, token, expiresAt, userId, createdAt, updatedAt)
               VALUES (?, ?, ?, ?, ?, ?)`,
         args: [sessionId, sessionToken, expiresAtIso, userId, nowIso, nowIso],
+      },
+      {
+        sql: `INSERT INTO "User" (id, email, name, role, emailVerified, mustChangePassword, orgId, createdAt, updatedAt)
+              VALUES (?, ?, ?, 'CONTROLLER', 1, 0, ?, ?, ?)`,
+        args: [controllerUserId, controllerEmail, `E2E Controller ${slug}`, orgId, nowIso, nowIso],
+      },
+      {
+        sql: `INSERT INTO "Account" (id, accountId, providerId, userId, password, createdAt, updatedAt)
+              VALUES (?, ?, 'credential', ?, ?, ?, ?)`,
+        args: [controllerAccountId, controllerEmail, controllerUserId, pwHash, nowIso, nowIso],
+      },
+      {
+        sql: `INSERT INTO "Session" (id, token, expiresAt, userId, createdAt, updatedAt)
+              VALUES (?, ?, ?, ?, ?, ?)`,
+        args: [controllerSessionId, controllerSessionToken, expiresAtIso, controllerUserId, nowIso, nowIso],
       },
       {
         sql: `INSERT INTO "AppSettings" (orgId, viewerDrawingEnabled, viewerPinHash)
@@ -250,6 +313,13 @@ async function insertSeedRows(
     user: { id: userId, email: adminEmail, password: adminPassword },
     account: { id: accountId },
     session: { id: sessionId, token: sessionToken, expiresAt },
+    controller: {
+      userId: controllerUserId,
+      accountId: controllerAccountId,
+      sessionId: controllerSessionId,
+      token: controllerSessionToken,
+      expiresAt,
+    },
     appSettings: { viewerPin },
     teacher: { id: Number(teacherRow.rows[0]?.id ?? 0), homeRoom },
     space: { id: Number(spaceRow.rows[0]?.id ?? 0), spaceNumber },
@@ -259,8 +329,13 @@ async function insertSeedRows(
 async function teardownSeedRows(db: LibsqlClient, state: SeededState): Promise<void> {
   // Best-effort teardown. Order matters for FK: children first.
   const stmts = [
+    // The dismissal endpoints write CallEvent rows scoped to the tenant
+    // orgId (tenant-extension Prisma), but also sweep by spaceNumber as a
+    // belt-and-braces against any row that escaped the orgId scope.
     { sql: `DELETE FROM "CallEvent" WHERE orgId = ?`, args: [state.org.id] },
+    { sql: `DELETE FROM "CallEvent" WHERE spaceNumber = ?`, args: [state.space.spaceNumber] },
     { sql: `DELETE FROM "Student" WHERE orgId = ?`, args: [state.org.id] },
+    { sql: `DELETE FROM "Household" WHERE orgId = ?`, args: [state.org.id] },
     { sql: `DELETE FROM "Space" WHERE orgId = ?`, args: [state.org.id] },
     { sql: `DELETE FROM "Teacher" WHERE orgId = ?`, args: [state.org.id] },
     { sql: `DELETE FROM "ViewerAccessAttempt" WHERE orgId = ?`, args: [state.org.id] },
@@ -269,6 +344,9 @@ async function teardownSeedRows(db: LibsqlClient, state: SeededState): Promise<v
     { sql: `DELETE FROM "Session" WHERE userId = ?`, args: [state.user.id] },
     { sql: `DELETE FROM "Account" WHERE userId = ?`, args: [state.user.id] },
     { sql: `DELETE FROM "User" WHERE id = ?`, args: [state.user.id] },
+    { sql: `DELETE FROM "Session" WHERE userId = ?`, args: [state.controller.userId] },
+    { sql: `DELETE FROM "Account" WHERE userId = ?`, args: [state.controller.userId] },
+    { sql: `DELETE FROM "User" WHERE id = ?`, args: [state.controller.userId] },
     { sql: `DELETE FROM "Org" WHERE id = ?`, args: [state.org.id] },
   ];
   for (const s of stmts) {
@@ -286,14 +364,20 @@ async function teardownSeedRows(db: LibsqlClient, state: SeededState): Promise<v
 /* ------------------------------------------------------------------ */
 
 export const test = base.extend<Fixtures>({
-  tenant: async ({}, use, testInfo) => {
+  // Option: per-test billing plan override. Default undefined → the
+  // `tenant` fixture falls back to project metadata, then "CAR_LINE".
+  tenantBillingPlan: [undefined, { option: true }],
+
+  tenant: async ({ tenantBillingPlan }, use, testInfo) => {
     const db = createClient({ url: databaseUrl() });
     // The tenant host lives on a subdomain of the Playwright baseURL.
     // Wrangler dev serves every Host header on its listening port, so
     // {slug}.localhost:PORT works without any /etc/hosts changes.
     const opts: SeedOptions = {
       billingPlan:
-        (testInfo.project.metadata?.tenantBillingPlan as SeedOptions["billingPlan"]) ?? "CAR_LINE",
+        tenantBillingPlan ??
+        (testInfo.project.metadata?.tenantBillingPlan as SeedOptions["billingPlan"]) ??
+        "CAR_LINE",
     };
 
     let state: SeededState | null = null;
@@ -325,6 +409,10 @@ export const test = base.extend<Fixtures>({
       useSecureCookies: false,
     });
     const cookieValue = await signCookieValue(state.session.token, secret);
+    const controllerCookieValue = await signCookieValue(
+      state.controller.token,
+      secret,
+    );
 
     const adminCookie: Cookie = {
       name: cookieName,
@@ -346,6 +434,15 @@ export const test = base.extend<Fixtures>({
       sameSite: "Lax",
     };
 
+    const controllerCookie: Cookie = {
+      ...adminCookie,
+      value: controllerCookieValue,
+    };
+
+    // Capture for the resetBoardForSpace closure — TS won't narrow the
+    // `let state` capture to non-null inside a callback.
+    const seededOrgId = state.org.id;
+
     const tenant: SeededTenant = {
       orgId: state.org.id,
       slug: state.org.slug,
@@ -353,11 +450,28 @@ export const test = base.extend<Fixtures>({
       adminEmail: state.user.email,
       adminPassword: state.user.password,
       adminCookie,
+      controllerUserId: state.controller.userId,
+      controllerCookie,
       viewerPin: state.appSettings.viewerPin,
       homeroomName: state.teacher.homeRoom,
       spaceNumber: state.space.spaceNumber,
+      db,
       tenantUrl: (path: string) => `${url.protocol}//${host}:${port}${path.startsWith("/") ? path : `/${path}`}`,
       marketingUrl: (path: string) => `${url.protocol}//${marketingHost}:${port}${path.startsWith("/") ? path : `/${path}`}`,
+      resetBoardForSpace: async (spaceNumber: number) => {
+        try {
+          await db.execute({
+            sql: `UPDATE "Space" SET status='EMPTY', timestamp=NULL WHERE spaceNumber = ? AND orgId = ?`,
+            args: [spaceNumber, seededOrgId],
+          });
+          await db.execute({
+            sql: `DELETE FROM "CallEvent" WHERE spaceNumber = ?`,
+            args: [spaceNumber],
+          });
+        } catch {
+          // Best-effort — see the doc-comment on the field.
+        }
+      },
     };
 
     try {
