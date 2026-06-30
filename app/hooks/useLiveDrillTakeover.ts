@@ -24,6 +24,10 @@ export function useLiveDrillTakeover({
   revalidatorRef.current = revalidator;
 
   const reconnectDelay = useRef(1000);
+  // Last drillStarted runId we already reacted to. The DO can re-deliver the
+  // same wake-up (reconnect replay, duplicate fan-out); without this every
+  // copy would trigger another full root-loader re-run across the fleet.
+  const handledRunId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
@@ -51,7 +55,17 @@ export function useLiveDrillTakeover({
           return;
         }
         if (!data || typeof data !== "object") return;
-        if ((data as { type?: unknown }).type !== "drillStarted") return;
+        const msg = data as { type?: unknown; runId?: unknown };
+        if (msg.type !== "drillStarted") return;
+
+        // Already on the takeover destination — nothing to redirect to, so
+        // don't waste a root-loader re-run.
+        if (window.location.pathname === "/drills/live") return;
+
+        // Ignore repeat deliveries of the same drill start.
+        const runId = typeof msg.runId === "string" ? msg.runId : null;
+        if (runId && runId === handledRunId.current) return;
+        handledRunId.current = runId;
 
         // Re-run the root loader; it redirects in-audience callers into the
         // drill. Skip if a revalidation is already in flight to avoid a storm.
