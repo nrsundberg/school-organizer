@@ -47,6 +47,8 @@ import {
   PopoverTrigger
 } from "@heroui/react";
 import { useBingoWebSocket } from "~/hooks/useBingoWebSocket";
+import { useAgingClock } from "~/hooks/useAgingClock";
+import { isTimedOut } from "~/domain/board/aging";
 import MobileCallerView from "~/components/MobileCallerView";
 import confetti from "canvas-confetti";
 import { endOfUtcDay, toDateInputValue } from "~/domain/dismissal/schedule";
@@ -210,21 +212,9 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
     setHomeroomFilter(searchParams.get("room") ?? "");
   }, [searchParams]);
 
-  // Aging safety tick. A called tile shows "fresh" yellow for the first 30s,
-  // then ages to green (see isTimedOut/TIMEOUT_MS). Each tile schedules its own
-  // one-shot timer for that single flip — but a one-shot timer has no recovery:
-  // if it's ever dropped or coalesced while the board sits idle, the tile stays
-  // yellow until the next render, which today only happens on a manual refresh.
-  // A low-frequency board tick re-renders the grid so every tile re-evaluates
-  // its age and self-heals, with no server round-trip. Runs only while at least
-  // one tile is ACTIVE; the per-tile effects don't re-run (their deps are
-  // unchanged), so this adds a cheap recompute, not timer churn.
-  const [, setAgingTick] = useState(0);
-  useEffect(() => {
-    if (!spaces.some((s) => s.status === Status.ACTIVE)) return;
-    const id = setInterval(() => setAgingTick((n) => n + 1), 5000);
-    return () => clearInterval(id);
-  }, [spaces]);
+  // Tile yellow→green aging is driven by a single resilient clock inside
+  // `ParkingRows` (see `useAgingClock`), so it self-heals on every
+  // return-to-foreground — no board-level timer needed here.
 
   useBingoWebSocket({
     onSpaceUpdate: ({ spaceNumber, status, timestamp }) => {
@@ -635,6 +625,11 @@ function ParkingRows({
   onDrawingSpace?: (spaceNumber: number) => void;
   onSpaceChange?: (spaceNumber: number, status: string) => void;
 }) {
+  // One resilient clock for the whole grid: ticks while any tile is ACTIVE and
+  // re-syncs on every return-to-foreground, so tiles age yellow→green without a
+  // manual refresh. Drives a re-render of every ParkingTile below.
+  const now = useAgingClock(data.some((s) => s.status === Status.ACTIVE));
+
   const newData = [];
   for (let i = 0; i < data.length; i += cols) {
     newData.push(data.slice(i, i + cols));
@@ -646,6 +641,7 @@ function ParkingRows({
       cols={cols}
       permitted={permitted}
       compact={compact}
+      now={now}
       onDrawingSpace={onDrawingSpace}
       onSpaceChange={onSpaceChange}
     />
@@ -657,6 +653,7 @@ function ParkingRow({
   cols,
   permitted,
   compact = false,
+  now,
   onDrawingSpace,
   onSpaceChange,
 }: {
@@ -664,6 +661,7 @@ function ParkingRow({
   data: Space[];
   permitted: boolean;
   compact?: boolean;
+  now: number;
   onDrawingSpace?: (spaceNumber: number) => void;
   onSpaceChange?: (spaceNumber: number, status: string) => void;
 }) {
@@ -688,6 +686,7 @@ function ParkingRow({
           space={it}
           permitted={permitted}
           compact={compact}
+          now={now}
           onDrawingSpace={onDrawingSpace}
           onSpaceChange={onSpaceChange}
         />
@@ -696,32 +695,24 @@ function ParkingRow({
   );
 }
 
-const TIMEOUT_MS = 30000;
-
 function ParkingTile({
   space,
   permitted,
   compact = false,
+  now,
   onDrawingSpace,
   onSpaceChange,
 }: {
   space: Space;
   permitted: boolean;
   compact?: boolean;
+  now: number;
   onDrawingSpace?: (spaceNumber: number) => void;
   onSpaceChange?: (spaceNumber: number, status: string) => void;
 }) {
   const { t } = useTranslation("roster");
   const { timestamp, status, spaceNumber } = space;
-  const [, forceTick] = useState(0);
-  useEffect(() => {
-    if (status !== Status.ACTIVE || !timestamp) return;
-    const remaining = TIMEOUT_MS - (Date.now() - new Date(timestamp).getTime());
-    if (remaining <= 0) return;
-    const id = setTimeout(() => forceTick((t) => t + 1), remaining + 50);
-    return () => clearTimeout(id);
-  }, [status, timestamp]);
-  const color = tileColor(status, isTimedOut(status, timestamp));
+  const color = tileColor(status, isTimedOut(timestamp, now));
 
   const fetcher = useFetcher();
 
@@ -864,11 +855,6 @@ function ViewerDrawingOverlay({
       ))}
     </svg>
   );
-}
-
-function isTimedOut(status: Status, timestamp: string | null): boolean {
-  if (status !== Status.ACTIVE || !timestamp) return false;
-  return new Date().getTime() - new Date(timestamp).getTime() > TIMEOUT_MS;
 }
 
 function tileColor(status: Status, timedOut?: boolean) {
