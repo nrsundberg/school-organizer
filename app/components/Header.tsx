@@ -64,6 +64,12 @@ export default function ({
       if (!target) return;
       if (menuRef.current?.contains(target)) return;
       if (buttonRef.current?.contains(target)) return;
+      // The language switcher is a HeroUI Popover whose content renders into a
+      // portal at the document root — outside menuRef, as `<div role="dialog">`.
+      // Don't treat clicks on that portaled content as "outside the menu", or
+      // we'd unmount it before the option's onClick runs.
+      const el = target instanceof Element ? target : target.parentElement;
+      if (el?.closest('[role="dialog"]')) return;
       setMenuOpen(false);
     }
     function onKeyDown(e: KeyboardEvent) {
@@ -124,7 +130,7 @@ export default function ({
             className={`absolute right-0 top-full mt-1 flex flex-col gap-2 p-2 rounded-lg border-1 ${fgBorder} z-50 min-w-[10rem]`}
             style={{ backgroundColor: headerColor }}
           >
-            <div onClick={closeMenu}>
+            <div>
               <LanguageSwitcher placement="compact" tone={tone} />
             </div>
             <Link
@@ -182,7 +188,7 @@ export default function ({
             className={`absolute right-0 top-full mt-1 flex flex-col gap-2 p-2 rounded-lg border-1 ${fgBorder} z-50 min-w-[10rem]`}
             style={{ backgroundColor: headerColor }}
           >
-            <div onClick={closeMenu}>
+            <div>
               <LanguageSwitcher placement="compact" tone={tone} />
             </div>
             <Link

@@ -400,15 +400,16 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
           <option
             key={room.homeRoom}
             value={room.homeRoom}
-            // Show the teacher's name beside the homeroom label so rooms that
-            // share a surname-based label (e.g. "Bishop" / "Bishop 2") are
-            // distinguishable. The `value` stays the homeRoom label, so the
-            // `?room=` filter contract is unchanged. Browsers that render only
-            // the value degrade to the prior behavior.
+            // Show "Room — Teacher" so rooms that share a surname-based label
+            // (e.g. "Bishop" / "Bishop 2") are distinguishable. The room is
+            // included in the label too, so when `teacherName` is null we fall
+            // back to just the room rather than an empty label. The `value`
+            // stays the homeRoom label, so the `?room=` filter contract is
+            // unchanged.
             label={
               room.teacherName && room.teacherName !== room.homeRoom
-                ? room.teacherName
-                : undefined
+                ? `${room.homeRoom} — ${room.teacherName}`
+                : room.homeRoom
             }
             className="bg-gray-900 text-white"
           />
