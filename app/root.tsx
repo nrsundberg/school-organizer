@@ -29,11 +29,12 @@ import {
   globalStorageMiddleware,
   userContext,
   getOptionalOrgFromContext,
-  getTenantPrisma
+  getTenantPrisma,
+  getImpersonatedByFromContext,
+  getImpersonationFromContext
 } from "~/domain/utils/global-context.server";
 import { isMarketingHost, isPlatformAdmin } from "~/domain/utils/host.server";
 import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
-import { getAuth } from "~/domain/auth/better-auth.server";
 import { ImpersonationBanner } from "~/components/ImpersonationBanner";
 import { DistrictImpersonationBanner } from "~/components/DistrictImpersonationBanner";
 import { Footer } from "~/components/Footer";
@@ -172,30 +173,18 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }
   }
 
-  let impersonatedBy: string | null = null;
-  let districtImpersonation: { active: boolean; orgName: string | null } = {
-    active: false,
-    orgName: null,
+  // Impersonation surfaces were already resolved by globalStorageMiddleware and
+  // stashed in context (impersonatedByContext / impersonationContext). Read
+  // them here instead of re-running getSession — that was a redundant session
+  // round-trip on every authed page load and every action.
+  const impersonatedBy = getImpersonatedByFromContext(context);
+  const districtActive = getImpersonationFromContext(context).active;
+  const districtImpersonation: { active: boolean; orgName: string | null } = {
+    active: districtActive,
+    // The org context already points at the impersonated org (the middleware
+    // honors session.impersonatedOrgId).
+    orgName: districtActive ? (org?.name ?? null) : null,
   };
-  if (user) {
-    try {
-      const auth = getAuth(context);
-      const session = await auth.api.getSession({ headers: request.headers });
-      impersonatedBy = (session?.session as any)?.impersonatedBy ?? null;
-      const impersonatedOrgId =
-        (session?.session as any)?.impersonatedOrgId ?? null;
-      if (impersonatedOrgId) {
-        // The org context resolved through globalStorageMiddleware already
-        // points at the impersonated org (it honors session.impersonatedOrgId).
-        districtImpersonation = {
-          active: true,
-          orgName: org?.name ?? null,
-        };
-      }
-    } catch {
-      // ignore
-    }
-  }
 
   // On marketing pages, surface the logged-in user's tenant board URL so the
   // marketing header can swap "Log in" for a "Dashboard" button that points

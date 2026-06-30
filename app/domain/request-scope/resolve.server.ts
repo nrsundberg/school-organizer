@@ -107,8 +107,13 @@ export async function resolveRequestScope(
   const onMarketingHost = deps.isMarketingHost(request);
   const path = classifyRequestPath(url.pathname, onMarketingHost);
 
-  const hostOrg = await resolveOrgByHost(deps, request).catch(() => null);
-  const session = await deps.loadSession(request);
+  // These two are independent — neither reads the other's result — so resolve
+  // them concurrently. They are the two heaviest steps in the middleware and
+  // run on every routed request; serializing them doubled the floor latency.
+  const [hostOrg, session] = await Promise.all([
+    resolveOrgByHost(deps, request).catch(() => null),
+    deps.loadSession(request),
+  ]);
 
   // Apply impersonation overlay. Impersonation takes precedence over both
   // host-resolved and user.orgId.
