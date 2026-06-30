@@ -75,23 +75,20 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   ]);
 
   // Compute "next due / overdue" per template that has a cadence configured.
-  // We need the most recent ENDED run per template. Pull all ENDED runs in one
-  // query (just templateId + endedAt) and reduce in JS, instead of a
-  // `findFirst` per template, which was an N+1 across the org's templates.
-  // ENDED runs are few (a handful per template per year), so the row count is
-  // small. Ordered endedAt desc so the first row seen per template is its most
-  // recent (SQLite sorts NULLs last under DESC, matching the old findFirst).
+  // We need the most recent ENDED run per template. A grouped MAX(endedAt)
+  // returns exactly one row per template, so the result set is bounded by the
+  // template count and never grows with run history — unlike pulling every
+  // ENDED run and reducing in JS. (SQL MAX ignores NULL endedAt, matching the
+  // old "NULLs sort last under DESC, take the first non-null" behavior.)
   const now = new Date();
-  const endedRuns = await prisma.drillRun.findMany({
+  const endedAgg = await prisma.drillRun.groupBy({
+    by: ["templateId"],
     where: { status: "ENDED" },
-    orderBy: { endedAt: "desc" },
-    select: { templateId: true, endedAt: true },
+    _max: { endedAt: true },
   });
   const lastEndedByTemplate = new Map<string, Date | null>();
-  for (const run of endedRuns) {
-    if (!lastEndedByTemplate.has(run.templateId)) {
-      lastEndedByTemplate.set(run.templateId, run.endedAt ?? null);
-    }
+  for (const row of endedAgg) {
+    lastEndedByTemplate.set(row.templateId, row._max.endedAt ?? null);
   }
   const templatesWithCadence = templates.map((tpl) => ({
     ...tpl,
