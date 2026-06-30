@@ -282,7 +282,13 @@ export async function action({ request, context }: Route.ActionArgs) {
       });
     }
 
-    const result = await applyRosterImport(prisma as unknown as RosterPrisma, rows);
+    // Reuse the plan we just built for the usage check — applyRosterImport
+    // would otherwise rebuild it (three redundant findMany round-trips).
+    const result = await applyRosterImport(
+      prisma as unknown as RosterPrisma,
+      rows,
+      plan,
+    );
     if (!result.ok) {
       return data<ActionData>(
         { stage: "error", error: translateServerMessage(t, result.error) },

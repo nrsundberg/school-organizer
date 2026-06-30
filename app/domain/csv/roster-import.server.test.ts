@@ -43,24 +43,27 @@ function makeFakePrisma(existing: ExistingSnapshot = {}) {
     },
     teacher: {
       findMany: async () => existing.teachers ?? [],
-      create: async () => ({}),
+      createMany: async () => ({}),
     },
     space: {
       findMany: async () => existing.spaces ?? [],
-      create: async () => ({}),
+      createMany: async () => ({}),
     },
     household: {
-      findFirst: async ({ where }) => {
+      findMany: async ({ where }) => {
         await Promise.resolve(); // force interleaving
-        const id = committed.get(where.spaceNumber);
-        return id ? { id } : null;
+        return where.spaceNumber.in
+          .filter((sn) => committed.has(sn))
+          .map((sn) => ({ id: committed.get(sn)!, spaceNumber: sn }));
       },
-      create: async ({ data }) => {
+      createManyAndReturn: async ({ data }) => {
         await Promise.resolve();
-        const id = `h${++hCounter}`;
-        committed.set(data.spaceNumber, id);
-        createdHouseholds.push({ ...data, id });
-        return { id };
+        return data.map((d) => {
+          const id = `h${++hCounter}`;
+          committed.set(d.spaceNumber, id);
+          createdHouseholds.push({ ...d, id });
+          return { id, spaceNumber: d.spaceNumber };
+        });
       },
     },
   };
