@@ -53,6 +53,7 @@ import {
 import { parseDrillAudience } from "~/domain/drills/types";
 import { hasValidViewerAccess } from "~/domain/auth/viewer-access.server";
 import { getCspNonceFromRequest } from "~/lib/csp";
+import { useLiveDrillTakeover } from "~/hooks/useLiveDrillTakeover";
 
 export const middleware: MiddlewareFunction<Response>[] = [
   globalStorageMiddleware
@@ -344,6 +345,12 @@ export default function App({ loaderData }: Route.ComponentProps) {
   // `i18n.changeLanguage(locale)`, falling back to the http backend only
   // when the loader hasn't pre-warmed the new language above.
   useChangeLanguage(locale);
+
+  // Instant live-drill takeover: on any tenant page, listen for the
+  // `drillStarted` broadcast and revalidate so the root loader can pull
+  // in-audience clients into /drills/live without waiting for a navigation.
+  // Disabled on the marketing host, where the takeover loader block never runs.
+  useLiveDrillTakeover({ enabled: !marketing });
 
   useEffect(() => {
     if (toast) {
