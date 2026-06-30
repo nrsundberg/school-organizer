@@ -34,6 +34,7 @@ import {
 } from "~/domain/drills/types";
 import { ChecklistPreview } from "~/domain/drills/ChecklistTable";
 import { startDrillRun } from "~/domain/drills/live.server";
+import { broadcastDrillStarted } from "~/lib/broadcast.server";
 import { parseIntent } from "~/lib/forms.server";
 import { formClasses } from "~/lib/forms";
 import { dataWithError, dataWithSuccess } from "remix-toast";
@@ -240,7 +241,7 @@ export async function action({ request, context, params }: Route.ActionArgs) {
         ? seedRunStateFromTemplate(parseTemplateDefinition(tpl.definition))
         : undefined;
       try {
-        await startDrillRun(
+        const created = await startDrillRun(
           prisma,
           orgId,
           id,
@@ -249,6 +250,12 @@ export async function action({ request, context, params }: Route.ActionArgs) {
           result.data.audience,
           result.data.mode,
         );
+        // Wake idle clients on other pages so they revalidate and the root
+        // loader pulls in-audience callers into /drills/live.
+        const env = (context as { cloudflare?: { env: Env } }).cloudflare?.env;
+        if (env) {
+          await broadcastDrillStarted(env, orgId, created.id);
+        }
       } catch (err) {
         // startDrillRun throws a Response (409) when another drill is already
         // active. Surface it as a toast instead of crashing the route.

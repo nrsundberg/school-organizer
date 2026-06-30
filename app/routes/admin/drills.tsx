@@ -24,6 +24,7 @@ import { StartLivePopover } from "~/domain/drills/StartLivePopover";
 import { endDrillRun, startDrillRun } from "~/domain/drills/live.server";
 import {
   broadcastDrillEnded,
+  broadcastDrillStarted,
   broadcastDrillUpdate,
 } from "~/lib/broadcast.server";
 import { computeCadenceStatus, type CadenceStatus } from "~/domain/drills/cadence";
@@ -219,6 +220,9 @@ export async function action({ request, context }: Route.ActionArgs) {
           state: created.state,
           updatedAtIso: created.updatedAt.toISOString(),
         });
+        // Wake idle clients on other pages so they revalidate and the root
+        // loader pulls in-audience callers into /drills/live.
+        await broadcastDrillStarted(env, orgId, created.id);
       }
     } catch (err) {
       if (err instanceof Response && err.status === 409) {
