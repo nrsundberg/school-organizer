@@ -5,8 +5,9 @@ import { Button, Popover, PopoverTrigger, PopoverContent } from "@heroui/react";
 import { Send } from "lucide-react";
 import { XCircleIcon } from "lucide-react";
 import { type Space, Status } from "~/db/browser";
-import { isTimedOut } from "~/domain/board/aging";
+import { hasAged } from "~/domain/board/aging";
 import { useAgingClock } from "~/hooks/useAgingClock";
+import { useObservedActiveAt } from "~/hooks/useObservedActiveAt";
 import LanguageSwitcher from "~/components/LanguageSwitcher";
 
 export default function MobileCallerView({
@@ -165,7 +166,8 @@ function ActiveSpaceItem({
   onClear: (spaceNumber: number) => void;
 }) {
   const { t } = useTranslation("roster");
-  const timedOut = isTimedOut(space.timestamp, now);
+  const observedAt = useObservedActiveAt(true, space.timestamp);
+  const timedOut = hasAged(observedAt, now);
   const bg = timedOut ? "bg-green-400/20 border-green-400/40" : "bg-yellow-400/20 border-yellow-400/40";
   const icon = timedOut ? "text-green-400" : "text-yellow-400";
   const text = timedOut ? "text-green-300" : "text-yellow-300";

@@ -48,7 +48,8 @@ import {
 } from "@heroui/react";
 import { useBingoWebSocket } from "~/hooks/useBingoWebSocket";
 import { useAgingClock } from "~/hooks/useAgingClock";
-import { isTimedOut } from "~/domain/board/aging";
+import { useObservedActiveAt } from "~/hooks/useObservedActiveAt";
+import { hasAged } from "~/domain/board/aging";
 import MobileCallerView from "~/components/MobileCallerView";
 import confetti from "canvas-confetti";
 import { endOfUtcDay, toDateInputValue } from "~/domain/dismissal/schedule";
@@ -399,6 +400,16 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
           <option
             key={room.homeRoom}
             value={room.homeRoom}
+            // Show the teacher's name beside the homeroom label so rooms that
+            // share a surname-based label (e.g. "Bishop" / "Bishop 2") are
+            // distinguishable. The `value` stays the homeRoom label, so the
+            // `?room=` filter contract is unchanged. Browsers that render only
+            // the value degrade to the prior behavior.
+            label={
+              room.teacherName && room.teacherName !== room.homeRoom
+                ? room.teacherName
+                : undefined
+            }
             className="bg-gray-900 text-white"
           />
         ))}
@@ -712,7 +723,8 @@ function ParkingTile({
 }) {
   const { t } = useTranslation("roster");
   const { timestamp, status, spaceNumber } = space;
-  const color = tileColor(status, isTimedOut(timestamp, now));
+  const observedAt = useObservedActiveAt(status === Status.ACTIVE, timestamp);
+  const color = tileColor(status, hasAged(observedAt, now));
 
   const fetcher = useFetcher();
 
