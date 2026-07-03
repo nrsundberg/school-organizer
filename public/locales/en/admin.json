@@ -1664,7 +1664,7 @@
       "unban": "Unban"
     },
     "toasts": {
-      "magicLinkCreated": "Magic link created. Valid for {{days}} day(s).",
+      "magicLinkCreated": "Magic link created. Reusable for {{days}} day(s).",
       "passwordReset": "Password reset! New temp password: {{password}}",
       "passwordResetDisabled": "Password reset is now disabled. Users must sign in via SSO once configured.",
       "passwordResetEnabled": "Password reset is now enabled for your org.",
@@ -1685,7 +1685,7 @@
       "eyebrow": "Viewer privacy",
       "generateLink": "Generate Link",
       "heading": "Viewer Privacy Access",
-      "linkValid": "This link will be valid for {{days}} day(s).",
+      "linkValid": "This link works for {{days}} day(s) and can be reused by everyone you share it with.",
       "lockedClients": "Locked Viewer Clients",
       "lockedUntil": "Locked until {{when}}",
       "lockedUntilUnknown": "unknown",
@@ -1696,6 +1696,7 @@
       "resetPin": "Reset Global 4-Digit PIN",
       "revokeSessions": "Revoke all current viewer sessions after resetting PIN",
       "savePin": "Save PIN",
+      "sessionLength": "Anyone who opens this link stays signed in on that device for {{days}} days.",
       "unknownNetwork": "Unknown network"
     }
   },

@@ -1664,7 +1664,7 @@
       "unban": "Reactivar"
     },
     "toasts": {
-      "magicLinkCreated": "Enlace mágico creado. Válido por {{days}} día(s).",
+      "magicLinkCreated": "Enlace mágico creado. Reutilizable por {{days}} día(s).",
       "passwordReset": "¡Contraseña restablecida! Nueva contraseña temporal: {{password}}",
       "passwordResetDisabled": "El restablecimiento de contraseña ahora está deshabilitado. Los usuarios deben iniciar sesión a través de SSO una vez configurado.",
       "passwordResetEnabled": "El restablecimiento de contraseña ahora está habilitado para tu organización.",
@@ -1685,7 +1685,7 @@
       "eyebrow": "Privacidad del observador",
       "generateLink": "Generar enlace",
       "heading": "Acceso privado de observador",
-      "linkValid": "Este enlace será válido por {{days}} día(s).",
+      "linkValid": "Este enlace funciona por {{days}} día(s) y puede reutilizarlo todas las personas con quienes lo comparta.",
       "lockedClients": "Clientes de observador bloqueados",
       "lockedUntil": "Bloqueado hasta {{when}}",
       "lockedUntilUnknown": "desconocido",
@@ -1696,6 +1696,7 @@
       "resetPin": "Restablecer PIN global de 4 dígitos",
       "revokeSessions": "Revocar todas las sesiones actuales de observador después de restablecer el PIN",
       "savePin": "Guardar PIN",
+      "sessionLength": "Cualquiera que abra este enlace permanecerá conectado en ese dispositivo durante {{days}} días.",
       "unknownNetwork": "Red desconocida"
     }
   },
