@@ -37,13 +37,13 @@ export default function ProfileForm({ user, logoutHref }: Props) {
     try {
       const result = await authClient.updateUser({ name: trimmedName });
       if (result.error) {
-        toast.error(t("nameSection.errorGeneric"));
+        toast.error(t("accountSection.errorGeneric"));
         return;
       }
       setName(trimmedName);
-      toast.success(t("nameSection.success"));
+      toast.success(t("accountSection.success"));
     } catch {
-      toast.error(t("nameSection.errorGeneric"));
+      toast.error(t("accountSection.errorGeneric"));
     } finally {
       setSavingName(false);
     }

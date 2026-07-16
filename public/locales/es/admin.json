@@ -689,10 +689,24 @@
       "liveRunNotice": "La reproducción estará disponible después de que finalice el simulacro.",
       "timeline": {
         "ariaLabel": "Línea de tiempo de la reproducción del simulacro",
+        "clusterLabel": "{{count}} eventos cerca de {{label}}",
         "pause": "Pausar",
         "play": "Reproducir",
+        "scrubberLabel": "Control de reproducción del simulacro",
         "speed": "{{x}}x",
         "trackAriaLabel": "Haga clic para buscar"
+      },
+      "viewerTrack": {
+        "atOffset": "+{{seconds}} s",
+        "empty": "No se capturaron instantáneas de observadores para este simulacro.",
+        "guestsLabel_one": "{{count}} observador",
+        "guestsLabel_other": "{{count}} observadores",
+        "guestsTooltip": "Invitados anónimos con pin de observador",
+        "heading": "Observadores",
+        "heatBarTooltip": "+{{seconds}} s · {{count}}",
+        "heatStripLabel": "Cantidad de observadores a lo largo del tiempo",
+        "noneAtMoment": "Nadie estaba mirando en este momento.",
+        "preFirst": "Aún no hay instantánea en este punto del simulacro."
       },
       "actionDone": "Hecho",
       "actionEmpty": "(elemento vacío)",

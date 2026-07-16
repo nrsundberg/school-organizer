@@ -709,10 +709,24 @@
       "subhead": "Run on {{started}} · {{duration}}",
       "timeline": {
         "ariaLabel": "Drill replay timeline",
+        "clusterLabel": "{{count}} events near {{label}}",
         "pause": "Pause",
         "play": "Play",
+        "scrubberLabel": "Drill replay scrubber",
         "speed": "{{x}}x",
         "trackAriaLabel": "Click to seek"
+      },
+      "viewerTrack": {
+        "atOffset": "+{{seconds}}s",
+        "empty": "No viewer snapshots were captured for this run.",
+        "guestsLabel_one": "{{count}} viewer",
+        "guestsLabel_other": "{{count}} viewers",
+        "guestsTooltip": "Anonymous viewer-pin guests",
+        "heading": "Viewers",
+        "heatBarTooltip": "+{{seconds}}s · {{count}}",
+        "heatStripLabel": "Viewer count over time",
+        "noneAtMoment": "Nobody was watching at this moment.",
+        "preFirst": "No snapshot yet at this point in the run."
       }
     },
     "status": {
