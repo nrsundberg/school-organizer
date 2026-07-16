@@ -51,6 +51,12 @@ import { useAgingClock } from "~/hooks/useAgingClock";
 import { useObservedActiveAt } from "~/hooks/useObservedActiveAt";
 import { hasAged } from "~/domain/board/aging";
 import MobileCallerView from "~/components/MobileCallerView";
+import {
+  useFitToScreen,
+  useTilesTooSmall,
+  BoardFitControls,
+} from "~/components/board/BoardFit";
+import { BoardControlsDrawer } from "~/components/board/BoardControlsDrawer";
 import confetti from "canvas-confetti";
 import { endOfUtcDay, toDateInputValue } from "~/domain/dismissal/schedule";
 
@@ -321,6 +327,13 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
 
   const [drawPoints, setDrawPoints] = useState<number[]>([]);
 
+  // Fit-to-screen: the board fills one viewport (no page scroll) by default;
+  // toggling off lets tiles grow and the grid scroll inside the fixed frame.
+  const { fitToScreen, toggle: toggleFit } = useFitToScreen();
+  const boardRef = useRef<HTMLDivElement>(null);
+  const rowCount = Math.ceil(spaces.length / cols);
+  const tilesTooSmall = useTilesTooSmall(boardRef, rowCount, fitToScreen);
+
   useEffect(() => {
     if (!showViewerDrawing) return;
     try {
@@ -444,7 +457,7 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
   // Controllers see a tabbed view: keypad or board (default board; preference persisted)
   if (role === "CONTROLLER") {
     return (
-      <Page user={user}>
+      <Page user={user} fitViewport>
         {noticePanel}
         <ControllerTabView
           spaces={spaces}
@@ -462,18 +475,22 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
   // a controller) can actually mark tiles, gated server-side in
   // /update/:space and /empty/:space.
   return (
-    <Page user={user}>
+    <Page user={user} fitViewport>
       {noticePanel}
-      <div className="flex flex-col gap-3 md:flex-row md:justify-center md:gap-0">
-        {/* Mobile controls: homeroom selector + recent queue above grid */}
-        <div className="w-full px-4 pt-3 text-center md:hidden">
-          {homeroomFilterControl}
-          {recentQueueContent}
-        </div>
 
+      {/* Mobile controls: collapsible overlay so they never steal board height */}
+      <BoardControlsDrawer>
+        {homeroomFilterControl}
+        {recentQueueContent}
+      </BoardControlsDrawer>
+
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row md:justify-center md:gap-0">
         {/* Read-only board */}
         <div
-          className="grid w-full font-extrabold text-large text-center relative md:w-5/6"
+          ref={boardRef}
+          className={`relative grid w-full min-h-0 flex-1 font-extrabold text-large text-center md:w-5/6 md:flex-none ${
+            fitToScreen ? "auto-rows-fr overflow-hidden" : "overflow-y-auto"
+          }`}
           onPointerDown={showViewerDrawing ? onPointerDown : undefined}
           onPointerMove={showViewerDrawing ? onPointerMove : undefined}
           onPointerUp={showViewerDrawing ? onPointerEnd : undefined}
@@ -485,7 +502,13 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
             data={spaces}
             cols={cols}
             permitted={false}
+            fill={fitToScreen}
             onDrawingSpace={showViewerDrawing ? handleDrawingSpace : undefined}
+          />
+          <BoardFitControls
+            fitToScreen={fitToScreen}
+            tooSmall={tilesTooSmall}
+            onToggle={toggleFit}
           />
           {showViewerDrawing ? (
             <>
@@ -504,9 +527,11 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
         </div>
 
         {/* Desktop sidebar */}
-        <div className="hidden h-[80vh] gap-3 py-2 text-center md:block">
+        <div className="hidden min-h-0 flex-col gap-3 py-2 text-center md:flex">
           <div className="max-w-xs px-4 pt-4">{homeroomFilterControl}</div>
-          {recentQueueContent}
+          <div className="min-h-0 flex-1 overflow-y-auto px-4">
+            {recentQueueContent}
+          </div>
         </div>
       </div>
     </Page>
@@ -561,6 +586,18 @@ function ControllerTabView({
   const defaultTab = initialPreference === "controller" ? "controller" : "board";
   const [tab, setTab] = useState<"controller" | "board">(defaultTab);
 
+  // Fit-to-screen for the controller's board tab (kept at 10 columns — staff
+  // find it easier to scan). The keypad tab manages its own layout and just
+  // scrolls if it outgrows the frame.
+  const { fitToScreen, toggle: toggleFit } = useFitToScreen();
+  const boardRef = useRef<HTMLDivElement>(null);
+  const rowCount = Math.ceil(spaces.length / 10);
+  const tilesTooSmall = useTilesTooSmall(
+    boardRef,
+    rowCount,
+    fitToScreen && tab === "board",
+  );
+
   useEffect(() => {
     setTab(initialPreference === "controller" ? "controller" : "board");
   }, [initialPreference]);
@@ -574,8 +611,8 @@ function ControllerTabView({
   };
 
   return (
-    <div className="flex flex-col w-full">
-      <div className="flex border-b border-white/10 mb-4">
+    <div className="flex min-h-0 w-full flex-1 flex-col">
+      <div className="flex flex-none border-b border-white/10 mb-2">
         <button
           type="button"
           onClick={() => persist("board")}
@@ -601,19 +638,32 @@ function ControllerTabView({
       </div>
 
       {tab === "controller" ? (
-        <MobileCallerView
-          spaces={spaces}
-          onSpaceChange={onSpaceChange}
-          maxSpaceNumber={maxSpaceNumber}
-        />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <MobileCallerView
+            spaces={spaces}
+            onSpaceChange={onSpaceChange}
+            maxSpaceNumber={maxSpaceNumber}
+          />
+        </div>
       ) : (
-        <div className="flex justify-center">
-          <div className="grid w-full md:w-5/6 font-extrabold text-large text-center">
+        <div className="flex min-h-0 flex-1 justify-center">
+          <div
+            ref={boardRef}
+            className={`relative grid w-full min-h-0 flex-1 font-extrabold text-large text-center md:w-5/6 md:flex-none ${
+              fitToScreen ? "auto-rows-fr overflow-hidden" : "overflow-y-auto"
+            }`}
+          >
             <ParkingRows
               data={spaces}
               cols={10}
               permitted={true}
+              fill={fitToScreen}
               onSpaceChange={onSpaceChange}
+            />
+            <BoardFitControls
+              fitToScreen={fitToScreen}
+              tooSmall={tilesTooSmall}
+              onToggle={toggleFit}
             />
           </div>
         </div>
@@ -627,6 +677,7 @@ function ParkingRows({
   cols,
   permitted,
   compact = false,
+  fill = false,
   onDrawingSpace,
   onSpaceChange,
 }: {
@@ -634,6 +685,9 @@ function ParkingRows({
   data: Space[];
   permitted: boolean;
   compact?: boolean;
+  // `fill` makes rows/tiles stretch to share the board's height (fit-to-screen)
+  // instead of using a fixed per-tile min-height.
+  fill?: boolean;
   onDrawingSpace?: (spaceNumber: number) => void;
   onSpaceChange?: (spaceNumber: number, status: string) => void;
 }) {
@@ -653,6 +707,7 @@ function ParkingRows({
       cols={cols}
       permitted={permitted}
       compact={compact}
+      fill={fill}
       now={now}
       onDrawingSpace={onDrawingSpace}
       onSpaceChange={onSpaceChange}
@@ -665,6 +720,7 @@ function ParkingRow({
   cols,
   permitted,
   compact = false,
+  fill = false,
   now,
   onDrawingSpace,
   onSpaceChange,
@@ -673,15 +729,19 @@ function ParkingRow({
   data: Space[];
   permitted: boolean;
   compact?: boolean;
+  fill?: boolean;
   now: number;
   onDrawingSpace?: (spaceNumber: number) => void;
   onSpaceChange?: (spaceNumber: number, status: string) => void;
 }) {
   const columnClass =
     cols === 10 ? "grid-cols-10" : cols === 15 ? "grid-cols-15" : "";
+  // In fill mode the row stretches to its grid track (the board uses
+  // `auto-rows-fr`), and its tiles stretch to fill that height.
+  const rowClass = `grid${fill ? " h-full" : ""}${columnClass ? ` ${columnClass}` : ""}`;
   return (
     <div
-      className={columnClass ? `grid ${columnClass}` : "grid"}
+      className={rowClass}
       style={
         columnClass
           ? undefined
@@ -698,6 +758,7 @@ function ParkingRow({
           space={it}
           permitted={permitted}
           compact={compact}
+          fill={fill}
           now={now}
           onDrawingSpace={onDrawingSpace}
           onSpaceChange={onSpaceChange}
@@ -711,6 +772,7 @@ function ParkingTile({
   space,
   permitted,
   compact = false,
+  fill = false,
   now,
   onDrawingSpace,
   onSpaceChange,
@@ -718,6 +780,7 @@ function ParkingTile({
   space: Space;
   permitted: boolean;
   compact?: boolean;
+  fill?: boolean;
   now: number;
   onDrawingSpace?: (spaceNumber: number) => void;
   onSpaceChange?: (spaceNumber: number, status: string) => void;
@@ -761,7 +824,14 @@ function ParkingTile({
 
   // Non-compact tiles get a larger touch target on small screens (WCAG 2.5.5 — 44x44).
   // Compact view is for the controller board, which is densely packed for quick scan.
-  const commonClasses = `w-full border border-black flex items-center justify-center drop-shadow-sm select-none ${compact ? "min-h-[24px] text-[10px] px-0 leading-none" : "min-h-[44px] md:min-h-[30px] text-sm px-0.5 leading-none"}`;
+  // Fill mode (fit-to-screen) drops the fixed min-height so tiles stretch to
+  // share the board's height; the number stays legible via a clamped font.
+  const sizeClasses = compact
+    ? "min-h-[24px] text-[10px] px-0 leading-none"
+    : fill
+      ? "h-full min-h-0 overflow-hidden text-[clamp(9px,2.2vw,14px)] px-0.5 leading-none"
+      : "min-h-[44px] md:min-h-[30px] text-sm px-0.5 leading-none";
+  const commonClasses = `w-full border border-black flex items-center justify-center drop-shadow-sm select-none ${sizeClasses}`;
 
   return permitted ? (
     status === Status.EMPTY ? (

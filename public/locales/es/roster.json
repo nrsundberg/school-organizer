@@ -88,6 +88,7 @@
       "resumed": "Simulacro reanudado."
     },
     "viewerRoster": {
+      "ariaLabel": "Observadores en vivo",
       "guestsLabel_one": "{{count}} observador",
       "guestsLabel_other": "{{count}} observadores",
       "guestsTooltip": "Observadores anónimos",
@@ -100,10 +101,22 @@
     "spaceLabel": "Espacio {{number}}"
   },
   "index": {
+    "controls": {
+      "close": "Cerrar",
+      "toggle": "Filtros y recientes"
+    },
     "drawing": {
       "clear": "Limpiar ({{count}})",
       "clear_one": "Limpiar ({{count}})",
       "clear_other": "Limpiar ({{count}})"
+    },
+    "fit": {
+      "dismiss": "Descartar",
+      "hintAction": "Ver a tamaño completo",
+      "hintBody": "Las casillas son pequeñas para que todo el tablero quepa sin desplazarse. Cambia a tamaño completo para desplazarte.",
+      "hintTitle": "Mostrando todo el tablero",
+      "toFit": "Ajustar a la pantalla",
+      "toFull": "Tamaño completo"
     },
     "filterHomeroom": "Filtrar salón principal",
     "homeroomPlaceholder": "Salón principal...",

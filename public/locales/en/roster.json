@@ -88,6 +88,7 @@
       "resumed": "Drill resumed."
     },
     "viewerRoster": {
+      "ariaLabel": "Live viewers",
       "guestsLabel_one": "{{count}} viewer",
       "guestsLabel_other": "{{count}} viewers",
       "guestsTooltip": "Anonymous viewers",
@@ -100,10 +101,22 @@
     "spaceLabel": "Space {{number}}"
   },
   "index": {
+    "controls": {
+      "close": "Close",
+      "toggle": "Filters & recent"
+    },
     "drawing": {
       "clear": "Clear ({{count}})",
       "clear_one": "Clear ({{count}})",
       "clear_other": "Clear ({{count}})"
+    },
+    "fit": {
+      "dismiss": "Dismiss",
+      "hintAction": "View full size",
+      "hintBody": "Tiles are small so the whole board fits without scrolling. Switch to full size to scroll instead.",
+      "hintTitle": "Showing the whole board",
+      "toFit": "Fit to screen",
+      "toFull": "Full size"
     },
     "filterHomeroom": "Filter Homeroom",
     "homeroomPlaceholder": "Homeroom...",

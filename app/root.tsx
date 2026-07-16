@@ -8,7 +8,8 @@ import {
   redirect,
   Scripts,
   ScrollRestoration,
-  useRouteError
+  useRouteError,
+  useRouteLoaderData
 } from "react-router";
 import { useEffect } from "react";
 import { getToast } from "remix-toast";
@@ -350,6 +351,15 @@ export default function App({ loaderData }: Route.ComponentProps) {
   // Tenant palette override: render :root { --color-primary: X; --color-secondary: Y }
   // only on tenant hosts, only for colors that pass the hex regex. The apex
   // marketing host always uses the default palette.
+  // The live tenant board runs as a fixed-height, no-scroll app frame (see
+  // Page's `fitViewport`), so the always-on site footer would add a stray
+  // scroll below the fold. Suppress it only when the index route is showing the
+  // tenant board; marketing mode and every other route keep the footer.
+  const indexRouteData = useRouteLoaderData("routes/_index") as
+    | { mode?: "marketing" | "tenant" }
+    | undefined;
+  const hideFooter = indexRouteData?.mode === "tenant";
+
   const paletteOverrideCss = buildPaletteOverrideCss({
     marketing,
     primary: branding?.primaryColorOverride ?? null,
@@ -406,11 +416,13 @@ export default function App({ loaderData }: Route.ComponentProps) {
         <main id="main-content" className="flex-1">
           <Outlet />
         </main>
-        <Footer
-          siteName={DEFAULT_SITE_NAME}
-          supportEmail={supportEmail}
-          orgName={branding?.orgName ?? null}
-        />
+        {!hideFooter && (
+          <Footer
+            siteName={DEFAULT_SITE_NAME}
+            supportEmail={supportEmail}
+            orgName={branding?.orgName ?? null}
+          />
+        )}
         <ScrollRestoration nonce={cspNonce ?? undefined} />
         <Scripts nonce={cspNonce ?? undefined} />
       </body>
