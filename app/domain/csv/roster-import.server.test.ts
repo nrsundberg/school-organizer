@@ -423,6 +423,73 @@ test("applyRosterImport: prune allows removals up to the size of the file", asyn
   assert.deepEqual(deletedStudentIds.sort(), [1, 2]);
 });
 
+test("applyRosterImport: prune deletes only the students the admin confirmed", async () => {
+  // The preview lists removals BY NAME so the admin is confirming people, but
+  // apply rebuilds the plan from the database. A student enrolled by another
+  // admin between preview and apply lands in the fresh plan's removals and
+  // would be deleted without ever appearing in the approved list — a live
+  // window on a first-week-of-school day with two people in the office.
+  const { prisma, deletedStudentIds } = makeFakePrisma({
+    students: [
+      { id: 7, firstName: "Grace", lastName: "Hopper", homeRoom: "Room 9", householdId: null, household: null },
+      // Enrolled after the admin saw (and approved) the removal list.
+      { id: 8, firstName: "Newly", lastName: "Enrolled", homeRoom: "Room 3", householdId: null, household: null },
+    ],
+  });
+
+  const result = await applyRosterImport(
+    prisma,
+    [row(2, "Ada", "Lovelace", 12), row(3, "Cy", "Turing", 13)],
+    undefined,
+    { prune: true, confirmedRemovalIds: [7] },
+  );
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(deletedStudentIds, [7], "the unconfirmed student survives");
+  assert.equal(result.ok && result.data.removed, 1);
+  assert.equal(
+    result.ok && result.data.skippedRemovals,
+    1,
+    "the newly-absent student is reported as skipped, not deleted",
+  );
+});
+
+test("applyRosterImport: an empty confirmation list deletes nobody", async () => {
+  const { prisma, deletedStudentIds } = makeFakePrisma({
+    students: EXISTING_GRACE.map((s) => ({ ...s, household: { spaceNumber: s.spaceNumber } })),
+  });
+
+  const result = await applyRosterImport(
+    prisma,
+    [row(2, "Ada", "Lovelace", 12)],
+    undefined,
+    { prune: true, confirmedRemovalIds: [] },
+  );
+
+  assert.equal(result.ok, true, "confirming nothing is a valid import, just not a delete");
+  assert.deepEqual(deletedStudentIds, []);
+  assert.equal(result.ok && result.data.removed, 0);
+  assert.equal(result.ok && result.data.skippedRemovals, 1);
+});
+
+test("applyRosterImport: confirmation can only shrink the fresh removal set", async () => {
+  // A stale id that is no longer a removal (the student was re-added to the
+  // CSV, or already deleted) must not resurrect a delete.
+  const { prisma, deletedStudentIds } = makeFakePrisma({
+    students: EXISTING_GRACE.map((s) => ({ ...s, household: { spaceNumber: s.spaceNumber } })),
+  });
+
+  const result = await applyRosterImport(
+    prisma,
+    [row(2, "Ada", "Lovelace", 12)],
+    undefined,
+    { prune: true, confirmedRemovalIds: [7, 999] },
+  );
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(deletedStudentIds, [7], "id 999 is not in the fresh plan and is ignored");
+});
+
 test("applyRosterImport: prune deletes households it empties, and only those", async () => {
   const { prisma, deletedHouseholdIds, householdDeleteManyCalls } = makeFakePrisma({
     students: [

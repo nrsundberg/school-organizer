@@ -18,10 +18,12 @@ import {
   buildRosterImportPlanFromDatabase,
   parseSerializedGrid,
   parseSerializedPresentNameKeys,
+  parseSerializedRemovalIds,
   parseSerializedRosterRows,
   RosterImportError,
   serializeGrid,
   serializePresentNameKeys,
+  serializeRemovalIds,
   serializeRosterRows,
   suggestColumnMapping,
   type ColumnMapping,
@@ -85,6 +87,11 @@ type PreviewActionData = {
    * validation). Posted back on apply so a prune can refuse to delete them.
    */
   presentNameKeysJson: string;
+  /**
+   * The removal ids listed by name in this preview. Posted back on apply and
+   * intersected with the rebuilt plan, so the confirmation is binding.
+   */
+  confirmedRemovalIdsJson: string;
   errorReportCsv: string;
   planLimitError: string | null;
   canApply: boolean;
@@ -255,6 +262,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       skippedBlank: mapped.skippedBlank,
       rowsJson: serializeRosterRows(mapped.rows),
       presentNameKeysJson: serializePresentNameKeys(mapped.presentNameKeys),
+      confirmedRemovalIdsJson: serializeRemovalIds(
+        plan.removals.map((r) => r.studentId),
+      ),
       errorReportCsv: buildErrorReportCsv(rowErrors),
       planLimitError,
       canApply,
@@ -303,7 +313,21 @@ export async function action({ request, context }: Route.ActionArgs) {
     } catch {
       presentNameKeysMissing = true;
     }
-    if (prune && presentNameKeysMissing) {
+    // The removal ids the preview actually showed the admin. Apply intersects
+    // them with the freshly rebuilt plan, so the names on screen are the names
+    // deleted — a student enrolled since the preview is skipped rather than
+    // silently included. Mandatory when pruning, same as `presentNameKeysJson`.
+    let confirmedRemovalIds: number[] = [];
+    let confirmedRemovalIdsMissing = false;
+    try {
+      confirmedRemovalIds = parseSerializedRemovalIds(
+        formData.get("confirmedRemovalIdsJson"),
+      );
+    } catch {
+      confirmedRemovalIdsMissing = true;
+    }
+
+    if (prune && (presentNameKeysMissing || confirmedRemovalIdsMissing)) {
       return data<ActionData>(
         { stage: "error", error: t("rosterImport.errors.previewAgain") },
         { status: 400 },
@@ -324,6 +348,9 @@ export async function action({ request, context }: Route.ActionArgs) {
         skippedBlank: 0,
         rowsJson: serializeRosterRows(rows),
         presentNameKeysJson: serializePresentNameKeys(presentNameKeys),
+        confirmedRemovalIdsJson: serializeRemovalIds(
+          plan.removals.map((r) => r.studentId),
+        ),
         errorReportCsv: buildErrorReportCsv([]),
         planLimitError,
         canApply: false,
@@ -336,7 +363,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       prisma as unknown as RosterPrisma,
       rows,
       plan,
-      { prune },
+      { prune, confirmedRemovalIds },
     );
     if (!result.ok) {
       return data<ActionData>(
@@ -723,6 +750,11 @@ function PreviewPanel({
             type="hidden"
             name="presentNameKeysJson"
             value={preview.presentNameKeysJson}
+          />
+          <input
+            type="hidden"
+            name="confirmedRemovalIdsJson"
+            value={preview.confirmedRemovalIdsJson}
           />
           <input type="hidden" name="prune" value={prune ? "on" : "off"} />
           <Button
