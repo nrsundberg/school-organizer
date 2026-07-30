@@ -1,4 +1,10 @@
-import { Link, redirect, useFetcher } from "react-router";
+import {
+  Link,
+  isRouteErrorResponse,
+  redirect,
+  useFetcher,
+  useRouteError,
+} from "react-router";
 import { useTranslation } from "react-i18next";
 import { Popover, PopoverContent, PopoverTrigger } from "@heroui/react";
 import { AlertTriangle, ArrowLeft, Check, Pause, Play, Plus, Square, Trash2 } from "lucide-react";
@@ -471,6 +477,86 @@ export async function action({ request, context }: Route.ActionArgs) {
     const msg = err instanceof Error ? err.message : t("drillsLive.errors.unexpected");
     return dataWithError(null, msg, { status: 500 });
   }
+}
+
+// This route is a full-screen safety takeover: during a live fire drill or
+// lockdown it replaces every screen in the building, and staff use it to
+// tick off classrooms and attest all-clear. An unhandled error here would
+// otherwise bubble to the root ErrorBoundary (app/root.tsx) and replace the
+// entire drill with a generic "Not Logged In" / "Access Denied" page — the
+// worst possible failure mode for a page whose whole job is to stay on
+// screen. This boundary keeps the drill's visual language (dark background,
+// white text, `rounded-xl border border-white/10` panel) and tells whoever
+// is standing in the hallway what to do next, instead of handing off to a
+// generic app-wide error page.
+//
+// Constraint: a route ErrorBoundary does not receive `loaderData`, so it
+// cannot re-render the checklist, presence roster, or activity feed from
+// scratch — there's no drill state to show. What it *can* do is give a calm,
+// specific instruction. Reloading the page re-runs the loader (not the
+// action that failed), so for every case below "reload" genuinely recovers
+// the working checklist — it isn't a placebo.
+//
+// Cases distinguished, matching the throws in `action`/`loader` above:
+//  - 401: a staff session expired mid-drill (loader/action `!user` check).
+//    Reads as "you were signed out", not "you're not allowed" — the fix is
+//    signing back in, and the drill is still running for everyone else.
+//  - 403: a non-admin's lifecycle intent (pause/resume/end) hit
+//    `requireAdmin()`. This shouldn't normally be reachable from the UI
+//    (only `isAdmin` renders those buttons) but can happen if a role changes
+//    mid-drill. Reads as "someone else has to do this," not a login problem.
+//  - 404: a viewer-pin guest hit the STAFF_ONLY audience gate. Not an
+//    emergency for that guest — they were never meant to see this drill.
+//  - Anything else (500s from `getActiveDrillRun`, a thrown non-Response
+//    error in the action's catch-all, etc.): an honest "something broke,
+//    reload" rather than pretending to know more than we do.
+export function ErrorBoundary() {
+  const error = useRouteError();
+  const { t } = useTranslation("roster");
+
+  const status = isRouteErrorResponse(error) ? error.status : null;
+
+  let heading: string;
+  let body: string;
+  const showSignIn = status === 401;
+
+  if (status === 401) {
+    heading = t("drillsLive.errorBoundary.sessionExpired.heading");
+    body = t("drillsLive.errorBoundary.sessionExpired.body");
+  } else if (status === 403) {
+    heading = t("drillsLive.errorBoundary.forbidden.heading");
+    body = t("drillsLive.errorBoundary.forbidden.body");
+  } else if (status === 404) {
+    heading = t("drillsLive.errorBoundary.notFound.heading");
+    body = t("drillsLive.errorBoundary.notFound.body");
+  } else {
+    heading = t("drillsLive.errorBoundary.unexpected.heading");
+    body = t("drillsLive.errorBoundary.unexpected.body");
+  }
+
+  return (
+    <div className="min-h-screen bg-[#181c1c] flex flex-col items-center justify-center px-4">
+      <div className="w-full max-w-md rounded-xl border border-white/10 bg-white/5 p-6 text-center">
+        <AlertTriangle className="w-8 h-8 mx-auto mb-3 text-amber-300" />
+        <h1 className="text-lg font-bold text-white mb-2">{heading}</h1>
+        <p className="text-white/70 text-sm mb-5">{body}</p>
+        <div className="flex flex-col gap-2">
+          {/* `reloadDocument` forces a real browser navigation rather than a
+              client-side transition, so it re-runs the loader from scratch
+              (picking up a fresh session / role / drill state) instead of
+              re-entering whatever client state produced the error. */}
+          <Link to="." reloadDocument className={`${btnPrimary} w-full`}>
+            {t("drillsLive.errorBoundary.reload")}
+          </Link>
+          {showSignIn && (
+            <Link to="/login" className={`${btnSecondary} w-full`}>
+              {t("drillsLive.errorBoundary.signIn")}
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function newId(): string {
