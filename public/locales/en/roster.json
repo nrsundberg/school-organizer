@@ -74,6 +74,7 @@
       "editing": "{{label}} is editing…",
       "editingMany": "{{label}} + {{count}} editing"
     },
+    "readOnlyNotice": "You're watching as a guest. Attestations, notes, and follow-ups are read-only.",
     "removeItem": "Remove item",
     "resume": "Resume drill",
     "savedIndicator": {

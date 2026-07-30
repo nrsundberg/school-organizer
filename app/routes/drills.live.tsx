@@ -1188,6 +1188,15 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
             })}
           </p>
 
+          {!canEdit && (
+            <p
+              className="-mt-1 inline-flex items-center gap-2 self-start rounded-md border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-xs font-medium text-amber-100/90"
+              role="status"
+            >
+              {t("drillsLive.readOnlyNotice")}
+            </p>
+          )}
+
           <ChecklistTable
             definition={def}
             state={state}

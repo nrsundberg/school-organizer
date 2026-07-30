@@ -74,6 +74,7 @@
       "editing": "{{label}} está editando…",
       "editingMany": "{{label}} + {{count}} editando"
     },
+    "readOnlyNotice": "Estás viendo como invitado. Las certificaciones, las notas y los seguimientos son de solo lectura.",
     "removeItem": "Eliminar tarea",
     "resume": "Reanudar simulacro",
     "savedIndicator": {
