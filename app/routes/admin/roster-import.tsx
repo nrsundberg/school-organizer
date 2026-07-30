@@ -395,20 +395,16 @@ export async function action({ request, context }: Route.ActionArgs) {
   );
 }
 
-function StatusBadge({ status }: { status: "new" | "update" | "error" }) {
+// Only "new" and "update" reach the preview table: invalid rows are reported
+// in the "Rows to fix" panel and never become plan rows.
+function StatusBadge({ status }: { status: RosterPreviewRow["status"] }) {
   const { t } = useTranslation("admin");
   const label =
-    status === "new"
-      ? t("rosterImport.status.new")
-      : status === "update"
-        ? t("rosterImport.status.update")
-        : t("rosterImport.status.error");
+    status === "new" ? t("rosterImport.status.new") : t("rosterImport.status.update");
   const classes =
     status === "new"
       ? "bg-emerald-500/15 text-emerald-200 border-emerald-500/30"
-      : status === "update"
-        ? "bg-blue-500/15 text-blue-200 border-blue-500/30"
-        : "bg-red-500/15 text-red-200 border-red-500/30";
+      : "bg-blue-500/15 text-blue-200 border-blue-500/30";
   return (
     <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${classes}`}>
       {label}

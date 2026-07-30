@@ -355,6 +355,74 @@ test("applyRosterImport: prune with nothing to remove issues no delete", async (
   assert.equal(result.ok && result.data.removed, 0);
 });
 
+test("applyRosterImport: prune refuses an empty row set", async () => {
+  // `rowsJson=[]` parses fine (the array schema has no minimum), so with
+  // `prune=on` every student in the org becomes a removal and a single POST
+  // wipes the roster. The only thing standing in the way was a disabled
+  // button; this is the server-side floor.
+  const { prisma, deletedStudentIds } = makeFakePrisma({
+    students: EXISTING_GRACE.map((s) => ({ ...s, household: { spaceNumber: s.spaceNumber } })),
+  });
+
+  const result = await applyRosterImport(prisma, [], undefined, { prune: true });
+
+  assert.equal(result.ok, false, "an empty file is never a mandate to delete everyone");
+  assert.deepEqual(deletedStudentIds, []);
+});
+
+test("applyRosterImport: an empty row set without prune is a harmless no-op", async () => {
+  const { prisma, deletedStudentIds } = makeFakePrisma({
+    students: EXISTING_GRACE.map((s) => ({ ...s, household: { spaceNumber: s.spaceNumber } })),
+  });
+
+  const result = await applyRosterImport(prisma, []);
+
+  assert.equal(result.ok, true, "the floor is scoped to pruning, not to imports generally");
+  assert.deepEqual(deletedStudentIds, []);
+});
+
+test("applyRosterImport: prune refuses to remove more students than the file contains", async () => {
+  // Removing more than the file supplies means the file (or the column
+  // mapping) is wrong, not that the school lost that many children.
+  const { prisma, deletedStudentIds } = makeFakePrisma({
+    students: [
+      { id: 1, firstName: "Grace", lastName: "Hopper", homeRoom: "Room 9", householdId: null, household: null },
+      { id: 2, firstName: "Bob", lastName: "Sibling", homeRoom: "Room 20", householdId: null, household: null },
+      { id: 3, firstName: "Cara", lastName: "Sibling", homeRoom: "Room 20", householdId: null, household: null },
+    ],
+  });
+
+  const result = await applyRosterImport(
+    prisma,
+    [row(2, "Ada", "Lovelace", 12)],
+    undefined,
+    { prune: true },
+  );
+
+  assert.equal(result.ok, false, "3 removals from a 1-row file is a mapping error");
+  assert.deepEqual(deletedStudentIds, []);
+});
+
+test("applyRosterImport: prune allows removals up to the size of the file", async () => {
+  // Boundary control for the test above: equal counts are legitimate.
+  const { prisma, deletedStudentIds } = makeFakePrisma({
+    students: [
+      { id: 1, firstName: "Grace", lastName: "Hopper", homeRoom: "Room 9", householdId: null, household: null },
+      { id: 2, firstName: "Bob", lastName: "Sibling", homeRoom: "Room 20", householdId: null, household: null },
+    ],
+  });
+
+  const result = await applyRosterImport(
+    prisma,
+    [row(2, "Ada", "Lovelace", 12), row(3, "Cy", "Turing", 13)],
+    undefined,
+    { prune: true },
+  );
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(deletedStudentIds.sort(), [1, 2]);
+});
+
 test("applyRosterImport: prune deletes households it empties, and only those", async () => {
   const { prisma, deletedHouseholdIds, householdDeleteManyCalls } = makeFakePrisma({
     students: [
