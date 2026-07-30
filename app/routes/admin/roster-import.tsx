@@ -45,6 +45,10 @@ import {
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
 import { auditOrgAction } from "~/domain/org/audit.server";
+import { enqueueEmails } from "~/domain/email/queue.server";
+import type { StudentsDeletedMessage } from "~/domain/email/types";
+import { getSupportEmail } from "~/lib/site";
+import { detectLocale } from "~/i18n.server";
 import { protectToAdminAndGetPermissions, requireRole } from "~/sessions.server";
 import { redirectWithSuccess } from "remix-toast";
 import { getAdminT } from "~/lib/t.server";
@@ -181,7 +185,7 @@ async function usageErrorForPlan(
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
-  await protectToAdminAndGetPermissions(context);
+  const actor = await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const org = getOrgFromContext(context);
   const formData = await request.formData();
@@ -401,6 +405,18 @@ export async function action({ request, context }: Route.ActionArgs) {
               updated: summary.updated,
             });
 
+    // Name the children. Deleting ONE student records firstName/lastName/
+    // suffix/homeRoom (see students.$studentId.tsx); without this the forensic
+    // record for deleting 200 was strictly worse than for deleting one, even
+    // though the plan already held every name. Capped so a large prune can't
+    // bloat the audit row; the overflow count keeps the total honest.
+    const AUDIT_NAME_CAP = 200;
+    const removedNames = summary.removedStudents.slice(0, AUDIT_NAME_CAP).map((s) => ({
+      firstName: s.firstName,
+      lastName: s.lastName,
+      homeRoom: s.homeRoom,
+    }));
+
     await auditOrgAction(context, request, {
       action: "roster.import.applied",
       targetType: "org",
@@ -411,8 +427,67 @@ export async function action({ request, context }: Route.ActionArgs) {
         updated: summary.updated,
         removed: summary.removed,
         newHomerooms: summary.newHomerooms,
+        ...(summary.removedStudents.length > 0
+          ? {
+              removedStudents: removedNames,
+              removedStudentsOmitted: Math.max(
+                0,
+                summary.removedStudents.length - AUDIT_NAME_CAP,
+              ),
+              skippedRemovals: summary.skippedRemovals,
+            }
+          : {}),
       },
     });
+
+    // Same notification the dashboard's bulk delete sends, for the same
+    // reason: a surprise/accidental deletion should be caught while it is
+    // still recoverable from database backups. NOTE: User is NOT a
+    // tenant-scoped model (see tenant-extension.ts), so orgId MUST be filtered
+    // explicitly — otherwise this emails the admins of every org.
+    if (summary.removed > 0) {
+      const [locale, admins] = await Promise.all([
+        detectLocale(request, context),
+        prisma.user.findMany({
+          where: { orgId: org.id, role: "ADMIN" },
+          select: { email: true, locale: true },
+        }),
+      ]);
+      const actorLabel =
+        (actor.name && actor.name.trim().length > 0
+          ? actor.name
+          : (actor as { email?: string }).email) ?? t("dashboard.danger.unknownActor");
+      const deletedAt = new Date().toLocaleString(locale);
+      const supportEmail = getSupportEmail(context);
+
+      const messages: StudentsDeletedMessage[] = admins
+        .filter((a): a is { email: string; locale: string } => !!a.email)
+        .map((a) => ({
+          kind: "students_deleted" as const,
+          to: a.email,
+          orgName: org.name,
+          actorLabel,
+          deletedCount: summary.removed,
+          deletedAt,
+          source: "roster_import" as const,
+          locale: a.locale ?? "en",
+        }));
+      if (!messages.some((m) => m.to === supportEmail)) {
+        messages.push({
+          kind: "students_deleted",
+          to: supportEmail,
+          orgName: org.name,
+          actorLabel,
+          deletedCount: summary.removed,
+          deletedAt,
+          source: "roster_import",
+          isOps: true,
+          locale: "en",
+        });
+      }
+      await enqueueEmails(context, messages);
+    }
+
     return redirectWithSuccess("/admin/children", { message });
   }
 
