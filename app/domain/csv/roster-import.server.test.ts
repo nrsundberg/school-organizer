@@ -7,7 +7,13 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { applyRosterImport, type RosterImportRow, type RosterPrisma } from "./roster-import.server";
+import {
+  applyRosterImport,
+  buildRosterImportPlan,
+  type ExistingRosterSnapshot,
+  type RosterImportRow,
+  type RosterPrisma,
+} from "./roster-import.server";
 
 type ExistingSnapshot = {
   students?: {
@@ -112,4 +118,59 @@ test("applyRosterImport: null space yields null householdId", async () => {
   assert.equal(result.ok, true);
   assert.equal(createdHouseholds.length, 0);
   assert.equal(createdStudents[0].householdId, null);
+});
+
+function snapshot(
+  students: ExistingRosterSnapshot["students"],
+): ExistingRosterSnapshot {
+  return { students, teachers: [], spaces: [] };
+}
+
+test("buildRosterImportPlan: flags students absent from the CSV as removals", () => {
+  const plan = buildRosterImportPlan(
+    [row(2, "Ada", "Lovelace", 12)],
+    snapshot([
+      { id: 1, firstName: "Ada", lastName: "Lovelace", homeRoom: "Room 12", spaceNumber: 12 },
+      { id: 2, firstName: "Grace", lastName: "Hopper", homeRoom: "Room 9", spaceNumber: 9 },
+    ]),
+  );
+
+  assert.equal(plan.summary.removeCount, 1);
+  assert.deepEqual(
+    plan.removals.map((r) => r.studentId),
+    [2],
+    "only the student missing from the CSV is a removal",
+  );
+});
+
+test("buildRosterImportPlan: a student who changed homeroom is NOT a removal", () => {
+  // The regression this whole design exists to prevent. `rosterKey` includes
+  // homeRoom, so Ada reads as "new" here — but she is plainly still enrolled,
+  // and deleting her would orphan her CallEvent history.
+  const plan = buildRosterImportPlan(
+    [{ rowNumber: 2, firstName: "Ada", lastName: "Lovelace", homeRoom: "Room 99", spaceNumber: 12 }],
+    snapshot([
+      { id: 1, firstName: "Ada", lastName: "Lovelace", homeRoom: "Room 12", spaceNumber: 12 },
+    ]),
+  );
+
+  assert.equal(plan.summary.removeCount, 0);
+  assert.deepEqual(plan.removals, []);
+});
+
+test("buildRosterImportPlan: removal matching ignores case and surrounding space", () => {
+  const plan = buildRosterImportPlan(
+    [{ rowNumber: 2, firstName: "  ADA ", lastName: "lovelace", homeRoom: "Room 12", spaceNumber: 12 }],
+    snapshot([
+      { id: 1, firstName: "Ada", lastName: "Lovelace", homeRoom: "Room 12", spaceNumber: 12 },
+    ]),
+  );
+
+  assert.equal(plan.summary.removeCount, 0);
+});
+
+test("buildRosterImportPlan: an empty roster yields no removals", () => {
+  const plan = buildRosterImportPlan([], snapshot([]));
+  assert.equal(plan.summary.removeCount, 0);
+  assert.deepEqual(plan.removals, []);
 });
