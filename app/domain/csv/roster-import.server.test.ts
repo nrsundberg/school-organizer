@@ -37,6 +37,7 @@ function makeFakePrisma(existing: ExistingSnapshot = {}) {
     homeRoom: string | null;
     householdId: string | null;
   }[] = [];
+  const deletedStudentIds: number[] = [];
 
   const prisma: RosterPrisma = {
     student: {
@@ -46,6 +47,10 @@ function makeFakePrisma(existing: ExistingSnapshot = {}) {
         return {};
       },
       update: async () => ({}),
+      deleteMany: async ({ where }) => {
+        deletedStudentIds.push(...where.id.in);
+        return {};
+      },
     },
     teacher: {
       findMany: async () => existing.teachers ?? [],
@@ -74,7 +79,7 @@ function makeFakePrisma(existing: ExistingSnapshot = {}) {
     },
   };
 
-  return { prisma, createdHouseholds, createdStudents };
+  return { prisma, createdHouseholds, createdStudents, deletedStudentIds };
 }
 
 function row(rowNumber: number, firstName: string, lastName: string, spaceNumber: number | null): RosterImportRow {
@@ -173,4 +178,52 @@ test("buildRosterImportPlan: an empty roster yields no removals", () => {
   const plan = buildRosterImportPlan([], snapshot([]));
   assert.equal(plan.summary.removeCount, 0);
   assert.deepEqual(plan.removals, []);
+});
+
+const EXISTING_GRACE: ExistingRosterSnapshot["students"] = [
+  { id: 7, firstName: "Grace", lastName: "Hopper", homeRoom: "Room 9", spaceNumber: 9 },
+];
+
+test("applyRosterImport: does NOT delete when prune is not requested", async () => {
+  const { prisma, deletedStudentIds } = makeFakePrisma({
+    students: EXISTING_GRACE.map((s) => ({ ...s, household: { spaceNumber: s.spaceNumber } })),
+  });
+
+  const result = await applyRosterImport(prisma, [row(2, "Ada", "Lovelace", 12)]);
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(deletedStudentIds, [], "a plain re-import is never destructive");
+  assert.equal(result.ok && result.data.removed, 0);
+});
+
+test("applyRosterImport: deletes absent students when prune is requested", async () => {
+  const { prisma, deletedStudentIds } = makeFakePrisma({
+    students: EXISTING_GRACE.map((s) => ({ ...s, household: { spaceNumber: s.spaceNumber } })),
+  });
+
+  const result = await applyRosterImport(
+    prisma,
+    [row(2, "Ada", "Lovelace", 12)],
+    undefined,
+    { prune: true },
+  );
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(deletedStudentIds, [7]);
+  assert.equal(result.ok && result.data.removed, 1);
+});
+
+test("applyRosterImport: prune with nothing to remove issues no delete", async () => {
+  const { prisma, deletedStudentIds } = makeFakePrisma();
+
+  const result = await applyRosterImport(
+    prisma,
+    [row(2, "Ada", "Lovelace", 12)],
+    undefined,
+    { prune: true },
+  );
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(deletedStudentIds, []);
+  assert.equal(result.ok && result.data.removed, 0);
 });
