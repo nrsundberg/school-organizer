@@ -264,6 +264,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       return data<ActionData>({ stage: "error", error: message }, { status: 400 });
     }
 
+    // Opt-in and default-off: absent the checkbox, a re-import never deletes.
+    const prune = formData.get("prune") === "on";
+
     const plan = await buildRosterImportPlanFromDatabase(
       prisma as unknown as RosterPrisma,
       rows,
@@ -288,6 +291,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       prisma as unknown as RosterPrisma,
       rows,
       plan,
+      { prune },
     );
     if (!result.ok) {
       return data<ActionData>(
@@ -305,18 +309,25 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
 
     const message =
-      summary.newHomerooms > 0
-        ? t("rosterImport.actions.importedSummaryWithHomerooms", {
+      summary.removed > 0
+        ? t("rosterImport.actions.importedSummaryWithRemovals", {
             count: summary.created,
             created: summary.created,
             updated: summary.updated,
-            homerooms: summary.newHomerooms,
+            removed: summary.removed,
           })
-        : t("rosterImport.actions.importedSummary", {
-            count: summary.created,
-            created: summary.created,
-            updated: summary.updated,
-          });
+        : summary.newHomerooms > 0
+          ? t("rosterImport.actions.importedSummaryWithHomerooms", {
+              count: summary.created,
+              created: summary.created,
+              updated: summary.updated,
+              homerooms: summary.newHomerooms,
+            })
+          : t("rosterImport.actions.importedSummary", {
+              count: summary.created,
+              created: summary.created,
+              updated: summary.updated,
+            });
 
     await auditOrgAction(context, request, {
       action: "roster.import.applied",
@@ -326,6 +337,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       payload: {
         created: summary.created,
         updated: summary.updated,
+        removed: summary.removed,
         newHomerooms: summary.newHomerooms,
       },
     });
@@ -455,6 +467,8 @@ function MappingPanel({ map }: { map: MapActionData }) {
 function PreviewPanel({ preview }: { preview: PreviewActionData }) {
   const { t } = useTranslation("admin");
   const [skipInvalid, setSkipInvalid] = useState(false);
+  // Defaults to false: deleting students is never the default outcome of an upload.
+  const [prune, setPrune] = useState(false);
   const visibleRows = preview.plan.rows.slice(0, 25);
   const hasErrors = preview.rowErrors.length > 0;
   const validRows = preview.plan.summary.validRows;
@@ -627,10 +641,38 @@ function PreviewPanel({ preview }: { preview: PreviewActionData }) {
         </label>
       ) : null}
 
+      {preview.plan.removals.length > 0 ? (
+        <div className="mt-4 rounded-lg border border-amber-300/25 bg-amber-300/5 p-3">
+          <label className="flex items-start gap-2 text-sm font-semibold text-amber-100">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={prune}
+              onChange={(event) => setPrune(event.currentTarget.checked)}
+            />
+            {t("rosterImport.preview.prune", {
+              count: preview.plan.removals.length,
+            })}
+          </label>
+          <p className="mt-1.5 pl-6 text-xs text-white/60">
+            {t("rosterImport.preview.pruneWarning")}
+          </p>
+          <ul className="mt-2 max-h-40 overflow-y-auto pl-6 text-xs text-white/70">
+            {preview.plan.removals.map((r) => (
+              <li key={r.studentId}>
+                {r.firstName} {r.lastName}
+                {r.homeRoom ? ` · ${r.homeRoom}` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <Form method="post">
           <input type="hidden" name="intent" value="apply" />
           <input type="hidden" name="rowsJson" value={preview.rowsJson} />
+          <input type="hidden" name="prune" value={prune ? "on" : "off"} />
           <Button
             type="submit"
             variant="primary"
