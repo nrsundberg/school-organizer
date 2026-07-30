@@ -8,6 +8,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  applyColumnMapping,
   applyRosterImport,
   buildRosterImportPlan,
   type ExistingRosterSnapshot,
@@ -231,6 +232,79 @@ test("buildRosterImportPlan: an empty roster yields no removals", () => {
   const plan = buildRosterImportPlan([], snapshot([]));
   assert.equal(plan.summary.removeCount, 0);
   assert.deepEqual(plan.removals, []);
+});
+
+test("buildRosterImportPlan: a row rejected for a bad space number is NOT a removal", () => {
+  // The failure this guards: `applyColumnMapping` drops rows that fail
+  // validation, so a student whose ONLY problem is junk in an unrelated
+  // column ("N/A" in spaceNumber) never reached `rows` — and a prune then
+  // read her absence as "no longer enrolled" and hard-deleted her. The admin
+  // ticked a checkbox that says *skip*, not *delete*.
+  const grid = {
+    header: ["firstName", "lastName", "homeRoom", "spaceNumber"],
+    rows: [
+      ["Ada", "Lovelace", "Room 12", "12"],
+      ["Grace", "Hopper", "Room 9", "N/A"],
+    ],
+  };
+  const mapped = applyColumnMapping(grid, {
+    firstName: 0,
+    lastName: 1,
+    homeRoom: 2,
+    spaceNumber: 3,
+  });
+
+  assert.equal(mapped.ok, true);
+  if (!mapped.ok) return;
+  assert.equal(mapped.rows.length, 1, "the bad-space row is excluded from importable rows");
+  assert.equal(mapped.rowErrors.length, 1, "...and is reported as a fixable row error");
+
+  const plan = buildRosterImportPlan(
+    mapped.rows,
+    snapshot([
+      { id: 1, firstName: "Ada", lastName: "Lovelace", homeRoom: "Room 12", householdId: null, spaceNumber: 12 },
+      { id: 2, firstName: "Grace", lastName: "Hopper", homeRoom: "Room 9", householdId: null, spaceNumber: 9 },
+    ]),
+    mapped.presentNameKeys,
+  );
+
+  assert.deepEqual(
+    plan.removals.map((r) => r.studentId),
+    [],
+    "a name that appeared anywhere in the source file is never pruned",
+  );
+  assert.equal(plan.summary.removeCount, 0);
+});
+
+test("applyColumnMapping: presentNameKeys covers rejected, duplicate, and valid rows", () => {
+  const grid = {
+    header: ["firstName", "lastName", "homeRoom", "spaceNumber"],
+    rows: [
+      ["Ada", "Lovelace", "Room 12", "12"],
+      // Duplicate of row 2 — rejected, but Ada is plainly still in the file.
+      ["Ada", "Lovelace", "Room 12", "12"],
+      // Rejected on spaceNumber only.
+      ["Grace", "Hopper", "Room 9", "TBD"],
+      // Rejected for a missing last name: no usable identity, so no key.
+      ["Nameless", "", "Room 1", "3"],
+      ["", "", "", ""],
+    ],
+  };
+  const mapped = applyColumnMapping(grid, {
+    firstName: 0,
+    lastName: 1,
+    homeRoom: 2,
+    spaceNumber: 3,
+  });
+
+  assert.equal(mapped.ok, true);
+  if (!mapped.ok) return;
+  assert.deepEqual(
+    [...mapped.presentNameKeys].sort(),
+    ["ada lovelace", "grace hopper"],
+    "one key per distinct full name present in the source, blank rows excluded",
+  );
+  assert.equal(mapped.skippedBlank, 1);
 });
 
 const EXISTING_GRACE: ExistingRosterSnapshot["students"] = [

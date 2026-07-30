@@ -17,9 +17,11 @@ import {
   buildErrorReportCsv,
   buildRosterImportPlanFromDatabase,
   parseSerializedGrid,
+  parseSerializedPresentNameKeys,
   parseSerializedRosterRows,
   RosterImportError,
   serializeGrid,
+  serializePresentNameKeys,
   serializeRosterRows,
   suggestColumnMapping,
   type ColumnMapping,
@@ -78,6 +80,11 @@ type PreviewActionData = {
   rowErrors: LocalizedRowError[];
   skippedBlank: number;
   rowsJson: string;
+  /**
+   * Names present in the uploaded file but NOT in `rowsJson` (rows that failed
+   * validation). Posted back on apply so a prune can refuse to delete them.
+   */
+  presentNameKeysJson: string;
   errorReportCsv: string;
   planLimitError: string | null;
   canApply: boolean;
@@ -227,6 +234,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const plan = await buildRosterImportPlanFromDatabase(
       prisma as unknown as RosterPrisma,
       mapped.rows,
+      mapped.presentNameKeys,
     );
     const planLimitError = await usageErrorForPlan(context, plan);
     const rowErrors = mapped.rowErrors.map((err) => ({
@@ -242,6 +250,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       rowErrors,
       skippedBlank: mapped.skippedBlank,
       rowsJson: serializeRosterRows(mapped.rows),
+      presentNameKeysJson: serializePresentNameKeys(mapped.presentNameKeys),
       errorReportCsv: buildErrorReportCsv(rowErrors),
       planLimitError,
       canApply,
@@ -267,9 +276,31 @@ export async function action({ request, context }: Route.ActionArgs) {
     // Opt-in and default-off: absent the checkbox, a re-import never deletes.
     const prune = formData.get("prune") === "on";
 
+    // Names that were in the uploaded file but not in `rowsJson` (rows the
+    // mapper rejected). Without them a prune deletes students whose only sin
+    // was a bad value in an unrelated column, so when pruning this field is
+    // mandatory: a request that lacks it gets bounced back to preview rather
+    // than silently falling back to the unsafe, rows-only set.
+    let presentNameKeys: string[] = [];
+    let presentNameKeysMissing = false;
+    try {
+      presentNameKeys = parseSerializedPresentNameKeys(
+        formData.get("presentNameKeysJson"),
+      );
+    } catch {
+      presentNameKeysMissing = true;
+    }
+    if (prune && presentNameKeysMissing) {
+      return data<ActionData>(
+        { stage: "error", error: t("rosterImport.errors.previewAgain") },
+        { status: 400 },
+      );
+    }
+
     const plan = await buildRosterImportPlanFromDatabase(
       prisma as unknown as RosterPrisma,
       rows,
+      presentNameKeys,
     );
     const planLimitError = await usageErrorForPlan(context, plan);
     if (planLimitError) {
@@ -279,6 +310,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         rowErrors: [],
         skippedBlank: 0,
         rowsJson: serializeRosterRows(rows),
+        presentNameKeysJson: serializePresentNameKeys(presentNameKeys),
         errorReportCsv: buildErrorReportCsv([]),
         planLimitError,
         canApply: false,
@@ -672,6 +704,11 @@ function PreviewPanel({ preview }: { preview: PreviewActionData }) {
         <Form method="post">
           <input type="hidden" name="intent" value="apply" />
           <input type="hidden" name="rowsJson" value={preview.rowsJson} />
+          <input
+            type="hidden"
+            name="presentNameKeysJson"
+            value={preview.presentNameKeysJson}
+          />
           <input type="hidden" name="prune" value={prune ? "on" : "off"} />
           <Button
             type="submit"
