@@ -48,6 +48,7 @@ import {
   broadcastDrillUpdate,
 } from "~/lib/broadcast.server";
 import { hasValidViewerAccess } from "~/domain/auth/viewer-access.server";
+import { canEditDrillRun } from "~/domain/drills/edit-policy";
 import { useDrillWebSocket } from "~/hooks/useDrillWebSocket";
 import type { Prisma } from "~/db";
 
@@ -118,6 +119,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // the deleted `userIsAdmin` helper just for one call site.
   const isAdmin =
     !!user && (user.role === "ADMIN" || user.role === "CONTROLLER");
+
+  // Guests hold no User row: they watch, they never write. Drives the
+  // component's `readOnly` flag so the controls are inert rather than
+  // interactive-then-401.
+  const canEdit = canEditDrillRun(membership);
 
   const paused = run.status === "PAUSED";
   const metaTitle = paused
@@ -205,6 +211,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       definition: run.template.definition,
     },
     isAdmin,
+    canEdit,
     paused,
     userName: user?.name || user?.email || "viewer",
     me: {
@@ -534,7 +541,7 @@ function formatElapsed(startIso: string | null): string {
 export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
   const { t } = useTranslation("roster");
   const { t: tAdmin } = useTranslation("admin");
-  const { run, template, isAdmin, paused, me, recentActivity } = loaderData;
+  const { run, template, isAdmin, canEdit, paused, me, recentActivity } = loaderData;
   const def = useMemo(() => parseTemplateDefinition(template.definition), [template.definition]);
   const [state, setState] = useState<RunState>(() => parseRunState(run.state));
   const fetcher = useFetcher();
@@ -689,7 +696,11 @@ export default function DrillsLivePage({ loaderData }: Route.ComponentProps) {
     return () => clearInterval(i);
   }, []);
 
-  const readOnly = paused;
+  // Two independent reasons the page is inert: the drill is paused (state),
+  // or the caller may not write (identity). Every control below —
+  // ChecklistTable cells and attest buttons, the notes textarea, follow-up
+  // add/remove — already honours this one flag.
+  const readOnly = paused || !canEdit;
 
   const persist = useCallback(
     (next: RunState) => {
