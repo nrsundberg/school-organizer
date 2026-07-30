@@ -110,14 +110,6 @@
       "clear_one": "Clear ({{count}})",
       "clear_other": "Clear ({{count}})"
     },
-    "fit": {
-      "dismiss": "Dismiss",
-      "hintAction": "View full size",
-      "hintBody": "Tiles are small so the whole board fits without scrolling. Switch to full size to scroll instead.",
-      "hintTitle": "Showing the whole board",
-      "toFit": "Fit to screen",
-      "toFull": "Full size"
-    },
     "filterHomeroom": "Filter Homeroom",
     "homeroomPlaceholder": "Homeroom...",
     "metaDescription": "Live car line board, viewer access, and school admin tools.",

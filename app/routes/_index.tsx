@@ -51,11 +51,6 @@ import { useAgingClock } from "~/hooks/useAgingClock";
 import { useObservedActiveAt } from "~/hooks/useObservedActiveAt";
 import { hasAged } from "~/domain/board/aging";
 import MobileCallerView from "~/components/MobileCallerView";
-import {
-  useFitToScreen,
-  useTilesTooSmall,
-  BoardFitControls,
-} from "~/components/board/BoardFit";
 import { BoardControlsDrawer } from "~/components/board/BoardControlsDrawer";
 import confetti from "canvas-confetti";
 import { endOfUtcDay, toDateInputValue } from "~/domain/dismissal/schedule";
@@ -327,13 +322,6 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
 
   const [drawPoints, setDrawPoints] = useState<number[]>([]);
 
-  // Fit-to-screen: the board fills one viewport (no page scroll) by default;
-  // toggling off lets tiles grow and the grid scroll inside the fixed frame.
-  const { fitToScreen, toggle: toggleFit } = useFitToScreen();
-  const boardRef = useRef<HTMLDivElement>(null);
-  const rowCount = Math.ceil(spaces.length / cols);
-  const tilesTooSmall = useTilesTooSmall(boardRef, rowCount, fitToScreen);
-
   useEffect(() => {
     if (!showViewerDrawing) return;
     try {
@@ -485,12 +473,9 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
       </BoardControlsDrawer>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row md:justify-center md:gap-0">
-        {/* Read-only board */}
+        {/* Read-only board — always fits the viewport (no page scroll) */}
         <div
-          ref={boardRef}
-          className={`relative grid w-full min-h-0 flex-1 font-extrabold text-large text-center md:w-5/6 md:flex-none ${
-            fitToScreen ? "auto-rows-fr overflow-hidden" : "overflow-y-auto"
-          }`}
+          className="relative grid w-full min-h-0 flex-1 auto-rows-fr overflow-hidden font-extrabold text-large text-center md:w-5/6 md:flex-none"
           onPointerDown={showViewerDrawing ? onPointerDown : undefined}
           onPointerMove={showViewerDrawing ? onPointerMove : undefined}
           onPointerUp={showViewerDrawing ? onPointerEnd : undefined}
@@ -502,13 +487,8 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
             data={spaces}
             cols={cols}
             permitted={false}
-            fill={fitToScreen}
+            fill
             onDrawingSpace={showViewerDrawing ? handleDrawingSpace : undefined}
-          />
-          <BoardFitControls
-            fitToScreen={fitToScreen}
-            tooSmall={tilesTooSmall}
-            onToggle={toggleFit}
           />
           {showViewerDrawing ? (
             <>
@@ -586,21 +566,27 @@ function ControllerTabView({
   const defaultTab = initialPreference === "controller" ? "controller" : "board";
   const [tab, setTab] = useState<"controller" | "board">(defaultTab);
 
-  // Fit-to-screen for the controller's board tab (kept at 10 columns — staff
-  // find it easier to scan). The keypad tab manages its own layout and just
-  // scrolls if it outgrows the frame.
-  const { fitToScreen, toggle: toggleFit } = useFitToScreen();
-  const boardRef = useRef<HTMLDivElement>(null);
-  const rowCount = Math.ceil(spaces.length / 10);
-  const tilesTooSmall = useTilesTooSmall(
-    boardRef,
-    rowCount,
-    fitToScreen && tab === "board",
-  );
-
   useEffect(() => {
     setTab(initialPreference === "controller" ? "controller" : "board");
   }, [initialPreference]);
+
+  // Board tab: jump the tab bar out of view on load (and whenever we switch back
+  // to the board) so the tiles fill the frame — mirrors Page's header jump. The
+  // tab bar stays just above the fold; scroll/swipe up to reach it (e.g. to
+  // switch to the keypad).
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (tab !== "board") return;
+    const port = scrollRef.current;
+    const stage = stageRef.current;
+    if (!port || !stage) return;
+    // Align the board stage's top with the scroll port's top (i.e. scroll the
+    // tab bar out of view). Uses live rects rather than offsetTop so it stays
+    // correct regardless of offsetParent or a cancellation notice above.
+    const delta = stage.getBoundingClientRect().top - port.getBoundingClientRect().top;
+    if (delta) port.scrollTop += delta;
+  }, [tab]);
 
   const persist = (next: "controller" | "board") => {
     setTab(next);
@@ -611,7 +597,10 @@ function ControllerTabView({
   };
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col">
+    <div
+      ref={scrollRef}
+      className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
       <div className="flex flex-none border-b border-white/10 mb-2">
         <button
           type="button"
@@ -646,24 +635,14 @@ function ControllerTabView({
           />
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 justify-center">
-          <div
-            ref={boardRef}
-            className={`relative grid w-full min-h-0 flex-1 font-extrabold text-large text-center md:w-5/6 md:flex-none ${
-              fitToScreen ? "auto-rows-fr overflow-hidden" : "overflow-y-auto"
-            }`}
-          >
+        <div ref={stageRef} className="flex h-full shrink-0 justify-center">
+          <div className="relative grid h-full w-full auto-rows-fr overflow-hidden font-extrabold text-large text-center md:w-5/6 md:flex-none">
             <ParkingRows
               data={spaces}
               cols={10}
               permitted={true}
-              fill={fitToScreen}
+              fill
               onSpaceChange={onSpaceChange}
-            />
-            <BoardFitControls
-              fitToScreen={fitToScreen}
-              tooSmall={tilesTooSmall}
-              onToggle={toggleFit}
             />
           </div>
         </div>
@@ -832,6 +811,12 @@ function ParkingTile({
       ? "h-full min-h-0 overflow-hidden text-[clamp(9px,2.2vw,14px)] px-0.5 leading-none"
       : "min-h-[44px] md:min-h-[30px] text-sm px-0.5 leading-none";
   const commonClasses = `w-full border border-black flex items-center justify-center drop-shadow-sm select-none ${sizeClasses}`;
+  // In fill mode tiles compress to share the board height; the lucide arrow
+  // defaults to a rigid 24px that won't shrink, so on a dense board every
+  // ACTIVE tile forces its row taller than its fr share and the board overflows
+  // past the viewport. Scale the arrow with the tile's font (1em) and let it
+  // shrink so it never sets the row height.
+  const iconClass = fill ? "h-[1em] w-[1em] min-h-0 shrink-0" : "";
 
   return permitted ? (
     status === Status.EMPTY ? (
@@ -854,7 +839,7 @@ function ParkingTile({
               aria-label={t("index.tile.ariaActive", { spaceNumber })}
               className={`${color} ${commonClasses} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D500] focus-visible:z-10`}
             >
-              <Send aria-hidden="true" />
+              <Send aria-hidden="true" className={iconClass} />
               {spaceNumber}
             </button>
           </PopoverTrigger>
@@ -877,7 +862,7 @@ function ParkingTile({
       className={`${color} ${commonClasses} w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D500] focus-visible:z-10 ${onDrawingSpace ? "cursor-crosshair opacity-95" : ""}`}
       onClick={() => onDrawingSpace?.(spaceNumber)}
     >
-      {status === Status.ACTIVE && <Send aria-hidden="true" />}
+      {status === Status.ACTIVE && <Send aria-hidden="true" className={iconClass} />}
       {spaceNumber}
     </button>
   );

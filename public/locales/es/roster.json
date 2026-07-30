@@ -110,14 +110,6 @@
       "clear_one": "Limpiar ({{count}})",
       "clear_other": "Limpiar ({{count}})"
     },
-    "fit": {
-      "dismiss": "Descartar",
-      "hintAction": "Ver a tamaño completo",
-      "hintBody": "Las casillas son pequeñas para que todo el tablero quepa sin desplazarse. Cambia a tamaño completo para desplazarte.",
-      "hintTitle": "Mostrando todo el tablero",
-      "toFit": "Ajustar a la pantalla",
-      "toFull": "Tamaño completo"
-    },
     "filterHomeroom": "Filtrar salón principal",
     "homeroomPlaceholder": "Salón principal...",
     "metaDescription": "Tablero de fila de autos en vivo, acceso para observadores y herramientas de administración escolar.",
