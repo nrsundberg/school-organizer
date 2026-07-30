@@ -31,6 +31,7 @@ type ExistingSnapshot = {
 function makeFakePrisma(existing: ExistingSnapshot = {}) {
   const committed = new Map<number, string>(); // spaceNumber -> household id
   let hCounter = 0;
+  let syntheticStudentId = 100_000; // ids for students createMany doesn't return
   const createdHouseholds: { spaceNumber: number; name: string; id: string }[] = [];
   const createdStudents: {
     firstName: string;
@@ -40,17 +41,51 @@ function makeFakePrisma(existing: ExistingSnapshot = {}) {
   }[] = [];
   const deletedStudentIds: number[] = [];
   const deletedHouseholdIds: string[] = [];
+  // Raw arguments passed to household.deleteMany's `where.id.in`, BEFORE the
+  // `students: { none: {} }` guard is applied — lets tests assert on what was
+  // queried, not just on what actually got deleted.
+  const householdDeleteManyCalls: string[][] = [];
+
+  // Live student -> household membership, seeded from the snapshot and kept
+  // in sync as the fake processes creates/updates/deletes. This is what lets
+  // household.deleteMany honour `students: { none: {} }` for real, instead of
+  // unconditionally recording whatever id list it was called with.
+  const studentHousehold = new Map<number, string | null>();
+  for (const s of existing.students ?? []) {
+    studentHousehold.set(s.id, s.householdId ?? null);
+    // Also seed `committed` so a CSV row for a space that already has a
+    // household (e.g. a kept sibling) resolves to that existing household
+    // instead of the fake minting a duplicate.
+    if (s.householdId != null && s.household?.spaceNumber != null) {
+      committed.set(s.household.spaceNumber, s.householdId);
+    }
+  }
+  function householdStillHasStudents(householdId: string): boolean {
+    for (const hid of studentHousehold.values()) {
+      if (hid === householdId) return true;
+    }
+    return false;
+  }
 
   const prisma: RosterPrisma = {
     student: {
       findMany: async () => existing.students ?? [],
       createMany: async ({ data }) => {
         createdStudents.push(...data);
+        for (const d of data) {
+          studentHousehold.set(++syntheticStudentId, d.householdId);
+        }
         return {};
       },
-      update: async () => ({}),
+      update: async ({ where, data }) => {
+        studentHousehold.set(where.id, data.householdId);
+        return {};
+      },
       deleteMany: async ({ where }) => {
         deletedStudentIds.push(...where.id.in);
+        for (const id of where.id.in) {
+          studentHousehold.delete(id);
+        }
         return {};
       },
     },
@@ -79,13 +114,25 @@ function makeFakePrisma(existing: ExistingSnapshot = {}) {
         });
       },
       deleteMany: async ({ where }) => {
-        deletedHouseholdIds.push(...where.id.in);
+        householdDeleteManyCalls.push([...where.id.in]);
+        for (const id of where.id.in) {
+          if (!householdStillHasStudents(id)) {
+            deletedHouseholdIds.push(id);
+          }
+        }
         return {};
       },
     },
   };
 
-  return { prisma, createdHouseholds, createdStudents, deletedStudentIds, deletedHouseholdIds };
+  return {
+    prisma,
+    createdHouseholds,
+    createdStudents,
+    deletedStudentIds,
+    deletedHouseholdIds,
+    householdDeleteManyCalls,
+  };
 }
 
 function row(rowNumber: number, firstName: string, lastName: string, spaceNumber: number | null): RosterImportRow {
@@ -235,8 +282,10 @@ test("applyRosterImport: prune with nothing to remove issues no delete", async (
 });
 
 test("applyRosterImport: prune deletes households it empties, and only those", async () => {
-  const { prisma, deletedHouseholdIds } = makeFakePrisma({
+  const { prisma, deletedHouseholdIds, householdDeleteManyCalls } = makeFakePrisma({
     students: [
+      // Grace is the only occupant of her household and is absent from the
+      // CSV below: her removal genuinely empties "h-old".
       {
         id: 7,
         firstName: "Grace",
@@ -245,16 +294,71 @@ test("applyRosterImport: prune deletes households it empties, and only those", a
         householdId: "h-old",
         household: { spaceNumber: 9 },
       },
+      // Bob and Cara are siblings sharing "h-sibling". Cara is absent from
+      // the CSV (removed) but Bob is present (kept) — the household is a
+      // legitimate delete *candidate* (a resident left), but must survive
+      // because Bob still lives there. This is what the DB-side
+      // `students: { none: {} }` guard exists to catch.
+      {
+        id: 8,
+        firstName: "Bob",
+        lastName: "Sibling",
+        homeRoom: "Room 20",
+        householdId: "h-sibling",
+        household: { spaceNumber: 20 },
+      },
+      {
+        id: 9,
+        firstName: "Cara",
+        lastName: "Sibling",
+        homeRoom: "Room 20",
+        householdId: "h-sibling",
+        household: { spaceNumber: 20 },
+      },
+      // Dana's household is untouched by this import entirely — nobody in
+      // "h-unrelated" is being removed, so it must never even be a delete
+      // candidate. This is the JS-side scoping (touchedHouseholdIds), not
+      // the DB guard.
+      {
+        id: 10,
+        firstName: "Dana",
+        lastName: "Unrelated",
+        homeRoom: "Room 30",
+        householdId: "h-unrelated",
+        household: { spaceNumber: 30 },
+      },
     ],
+    spaces: [{ spaceNumber: 9 }, { spaceNumber: 20 }, { spaceNumber: 30 }],
   });
 
   const result = await applyRosterImport(
     prisma,
-    [row(2, "Ada", "Lovelace", 12)],
+    [
+      row(2, "Ada", "Lovelace", 12),
+      row(3, "Bob", "Sibling", 20),
+      row(4, "Dana", "Unrelated", 30),
+    ],
     undefined,
     { prune: true },
   );
 
   assert.equal(result.ok, true);
-  assert.deepEqual(deletedHouseholdIds, ["h-old"]);
+
+  const queriedIds = householdDeleteManyCalls.flat();
+
+  assert.ok(queriedIds.includes("h-old"), "the emptied household is a delete candidate");
+  assert.ok(
+    queriedIds.includes("h-sibling"),
+    "a household that lost a resident is a candidate, even though it survives",
+  );
+  assert.ok(
+    !queriedIds.includes("h-unrelated"),
+    "a household untouched by this import's removals is never even queried",
+  );
+
+  assert.deepEqual(
+    deletedHouseholdIds,
+    ["h-old"],
+    "only the household actually emptied by this prune is deleted",
+  );
 });
