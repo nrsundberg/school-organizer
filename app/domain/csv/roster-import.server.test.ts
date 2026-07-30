@@ -21,6 +21,7 @@ type ExistingSnapshot = {
     firstName: string;
     lastName: string;
     homeRoom: string | null;
+    householdId: string | null;
     household: { spaceNumber: number | null } | null;
   }[];
   teachers?: { homeRoom: string }[];
@@ -38,6 +39,7 @@ function makeFakePrisma(existing: ExistingSnapshot = {}) {
     householdId: string | null;
   }[] = [];
   const deletedStudentIds: number[] = [];
+  const deletedHouseholdIds: string[] = [];
 
   const prisma: RosterPrisma = {
     student: {
@@ -76,10 +78,14 @@ function makeFakePrisma(existing: ExistingSnapshot = {}) {
           return { id, spaceNumber: d.spaceNumber };
         });
       },
+      deleteMany: async ({ where }) => {
+        deletedHouseholdIds.push(...where.id.in);
+        return {};
+      },
     },
   };
 
-  return { prisma, createdHouseholds, createdStudents, deletedStudentIds };
+  return { prisma, createdHouseholds, createdStudents, deletedStudentIds, deletedHouseholdIds };
 }
 
 function row(rowNumber: number, firstName: string, lastName: string, spaceNumber: number | null): RosterImportRow {
@@ -135,8 +141,8 @@ test("buildRosterImportPlan: flags students absent from the CSV as removals", ()
   const plan = buildRosterImportPlan(
     [row(2, "Ada", "Lovelace", 12)],
     snapshot([
-      { id: 1, firstName: "Ada", lastName: "Lovelace", homeRoom: "Room 12", spaceNumber: 12 },
-      { id: 2, firstName: "Grace", lastName: "Hopper", homeRoom: "Room 9", spaceNumber: 9 },
+      { id: 1, firstName: "Ada", lastName: "Lovelace", homeRoom: "Room 12", householdId: null, spaceNumber: 12 },
+      { id: 2, firstName: "Grace", lastName: "Hopper", homeRoom: "Room 9", householdId: null, spaceNumber: 9 },
     ]),
   );
 
@@ -155,7 +161,7 @@ test("buildRosterImportPlan: a student who changed homeroom is NOT a removal", (
   const plan = buildRosterImportPlan(
     [{ rowNumber: 2, firstName: "Ada", lastName: "Lovelace", homeRoom: "Room 99", spaceNumber: 12 }],
     snapshot([
-      { id: 1, firstName: "Ada", lastName: "Lovelace", homeRoom: "Room 12", spaceNumber: 12 },
+      { id: 1, firstName: "Ada", lastName: "Lovelace", homeRoom: "Room 12", householdId: null, spaceNumber: 12 },
     ]),
   );
 
@@ -167,7 +173,7 @@ test("buildRosterImportPlan: removal matching ignores case and surrounding space
   const plan = buildRosterImportPlan(
     [{ rowNumber: 2, firstName: "  ADA ", lastName: "lovelace", homeRoom: "Room 12", spaceNumber: 12 }],
     snapshot([
-      { id: 1, firstName: "Ada", lastName: "Lovelace", homeRoom: "Room 12", spaceNumber: 12 },
+      { id: 1, firstName: "Ada", lastName: "Lovelace", homeRoom: "Room 12", householdId: null, spaceNumber: 12 },
     ]),
   );
 
@@ -181,7 +187,7 @@ test("buildRosterImportPlan: an empty roster yields no removals", () => {
 });
 
 const EXISTING_GRACE: ExistingRosterSnapshot["students"] = [
-  { id: 7, firstName: "Grace", lastName: "Hopper", homeRoom: "Room 9", spaceNumber: 9 },
+  { id: 7, firstName: "Grace", lastName: "Hopper", homeRoom: "Room 9", householdId: null, spaceNumber: 9 },
 ];
 
 test("applyRosterImport: does NOT delete when prune is not requested", async () => {
@@ -226,4 +232,29 @@ test("applyRosterImport: prune with nothing to remove issues no delete", async (
   assert.equal(result.ok, true);
   assert.deepEqual(deletedStudentIds, []);
   assert.equal(result.ok && result.data.removed, 0);
+});
+
+test("applyRosterImport: prune deletes households it empties, and only those", async () => {
+  const { prisma, deletedHouseholdIds } = makeFakePrisma({
+    students: [
+      {
+        id: 7,
+        firstName: "Grace",
+        lastName: "Hopper",
+        homeRoom: "Room 9",
+        householdId: "h-old",
+        household: { spaceNumber: 9 },
+      },
+    ],
+  });
+
+  const result = await applyRosterImport(
+    prisma,
+    [row(2, "Ada", "Lovelace", 12)],
+    undefined,
+    { prune: true },
+  );
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(deletedHouseholdIds, ["h-old"]);
 });
