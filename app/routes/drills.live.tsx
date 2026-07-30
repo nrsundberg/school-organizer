@@ -388,6 +388,11 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
 
     if (intent === "update-state") {
+      // Write gate lives in the `!user` 401 at the top of this action, which
+      // is the server-side twin of `canEditDrillRun` in
+      // `app/domain/drills/edit-policy.ts`. Any signed-in org member may
+      // write (teachers usually carry role "VIEWER"); guests hold no User
+      // row and are rejected there. Keep the two in step.
       const raw = String(formData.get("state") ?? "");
       const clientId = String(formData.get("clientId") ?? "") || undefined;
       let parsed: unknown;
