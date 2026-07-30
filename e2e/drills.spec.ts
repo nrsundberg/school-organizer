@@ -19,9 +19,11 @@
  * probe off and the assertions run for real.
  */
 import { test, expect, type Page } from "@playwright/test";
+import { createClient, type Client as LibsqlClient } from "@libsql/client";
 import {
   test as flowTest,
   expect as flowExpect,
+  databaseUrl,
 } from "./fixtures/seeded-tenant";
 
 async function isOnAdminDrills(page: Page): Promise<boolean> {
@@ -211,13 +213,66 @@ test.describe("@smoke drills library — clone template", () => {
  *     `pickuproster_viewer_session` cookie via a Set-Cookie header on the
  *     redirect response — see e2e/flows/viewer-pin.spec.ts for the same
  *     selectors used against the real flow.
+ *
+ * This is the first seeded-tenant spec to create DrillTemplate / DrillRun
+ * rows, and teardownSeedRows in e2e/fixtures/seeded-tenant.ts has no
+ * DELETE for either table — it was written before any consumer needed
+ * one. Rather than grow the shared fixture's teardown for tables only
+ * this spec touches, clean up here in a `finally`, the same way
+ * e2e/admin-users-cross-tenant.spec.ts tears down its second-tenant rows:
+ * open a fresh libsql client, delete children before parents, and
+ * tolerate individual statement failures the same way
+ * teardownSeedRows/teardownSecondTenant already do (a leftover row under
+ * this test's unique per-spec orgId is harmless; a thrown teardown error
+ * masking a real assertion failure is not).
+ *
+ * Deletion order matters for FK: DrillRunEvent and
+ * DrillRunPresenceSample reference DrillRun.id (both onDelete: Cascade in
+ * the schema, but this deletes explicitly rather than depend on D1/SQLite
+ * actually having FK cascades enabled locally); DrillRun references
+ * DrillTemplate.id. Neither DrillRunEvent nor DrillRunPresenceSample has
+ * an orgId column, so both are scoped via a
+ * `runId IN (SELECT id FROM DrillRun WHERE orgId = ?)` subquery.
+ *
+ * This runs (and must finish) before the `tenant` fixture's own teardown
+ * — a test's `finally` resolves before Playwright's fixture-teardown
+ * queue runs — otherwise the fixture's `DELETE FROM "Org"` could fail
+ * under FK enforcement with these rows still pointing at it.
  */
+async function teardownDrillRows(
+  db: LibsqlClient,
+  orgId: string,
+): Promise<void> {
+  for (const stmt of [
+    {
+      sql: `DELETE FROM "DrillRunPresenceSample" WHERE runId IN (SELECT id FROM "DrillRun" WHERE orgId = ?)`,
+      args: [orgId],
+    },
+    {
+      sql: `DELETE FROM "DrillRunEvent" WHERE runId IN (SELECT id FROM "DrillRun" WHERE orgId = ?)`,
+      args: [orgId],
+    },
+    { sql: `DELETE FROM "DrillRun" WHERE orgId = ?`, args: [orgId] },
+    { sql: `DELETE FROM "DrillTemplate" WHERE orgId = ?`, args: [orgId] },
+  ]) {
+    try {
+      await db.execute(stmt);
+    } catch {
+      // Tolerate — same rationale as teardownSeedRows/teardownSecondTenant:
+      // the unique per-spec orgId means a failed cleanup here leaves a
+      // harmless orphan, not a correctness problem for any other spec.
+    }
+  }
+}
+
 flowTest.describe("@flow drills — guest read-only", () => {
   flowTest("magic-code guest sees a read-only live drill, not an error page", async ({
     page,
     browser,
     tenant,
   }) => {
+    const db = createClient({ url: databaseUrl() });
+    try {
     // Arrange 1: admin starts an EVERYONE drill.
     await page.context().addCookies([tenant.adminCookie]);
     await page.goto(tenant.tenantUrl("/admin/drills"));
@@ -297,5 +352,13 @@ flowTest.describe("@flow drills — guest read-only", () => {
     await flowExpect(guest.getByText(/not logged in/i)).toHaveCount(0);
 
     await guestContext.close();
+    } finally {
+      // Remove the DrillTemplate + DrillRun (+ dependents) this test
+      // creates so local D1/dev.db doesn't grow one of each per run. See
+      // the teardownDrillRows doc comment above for why this lives here
+      // instead of in the shared fixture.
+      await teardownDrillRows(db, tenant.orgId);
+      db.close();
+    }
   });
 });
