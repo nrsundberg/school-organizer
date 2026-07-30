@@ -29,7 +29,15 @@ type ExistingSnapshot = {
   spaces?: { spaceNumber: number }[];
 };
 
-function makeFakePrisma(existing: ExistingSnapshot = {}) {
+function makeFakePrisma(
+  existing: ExistingSnapshot = {},
+  // Students the snapshot still lists but that are already gone by the time
+  // the delete runs (a concurrent delete, or an id the tenant extension's
+  // injected orgId filters out). Prisma's deleteMany reports how many rows it
+  // actually removed; these ones contribute nothing to that count.
+  options: { vanishedStudentIds?: number[] } = {},
+) {
+  const vanished = new Set(options.vanishedStudentIds ?? []);
   const committed = new Map<number, string>(); // spaceNumber -> household id
   let hCounter = 0;
   let syntheticStudentId = 100_000; // ids for students createMany doesn't return
@@ -84,10 +92,12 @@ function makeFakePrisma(existing: ExistingSnapshot = {}) {
       },
       deleteMany: async ({ where }) => {
         deletedStudentIds.push(...where.id.in);
+        let count = 0;
         for (const id of where.id.in) {
-          studentHousehold.delete(id);
+          if (vanished.has(id)) continue;
+          if (studentHousehold.delete(id)) count += 1;
         }
-        return {};
+        return { count };
       },
     },
     teacher: {
@@ -488,6 +498,36 @@ test("applyRosterImport: confirmation can only shrink the fresh removal set", as
 
   assert.equal(result.ok, true);
   assert.deepEqual(deletedStudentIds, [7], "id 999 is not in the fresh plan and is ignored");
+});
+
+test("applyRosterImport: removed reports rows actually deleted, not rows requested", async () => {
+  // `removed` used to be `ids.length` — the intended count — so the toast and
+  // the audit row claimed deletions that never happened when a student had
+  // already been removed concurrently, or when the tenant extension's injected
+  // orgId filtered an id out.
+  const { prisma } = makeFakePrisma(
+    {
+      students: [
+        { id: 7, firstName: "Grace", lastName: "Hopper", homeRoom: "Room 9", householdId: null, household: null },
+        { id: 8, firstName: "Ghost", lastName: "Record", homeRoom: "Room 4", householdId: null, household: null },
+      ],
+    },
+    { vanishedStudentIds: [8] },
+  );
+
+  const result = await applyRosterImport(
+    prisma,
+    [row(2, "Ada", "Lovelace", 12), row(3, "Cy", "Turing", 13)],
+    undefined,
+    { prune: true, confirmedRemovalIds: [7, 8] },
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(
+    result.ok && result.data.removed,
+    1,
+    "only the row the database actually deleted is counted",
+  );
 });
 
 test("applyRosterImport: prune deletes households it empties, and only those", async () => {
