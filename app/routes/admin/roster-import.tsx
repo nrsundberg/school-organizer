@@ -43,7 +43,7 @@ import {
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
 import { auditOrgAction } from "~/domain/org/audit.server";
-import { protectToAdminAndGetPermissions } from "~/sessions.server";
+import { protectToAdminAndGetPermissions, requireRole } from "~/sessions.server";
 import { redirectWithSuccess } from "remix-toast";
 import { getAdminT } from "~/lib/t.server";
 
@@ -128,7 +128,7 @@ function readMappingFromForm(formData: FormData): ColumnMapping {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  await protectToAdminAndGetPermissions(context);
+  const user = await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const [studentCount, homeroomCount] = await Promise.all([
     prisma.student.count(),
@@ -139,6 +139,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return {
     studentCount,
     homeroomCount,
+    // Importing is open to CONTROLLERs; *deleting* the roster is not (see the
+    // ADMIN guard in the apply branch). Hide the prune control rather than
+    // offering a checkbox that bounces them to "Not Authorized".
+    canPrune: user.role === "ADMIN",
     metaTitle: t("rosterImport.metaTitle"),
   };
 }
@@ -275,6 +279,15 @@ export async function action({ request, context }: Route.ActionArgs) {
 
     // Opt-in and default-off: absent the checkbox, a re-import never deletes.
     const prune = formData.get("prune") === "on";
+
+    // `protectToAdminAndGetPermissions` admits ADMIN *and* CONTROLLER, which
+    // was right while roster import was purely additive. Pruning makes this
+    // route a bulk-delete surface, so it inherits the stricter guard the
+    // dashboard's "delete all students" already uses: destructive and
+    // irreversible-in-app means ADMIN only. Plain imports stay open.
+    if (prune) {
+      await requireRole(context, "ADMIN");
+    }
 
     // Names that were in the uploaded file but not in `rowsJson` (rows the
     // mapper rejected). Without them a prune deletes students whose only sin
@@ -496,7 +509,13 @@ function MappingPanel({ map }: { map: MapActionData }) {
   );
 }
 
-function PreviewPanel({ preview }: { preview: PreviewActionData }) {
+function PreviewPanel({
+  preview,
+  canPrune,
+}: {
+  preview: PreviewActionData;
+  canPrune: boolean;
+}) {
   const { t } = useTranslation("admin");
   const [skipInvalid, setSkipInvalid] = useState(false);
   // Defaults to false: deleting students is never the default outcome of an upload.
@@ -673,7 +692,7 @@ function PreviewPanel({ preview }: { preview: PreviewActionData }) {
         </label>
       ) : null}
 
-      {preview.plan.removals.length > 0 ? (
+      {canPrune && preview.plan.removals.length > 0 ? (
         <div className="mt-4 rounded-lg border border-amber-300/25 bg-amber-300/5 p-3">
           <label className="flex items-start gap-2 text-sm font-semibold text-amber-100">
             <input
@@ -839,7 +858,7 @@ export default function AdminRosterImport({ loaderData }: Route.ComponentProps) 
 
       {actionData?.stage === "map" ? <MappingPanel map={actionData} /> : null}
       {actionData?.stage === "preview" ? (
-        <PreviewPanel preview={actionData} />
+        <PreviewPanel preview={actionData} canPrune={loaderData.canPrune} />
       ) : null}
     </div>
   );
