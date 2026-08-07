@@ -31,6 +31,7 @@ import {
   type ActorIds,
 } from "~/domain/auth/impersonate-gate.server";
 import {
+  getPublicEnv,
   isMarketingHost,
   isPlatformAdmin,
   marketingOriginFromRequest,
@@ -93,7 +94,12 @@ export function buildResolveDeps(context: any): ResolveDeps {
     isPlatformAdmin: (user) => isPlatformAdmin(user, context),
     marketingOrigin: (request) => marketingOriginFromRequest(request, context),
     resolveTenantSlug: (request) => resolveTenantSlugFromHost(request, context),
-    tenantBoardUrl: (request, slug) => tenantBoardUrlFromRequest(request, slug),
+    tenantBoardUrl: (request, slug) =>
+      tenantBoardUrlFromRequest(
+        request,
+        slug,
+        getPublicEnv(context).PUBLIC_ROOT_DOMAIN,
+      ),
     now: () => new Date(),
   };
 }

@@ -68,3 +68,48 @@ test("tenantBoardUrlFromRequest apex marketing host", () => {
   );
   assert.equal(url, "https://maple.pickuproster.com/");
 });
+
+// Regression: signing in from a tenant host redirected to
+// tome.tome.pickuproster.com. schoolBoardHostname derived the root by
+// stripping only a leading "www.", so from a tenant host it prepended the
+// slug a second time. The root domain is now passed explicitly by every
+// server caller (PUBLIC_ROOT_DOMAIN); without it the helper can't tell
+// "tome.pickuproster.com" (tenant) from "pickuproster.co.uk" (apex).
+test("schoolBoardHostname: tenant host does not double the slug", () => {
+  assert.equal(
+    schoolBoardHostname("tome.pickuproster.com", "tome", "pickuproster.com"),
+    "tome.pickuproster.com",
+  );
+});
+
+test("schoolBoardHostname: switches tenants from another tenant's host", () => {
+  assert.equal(
+    schoolBoardHostname("other.pickuproster.com", "tome", "pickuproster.com"),
+    "tome.pickuproster.com",
+  );
+});
+
+test("schoolBoardHostname: multi-label staging root", () => {
+  assert.equal(
+    schoolBoardHostname("tome.staging.pickuproster.com", "tome", "staging.pickuproster.com"),
+    "tome.staging.pickuproster.com",
+  );
+  assert.equal(
+    schoolBoardHostname("staging.pickuproster.com", "tome", "staging.pickuproster.com"),
+    "tome.staging.pickuproster.com",
+  );
+});
+
+test("schoolBoardHostname: dev *.localhost does not double", () => {
+  assert.equal(schoolBoardHostname("tome.localhost", "tome"), "tome.localhost");
+  assert.equal(schoolBoardHostname("other.localhost", "tome"), "tome.localhost");
+});
+
+test("tenantBoardUrlFromRequest: signing in from a tenant host", () => {
+  const url = tenantBoardUrlFromRequest(
+    new Request("https://tome.pickuproster.com/login"),
+    "tome",
+    "pickuproster.com",
+  );
+  assert.equal(url, "https://tome.pickuproster.com/");
+});
