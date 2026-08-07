@@ -17,9 +17,13 @@ import {
   buildErrorReportCsv,
   buildRosterImportPlanFromDatabase,
   parseSerializedGrid,
+  parseSerializedPresentNameKeys,
+  parseSerializedRemovalIds,
   parseSerializedRosterRows,
   RosterImportError,
   serializeGrid,
+  serializePresentNameKeys,
+  serializeRemovalIds,
   serializeRosterRows,
   suggestColumnMapping,
   type ColumnMapping,
@@ -41,7 +45,11 @@ import {
   getTenantPrisma,
 } from "~/domain/utils/global-context.server";
 import { auditOrgAction } from "~/domain/org/audit.server";
-import { protectToAdminAndGetPermissions } from "~/sessions.server";
+import { enqueueEmails } from "~/domain/email/queue.server";
+import type { StudentsDeletedMessage } from "~/domain/email/types";
+import { getSupportEmail } from "~/lib/site";
+import { detectLocale } from "~/i18n.server";
+import { protectToAdminAndGetPermissions, requireRole } from "~/sessions.server";
 import { redirectWithSuccess } from "remix-toast";
 import { getAdminT } from "~/lib/t.server";
 
@@ -78,6 +86,16 @@ type PreviewActionData = {
   rowErrors: LocalizedRowError[];
   skippedBlank: number;
   rowsJson: string;
+  /**
+   * Names present in the uploaded file but NOT in `rowsJson` (rows that failed
+   * validation). Posted back on apply so a prune can refuse to delete them.
+   */
+  presentNameKeysJson: string;
+  /**
+   * The removal ids listed by name in this preview. Posted back on apply and
+   * intersected with the rebuilt plan, so the confirmation is binding.
+   */
+  confirmedRemovalIdsJson: string;
   errorReportCsv: string;
   planLimitError: string | null;
   canApply: boolean;
@@ -121,7 +139,7 @@ function readMappingFromForm(formData: FormData): ColumnMapping {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  await protectToAdminAndGetPermissions(context);
+  const user = await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const [studentCount, homeroomCount] = await Promise.all([
     prisma.student.count(),
@@ -132,6 +150,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return {
     studentCount,
     homeroomCount,
+    // Importing is open to CONTROLLERs; *deleting* the roster is not (see the
+    // ADMIN guard in the apply branch). Hide the prune control rather than
+    // offering a checkbox that bounces them to "Not Authorized".
+    canPrune: user.role === "ADMIN",
     metaTitle: t("rosterImport.metaTitle"),
   };
 }
@@ -163,7 +185,7 @@ async function usageErrorForPlan(
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
-  await protectToAdminAndGetPermissions(context);
+  const actor = await protectToAdminAndGetPermissions(context);
   const prisma = getTenantPrisma(context);
   const org = getOrgFromContext(context);
   const formData = await request.formData();
@@ -227,6 +249,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const plan = await buildRosterImportPlanFromDatabase(
       prisma as unknown as RosterPrisma,
       mapped.rows,
+      mapped.presentNameKeys,
     );
     const planLimitError = await usageErrorForPlan(context, plan);
     const rowErrors = mapped.rowErrors.map((err) => ({
@@ -242,6 +265,10 @@ export async function action({ request, context }: Route.ActionArgs) {
       rowErrors,
       skippedBlank: mapped.skippedBlank,
       rowsJson: serializeRosterRows(mapped.rows),
+      presentNameKeysJson: serializePresentNameKeys(mapped.presentNameKeys),
+      confirmedRemovalIdsJson: serializeRemovalIds(
+        plan.removals.map((r) => r.studentId),
+      ),
       errorReportCsv: buildErrorReportCsv(rowErrors),
       planLimitError,
       canApply,
@@ -264,9 +291,57 @@ export async function action({ request, context }: Route.ActionArgs) {
       return data<ActionData>({ stage: "error", error: message }, { status: 400 });
     }
 
+    // Opt-in and default-off: absent the checkbox, a re-import never deletes.
+    const prune = formData.get("prune") === "on";
+
+    // `protectToAdminAndGetPermissions` admits ADMIN *and* CONTROLLER, which
+    // was right while roster import was purely additive. Pruning makes this
+    // route a bulk-delete surface, so it inherits the stricter guard the
+    // dashboard's "delete all students" already uses: destructive and
+    // irreversible-in-app means ADMIN only. Plain imports stay open.
+    if (prune) {
+      await requireRole(context, "ADMIN");
+    }
+
+    // Names that were in the uploaded file but not in `rowsJson` (rows the
+    // mapper rejected). Without them a prune deletes students whose only sin
+    // was a bad value in an unrelated column, so when pruning this field is
+    // mandatory: a request that lacks it gets bounced back to preview rather
+    // than silently falling back to the unsafe, rows-only set.
+    let presentNameKeys: string[] = [];
+    let presentNameKeysMissing = false;
+    try {
+      presentNameKeys = parseSerializedPresentNameKeys(
+        formData.get("presentNameKeysJson"),
+      );
+    } catch {
+      presentNameKeysMissing = true;
+    }
+    // The removal ids the preview actually showed the admin. Apply intersects
+    // them with the freshly rebuilt plan, so the names on screen are the names
+    // deleted — a student enrolled since the preview is skipped rather than
+    // silently included. Mandatory when pruning, same as `presentNameKeysJson`.
+    let confirmedRemovalIds: number[] = [];
+    let confirmedRemovalIdsMissing = false;
+    try {
+      confirmedRemovalIds = parseSerializedRemovalIds(
+        formData.get("confirmedRemovalIdsJson"),
+      );
+    } catch {
+      confirmedRemovalIdsMissing = true;
+    }
+
+    if (prune && (presentNameKeysMissing || confirmedRemovalIdsMissing)) {
+      return data<ActionData>(
+        { stage: "error", error: t("rosterImport.errors.previewAgain") },
+        { status: 400 },
+      );
+    }
+
     const plan = await buildRosterImportPlanFromDatabase(
       prisma as unknown as RosterPrisma,
       rows,
+      presentNameKeys,
     );
     const planLimitError = await usageErrorForPlan(context, plan);
     if (planLimitError) {
@@ -276,6 +351,10 @@ export async function action({ request, context }: Route.ActionArgs) {
         rowErrors: [],
         skippedBlank: 0,
         rowsJson: serializeRosterRows(rows),
+        presentNameKeysJson: serializePresentNameKeys(presentNameKeys),
+        confirmedRemovalIdsJson: serializeRemovalIds(
+          plan.removals.map((r) => r.studentId),
+        ),
         errorReportCsv: buildErrorReportCsv([]),
         planLimitError,
         canApply: false,
@@ -288,6 +367,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       prisma as unknown as RosterPrisma,
       rows,
       plan,
+      { prune, confirmedRemovalIds },
     );
     if (!result.ok) {
       return data<ActionData>(
@@ -305,18 +385,37 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
 
     const message =
-      summary.newHomerooms > 0
-        ? t("rosterImport.actions.importedSummaryWithHomerooms", {
+      summary.removed > 0
+        ? t("rosterImport.actions.importedSummaryWithRemovals", {
             count: summary.created,
             created: summary.created,
             updated: summary.updated,
-            homerooms: summary.newHomerooms,
+            removed: summary.removed,
           })
-        : t("rosterImport.actions.importedSummary", {
-            count: summary.created,
-            created: summary.created,
-            updated: summary.updated,
-          });
+        : summary.newHomerooms > 0
+          ? t("rosterImport.actions.importedSummaryWithHomerooms", {
+              count: summary.created,
+              created: summary.created,
+              updated: summary.updated,
+              homerooms: summary.newHomerooms,
+            })
+          : t("rosterImport.actions.importedSummary", {
+              count: summary.created,
+              created: summary.created,
+              updated: summary.updated,
+            });
+
+    // Name the children. Deleting ONE student records firstName/lastName/
+    // suffix/homeRoom (see students.$studentId.tsx); without this the forensic
+    // record for deleting 200 was strictly worse than for deleting one, even
+    // though the plan already held every name. Capped so a large prune can't
+    // bloat the audit row; the overflow count keeps the total honest.
+    const AUDIT_NAME_CAP = 200;
+    const removedNames = summary.removedStudents.slice(0, AUDIT_NAME_CAP).map((s) => ({
+      firstName: s.firstName,
+      lastName: s.lastName,
+      homeRoom: s.homeRoom,
+    }));
 
     await auditOrgAction(context, request, {
       action: "roster.import.applied",
@@ -326,9 +425,69 @@ export async function action({ request, context }: Route.ActionArgs) {
       payload: {
         created: summary.created,
         updated: summary.updated,
+        removed: summary.removed,
         newHomerooms: summary.newHomerooms,
+        ...(summary.removedStudents.length > 0
+          ? {
+              removedStudents: removedNames,
+              removedStudentsOmitted: Math.max(
+                0,
+                summary.removedStudents.length - AUDIT_NAME_CAP,
+              ),
+              skippedRemovals: summary.skippedRemovals,
+            }
+          : {}),
       },
     });
+
+    // Same notification the dashboard's bulk delete sends, for the same
+    // reason: a surprise/accidental deletion should be caught while it is
+    // still recoverable from database backups. NOTE: User is NOT a
+    // tenant-scoped model (see tenant-extension.ts), so orgId MUST be filtered
+    // explicitly — otherwise this emails the admins of every org.
+    if (summary.removed > 0) {
+      const [locale, admins] = await Promise.all([
+        detectLocale(request, context),
+        prisma.user.findMany({
+          where: { orgId: org.id, role: "ADMIN" },
+          select: { email: true, locale: true },
+        }),
+      ]);
+      const actorLabel =
+        (actor.name && actor.name.trim().length > 0
+          ? actor.name
+          : (actor as { email?: string }).email) ?? t("dashboard.danger.unknownActor");
+      const deletedAt = new Date().toLocaleString(locale);
+      const supportEmail = getSupportEmail(context);
+
+      const messages: StudentsDeletedMessage[] = admins
+        .filter((a): a is { email: string; locale: string } => !!a.email)
+        .map((a) => ({
+          kind: "students_deleted" as const,
+          to: a.email,
+          orgName: org.name,
+          actorLabel,
+          deletedCount: summary.removed,
+          deletedAt,
+          source: "roster_import" as const,
+          locale: a.locale ?? "en",
+        }));
+      if (!messages.some((m) => m.to === supportEmail)) {
+        messages.push({
+          kind: "students_deleted",
+          to: supportEmail,
+          orgName: org.name,
+          actorLabel,
+          deletedCount: summary.removed,
+          deletedAt,
+          source: "roster_import",
+          isOps: true,
+          locale: "en",
+        });
+      }
+      await enqueueEmails(context, messages);
+    }
+
     return redirectWithSuccess("/admin/children", { message });
   }
 
@@ -338,20 +497,16 @@ export async function action({ request, context }: Route.ActionArgs) {
   );
 }
 
-function StatusBadge({ status }: { status: "new" | "update" | "error" }) {
+// Only "new" and "update" reach the preview table: invalid rows are reported
+// in the "Rows to fix" panel and never become plan rows.
+function StatusBadge({ status }: { status: RosterPreviewRow["status"] }) {
   const { t } = useTranslation("admin");
   const label =
-    status === "new"
-      ? t("rosterImport.status.new")
-      : status === "update"
-        ? t("rosterImport.status.update")
-        : t("rosterImport.status.error");
+    status === "new" ? t("rosterImport.status.new") : t("rosterImport.status.update");
   const classes =
     status === "new"
       ? "bg-emerald-500/15 text-emerald-200 border-emerald-500/30"
-      : status === "update"
-        ? "bg-blue-500/15 text-blue-200 border-blue-500/30"
-        : "bg-red-500/15 text-red-200 border-red-500/30";
+      : "bg-blue-500/15 text-blue-200 border-blue-500/30";
   return (
     <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${classes}`}>
       {label}
@@ -452,9 +607,17 @@ function MappingPanel({ map }: { map: MapActionData }) {
   );
 }
 
-function PreviewPanel({ preview }: { preview: PreviewActionData }) {
+function PreviewPanel({
+  preview,
+  canPrune,
+}: {
+  preview: PreviewActionData;
+  canPrune: boolean;
+}) {
   const { t } = useTranslation("admin");
   const [skipInvalid, setSkipInvalid] = useState(false);
+  // Defaults to false: deleting students is never the default outcome of an upload.
+  const [prune, setPrune] = useState(false);
   const visibleRows = preview.plan.rows.slice(0, 25);
   const hasErrors = preview.rowErrors.length > 0;
   const validRows = preview.plan.summary.validRows;
@@ -627,10 +790,48 @@ function PreviewPanel({ preview }: { preview: PreviewActionData }) {
         </label>
       ) : null}
 
+      {canPrune && preview.plan.removals.length > 0 ? (
+        <div className="mt-4 rounded-lg border border-amber-300/25 bg-amber-300/5 p-3">
+          <label className="flex items-start gap-2 text-sm font-semibold text-amber-100">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={prune}
+              onChange={(event) => setPrune(event.currentTarget.checked)}
+            />
+            {t("rosterImport.preview.prune", {
+              count: preview.plan.removals.length,
+            })}
+          </label>
+          <p className="mt-1.5 pl-6 text-xs text-white/60">
+            {t("rosterImport.preview.pruneWarning")}
+          </p>
+          <ul className="mt-2 max-h-40 overflow-y-auto pl-6 text-xs text-white/70">
+            {preview.plan.removals.map((r) => (
+              <li key={r.studentId}>
+                {r.firstName} {r.lastName}
+                {r.homeRoom ? ` · ${r.homeRoom}` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <Form method="post">
           <input type="hidden" name="intent" value="apply" />
           <input type="hidden" name="rowsJson" value={preview.rowsJson} />
+          <input
+            type="hidden"
+            name="presentNameKeysJson"
+            value={preview.presentNameKeysJson}
+          />
+          <input
+            type="hidden"
+            name="confirmedRemovalIdsJson"
+            value={preview.confirmedRemovalIdsJson}
+          />
+          <input type="hidden" name="prune" value={prune ? "on" : "off"} />
           <Button
             type="submit"
             variant="primary"
@@ -760,7 +961,7 @@ export default function AdminRosterImport({ loaderData }: Route.ComponentProps) 
 
       {actionData?.stage === "map" ? <MappingPanel map={actionData} /> : null}
       {actionData?.stage === "preview" ? (
-        <PreviewPanel preview={actionData} />
+        <PreviewPanel preview={actionData} canPrune={loaderData.canPrune} />
       ) : null}
     </div>
   );

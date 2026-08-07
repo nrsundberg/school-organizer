@@ -52,6 +52,26 @@
       "heading": "Terminar simulacro",
       "subhead": "¿Cómo se debe registrar en el historial?"
     },
+    "errorBoundary": {
+      "forbidden": {
+        "body": "Puedes seguir viendo y marcando la lista de verificación. Recarga la página o busca a un administrador para pausar, reanudar o terminar el simulacro.",
+        "heading": "Solo un administrador puede hacer eso"
+      },
+      "notFound": {
+        "body": "Este simulacro es solo para personal con sesión iniciada. Si necesitas acceso, pide ayuda a un administrador o inicia sesión como personal.",
+        "heading": "No disponible para ti"
+      },
+      "reload": "Recargar página",
+      "sessionExpired": {
+        "body": "El simulacro sigue en vivo. Recarga la página para iniciar sesión de nuevo y seguir viendo la lista de verificación.",
+        "heading": "Se cerró tu sesión"
+      },
+      "signIn": "Iniciar sesión",
+      "unexpected": {
+        "body": "No se pudo guardar ese cambio en la lista de verificación. Recarga la página para seguir viendo el simulacro — si vuelve a pasar, avisa a un administrador o usa otro dispositivo.",
+        "heading": "Algo salió mal"
+      }
+    },
     "errors": {
       "invalidStateJson": "JSON de estado inválido.",
       "missingRunId": "Falta el ID de la ejecución.",
@@ -74,6 +94,7 @@
       "editing": "{{label}} está editando…",
       "editingMany": "{{label}} + {{count}} editando"
     },
+    "readOnlyNotice": "Estás viendo como invitado. Las certificaciones, las notas y los seguimientos son de solo lectura.",
     "removeItem": "Eliminar tarea",
     "resume": "Reanudar simulacro",
     "savedIndicator": {

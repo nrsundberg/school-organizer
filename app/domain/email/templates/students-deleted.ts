@@ -3,8 +3,14 @@ import { getFixedT } from "~/lib/t.server";
 import { escapeHtml } from "../html";
 
 /**
- * Notification that all student records in an org were deleted via the
- * dashboard Danger Zone. Sent to every org admin and to Pickup Roster ops.
+ * Notification that student records in an org were deleted in bulk. Sent to
+ * every org admin and to Pickup Roster ops, so a surprise deletion is caught
+ * while it is still recoverable from database backups.
+ *
+ * Two sources share this template: the dashboard Danger Zone ("all student
+ * records") and a roster import run with removals enabled (a partial prune of
+ * students absent from the uploaded file). The `*Prune` copy variants keep the
+ * partial case from claiming the whole roster was wiped.
  *
  * i18n: copy lives under the `email.studentsDeleted.*` namespace. The
  * recipient's `locale` flows in from the queue message; default is English.
@@ -20,10 +26,16 @@ export async function renderStudentsDeleted(
     when: msg.deletedAt,
   };
 
-  const subject = t("studentsDeleted.subject", vars);
-  const preview = t("studentsDeleted.preview", vars);
+  const suffix = msg.source === "roster_import" ? "Prune" : "";
+  const subject = t(`studentsDeleted.subject${suffix}`, vars);
+  const preview = t(`studentsDeleted.preview${suffix}`, vars);
   const heading = t("studentsDeleted.heading");
-  const para1 = t(msg.isOps ? "studentsDeleted.para1Ops" : "studentsDeleted.para1", vars);
+  const para1 = t(
+    msg.isOps
+      ? `studentsDeleted.para1Ops${suffix}`
+      : `studentsDeleted.para1${suffix}`,
+    vars,
+  );
   const para2 = t("studentsDeleted.para2", vars);
   const recovery = t("studentsDeleted.recovery", vars);
   const signOff = t("common.signOff");

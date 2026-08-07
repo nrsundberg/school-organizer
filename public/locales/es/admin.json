@@ -1202,7 +1202,9 @@
       "importedSummary_one": "Se importó {{created}} estudiante nuevo y se actualizó {{updated}} estudiante existente.",
       "importedSummary_other": "Se importaron {{created}} estudiantes nuevos y se actualizaron {{updated}} estudiantes existentes.",
       "importedSummaryWithHomerooms_one": "Se importó {{created}} estudiante nuevo y se actualizó {{updated}} estudiante existente. Se creó {{homerooms}} salón principal.",
-      "importedSummaryWithHomerooms_other": "Se importaron {{created}} estudiantes nuevos y se actualizaron {{updated}} estudiantes existentes. Se crearon {{homerooms}} salones principales."
+      "importedSummaryWithHomerooms_other": "Se importaron {{created}} estudiantes nuevos y se actualizaron {{updated}} estudiantes existentes. Se crearon {{homerooms}} salones principales.",
+      "importedSummaryWithRemovals_one": "Se importó {{created}} estudiante nuevo, se actualizó {{updated}} existente y se eliminó {{removed}}.",
+      "importedSummaryWithRemovals_other": "Se importaron {{created}} estudiantes nuevos, se actualizaron {{updated}} existentes y se eliminaron {{removed}}."
     },
     "errors": {
       "chooseFile": "Elige un archivo CSV o Excel para continuar.",
@@ -1225,10 +1227,13 @@
       "fixRequired": "Se requiere corregir",
       "import_one": "Importar {{count}} fila",
       "import_other": "Importar {{count}} filas",
-      "intro": "Aún no se ha escrito nada. Al confirmar se crearán los salones principales y espacios faltantes, se crearán nuevos estudiantes y se actualizarán los estudiantes coincidentes por nombre, apellido y salón principal.",
+      "intro": "Todavía no se ha escrito nada. Al confirmar se crearán las aulas y los espacios del tablero que falten, se crearán los estudiantes nuevos y se actualizarán los estudiantes coincidentes por nombre, apellido y aula. Los estudiantes que ya están en la lista solo se eliminan si marcas la casilla de eliminación.",
       "moreErrors_one": "Más {{count}} error de fila adicional.",
       "moreErrors_other": "Más {{count}} errores de fila adicionales.",
       "noBlocking": "Sin errores bloqueantes",
+      "prune_one": "También eliminar {{count}} estudiante que ya no está en esta lista",
+      "prune_other": "También eliminar {{count}} estudiantes que ya no están en esta lista",
+      "pruneWarning": "Los estudiantes eliminados se borran de forma permanente y desaparecen del tablero. Se conserva su historial de recogida: los registros anteriores siguen en Actividad con su nombre. Se descartan las excepciones de salida pendientes.",
       "ready_one": "Listo para importar {{count}} fila",
       "ready_other": "Listo para importar {{count}} filas",
       "review": "Revisar antes de importar",

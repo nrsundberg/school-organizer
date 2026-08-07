@@ -1202,7 +1202,9 @@
       "importedSummary_one": "Imported {{created}} new student and updated {{updated}} existing student.",
       "importedSummary_other": "Imported {{created}} new students and updated {{updated}} existing students.",
       "importedSummaryWithHomerooms_one": "Imported {{created}} new student and updated {{updated}} existing student. Created {{homerooms}} homeroom.",
-      "importedSummaryWithHomerooms_other": "Imported {{created}} new students and updated {{updated}} existing students. Created {{homerooms}} homerooms."
+      "importedSummaryWithHomerooms_other": "Imported {{created}} new students and updated {{updated}} existing students. Created {{homerooms}} homerooms.",
+      "importedSummaryWithRemovals_one": "Imported {{created}} new student, updated {{updated}} existing student, and removed {{removed}}.",
+      "importedSummaryWithRemovals_other": "Imported {{created}} new students, updated {{updated}} existing students, and removed {{removed}}."
     },
     "errors": {
       "chooseFile": "Choose a CSV or Excel file to continue.",
@@ -1225,10 +1227,13 @@
       "fixRequired": "Fix required",
       "import_one": "Import {{count}} row",
       "import_other": "Import {{count}} rows",
-      "intro": "Nothing has been written yet. Confirming will create missing homerooms and board spaces, create new students, and update matching students by first name, last name, and homeroom.",
+      "intro": "Nothing has been written yet. Confirming will create missing homerooms and board spaces, create new students, and update matching students by first name, last name, and homeroom. Students already on the roll are only removed if you tick the removal box below.",
       "moreErrors_one": "Plus {{count}} more row error.",
       "moreErrors_other": "Plus {{count}} more row errors.",
       "noBlocking": "No blocking errors",
+      "prune_one": "Also remove {{count}} student who is no longer on this roster",
+      "prune_other": "Also remove {{count}} students who are no longer on this roster",
+      "pruneWarning": "Removed students are deleted permanently and disappear from the board. Their pickup history is kept — past call records stay in Activity under their name. Any upcoming dismissal exceptions for them are discarded.",
       "ready_one": "Ready to import {{count}} row",
       "ready_other": "Ready to import {{count}} rows",
       "review": "Review before importing",
