@@ -272,8 +272,8 @@ export type TeacherApplySummary = {
 export type TeacherWritePrisma = {
   teacher: {
     findMany: (args: { select: { homeRoom: true } }) => Promise<{ homeRoom: string }[]>;
-    create: (args: {
-      data: { homeRoom: string; teacherName: string };
+    createMany: (args: {
+      data: { homeRoom: string; teacherName: string }[];
     }) => Promise<unknown>;
     updateMany: (args: {
       where: { homeRoom: string };
@@ -293,6 +293,10 @@ export type InviteTeacherFn = (
  * expected — a single failed invite (already-exists, bad email) does not abort
  * the batch; every row's outcome is reported back.
  */
+/** Bound on concurrent invites — each is ~6 D1 round-trips, so we keep a few
+ *  in flight without flooding the Worker's subrequest budget. */
+const INVITE_CONCURRENCY = 8;
+
 export async function applyTeacherImport(
   prisma: TeacherWritePrisma,
   rows: TeacherImportRow[],
@@ -300,28 +304,55 @@ export async function applyTeacherImport(
 ): Promise<TeacherApplySummary> {
   const existing = await prisma.teacher.findMany({ select: { homeRoom: true } });
   const existingRooms = new Set(existing.map((t) => normalizeRoom(t.homeRoom)));
-  const createdRooms = new Set<string>();
 
-  const outcomes: TeacherApplyOutcome[] = [];
-  let teachersCreated = 0;
-
+  // Collapse rows to one entry per homeroom, last row winning the teacher name
+  // (the previous per-row updateMany loop had the same last-write-wins effect).
+  const roomByKey = new Map<string, { homeRoom: string; teacherName: string }>();
   for (const row of rows) {
-    const roomKey = normalizeRoom(row.homeRoom);
-    if (existingRooms.has(roomKey) || createdRooms.has(roomKey)) {
-      await prisma.teacher.updateMany({
-        where: { homeRoom: row.homeRoom },
-        data: { teacherName: row.name },
-      });
-    } else {
-      await prisma.teacher.create({
-        data: { homeRoom: row.homeRoom, teacherName: row.name },
-      });
-      createdRooms.add(roomKey);
-      teachersCreated += 1;
-    }
+    roomByKey.set(normalizeRoom(row.homeRoom), {
+      homeRoom: row.homeRoom,
+      teacherName: row.name,
+    });
+  }
+  const newRooms: { homeRoom: string; teacherName: string }[] = [];
+  const updateRooms: { homeRoom: string; teacherName: string }[] = [];
+  for (const [key, room] of roomByKey) {
+    (existingRooms.has(key) ? updateRooms : newRooms).push(room);
+  }
 
-    const result = await invite(row);
-    outcomes.push({ row: row.rowNumber, email: row.email, result });
+  // Batch the homeroom writes: a single createMany for new rooms, and the
+  // existing-room name refreshes in parallel — instead of one round-trip per
+  // row interleaved with the invites.
+  await Promise.all([
+    newRooms.length
+      ? prisma.teacher.createMany({ data: newRooms })
+      : Promise.resolve(),
+    ...updateRooms.map((r) =>
+      prisma.teacher.updateMany({
+        where: { homeRoom: r.homeRoom },
+        data: { teacherName: r.teacherName },
+      }),
+    ),
+  ]);
+  const teachersCreated = newRooms.length;
+
+  // Invites dominate the cost (~6 round-trips each). Run them in bounded
+  // concurrent batches rather than strictly sequentially. Emails were already
+  // deduped upstream (applyTeacherMapping), so concurrent invites can't race on
+  // the same address. A throwing invite is treated as "failed" so one bad row
+  // never aborts the batch.
+  const outcomes: TeacherApplyOutcome[] = new Array(rows.length);
+  for (let i = 0; i < rows.length; i += INVITE_CONCURRENCY) {
+    const batch = rows.slice(i, i + INVITE_CONCURRENCY);
+    const results = await Promise.all(
+      batch.map((row) =>
+        invite(row).catch(() => "failed" as const),
+      ),
+    );
+    results.forEach((result, j) => {
+      const row = batch[j];
+      outcomes[i + j] = { row: row.rowNumber, email: row.email, result };
+    });
   }
 
   return {

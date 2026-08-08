@@ -41,6 +41,8 @@
     "missingColumns": "CSV is missing required column(s): {{columns}}. Download the template for the expected format.",
     "previewMissing": "Missing roster rows to import. Preview the CSV again.",
     "previewUnreadable": "Could not read roster preview data. Preview the CSV again.",
+    "pruneExceedsFile": "Refusing to remove {{removals}} students when the file only contains {{rows}}. Check the column mapping and upload the full roster.",
+    "pruneNeedsRows": "Nothing to import, so nothing can be removed. Upload a roster file with at least one valid row before removing students.",
     "spaceNumberInvalid": "spaceNumber must be a positive whole number.",
     "tooManyRows": "CSV has {{rows}} rows; maximum is {{max}}.",
     "unsupportedColumns": "CSV has unsupported column(s): {{columns}}. Use firstName, lastName, homeRoom, and optional spaceNumber.",

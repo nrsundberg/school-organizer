@@ -1,18 +1,14 @@
 import { useFetcher } from "react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Popover, PopoverTrigger, PopoverContent } from "@heroui/react";
 import { Send } from "lucide-react";
 import { XCircleIcon } from "lucide-react";
 import { type Space, Status } from "~/db/browser";
+import { hasAged } from "~/domain/board/aging";
+import { useAgingClock } from "~/hooks/useAgingClock";
+import { useObservedActiveAt } from "~/hooks/useObservedActiveAt";
 import LanguageSwitcher from "~/components/LanguageSwitcher";
-
-const TIMEOUT_MS = 30000;
-
-function isTimedOut(timestamp: string | null | undefined): boolean {
-  if (!timestamp) return false;
-  return Date.now() - new Date(timestamp).getTime() > TIMEOUT_MS;
-}
 
 export default function MobileCallerView({
   spaces,
@@ -43,6 +39,10 @@ export default function MobileCallerView({
       return 0;
     })
     .slice(0, 20);
+
+  // Resilient clock: ages the active-space chips yellow→green on a steady tick
+  // and re-syncs on every return-to-foreground (no manual refresh needed).
+  const now = useAgingClock(activeSpaces.length > 0);
 
   const parsedNumber = parseInt(input);
   const isValid =
@@ -145,6 +145,7 @@ export default function MobileCallerView({
               <ActiveSpaceItem
                 key={space.spaceNumber}
                 space={space}
+                now={now}
                 onClear={handleClear}
               />
             ))}
@@ -157,22 +158,16 @@ export default function MobileCallerView({
 
 function ActiveSpaceItem({
   space,
+  now,
   onClear,
 }: {
   space: Space;
+  now: number;
   onClear: (spaceNumber: number) => void;
 }) {
   const { t } = useTranslation("roster");
-  const [, forceTick] = useState(0);
-  useEffect(() => {
-    if (!space.timestamp) return;
-    const remaining = TIMEOUT_MS - (Date.now() - new Date(space.timestamp).getTime());
-    if (remaining <= 0) return;
-    const id = setTimeout(() => forceTick((t) => t + 1), remaining + 50);
-    return () => clearTimeout(id);
-  }, [space.timestamp]);
-
-  const timedOut = isTimedOut(space.timestamp);
+  const observedAt = useObservedActiveAt(true, space.timestamp);
+  const timedOut = hasAged(observedAt, now);
   const bg = timedOut ? "bg-green-400/20 border-green-400/40" : "bg-yellow-400/20 border-yellow-400/40";
   const icon = timedOut ? "text-green-400" : "text-yellow-400";
   const text = timedOut ? "text-green-300" : "text-yellow-300";

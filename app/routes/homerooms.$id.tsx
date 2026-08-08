@@ -27,21 +27,35 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     status: Status;
   }
 
-  const studentReturn: Student[] = [];
+  // Resolve every referenced space's status in a single query instead of one
+  // findFirst per student (a 25-student room was 25 serial round-trips).
+  const spaceNumbers = [
+    ...new Set(
+      students
+        .map((s) => s.household?.spaceNumber)
+        .filter((n): n is number => n != null)
+    )
+  ];
+  const spaces = spaceNumbers.length
+    ? await prisma.space.findMany({
+        where: { spaceNumber: { in: spaceNumbers } },
+        select: { spaceNumber: true, status: true }
+      })
+    : [];
+  const statusBySpace = new Map(spaces.map((s) => [s.spaceNumber, s.status]));
 
-  for (let student of students) {
+  const studentReturn: Student[] = students.map((student) => {
     const spaceNumber = student.household?.spaceNumber ?? null;
-    let spaceStatus = await prisma.space.findFirst({
-      where: { spaceNumber: spaceNumber ?? 0 },
-      select: { status: true }
-    });
-    studentReturn.push({
+    return {
       firstName: student.firstName,
       lastName: student.lastName,
       spaceNumber,
-      status: spaceStatus ? spaceStatus.status : Status.EMPTY
-    });
-  }
+      status:
+        spaceNumber != null
+          ? (statusBySpace.get(spaceNumber) ?? Status.EMPTY)
+          : Status.EMPTY
+    };
+  });
 
   return studentReturn;
 }

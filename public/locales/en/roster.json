@@ -52,6 +52,26 @@
       "heading": "End drill",
       "subhead": "How should this be recorded in the history?"
     },
+    "errorBoundary": {
+      "forbidden": {
+        "body": "You can still watch and check off the checklist. Reload the page, or find an admin to pause, resume, or end the drill.",
+        "heading": "Only an admin can do that"
+      },
+      "notFound": {
+        "body": "This drill is for signed-in staff only. If you need access, ask an admin or sign in as staff.",
+        "heading": "Not available to you"
+      },
+      "reload": "Reload page",
+      "sessionExpired": {
+        "body": "This drill is still live. Reload the page to sign back in and keep watching the checklist.",
+        "heading": "You've been signed out"
+      },
+      "signIn": "Sign in",
+      "unexpected": {
+        "body": "The checklist couldn't save that change. Reload the page to keep watching the drill — if it happens again, tell an admin or use another device.",
+        "heading": "Something went wrong"
+      }
+    },
     "errors": {
       "invalidStateJson": "Invalid state JSON.",
       "missingRunId": "Missing run id.",
@@ -74,6 +94,7 @@
       "editing": "{{label}} is editing…",
       "editingMany": "{{label}} + {{count}} editing"
     },
+    "readOnlyNotice": "You're watching as a guest. Attestations, notes, and follow-ups are read-only.",
     "removeItem": "Remove item",
     "resume": "Resume drill",
     "savedIndicator": {
@@ -88,6 +109,7 @@
       "resumed": "Drill resumed."
     },
     "viewerRoster": {
+      "ariaLabel": "Live viewers",
       "guestsLabel_one": "{{count}} viewer",
       "guestsLabel_other": "{{count}} viewers",
       "guestsTooltip": "Anonymous viewers",
@@ -100,6 +122,10 @@
     "spaceLabel": "Space {{number}}"
   },
   "index": {
+    "controls": {
+      "close": "Close",
+      "toggle": "Filters & recent"
+    },
     "drawing": {
       "clear": "Clear ({{count}})",
       "clear_one": "Clear ({{count}})",

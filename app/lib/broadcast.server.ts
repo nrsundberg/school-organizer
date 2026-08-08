@@ -106,6 +106,28 @@ export async function broadcastDrillUpdate(
   });
 }
 
+/**
+ * A drill just transitioned into LIVE. This is a rare, lightweight "wake up"
+ * signal — distinct from `drillUpdate` (which fires on every state change) so
+ * that the global takeover listener (`useLiveDrillTakeover`) can revalidate
+ * exactly once per drill start and let the root loader decide who gets pulled
+ * into `/drills/live`. Carries only `runId` for optional filtering; recipients
+ * derive everything else from the loader.
+ */
+export async function broadcastDrillStarted(
+  env: Env,
+  orgId: string,
+  runId: string,
+) {
+  const id = env.BINGO_BOARD.idFromName(orgId);
+  const stub = env.BINGO_BOARD.get(id);
+  await stub.fetch("https://internal/broadcast", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "drillStarted", runId }),
+  });
+}
+
 export async function broadcastDrillActivity(
   env: Env,
   orgId: string,

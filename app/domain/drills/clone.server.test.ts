@@ -8,6 +8,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { getGlobalTemplate } from "./library";
 import type { TemplateDefinition } from "./types";
+import * as cloneModule from "./clone.server";
 
 interface FakeTeacherRow {
   id: number;
@@ -86,16 +87,10 @@ class FakePrisma {
   }
 }
 
-// Try to import — same pattern as live.server.test so a missing schema
-// doesn't break the rest of the test run.
-type CloneModule = typeof import("./clone.server");
-let mod: CloneModule | null = null;
-let importError: unknown = null;
-try {
-  mod = await import("./clone.server");
-} catch (err) {
-  importError = err;
-}
+// The module under test; its helpers take a Prisma client argument, so the
+// FakePrisma stand-in below drives them without a real DB.
+type CloneModule = typeof cloneModule;
+const { cloneGlobalTemplateToOrg, fanOutClassRollWithTeachers } = cloneModule;
 
 function P(p: FakePrisma): Parameters<CloneModule["cloneGlobalTemplateToOrg"]>[0] {
   return p as unknown as Parameters<CloneModule["cloneGlobalTemplateToOrg"]>[0];
@@ -103,184 +98,175 @@ function P(p: FakePrisma): Parameters<CloneModule["cloneGlobalTemplateToOrg"]>[0
 
 const ORG = "org-test";
 
-if (!mod) {
-  describe("clone.server — SKIPPED", () => {
-    it("could not import clone.server.ts", { skip: true }, () => {
-      console.error("clone.server import failed:", importError);
-    });
-  });
-} else {
-  const { cloneGlobalTemplateToOrg, fanOutClassRollWithTeachers } = mod;
 
-  // -------------------------------------------------------------------------
-  // Direct unit tests for the pure fan-out helper.
-  // -------------------------------------------------------------------------
-  describe("fanOutClassRollWithTeachers", () => {
-    it("zero teachers → returns the definition unchanged", () => {
-      const def = getGlobalTemplate("fire-evacuation")!.definition;
-      const out = fanOutClassRollWithTeachers(def, []);
-      assert.equal(out.rows.length, def.rows.length);
-      assert.deepEqual(out.rows, def.rows);
-    });
-
-    it("no Teacher column → returns the definition unchanged", () => {
-      const def: TemplateDefinition = {
-        columns: [
-          { id: "area", label: "Area", kind: "text" },
-          { id: "ok", label: "OK", kind: "toggle" },
-        ],
-        rows: [{ id: "r1", cells: { area: "Lobby" } }],
-      };
-      const out = fanOutClassRollWithTeachers(def, [
-        { id: 1, homeRoom: "Smith" },
-      ]);
-      assert.deepEqual(out.rows, def.rows);
-    });
+// -------------------------------------------------------------------------
+// Direct unit tests for the pure fan-out helper.
+// -------------------------------------------------------------------------
+describe("fanOutClassRollWithTeachers", () => {
+  it("zero teachers → returns the definition unchanged", () => {
+    const def = getGlobalTemplate("fire-evacuation")!.definition;
+    const out = fanOutClassRollWithTeachers(def, []);
+    assert.equal(out.rows.length, def.rows.length);
+    assert.deepEqual(out.rows, def.rows);
   });
 
-  // -------------------------------------------------------------------------
-  // Integration-ish tests via cloneGlobalTemplateToOrg.
-  // -------------------------------------------------------------------------
-  describe("cloneGlobalTemplateToOrg — fire-evacuation (single section)", () => {
-    it("fans out to one row per teacher with teacher cell filled", async () => {
-      const fake = new FakePrisma();
-      fake.seedTeachers([
-        { id: 1, orgId: ORG, homeRoom: "Smith - K" },
-        { id: 2, orgId: ORG, homeRoom: "Jones 3" },
-        { id: 3, orgId: ORG, homeRoom: "Patel - 5" },
-      ]);
+  it("no Teacher column → returns the definition unchanged", () => {
+    const def: TemplateDefinition = {
+      columns: [
+        { id: "area", label: "Area", kind: "text" },
+        { id: "ok", label: "OK", kind: "toggle" },
+      ],
+      rows: [{ id: "r1", cells: { area: "Lobby" } }],
+    };
+    const out = fanOutClassRollWithTeachers(def, [
+      { id: 1, homeRoom: "Smith" },
+    ]);
+    assert.deepEqual(out.rows, def.rows);
+  });
+});
 
-      const created = await cloneGlobalTemplateToOrg(P(fake), ORG, "fire-evacuation");
-      const def = created.definition as unknown as TemplateDefinition;
+// -------------------------------------------------------------------------
+// Integration-ish tests via cloneGlobalTemplateToOrg.
+// -------------------------------------------------------------------------
+describe("cloneGlobalTemplateToOrg — fire-evacuation (single section)", () => {
+  it("fans out to one row per teacher with teacher cell filled", async () => {
+    const fake = new FakePrisma();
+    fake.seedTeachers([
+      { id: 1, orgId: ORG, homeRoom: "Smith - K" },
+      { id: 2, orgId: ORG, homeRoom: "Jones 3" },
+      { id: 3, orgId: ORG, homeRoom: "Patel - 5" },
+    ]);
 
-      assert.equal(def.rows.length, 3, "expected one row per teacher");
+    const created = await cloneGlobalTemplateToOrg(P(fake), ORG, "fire-evacuation");
+    const def = created.definition as unknown as TemplateDefinition;
 
-      const teacherCells = def.rows.map((r) => r.cells.teacher);
-      assert.deepEqual(teacherCells, ["Jones 3", "Patel - 5", "Smith - K"]);
+    assert.equal(def.rows.length, 3, "expected one row per teacher");
 
-      // Row ids should be stable + derived from teacher.id.
-      const ids = def.rows.map((r) => r.id).sort();
-      assert.deepEqual(ids, ["teacher-1", "teacher-2", "teacher-3"]);
+    const teacherCells = def.rows.map((r) => r.cells.teacher);
+    assert.deepEqual(teacherCells, ["Jones 3", "Patel - 5", "Smith - K"]);
 
-      // Grade cells should be derived from homeRoom where possible.
-      const gradeCells = def.rows.map((r) => r.cells.grade);
-      assert.ok(gradeCells.includes("K"));
-      assert.ok(gradeCells.includes("3"));
-      assert.ok(gradeCells.includes("5"));
+    // Row ids should be stable + derived from teacher.id.
+    const ids = def.rows.map((r) => r.id).sort();
+    assert.deepEqual(ids, ["teacher-1", "teacher-2", "teacher-3"]);
 
-      // Per-row defaults from the prototype row should be preserved.
-      assert.ok(
-        def.rows.every((r) => r.cells["assembly-point"]?.length > 0),
-        "expected assembly-point default to be carried over from prototype row",
-      );
+    // Grade cells should be derived from homeRoom where possible.
+    const gradeCells = def.rows.map((r) => r.cells.grade);
+    assert.ok(gradeCells.includes("K"));
+    assert.ok(gradeCells.includes("3"));
+    assert.ok(gradeCells.includes("5"));
 
-      // Columns and other fields untouched.
-      assert.equal(def.columns.length, 5);
-      assert.equal(created.globalKey, "fire-evacuation");
-      assert.equal(created.orgId, ORG);
-    });
+    // Per-row defaults from the prototype row should be preserved.
+    assert.ok(
+      def.rows.every((r) => r.cells["assembly-point"]?.length > 0),
+      "expected assembly-point default to be carried over from prototype row",
+    );
 
-    it("falls back to library rows when org has zero teachers", async () => {
-      const fake = new FakePrisma();
-      const created = await cloneGlobalTemplateToOrg(P(fake), ORG, "fire-evacuation");
-      const def = created.definition as unknown as TemplateDefinition;
-      const source = getGlobalTemplate("fire-evacuation")!.definition;
-      // Verbatim — original ids and grade labels preserved.
-      assert.deepEqual(
-        def.rows.map((r) => r.id),
-        source.rows.map((r) => r.id),
-      );
-      assert.deepEqual(
-        def.rows.map((r) => r.cells.grade),
-        source.rows.map((r) => r.cells.grade),
-      );
-    });
+    // Columns and other fields untouched.
+    assert.equal(def.columns.length, 5);
+    assert.equal(created.globalKey, "fire-evacuation");
+    assert.equal(created.orgId, ORG);
   });
 
-  describe("cloneGlobalTemplateToOrg — multi-section templates", () => {
-    it("lockdown-srp: only class-roll section is fanned out; staff-actions preserved", async () => {
-      const fake = new FakePrisma();
-      fake.seedTeachers([
-        { id: 10, orgId: ORG, homeRoom: "Mrs. A - K" },
-        { id: 11, orgId: ORG, homeRoom: "Mr. B - 1" },
-      ]);
+  it("falls back to library rows when org has zero teachers", async () => {
+    const fake = new FakePrisma();
+    const created = await cloneGlobalTemplateToOrg(P(fake), ORG, "fire-evacuation");
+    const def = created.definition as unknown as TemplateDefinition;
+    const source = getGlobalTemplate("fire-evacuation")!.definition;
+    // Verbatim — original ids and grade labels preserved.
+    assert.deepEqual(
+      def.rows.map((r) => r.id),
+      source.rows.map((r) => r.id),
+    );
+    assert.deepEqual(
+      def.rows.map((r) => r.cells.grade),
+      source.rows.map((r) => r.cells.grade),
+    );
+  });
+});
 
-      const created = await cloneGlobalTemplateToOrg(P(fake), ORG, "lockdown-srp");
-      const def = created.definition as unknown as TemplateDefinition;
-      const source = getGlobalTemplate("lockdown-srp")!.definition;
+describe("cloneGlobalTemplateToOrg — multi-section templates", () => {
+  it("lockdown-srp: only class-roll section is fanned out; staff-actions preserved", async () => {
+    const fake = new FakePrisma();
+    fake.seedTeachers([
+      { id: 10, orgId: ORG, homeRoom: "Mrs. A - K" },
+      { id: 11, orgId: ORG, homeRoom: "Mr. B - 1" },
+    ]);
 
-      const staffRows = def.rows.filter((r) => r.sectionId === "staff-actions");
-      const rollRows = def.rows.filter((r) => r.sectionId === "class-roll");
+    const created = await cloneGlobalTemplateToOrg(P(fake), ORG, "lockdown-srp");
+    const def = created.definition as unknown as TemplateDefinition;
+    const source = getGlobalTemplate("lockdown-srp")!.definition;
 
-      // Staff actions are untouched (same count, same ids, same item text).
-      const sourceStaff = source.rows.filter((r) => r.sectionId === "staff-actions");
-      assert.equal(staffRows.length, sourceStaff.length);
-      assert.deepEqual(
-        staffRows.map((r) => r.id),
-        sourceStaff.map((r) => r.id),
-      );
-      assert.deepEqual(
-        staffRows.map((r) => r.cells.item),
-        sourceStaff.map((r) => r.cells.item),
-      );
+    const staffRows = def.rows.filter((r) => r.sectionId === "staff-actions");
+    const rollRows = def.rows.filter((r) => r.sectionId === "class-roll");
 
-      // Class-roll rows replaced with one per teacher.
-      assert.equal(rollRows.length, 2);
-      const teacherCells = rollRows.map((r) => r.cells.teacher).sort();
-      assert.deepEqual(teacherCells, ["Mr. B - 1", "Mrs. A - K"]);
-      // Each fanned row keeps the section id so it renders under the right
-      // heading on the run screen.
-      assert.ok(rollRows.every((r) => r.sectionId === "class-roll"));
-    });
+    // Staff actions are untouched (same count, same ids, same item text).
+    const sourceStaff = source.rows.filter((r) => r.sectionId === "staff-actions");
+    assert.equal(staffRows.length, sourceStaff.length);
+    assert.deepEqual(
+      staffRows.map((r) => r.id),
+      sourceStaff.map((r) => r.id),
+    );
+    assert.deepEqual(
+      staffRows.map((r) => r.cells.item),
+      sourceStaff.map((r) => r.cells.item),
+    );
 
-    it("bus-evacuation: no class-roll section → driver-actions and student-roll untouched", async () => {
-      const fake = new FakePrisma();
-      fake.seedTeachers([
-        { id: 20, orgId: ORG, homeRoom: "Smith - K" },
-        { id: 21, orgId: ORG, homeRoom: "Jones - 1" },
-      ]);
-
-      const created = await cloneGlobalTemplateToOrg(P(fake), ORG, "bus-evacuation");
-      const def = created.definition as unknown as TemplateDefinition;
-      const source = getGlobalTemplate("bus-evacuation")!.definition;
-
-      // Bus-evacuation has no Teacher column AND no class-roll section, so
-      // the template should round-trip untouched.
-      assert.deepEqual(
-        def.rows.map((r) => r.id),
-        source.rows.map((r) => r.id),
-      );
-      assert.deepEqual(
-        def.rows.map((r) => r.sectionId),
-        source.rows.map((r) => r.sectionId),
-      );
-    });
+    // Class-roll rows replaced with one per teacher.
+    assert.equal(rollRows.length, 2);
+    const teacherCells = rollRows.map((r) => r.cells.teacher).sort();
+    assert.deepEqual(teacherCells, ["Mr. B - 1", "Mrs. A - K"]);
+    // Each fanned row keeps the section id so it renders under the right
+    // heading on the run screen.
+    assert.ok(rollRows.every((r) => r.sectionId === "class-roll"));
   });
 
-  describe("cloneGlobalTemplateToOrg — orgId scoping", () => {
-    it("only includes teachers from the requested org", async () => {
-      const fake = new FakePrisma();
-      fake.seedTeachers([
-        { id: 1, orgId: ORG, homeRoom: "Smith - K" },
-        { id: 2, orgId: "other-org", homeRoom: "OtherOrg Teacher" },
-      ]);
-      const created = await cloneGlobalTemplateToOrg(P(fake), ORG, "fire-evacuation");
-      const def = created.definition as unknown as TemplateDefinition;
-      assert.equal(def.rows.length, 1);
-      assert.equal(def.rows[0].cells.teacher, "Smith - K");
-    });
-  });
+  it("bus-evacuation: no class-roll section → driver-actions and student-roll untouched", async () => {
+    const fake = new FakePrisma();
+    fake.seedTeachers([
+      { id: 20, orgId: ORG, homeRoom: "Smith - K" },
+      { id: 21, orgId: ORG, homeRoom: "Jones - 1" },
+    ]);
 
-  describe("cloneGlobalTemplateToOrg — bad input", () => {
-    it("throws 404 Response for unknown globalKey", async () => {
-      const fake = new FakePrisma();
-      try {
-        await cloneGlobalTemplateToOrg(P(fake), ORG, "no-such-template");
-        assert.fail("expected throw");
-      } catch (err) {
-        assert.ok(err instanceof Response);
-        assert.equal((err as Response).status, 404);
-      }
-    });
+    const created = await cloneGlobalTemplateToOrg(P(fake), ORG, "bus-evacuation");
+    const def = created.definition as unknown as TemplateDefinition;
+    const source = getGlobalTemplate("bus-evacuation")!.definition;
+
+    // Bus-evacuation has no Teacher column AND no class-roll section, so
+    // the template should round-trip untouched.
+    assert.deepEqual(
+      def.rows.map((r) => r.id),
+      source.rows.map((r) => r.id),
+    );
+    assert.deepEqual(
+      def.rows.map((r) => r.sectionId),
+      source.rows.map((r) => r.sectionId),
+    );
   });
-}
+});
+
+describe("cloneGlobalTemplateToOrg — orgId scoping", () => {
+  it("only includes teachers from the requested org", async () => {
+    const fake = new FakePrisma();
+    fake.seedTeachers([
+      { id: 1, orgId: ORG, homeRoom: "Smith - K" },
+      { id: 2, orgId: "other-org", homeRoom: "OtherOrg Teacher" },
+    ]);
+    const created = await cloneGlobalTemplateToOrg(P(fake), ORG, "fire-evacuation");
+    const def = created.definition as unknown as TemplateDefinition;
+    assert.equal(def.rows.length, 1);
+    assert.equal(def.rows[0].cells.teacher, "Smith - K");
+  });
+});
+
+describe("cloneGlobalTemplateToOrg — bad input", () => {
+  it("throws 404 Response for unknown globalKey", async () => {
+    const fake = new FakePrisma();
+    try {
+      await cloneGlobalTemplateToOrg(P(fake), ORG, "no-such-template");
+      assert.fail("expected throw");
+    } catch (err) {
+      assert.ok(err instanceof Response);
+      assert.equal((err as Response).status, 404);
+    }
+  });
+});

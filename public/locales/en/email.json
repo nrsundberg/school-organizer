@@ -70,6 +70,10 @@
     "para1": "{{actor}} deleted all student records for {{orgName}} on {{when}} — {{count}} records in total. Households and classrooms were kept.",
     "para1Ops": "Heads up: {{actor}} deleted all {{count}} student records for {{orgName}} on {{when}} via the dashboard Danger Zone. Households and classrooms were kept.",
     "para2": "If you expected this, no action is needed.",
-    "recovery": "If this was a mistake, the data can still be recovered from database backups for a limited time. Reply to this email or contact support@pickuproster.com as soon as possible."
+    "recovery": "If this was a mistake, the data can still be recovered from database backups for a limited time. Reply to this email or contact support@pickuproster.com as soon as possible.",
+    "subjectPrune": "{{count}} student records removed from {{orgName}}",
+    "previewPrune": "{{actor}} removed {{count}} student records during a roster import.",
+    "para1Prune": "{{actor}} imported a roster for {{orgName}} on {{when}} and removed {{count}} student records that were no longer on the uploaded list. Pickup history for those students is kept.",
+    "para1OpsPrune": "Heads up: {{actor}} removed {{count}} student records from {{orgName}} on {{when}} via a roster import with removals enabled. Pickup history for those students is kept."
   }
 }

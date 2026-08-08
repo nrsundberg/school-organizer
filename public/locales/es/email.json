@@ -70,6 +70,10 @@
     "para1": "{{actor}} eliminó todos los registros de estudiantes de {{orgName}} el {{when}}: {{count}} registros en total. Se conservaron los hogares y las aulas.",
     "para1Ops": "Aviso: {{actor}} eliminó los {{count}} registros de estudiantes de {{orgName}} el {{when}} desde la Zona de peligro del panel. Se conservaron los hogares y las aulas.",
     "para2": "Si esperabas esto, no es necesario hacer nada.",
-    "recovery": "Si fue un error, los datos aún se pueden recuperar desde las copias de seguridad durante un tiempo limitado. Responde a este correo o contacta con support@pickuproster.com lo antes posible."
+    "recovery": "Si fue un error, los datos aún se pueden recuperar desde las copias de seguridad durante un tiempo limitado. Responde a este correo o contacta con support@pickuproster.com lo antes posible.",
+    "subjectPrune": "Se eliminaron {{count}} registros de estudiantes de {{orgName}}",
+    "previewPrune": "{{actor}} eliminó {{count}} registros de estudiantes durante una importación de lista.",
+    "para1Prune": "{{actor}} importó una lista para {{orgName}} el {{when}} y eliminó {{count}} registros de estudiantes que ya no aparecían en el archivo subido. Se conserva el historial de recogida de esos estudiantes.",
+    "para1OpsPrune": "Aviso: {{actor}} eliminó {{count}} registros de estudiantes de {{orgName}} el {{when}} mediante una importación de lista con eliminaciones activadas. Se conserva el historial de recogida de esos estudiantes."
   }
 }
