@@ -48,20 +48,57 @@ export function suggestOrgSlugsFromName(orgName: string): string[] {
 
 /**
  * Hostname for the school's subdomain board URL (matches dev *.localhost and prod *.root).
+ *
+ * `rootDomain` is the configured PUBLIC_ROOT_DOMAIN — "pickuproster.com" in
+ * production, "staging.pickuproster.com" on staging. Pass it whenever it is
+ * available; every server caller has it via `getPublicEnv(context)`. It is
+ * what lets the board host be built from the ROOT rather than from whatever
+ * host the request happened to arrive on.
+ *
+ * Without it this treats the current host as the root (minus a leading
+ * "www."), which is correct on the marketing apex but silently wrong on a
+ * tenant host: signing in at tome.pickuproster.com used to redirect to
+ * tome.tome.pickuproster.com, because the slug was prepended to a host that
+ * already carried it. The fallback cannot fix that on its own — from the
+ * hostname alone, "tome.pickuproster.com" and "pickuproster.co.uk" are the
+ * same shape, so guessing which label is a tenant would break real apexes.
+ *
+ * The one client-side caller (the signup slug preview) has no access to
+ * PUBLIC_ROOT_DOMAIN and always runs on the marketing host, where the
+ * fallback is already correct.
  */
-export function schoolBoardHostname(hostname: string, slug: string): string {
+export function schoolBoardHostname(
+  hostname: string,
+  slug: string,
+  rootDomain?: string,
+): string {
   const h = hostname.toLowerCase().split(":")[0];
-  const root = h.startsWith("www.") ? h.slice(4) : h;
   const safe = slugifyOrgName(slug) || slug.trim().toLowerCase();
-  if (!safe) return root;
-  if (root === "localhost") return `${safe}.localhost`;
+  if (!safe) return h.startsWith("www.") ? h.slice(4) : h;
+
+  const configuredRoot = (rootDomain ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/^\.+|\.+$/g, "");
+  if (configuredRoot) return `${safe}.${configuredRoot}`;
+
+  // No configured root. Dev hosts are unambiguous — everything under
+  // .localhost has "localhost" as its root — so a tenant host can be
+  // rebuilt safely there without knowing the config.
+  if (h === "localhost" || h.endsWith(".localhost")) return `${safe}.localhost`;
+
+  const root = h.startsWith("www.") ? h.slice(4) : h;
   return `${safe}.${root}`;
 }
 
 /** Absolute board URL for a tenant slug; preserves scheme and port from the current request. */
-export function tenantBoardUrlFromRequest(request: Request, slug: string): string {
+export function tenantBoardUrlFromRequest(
+  request: Request,
+  slug: string,
+  rootDomain?: string,
+): string {
   const u = new URL(request.url);
-  const boardHost = schoolBoardHostname(u.hostname, slug);
+  const boardHost = schoolBoardHostname(u.hostname, slug, rootDomain);
   const port = u.port;
   const origin =
     port !== ""

@@ -47,7 +47,11 @@ import {
   PopoverTrigger
 } from "@heroui/react";
 import { useBingoWebSocket } from "~/hooks/useBingoWebSocket";
+import { useAgingClock } from "~/hooks/useAgingClock";
+import { useObservedActiveAt } from "~/hooks/useObservedActiveAt";
+import { hasAged } from "~/domain/board/aging";
 import MobileCallerView from "~/components/MobileCallerView";
+import { BoardControlsDrawer } from "~/components/board/BoardControlsDrawer";
 import confetti from "canvas-confetti";
 import { endOfUtcDay, toDateInputValue } from "~/domain/dismissal/schedule";
 
@@ -210,21 +214,9 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
     setHomeroomFilter(searchParams.get("room") ?? "");
   }, [searchParams]);
 
-  // Aging safety tick. A called tile shows "fresh" yellow for the first 30s,
-  // then ages to green (see isTimedOut/TIMEOUT_MS). Each tile schedules its own
-  // one-shot timer for that single flip — but a one-shot timer has no recovery:
-  // if it's ever dropped or coalesced while the board sits idle, the tile stays
-  // yellow until the next render, which today only happens on a manual refresh.
-  // A low-frequency board tick re-renders the grid so every tile re-evaluates
-  // its age and self-heals, with no server round-trip. Runs only while at least
-  // one tile is ACTIVE; the per-tile effects don't re-run (their deps are
-  // unchanged), so this adds a cheap recompute, not timer churn.
-  const [, setAgingTick] = useState(0);
-  useEffect(() => {
-    if (!spaces.some((s) => s.status === Status.ACTIVE)) return;
-    const id = setInterval(() => setAgingTick((n) => n + 1), 5000);
-    return () => clearInterval(id);
-  }, [spaces]);
+  // Tile yellow→green aging is driven by a single resilient clock inside
+  // `ParkingRows` (see `useAgingClock`), so it self-heals on every
+  // return-to-foreground — no board-level timer needed here.
 
   useBingoWebSocket({
     onSpaceUpdate: ({ spaceNumber, status, timestamp }) => {
@@ -409,6 +401,17 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
           <option
             key={room.homeRoom}
             value={room.homeRoom}
+            // Show "Room — Teacher" so rooms that share a surname-based label
+            // (e.g. "Bishop" / "Bishop 2") are distinguishable. The room is
+            // included in the label too, so when `teacherName` is null we fall
+            // back to just the room rather than an empty label. The `value`
+            // stays the homeRoom label, so the `?room=` filter contract is
+            // unchanged.
+            label={
+              room.teacherName && room.teacherName !== room.homeRoom
+                ? `${room.homeRoom} — ${room.teacherName}`
+                : room.homeRoom
+            }
             className="bg-gray-900 text-white"
           />
         ))}
@@ -442,7 +445,7 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
   // Controllers see a tabbed view: keypad or board (default board; preference persisted)
   if (role === "CONTROLLER") {
     return (
-      <Page user={user}>
+      <Page user={user} fitViewport>
         {noticePanel}
         <ControllerTabView
           spaces={spaces}
@@ -460,18 +463,19 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
   // a controller) can actually mark tiles, gated server-side in
   // /update/:space and /empty/:space.
   return (
-    <Page user={user}>
+    <Page user={user} fitViewport>
       {noticePanel}
-      <div className="flex flex-col gap-3 md:flex-row md:justify-center md:gap-0">
-        {/* Mobile controls: homeroom selector + recent queue above grid */}
-        <div className="w-full px-4 pt-3 text-center md:hidden">
-          {homeroomFilterControl}
-          {recentQueueContent}
-        </div>
 
-        {/* Read-only board */}
+      {/* Mobile controls: collapsible overlay so they never steal board height */}
+      <BoardControlsDrawer>
+        {homeroomFilterControl}
+        {recentQueueContent}
+      </BoardControlsDrawer>
+
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row md:justify-center md:gap-0">
+        {/* Read-only board — always fits the viewport (no page scroll) */}
         <div
-          className="grid w-full font-extrabold text-large text-center relative md:w-5/6"
+          className="relative grid w-full min-h-0 flex-1 auto-rows-fr overflow-hidden font-extrabold text-large text-center md:w-5/6 md:flex-none"
           onPointerDown={showViewerDrawing ? onPointerDown : undefined}
           onPointerMove={showViewerDrawing ? onPointerMove : undefined}
           onPointerUp={showViewerDrawing ? onPointerEnd : undefined}
@@ -483,6 +487,7 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
             data={spaces}
             cols={cols}
             permitted={false}
+            fill
             onDrawingSpace={showViewerDrawing ? handleDrawingSpace : undefined}
           />
           {showViewerDrawing ? (
@@ -502,9 +507,11 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
         </div>
 
         {/* Desktop sidebar */}
-        <div className="hidden h-[80vh] gap-3 py-2 text-center md:block">
+        <div className="hidden min-h-0 flex-col gap-3 py-2 text-center md:flex">
           <div className="max-w-xs px-4 pt-4">{homeroomFilterControl}</div>
-          {recentQueueContent}
+          <div className="min-h-0 flex-1 overflow-y-auto px-4">
+            {recentQueueContent}
+          </div>
         </div>
       </div>
     </Page>
@@ -563,6 +570,24 @@ function ControllerTabView({
     setTab(initialPreference === "controller" ? "controller" : "board");
   }, [initialPreference]);
 
+  // Board tab: jump the tab bar out of view on load (and whenever we switch back
+  // to the board) so the tiles fill the frame — mirrors Page's header jump. The
+  // tab bar stays just above the fold; scroll/swipe up to reach it (e.g. to
+  // switch to the keypad).
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (tab !== "board") return;
+    const port = scrollRef.current;
+    const stage = stageRef.current;
+    if (!port || !stage) return;
+    // Align the board stage's top with the scroll port's top (i.e. scroll the
+    // tab bar out of view). Uses live rects rather than offsetTop so it stays
+    // correct regardless of offsetParent or a cancellation notice above.
+    const delta = stage.getBoundingClientRect().top - port.getBoundingClientRect().top;
+    if (delta) port.scrollTop += delta;
+  }, [tab]);
+
   const persist = (next: "controller" | "board") => {
     setTab(next);
     fetcher.submit(
@@ -572,8 +597,11 @@ function ControllerTabView({
   };
 
   return (
-    <div className="flex flex-col w-full">
-      <div className="flex border-b border-white/10 mb-4">
+    <div
+      ref={scrollRef}
+      className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <div className="flex flex-none border-b border-white/10 mb-2">
         <button
           type="button"
           onClick={() => persist("board")}
@@ -599,18 +627,21 @@ function ControllerTabView({
       </div>
 
       {tab === "controller" ? (
-        <MobileCallerView
-          spaces={spaces}
-          onSpaceChange={onSpaceChange}
-          maxSpaceNumber={maxSpaceNumber}
-        />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <MobileCallerView
+            spaces={spaces}
+            onSpaceChange={onSpaceChange}
+            maxSpaceNumber={maxSpaceNumber}
+          />
+        </div>
       ) : (
-        <div className="flex justify-center">
-          <div className="grid w-full md:w-5/6 font-extrabold text-large text-center">
+        <div ref={stageRef} className="flex h-full shrink-0 justify-center">
+          <div className="relative grid h-full w-full auto-rows-fr overflow-hidden font-extrabold text-large text-center md:w-5/6 md:flex-none">
             <ParkingRows
               data={spaces}
               cols={10}
               permitted={true}
+              fill
               onSpaceChange={onSpaceChange}
             />
           </div>
@@ -625,6 +656,7 @@ function ParkingRows({
   cols,
   permitted,
   compact = false,
+  fill = false,
   onDrawingSpace,
   onSpaceChange,
 }: {
@@ -632,9 +664,17 @@ function ParkingRows({
   data: Space[];
   permitted: boolean;
   compact?: boolean;
+  // `fill` makes rows/tiles stretch to share the board's height (fit-to-screen)
+  // instead of using a fixed per-tile min-height.
+  fill?: boolean;
   onDrawingSpace?: (spaceNumber: number) => void;
   onSpaceChange?: (spaceNumber: number, status: string) => void;
 }) {
+  // One resilient clock for the whole grid: ticks while any tile is ACTIVE and
+  // re-syncs on every return-to-foreground, so tiles age yellow→green without a
+  // manual refresh. Drives a re-render of every ParkingTile below.
+  const now = useAgingClock(data.some((s) => s.status === Status.ACTIVE));
+
   const newData = [];
   for (let i = 0; i < data.length; i += cols) {
     newData.push(data.slice(i, i + cols));
@@ -646,6 +686,8 @@ function ParkingRows({
       cols={cols}
       permitted={permitted}
       compact={compact}
+      fill={fill}
+      now={now}
       onDrawingSpace={onDrawingSpace}
       onSpaceChange={onSpaceChange}
     />
@@ -657,6 +699,8 @@ function ParkingRow({
   cols,
   permitted,
   compact = false,
+  fill = false,
+  now,
   onDrawingSpace,
   onSpaceChange,
 }: {
@@ -664,14 +708,19 @@ function ParkingRow({
   data: Space[];
   permitted: boolean;
   compact?: boolean;
+  fill?: boolean;
+  now: number;
   onDrawingSpace?: (spaceNumber: number) => void;
   onSpaceChange?: (spaceNumber: number, status: string) => void;
 }) {
   const columnClass =
     cols === 10 ? "grid-cols-10" : cols === 15 ? "grid-cols-15" : "";
+  // In fill mode the row stretches to its grid track (the board uses
+  // `auto-rows-fr`), and its tiles stretch to fill that height.
+  const rowClass = `grid${fill ? " h-full" : ""}${columnClass ? ` ${columnClass}` : ""}`;
   return (
     <div
-      className={columnClass ? `grid ${columnClass}` : "grid"}
+      className={rowClass}
       style={
         columnClass
           ? undefined
@@ -688,6 +737,8 @@ function ParkingRow({
           space={it}
           permitted={permitted}
           compact={compact}
+          fill={fill}
+          now={now}
           onDrawingSpace={onDrawingSpace}
           onSpaceChange={onSpaceChange}
         />
@@ -696,32 +747,27 @@ function ParkingRow({
   );
 }
 
-const TIMEOUT_MS = 30000;
-
 function ParkingTile({
   space,
   permitted,
   compact = false,
+  fill = false,
+  now,
   onDrawingSpace,
   onSpaceChange,
 }: {
   space: Space;
   permitted: boolean;
   compact?: boolean;
+  fill?: boolean;
+  now: number;
   onDrawingSpace?: (spaceNumber: number) => void;
   onSpaceChange?: (spaceNumber: number, status: string) => void;
 }) {
   const { t } = useTranslation("roster");
   const { timestamp, status, spaceNumber } = space;
-  const [, forceTick] = useState(0);
-  useEffect(() => {
-    if (status !== Status.ACTIVE || !timestamp) return;
-    const remaining = TIMEOUT_MS - (Date.now() - new Date(timestamp).getTime());
-    if (remaining <= 0) return;
-    const id = setTimeout(() => forceTick((t) => t + 1), remaining + 50);
-    return () => clearTimeout(id);
-  }, [status, timestamp]);
-  const color = tileColor(status, isTimedOut(status, timestamp));
+  const observedAt = useObservedActiveAt(status === Status.ACTIVE, timestamp);
+  const color = tileColor(status, hasAged(observedAt, now));
 
   const fetcher = useFetcher();
 
@@ -757,7 +803,20 @@ function ParkingTile({
 
   // Non-compact tiles get a larger touch target on small screens (WCAG 2.5.5 — 44x44).
   // Compact view is for the controller board, which is densely packed for quick scan.
-  const commonClasses = `w-full border border-black flex items-center justify-center drop-shadow-sm select-none ${compact ? "min-h-[24px] text-[10px] px-0 leading-none" : "min-h-[44px] md:min-h-[30px] text-sm px-0.5 leading-none"}`;
+  // Fill mode (fit-to-screen) drops the fixed min-height so tiles stretch to
+  // share the board's height; the number stays legible via a clamped font.
+  const sizeClasses = compact
+    ? "min-h-[24px] text-[10px] px-0 leading-none"
+    : fill
+      ? "h-full min-h-0 overflow-hidden text-[clamp(9px,2.2vw,14px)] px-0.5 leading-none"
+      : "min-h-[44px] md:min-h-[30px] text-sm px-0.5 leading-none";
+  const commonClasses = `w-full border border-black flex items-center justify-center drop-shadow-sm select-none ${sizeClasses}`;
+  // In fill mode tiles compress to share the board height; the lucide arrow
+  // defaults to a rigid 24px that won't shrink, so on a dense board every
+  // ACTIVE tile forces its row taller than its fr share and the board overflows
+  // past the viewport. Scale the arrow with the tile's font (1em) and let it
+  // shrink so it never sets the row height.
+  const iconClass = fill ? "h-[1em] w-[1em] min-h-0 shrink-0" : "";
 
   return permitted ? (
     status === Status.EMPTY ? (
@@ -780,7 +839,7 @@ function ParkingTile({
               aria-label={t("index.tile.ariaActive", { spaceNumber })}
               className={`${color} ${commonClasses} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D500] focus-visible:z-10`}
             >
-              <Send aria-hidden="true" />
+              <Send aria-hidden="true" className={iconClass} />
               {spaceNumber}
             </button>
           </PopoverTrigger>
@@ -803,7 +862,7 @@ function ParkingTile({
       className={`${color} ${commonClasses} w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E9D500] focus-visible:z-10 ${onDrawingSpace ? "cursor-crosshair opacity-95" : ""}`}
       onClick={() => onDrawingSpace?.(spaceNumber)}
     >
-      {status === Status.ACTIVE && <Send aria-hidden="true" />}
+      {status === Status.ACTIVE && <Send aria-hidden="true" className={iconClass} />}
       {spaceNumber}
     </button>
   );
@@ -864,11 +923,6 @@ function ViewerDrawingOverlay({
       ))}
     </svg>
   );
-}
-
-function isTimedOut(status: Status, timestamp: string | null): boolean {
-  if (status !== Status.ACTIVE || !timestamp) return false;
-  return new Date().getTime() - new Date(timestamp).getTime() > TIMEOUT_MS;
 }
 
 function tileColor(status: Status, timedOut?: boolean) {

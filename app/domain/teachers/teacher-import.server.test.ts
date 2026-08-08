@@ -92,8 +92,8 @@ test("applyTeacherImport: creates new homerooms, updates existing, tallies outco
   const prisma: TeacherWritePrisma = {
     teacher: {
       findMany: async () => [{ homeRoom: "Room 101" }], // 101 exists, 202 new
-      create: async ({ data }) => {
-        created.push(data.homeRoom);
+      createMany: async ({ data }) => {
+        created.push(...data.map((d) => d.homeRoom));
         return {};
       },
       updateMany: async ({ where }) => {
@@ -109,7 +109,7 @@ test("applyTeacherImport: creates new homerooms, updates existing, tallies outco
   const summary = await applyTeacherImport(prisma, rows(), invite);
 
   assert.deepEqual(created, ["Room 202"], "only the new homeroom is created once");
-  assert.deepEqual(updated, ["Room 101", "Room 101"], "existing homeroom updated per row");
+  assert.deepEqual(updated, ["Room 101"], "existing homeroom updated once (deduped)");
   assert.equal(summary.teachersCreated, 1);
   assert.equal(summary.invited, 2);
   assert.equal(summary.existing, 1);
@@ -121,7 +121,7 @@ test("applyTeacherImport: a failed invite does not abort the batch", async () =>
   const prisma: TeacherWritePrisma = {
     teacher: {
       findMany: async () => [],
-      create: async () => ({}),
+      createMany: async () => ({}),
       updateMany: async () => ({}),
     },
   };

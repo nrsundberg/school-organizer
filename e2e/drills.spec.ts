@@ -19,6 +19,12 @@
  * probe off and the assertions run for real.
  */
 import { test, expect, type Page } from "@playwright/test";
+import { createClient, type Client as LibsqlClient } from "@libsql/client";
+import {
+  test as flowTest,
+  expect as flowExpect,
+  databaseUrl,
+} from "./fixtures/seeded-tenant";
 
 async function isOnAdminDrills(page: Page): Promise<boolean> {
   // We're "on" the admin drills page if the URL stuck and a Drill-related
@@ -173,5 +179,186 @@ test.describe("@smoke drills library — clone template", () => {
     await expect(
       fireRowAfter.getByText(/Already cloned/i).first(),
     ).toBeVisible({ timeout: 10000 });
+  });
+});
+
+/**
+ * Guest read-only e2e — uses the seeded-tenant fixture (see
+ * e2e/fixtures/seeded-tenant.ts) instead of the graceful-skip pattern
+ * above, because it needs a real admin session AND a real viewer-pin
+ * session, neither of which the anonymous-probe tests above can produce.
+ *
+ * Two flows, discovered by reading the routes before writing this test:
+ *
+ * (a) Starting an EVERYONE drill: `DrillTemplate.defaultAudience` defaults
+ *     to "EVERYONE" in the Prisma schema, and `StartLivePopover` (rendered
+ *     per-template on /admin/drills) hard-codes its hidden `audience`
+ *     input to that template's `defaultAudience`. So a freshly created
+ *     blank template needs no audience change — clicking "Start live
+ *     drill" then confirming in the popover starts an EVERYONE run
+ *     (app/routes/admin/drills.tsx `intent === "start-live"`, which
+ *     redirects to /drills/live on success). The popover's trigger button
+ *     and its confirm button share the exact same label ("Start live
+ *     drill" — see public/locales/en/admin.json `drills.list.startLive`
+ *     and `drills.list.startConfirm.confirm`), so the confirm click is
+ *     disambiguated via `button[type="submit"]` (the trigger is
+ *     type="button") rather than by name.
+ *
+ * (b) Claiming a viewer-pin session: `/viewer-access` (app/routes/
+ *     viewer-access.tsx) is a PIN form, not a token link — the fixture's
+ *     `tenant.viewerPin` is the plaintext PIN for the seeded
+ *     AppSettings.viewerPinHash. Submitting it drives the real action
+ *     (`verifyViewerPinAndIssueSession` in
+ *     app/domain/auth/viewer-access.server.ts), which issues a genuine
+ *     `pickuproster_viewer_session` cookie via a Set-Cookie header on the
+ *     redirect response — see e2e/flows/viewer-pin.spec.ts for the same
+ *     selectors used against the real flow.
+ *
+ * This is the first seeded-tenant spec to create DrillTemplate / DrillRun
+ * rows, and teardownSeedRows in e2e/fixtures/seeded-tenant.ts has no
+ * DELETE for either table — it was written before any consumer needed
+ * one. Rather than grow the shared fixture's teardown for tables only
+ * this spec touches, clean up here in a `finally`, the same way
+ * e2e/admin-users-cross-tenant.spec.ts tears down its second-tenant rows:
+ * open a fresh libsql client, delete children before parents, and
+ * tolerate individual statement failures the same way
+ * teardownSeedRows/teardownSecondTenant already do (a leftover row under
+ * this test's unique per-spec orgId is harmless; a thrown teardown error
+ * masking a real assertion failure is not).
+ *
+ * Deletion order matters for FK: DrillRunEvent and
+ * DrillRunPresenceSample reference DrillRun.id (both onDelete: Cascade in
+ * the schema, but this deletes explicitly rather than depend on D1/SQLite
+ * actually having FK cascades enabled locally); DrillRun references
+ * DrillTemplate.id. Neither DrillRunEvent nor DrillRunPresenceSample has
+ * an orgId column, so both are scoped via a
+ * `runId IN (SELECT id FROM DrillRun WHERE orgId = ?)` subquery.
+ *
+ * This runs (and must finish) before the `tenant` fixture's own teardown
+ * — a test's `finally` resolves before Playwright's fixture-teardown
+ * queue runs — otherwise the fixture's `DELETE FROM "Org"` could fail
+ * under FK enforcement with these rows still pointing at it.
+ */
+async function teardownDrillRows(
+  db: LibsqlClient,
+  orgId: string,
+): Promise<void> {
+  for (const stmt of [
+    {
+      sql: `DELETE FROM "DrillRunPresenceSample" WHERE runId IN (SELECT id FROM "DrillRun" WHERE orgId = ?)`,
+      args: [orgId],
+    },
+    {
+      sql: `DELETE FROM "DrillRunEvent" WHERE runId IN (SELECT id FROM "DrillRun" WHERE orgId = ?)`,
+      args: [orgId],
+    },
+    { sql: `DELETE FROM "DrillRun" WHERE orgId = ?`, args: [orgId] },
+    { sql: `DELETE FROM "DrillTemplate" WHERE orgId = ?`, args: [orgId] },
+  ]) {
+    try {
+      await db.execute(stmt);
+    } catch {
+      // Tolerate — same rationale as teardownSeedRows/teardownSecondTenant:
+      // the unique per-spec orgId means a failed cleanup here leaves a
+      // harmless orphan, not a correctness problem for any other spec.
+    }
+  }
+}
+
+flowTest.describe("@flow drills — guest read-only", () => {
+  flowTest("magic-code guest sees a read-only live drill, not an error page", async ({
+    page,
+    browser,
+    tenant,
+  }) => {
+    const db = createClient({ url: databaseUrl() });
+    try {
+    // Arrange 1: admin starts an EVERYONE drill.
+    await page.context().addCookies([tenant.adminCookie]);
+    await page.goto(tenant.tenantUrl("/admin/drills"));
+
+    const templateName = `E2E Guest RO ${Date.now()}`;
+    await page.getByLabel("Name").fill(templateName);
+    await page.getByRole("button", { name: /create blank/i }).click();
+
+    // Landed on the template editor (/admin/drills/:id).
+    await page.waitForURL(/\/admin\/drills\/[^/]+$/, { timeout: 15000 });
+
+    // Back on the list, the new template's row has a "Start live drill"
+    // trigger. Its defaultAudience is "EVERYONE" (schema default), which
+    // the popover's hidden `audience` field mirrors, so no audience
+    // change is needed before confirming.
+    await page.goto(tenant.tenantUrl("/admin/drills"));
+    await page
+      .getByRole("button", { name: /^start live drill$/i })
+      .first()
+      .click();
+
+    await flowExpect(page.getByText(/visible to:.*everyone/i)).toBeVisible();
+
+    // The confirm button shares its accessible name with the trigger
+    // button, so disambiguate on the real DOM attribute that differs
+    // between them (trigger is type="button", confirm is type="submit").
+    await page
+      .locator('button[type="submit"]')
+      .filter({ hasText: /start live drill/i })
+      .click();
+
+    // The fetcher submission doesn't navigate this admin tab (the action
+    // redirects, but the popover has no explicit close-on-success either —
+    // both are pre-existing UI quirks, not something this test should
+    // paper over). What DOES prove the run is live: /admin/drills's own
+    // loader shows an "Open live page" link once an active run exists, and
+    // the fetcher's automatic revalidation re-runs that loader after the
+    // POST resolves. Wait on that real signal instead of a URL change.
+    await flowExpect(
+      page.getByRole("link", { name: /open live page/i }),
+    ).toBeVisible({ timeout: 15000 });
+
+    // Arrange 2: a SEPARATE context with no admin cookie claims a viewer
+    // link, so the guest genuinely holds only a viewer-pin session.
+    const guestContext = await browser.newContext();
+    const guest = await guestContext.newPage();
+
+    await guest.goto(tenant.tenantUrl("/viewer-access"));
+    await guest.getByPlaceholder("Access code").fill(tenant.viewerPin);
+    // The action redirects to "/", but with a live EVERYONE drill running
+    // (per Arrange 1), the root loader immediately bounces in-audience
+    // callers on to /drills/live (see the "Wake idle clients" comment in
+    // app/routes/admin/drills.tsx) — so this guest may land on either,
+    // depending on timing. Either way confirms the real claim flow ran.
+    await Promise.all([
+      guest.waitForURL(
+        (u) => u.pathname === "/" || u.pathname === "/drills/live",
+        { timeout: 15000 },
+      ),
+      guest.getByRole("button", { name: /^continue$/i }).click(),
+    ]);
+
+    await guest.goto(tenant.tenantUrl("/drills/live"));
+
+    // The read-only notice renders...
+    await flowExpect(guest.getByText(/watching as a guest/i)).toBeVisible();
+
+    // ...attest buttons are inert...
+    await flowExpect(
+      guest.getByRole("button", { name: /attest all-clear/i }).first(),
+    ).toBeDisabled();
+
+    // ...the notes field is inert...
+    await flowExpect(guest.getByRole("textbox").first()).toBeDisabled();
+
+    // ...and the page is still the drill, not the root error boundary.
+    await flowExpect(guest.getByText(/not logged in/i)).toHaveCount(0);
+
+    await guestContext.close();
+    } finally {
+      // Remove the DrillTemplate + DrillRun (+ dependents) this test
+      // creates so local D1/dev.db doesn't grow one of each per run. See
+      // the teardownDrillRows doc comment above for why this lives here
+      // instead of in the shared fixture.
+      await teardownDrillRows(db, tenant.orgId);
+      db.close();
+    }
   });
 });

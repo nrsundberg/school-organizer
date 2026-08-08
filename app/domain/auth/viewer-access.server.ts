@@ -4,11 +4,11 @@ import {
   verifyPassword,
 } from "~/domain/auth/better-auth.server";
 import { getOrgFromContext, getTenantPrisma } from "~/domain/utils/global-context.server";
+import { VIEWER_SESSION_DAYS } from "./viewer-access.constants";
 
 const VIEWER_FID_COOKIE = "pickuproster_viewer_fid";
 const VIEWER_SESSION_COOKIE = "pickuproster_viewer_session";
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-const VIEWER_SESSION_DAYS = 180;
 
 type Ctx = { request: Request; context: any };
 
@@ -137,8 +137,11 @@ export async function getViewerLockState(ctx: Ctx): Promise<{
   return { locked: false, message: null, setCookie, clientKey, ipHint: hint };
 }
 
-async function createViewerSession(context: any, source: "pin" | "magic"): Promise<{ token: string; expiresAt: Date }> {
-  const prisma = getTenantPrisma(context);
+async function createViewerSession(
+  context: any,
+  source: "pin" | "magic",
+  prisma: ReturnType<typeof getTenantPrisma> = getTenantPrisma(context),
+): Promise<{ token: string; expiresAt: Date }> {
   const token = randomToken(24);
   const tokenHash = await sha256Hex(token);
   const expiresAt = new Date(Date.now() + VIEWER_SESSION_DAYS * ONE_DAY_MS);
@@ -296,19 +299,25 @@ export async function createViewerMagicLink(context: any, createdByUserId: strin
   return rawToken;
 }
 
-export async function consumeViewerMagicLink(ctx: Ctx, rawToken: string): Promise<{ ok: true; headers: Headers } | { ok: false; message: string; headers: Headers }> {
-  const prisma = getTenantPrisma(ctx.context);
+export async function consumeViewerMagicLink(
+  ctx: Ctx,
+  rawToken: string,
+  prisma: ReturnType<typeof getTenantPrisma> = getTenantPrisma(ctx.context),
+): Promise<{ ok: true; headers: Headers } | { ok: false; message: string; headers: Headers }> {
   const headers = new Headers();
   const tokenHash = await sha256Hex(rawToken);
   const now = new Date();
   const row = await prisma.viewerMagicLink.findFirst({ where: { tokenHash } });
   if (!row) return { ok: false, message: "Magic link is invalid.", headers };
   if (row.revokedAt) return { ok: false, message: "Magic link has been revoked.", headers };
-  if (row.usedAt) return { ok: false, message: "Magic link has already been used.", headers };
+  // Multi-use by design: one link is shared with all faculty, and each device
+  // redeems it to mint its own session. `usedAt` is no longer a gate — we only
+  // stamp it as a non-blocking "last redeemed" marker for audit. The link stays
+  // valid until `expiresAt` (admin-set window) or an admin revokes it.
   if (row.expiresAt <= now) return { ok: false, message: "Magic link has expired.", headers };
 
   await prisma.viewerMagicLink.update({ where: { id: row.id }, data: { usedAt: now } });
-  const session = await createViewerSession(ctx.context, "magic");
+  const session = await createViewerSession(ctx.context, "magic", prisma);
   headers.append("Set-Cookie", `${VIEWER_SESSION_COOKIE}=${encodeURIComponent(session.token)}; ${cookieAttr(ctx.context)}`);
   return { ok: true, headers };
 }

@@ -413,7 +413,11 @@ export async function action({ request, context, params }: Route.ActionArgs) {
           ? "/admin"
           : "/";
       const requestUrl = new URL(request.url);
-      const boardHost = schoolBoardHostname(requestUrl.hostname, org.slug);
+      const boardHost = schoolBoardHostname(
+        requestUrl.hostname,
+        org.slug,
+        getPublicEnv(context).PUBLIC_ROOT_DOMAIN,
+      );
       const origin = requestUrl.port
         ? `${requestUrl.protocol}//${boardHost}:${requestUrl.port}`
         : `${requestUrl.protocol}//${boardHost}`;

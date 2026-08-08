@@ -29,6 +29,7 @@ import {
   revokeAllViewerSessions,
   setViewerPin,
 } from "~/domain/auth/viewer-access.server";
+import { VIEWER_SESSION_DAYS } from "~/domain/auth/viewer-access.constants";
 import {
   getActorIdsFromContext,
   getOrgFromContext,
@@ -1547,6 +1548,9 @@ function ViewerAccessSection({
               <LinkIcon className="h-4 w-4" />
               {t("users.viewer.generateLink")}
             </Button>
+            <p className="text-xs text-white/60">
+              {t("users.viewer.sessionLength", { days: VIEWER_SESSION_DAYS })}
+            </p>
           </fetcher.Form>
           {fetcher.data?.magicLink ? (
             <p className="break-all text-xs text-green-300">

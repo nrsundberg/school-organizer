@@ -709,10 +709,24 @@
       "subhead": "Run on {{started}} · {{duration}}",
       "timeline": {
         "ariaLabel": "Drill replay timeline",
+        "clusterLabel": "{{count}} events near {{label}}",
         "pause": "Pause",
         "play": "Play",
+        "scrubberLabel": "Drill replay scrubber",
         "speed": "{{x}}x",
         "trackAriaLabel": "Click to seek"
+      },
+      "viewerTrack": {
+        "atOffset": "+{{seconds}}s",
+        "empty": "No viewer snapshots were captured for this run.",
+        "guestsLabel_one": "{{count}} viewer",
+        "guestsLabel_other": "{{count}} viewers",
+        "guestsTooltip": "Anonymous viewer-pin guests",
+        "heading": "Viewers",
+        "heatBarTooltip": "+{{seconds}}s · {{count}}",
+        "heatStripLabel": "Viewer count over time",
+        "noneAtMoment": "Nobody was watching at this moment.",
+        "preFirst": "No snapshot yet at this point in the run."
       }
     },
     "status": {
@@ -1188,7 +1202,9 @@
       "importedSummary_one": "Imported {{created}} new student and updated {{updated}} existing student.",
       "importedSummary_other": "Imported {{created}} new students and updated {{updated}} existing students.",
       "importedSummaryWithHomerooms_one": "Imported {{created}} new student and updated {{updated}} existing student. Created {{homerooms}} homeroom.",
-      "importedSummaryWithHomerooms_other": "Imported {{created}} new students and updated {{updated}} existing students. Created {{homerooms}} homerooms."
+      "importedSummaryWithHomerooms_other": "Imported {{created}} new students and updated {{updated}} existing students. Created {{homerooms}} homerooms.",
+      "importedSummaryWithRemovals_one": "Imported {{created}} new student, updated {{updated}} existing student, and removed {{removed}}.",
+      "importedSummaryWithRemovals_other": "Imported {{created}} new students, updated {{updated}} existing students, and removed {{removed}}."
     },
     "errors": {
       "chooseFile": "Choose a CSV or Excel file to continue.",
@@ -1211,10 +1227,13 @@
       "fixRequired": "Fix required",
       "import_one": "Import {{count}} row",
       "import_other": "Import {{count}} rows",
-      "intro": "Nothing has been written yet. Confirming will create missing homerooms and board spaces, create new students, and update matching students by first name, last name, and homeroom.",
+      "intro": "Nothing has been written yet. Confirming will create missing homerooms and board spaces, create new students, and update matching students by first name, last name, and homeroom. Students already on the roll are only removed if you tick the removal box below.",
       "moreErrors_one": "Plus {{count}} more row error.",
       "moreErrors_other": "Plus {{count}} more row errors.",
       "noBlocking": "No blocking errors",
+      "prune_one": "Also remove {{count}} student who is no longer on this roster",
+      "prune_other": "Also remove {{count}} students who are no longer on this roster",
+      "pruneWarning": "Removed students are deleted permanently and disappear from the board. Their pickup history is kept — past call records stay in Activity under their name. Any upcoming dismissal exceptions for them are discarded.",
       "ready_one": "Ready to import {{count}} row",
       "ready_other": "Ready to import {{count}} rows",
       "review": "Review before importing",
@@ -1725,7 +1744,7 @@
       "unban": "Unban"
     },
     "toasts": {
-      "magicLinkCreated": "Magic link created. Valid for {{days}} day(s).",
+      "magicLinkCreated": "Magic link created. Reusable for {{days}} day(s).",
       "passwordReset": "Password reset! New temp password: {{password}}",
       "passwordResetDisabled": "Password reset is now disabled. Users must sign in via SSO once configured.",
       "passwordResetEnabled": "Password reset is now enabled for your org.",
@@ -1746,7 +1765,7 @@
       "eyebrow": "Viewer privacy",
       "generateLink": "Generate Link",
       "heading": "Viewer Privacy Access",
-      "linkValid": "This link will be valid for {{days}} day(s).",
+      "linkValid": "This link works for {{days}} day(s) and can be reused by everyone you share it with.",
       "lockedClients": "Locked Viewer Clients",
       "lockedUntil": "Locked until {{when}}",
       "lockedUntilUnknown": "unknown",
@@ -1757,6 +1776,7 @@
       "resetPin": "Reset Global 4-Digit PIN",
       "revokeSessions": "Revoke all current viewer sessions after resetting PIN",
       "savePin": "Save PIN",
+      "sessionLength": "Anyone who opens this link stays signed in on that device for {{days}} days.",
       "unknownNetwork": "Unknown network"
     }
   },

@@ -775,7 +775,7 @@ export default function AdminHouseholdDetail({
 
           <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
             <p className="text-xs uppercase tracking-wide text-white/50">
-              {t("households.detail.rail.linkedAdminHeading")}
+              {t("households.detail.rail.linkedUserHeading")}
             </p>
             {linkedAdmin ? (
               <div className="mt-3 flex items-center gap-3">
@@ -798,13 +798,13 @@ export default function AdminHouseholdDetail({
                     to={`/admin/users?selected=${linkedAdmin.id}`}
                     arrow
                   >
-                    {t("households.detail.rail.linkedAdminOpen")}
+                    {t("households.detail.rail.linkedUserOpen")}
                   </EntityLink>
                 </div>
               </div>
             ) : (
               <p className="mt-2 text-sm text-white/55">
-                {t("households.detail.rail.linkedAdminEmpty")}
+                {t("households.detail.rail.linkedUserEmpty")}
               </p>
             )}
           </div>

@@ -111,6 +111,12 @@ export type StudentsDeletedMessage = {
   deletedAt: string;
   /** True for the internal ops recipient (slightly different framing). */
   isOps?: boolean;
+  /**
+   * Which surface performed the deletion. Defaults to the dashboard Danger
+   * Zone ("all student records"); `roster_import` swaps in copy for a partial
+   * prune, where only students absent from the uploaded roster were removed.
+   */
+  source?: "danger_zone" | "roster_import";
   /** Recipient locale. Optional; defaults to "en". */
   locale?: EmailLocale;
 };

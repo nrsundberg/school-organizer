@@ -41,6 +41,8 @@
     "missingColumns": "Al CSV le faltan columnas obligatorias: {{columns}}. Descarga la plantilla para ver el formato esperado.",
     "previewMissing": "Faltan filas de la lista para importar. Vuelve a previsualizar el CSV.",
     "previewUnreadable": "No se pudo leer la previsualización de la lista. Vuelve a previsualizar el CSV.",
+    "pruneExceedsFile": "Se cancela la eliminación de {{removals}} estudiantes cuando el archivo solo contiene {{rows}}. Revisa la asignación de columnas y sube la lista completa.",
+    "pruneNeedsRows": "No hay nada que importar, así que no se puede eliminar nada. Sube un archivo de lista con al menos una fila válida antes de eliminar estudiantes.",
     "spaceNumberInvalid": "spaceNumber debe ser un número entero positivo.",
     "tooManyRows": "El CSV tiene {{rows}} filas; el máximo es {{max}}.",
     "unsupportedColumns": "El CSV tiene columnas no admitidas: {{columns}}. Usa firstName, lastName, homeRoom y opcionalmente spaceNumber.",

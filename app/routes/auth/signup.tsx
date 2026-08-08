@@ -14,6 +14,7 @@ import { zfd } from "zod-form-data";
 import type { Route } from "./+types/signup";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
 import {
+  getPublicEnv,
   isMarketingHost,
   isPlatformAdmin,
   marketingOriginFromRequest
@@ -231,7 +232,11 @@ export async function action({ request, context }: Route.ActionArgs) {
     select: { slug: true }
   });
   const boardUrl = org?.slug
-    ? tenantBoardUrlFromRequest(request, org.slug)
+    ? tenantBoardUrlFromRequest(
+        request,
+        org.slug,
+        getPublicEnv(context).PUBLIC_ROOT_DOMAIN,
+      )
     : "/";
   throw redirect(boardUrl);
 }
