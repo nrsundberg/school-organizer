@@ -45,11 +45,21 @@ import { test, expect, type SeededTenant } from "../fixtures/seeded-tenant";
 /* ------------------------------------------------------------------ */
 
 /**
+ * Placeholder value the `e2e.yml` workflow writes into `.dev.vars` when no
+ * real Stripe test credentials are available (see "Write .dev.vars for
+ * wrangler dev" in .github/workflows/e2e.yml). It's syntactically non-empty
+ * but Stripe rejects it outright, so it must NOT count as "configured" or
+ * this test proceeds to hit the real Stripe API and fails with a 302 to
+ * `/pricing?...` instead of `checkout.stripe.com`.
+ */
+const STUB_STRIPE_SECRET_KEY = "sk_test_stub";
+
+/**
  * Returns true iff `.dev.vars` (the same file `wrangler dev` reads) has a
- * non-empty `STRIPE_SECRET_KEY`. We check the file rather than
- * `process.env.STRIPE_SECRET_KEY` because the Playwright runner doesn't
- * inherit wrangler's env, and we want the gate condition to actually
- * predict whether the worker request will succeed.
+ * non-empty, non-placeholder `STRIPE_SECRET_KEY`. We check the file rather
+ * than `process.env.STRIPE_SECRET_KEY` because the Playwright runner
+ * doesn't inherit wrangler's env, and we want the gate condition to
+ * actually predict whether the worker request will succeed.
  */
 function stripeIsConfigured(): boolean {
   try {
@@ -58,7 +68,7 @@ function stripeIsConfigured(): boolean {
     const match = content.match(/^STRIPE_SECRET_KEY\s*=\s*(.+)$/m);
     if (!match) return false;
     const value = match[1].trim().replace(/^["']|["']$/g, "");
-    return value.length > 0;
+    return value.length > 0 && value !== STUB_STRIPE_SECRET_KEY;
   } catch {
     return false;
   }
