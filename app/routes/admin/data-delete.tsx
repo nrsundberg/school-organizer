@@ -10,7 +10,7 @@ import { Button } from "@heroui/react";
 import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/data-delete";
-import { protectToAdminAndGetPermissions } from "~/sessions.server";
+import { requireRole } from "~/sessions.server";
 import {
   getOrgFromContext,
   getTenantPrisma,
@@ -38,7 +38,14 @@ export const meta: Route.MetaFunction = ({ data }) => [
  * dashboard.
  */
 export async function loader({ request, context }: Route.LoaderArgs) {
-  await protectToAdminAndGetPermissions(context);
+  // ADMIN only, not protectToAdminAndGetPermissions — that helper admits
+  // CONTROLLER too (sessions.server.tsx). This route deletes every student,
+  // teacher, household, user account, pickup record, and drill in the org,
+  // so it must be at least as strict as the dashboard's bulk student wipe,
+  // which is ADMIN-only precisely so a CONTROLLER cannot clear the roster
+  // (see admin/dashboard.tsx). Gating the loader as well as the action
+  // keeps the page itself unreachable rather than merely inert.
+  await requireRole(context, "ADMIN");
   const org = getOrgFromContext(context);
   const prisma = getTenantPrisma(context);
 
@@ -101,7 +108,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
  * surfaces a "sign out when ready" cleanup hint.
  */
 export async function action({ request, context }: Route.ActionArgs) {
-  await protectToAdminAndGetPermissions(context);
+  // ADMIN only — see the loader. The action is the one that actually
+  // destroys data, so this check is the load-bearing one; hiding the page
+  // without gating the POST would leave the capability reachable by anyone
+  // who can construct the request.
+  await requireRole(context, "ADMIN");
   const org = getOrgFromContext(context);
   const prisma = getTenantPrisma(context);
   const me = getUserFromContext(context);
