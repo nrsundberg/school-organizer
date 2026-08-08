@@ -135,16 +135,29 @@ test.describe("@flow signup-to-paid — checkout leg (Stripe redirect)", () => {
     ).toBe(true);
   });
 
-  test("POST /api/billing/checkout requires an authed admin (anonymous → /login)", async ({
+  test("POST /api/billing/checkout requires an authed admin (anonymous → auth gate)", async ({
     request,
     tenant,
   }: {
     request: import("@playwright/test").APIRequestContext;
     tenant: SeededTenant;
   }) => {
-    // No cookie header → user is unauthenticated. The action calls
-    // `redirectWithError("/login", ...)` before any Stripe call, so this
-    // case runs whether or not Stripe is configured.
+    // No cookie header → user is unauthenticated, so the request is bounced
+    // to an auth gate before any Stripe call. This case therefore runs
+    // whether or not Stripe is configured.
+    //
+    // WHICH gate depends on the host. `enforceAnonymousAccess` in
+    // app/domain/request-scope/resolve.server.ts sends anonymous traffic to
+    // /login only for platform paths or when no org resolved; on a tenant
+    // host with a resolved org it sends them to /viewer-access instead.
+    // /api/billing/checkout is deliberately absent from `anonSkipsViewer`
+    // (app/domain/request-scope/path-classification.ts) — only auth and
+    // public APIs skip the viewer gate — and this request goes to
+    // tenant.tenantUrl(), so /viewer-access is the correct destination.
+    //
+    // This assertion used to pin /login, which predates the viewer-access
+    // gate. What the test is actually for is below: an anonymous POST must
+    // never reach Stripe.
     const url = tenant.tenantUrl("/api/billing/checkout");
     const response = await request.post(url, {
       headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -154,7 +167,7 @@ test.describe("@flow signup-to-paid — checkout leg (Stripe redirect)", () => {
 
     expect([302, 303]).toContain(response.status());
     const location = response.headers()["location"] ?? "";
-    expect(location).toMatch(/\/login/);
+    expect(location).toMatch(/\/(login|viewer-access)/);
     // Crucially: the redirect is NOT to checkout.stripe.com.
     expect(location).not.toMatch(/checkout\.stripe\.com/);
   });
