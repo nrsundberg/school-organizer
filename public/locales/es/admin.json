@@ -1320,7 +1320,7 @@
   "dataExport": {
     "metaTitle": "Admin – Exportar datos",
     "heading": "Exporta los datos de tu escuela",
-    "description": "Descarga un archivo JSON con cada lista, evento de llamada, hogar y registro de configuración almacenado en esta organización. Quitamos hashes de credenciales y otros campos de transporte; todo lo demás es tuyo.",
+    "description": "Descarga un archivo zip con un JSON por tabla — cada lista, evento de llamada, hogar y registro de configuración almacenado en esta organización. Quitamos hashes de credenciales y otros campos de transporte; todo lo demás es tuyo.",
     "preview": {
       "title": "Lo que incluye tu exportación",
       "studentsCount_one": "{{count}} estudiante",

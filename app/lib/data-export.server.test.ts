@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { strFromU8, unzipSync } from "fflate";
 import {
+  buildExportZip,
   buildManifest,
   DELETE_ORDER,
   EXPORT_WHITELIST,
@@ -155,4 +157,76 @@ test("DELETE_ORDER puts user last and parents after dependents", () => {
       DELETE_ORDER.indexOf("afterSchoolProgram"),
     "programCancellation before afterSchoolProgram",
   );
+});
+
+test("buildExportZip writes manifest.json plus one <table>.json per table", () => {
+  const manifest = buildManifest({
+    orgId: "org_1",
+    orgSlug: "demo",
+    exportedAt: new Date("2026-04-28T02:00:00.000Z"),
+    exportedByUserId: "user_admin",
+    planAtExport: "CAMPUS",
+    rowCounts: { students: 1, teachers: 0 },
+  });
+  const studentRow = whitelistRow("students", {
+    id: 1,
+    firstName: "Alice",
+    lastName: "Adams",
+    homeRoom: "5A",
+    spaceNumber: 12,
+    householdId: "h1",
+  });
+
+  const zipBytes = buildExportZip(manifest, {
+    students: [studentRow],
+    teachers: [],
+  });
+
+  const entries = unzipSync(zipBytes);
+  assert.deepEqual(Object.keys(entries).sort(), [
+    "manifest.json",
+    "students.json",
+    "teachers.json",
+  ]);
+
+  const readJson = (name: string) => JSON.parse(strFromU8(entries[name]));
+
+  assert.deepEqual(readJson("manifest.json"), manifest);
+  assert.deepEqual(readJson("students.json"), [studentRow]);
+  assert.deepEqual(readJson("teachers.json"), []);
+});
+
+test("buildExportZip never leaks credential fields through the archive", () => {
+  // Belt-and-suspenders on top of the whitelist tests above: even if a
+  // caller accidentally handed buildExportZip an un-whitelisted row, the
+  // zip step itself does no filtering — this asserts the *pipeline*
+  // (whitelistRow -> buildExportZip) keeps the guarantee end to end.
+  const manifest = buildManifest({
+    orgId: "org_1",
+    orgSlug: "demo",
+    exportedAt: new Date("2026-04-28T02:00:00.000Z"),
+    exportedByUserId: null,
+    planAtExport: "CAMPUS",
+    rowCounts: { users: 1 },
+  });
+  const userRow = whitelistRow("users", {
+    id: "u1",
+    email: "admin@example.com",
+    name: "Admin",
+    phone: "+15555550100",
+    role: "ADMIN",
+    locale: "en",
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    passwordHash: "$2b$10$forbidden",
+    sessionToken: "secret-token",
+  });
+
+  const zipBytes = buildExportZip(manifest, { users: [userRow] });
+  const entries = unzipSync(zipBytes);
+  const usersJson = strFromU8(entries["users.json"]);
+
+  assert.equal(usersJson.includes("passwordHash"), false);
+  assert.equal(usersJson.includes("forbidden"), false);
+  assert.equal(usersJson.includes("secret-token"), false);
+  assert.ok(usersJson.includes("admin@example.com"));
 });

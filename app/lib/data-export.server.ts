@@ -16,6 +16,8 @@
  * for the rationale and the source-of-truth column list.
  */
 
+import { strToU8, zipSync } from "fflate";
+
 export type ExportTable =
   | "students"
   | "teachers"
@@ -172,6 +174,36 @@ export function buildManifest(params: {
     planAtExport: params.planAtExport,
     rowCounts: params.rowCounts,
   };
+}
+
+/**
+ * Assemble the per-table export ZIP: `manifest.json` at the archive root
+ * plus one `<table>.json` per whitelisted table (only tables present in
+ * `tables` are written — callers pass exactly the set they fetched).
+ *
+ * Kept pure (no I/O, no Prisma, no Worker context) so it's unit-testable
+ * the same way as `whitelistRow` / `buildManifest` — the caller is
+ * responsible for whitelisting rows *before* they reach this function;
+ * this helper does no filtering of its own.
+ *
+ * Uses `fflate`'s synchronous API: exports are already fully materialized
+ * in memory by the time this runs (same as the old single-JSON-document
+ * path), so `zipSync` doesn't add a meaningfully different memory profile.
+ */
+export function buildExportZip(
+  manifest: Record<string, unknown>,
+  tables: Partial<Record<ExportTable, unknown[]>>,
+): Uint8Array {
+  const files: Record<string, Uint8Array> = {
+    "manifest.json": strToU8(JSON.stringify(manifest, null, 2)),
+  };
+  for (const [table, rows] of Object.entries(tables)) {
+    files[`${table}.json`] = strToU8(JSON.stringify(rows ?? [], null, 2));
+  }
+  // level: 1 favors speed over ratio — this runs synchronously inside a
+  // Worker request, and export payloads are JSON text (already fairly
+  // compressible even at low levels).
+  return zipSync(files, { level: 1 });
 }
 
 /**

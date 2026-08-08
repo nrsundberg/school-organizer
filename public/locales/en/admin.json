@@ -1320,7 +1320,7 @@
   "dataExport": {
     "metaTitle": "Admin – Data export",
     "heading": "Export your school's data",
-    "description": "Download a JSON file containing every roster, call event, household, and configuration record this org has stored. We strip credential hashes and other transport-only fields; everything else is yours.",
+    "description": "Download a zip archive containing one JSON file per table — every roster, call event, household, and configuration record this org has stored. We strip credential hashes and other transport-only fields; everything else is yours.",
     "preview": {
       "title": "What's in your export",
       "studentsCount_one": "{{count}} student",

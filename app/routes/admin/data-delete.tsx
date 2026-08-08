@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { Form, Link, redirect, useActionData, useNavigation } from "react-router";
+import {
+  Form,
+  Link,
+  redirect,
+  useActionData,
+  useNavigation,
+} from "react-router";
 import { Button } from "@heroui/react";
 import { AlertTriangle } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -13,6 +19,7 @@ import {
 import { recordOrgAudit } from "~/domain/billing/comp.server";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
+import { broadcastBoardReset } from "~/lib/broadcast.server";
 
 export const handle = { i18n: ["admin", "common"] };
 
@@ -203,9 +210,64 @@ export async function action({ request, context }: Route.ActionArgs) {
     // workaround `comp.server.ts` uses elsewhere).
   }
 
-  // TODO follow-up #5.1: invalidate the BINGO_BOARD Durable Object cache so
-  // viewers don't see ghost rows for ~30s. Punted per spec recommendation.
-  // TODO follow-up: best-effort R2 logo cleanup if Org.logoObjectKey is set.
+  // Best-effort BINGO_BOARD Durable Object invalidation: broadcast a
+  // `boardReset` so any viewers still connected drop their local board
+  // state instead of showing ghost rows for the DO's connection lifetime.
+  // The DO holds no persistent copy of the deleted rows (it only relays to
+  // live WebSockets), so this is purely about live viewers, not stored
+  // state — but a failure here must never undo the delete above, which has
+  // already committed.
+  try {
+    await broadcastBoardReset((context as any).cloudflare.env, org.id);
+  } catch (err) {
+    console.error("data-delete: BINGO_BOARD invalidation failed", {
+      orgId: org.id,
+      err,
+    });
+  }
+
+  // Best-effort R2 org-logo cleanup. The Org row (and its logoObjectKey
+  // column) is intentionally preserved by this route, but the underlying
+  // uploaded file in R2 should not survive a "delete all our data" request.
+  // Same rule as above: an R2 failure must not roll back or abort the
+  // database delete that already happened — just log it so it's visible
+  // for manual follow-up.
+  if (org.logoObjectKey) {
+    try {
+      const bucket = (context as any).cloudflare?.env?.ORG_BRANDING_BUCKET as
+        | R2Bucket
+        | undefined;
+      if (bucket) {
+        await bucket.delete(org.logoObjectKey);
+        // Clear the now-dangling pointer so /admin/branding and the public
+        // logo route don't keep advertising a file that no longer exists.
+        // Best-effort too: if this update fails the R2 object is still
+        // gone either way — we just leave the pointer stale for a manual
+        // follow-up.
+        try {
+          await prisma.org.update({
+            where: { id: org.id },
+            data: { logoObjectKey: null, logoUrl: null },
+          });
+        } catch (err) {
+          console.error("data-delete: clearing org.logoObjectKey failed", {
+            orgId: org.id,
+            err,
+          });
+        }
+      } else {
+        console.error("data-delete: R2 logo cleanup skipped, bucket unbound", {
+          orgId: org.id,
+        });
+      }
+    } catch (err) {
+      console.error("data-delete: R2 logo cleanup failed", {
+        orgId: org.id,
+        logoObjectKey: org.logoObjectKey,
+        err,
+      });
+    }
+  }
 
   return redirect("/admin?dataDeleted=1");
 }

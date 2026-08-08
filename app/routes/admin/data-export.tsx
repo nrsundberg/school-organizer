@@ -14,6 +14,7 @@ import { planAllowsReports } from "~/lib/plan-limits";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
 import {
+  buildExportZip,
   buildManifest,
   EXPORT_WHITELIST,
   whitelistRow,
@@ -120,15 +121,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 /**
- * Action: build the export and stream it back as a single `application/json`
- * document. The plan gate is repeated here so a crafted POST from a
+ * Action: build the export and stream it back as a per-table ZIP archive
+ * (`manifest.json` + one `<table>.json` per whitelisted table, via
+ * `fflate`). The plan gate is repeated here so a crafted POST from a
  * downgraded org can't bypass the loader's check.
- *
- * v1 emits one combined JSON file (`{ manifest, tables: { … } }`) rather than
- * a per-table zip archive. This keeps the export dependency-free; a future
- * iteration can switch to a streamed zip (one file per table) once a zip
- * helper is vendored — see the PR description for the rationale and the
- * original spec at docs/nightly-specs/2026-04-27-data-export-delete.md § 4.
  */
 export async function action({ request, context }: Route.ActionArgs) {
   await protectToAdminAndGetPermissions(context);
@@ -310,12 +306,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     rowCounts,
   });
 
-  // Single combined document: manifest + every whitelisted table.
-  const document = { manifest, tables: filtered };
-  const body = JSON.stringify(document, null, 2);
+  // manifest.json + one <table>.json per whitelisted table, zipped.
+  const zipBytes = buildExportZip(
+    manifest,
+    filtered as Partial<Record<ExportTable, unknown[]>>,
+  );
 
   const ymd = exportedAt.toISOString().slice(0, 10);
-  const filename = `${org.slug}-data-export-${ymd}.json`;
+  const filename = `${org.slug}-data-export-${ymd}.zip`;
 
   // Audit log: only on success. Best-effort — a failure here must not stop
   // the user from getting their data.
@@ -325,16 +323,24 @@ export async function action({ request, context }: Route.ActionArgs) {
       orgId: org.id,
       actorUserId: me?.id ?? null,
       action: "data.export",
-      payload: { filename, byteSize: body.length, rowCounts },
+      payload: { filename, byteSize: zipBytes.byteLength, rowCounts },
     });
   } catch {
     // Audit failures must not prevent the user from getting their data.
   }
 
-  return new Response(body, {
+  // fflate's zipSync returns a Uint8Array typed over ArrayBufferLike, which
+  // the Workers-types BodyInit union rejects (it wants a concrete
+  // ArrayBuffer). Copy into a fresh ArrayBuffer-backed view — cheap
+  // relative to the zip work already done — so Response accepts it
+  // directly.
+  const zipBuffer = new ArrayBuffer(zipBytes.byteLength);
+  new Uint8Array(zipBuffer).set(zipBytes);
+
+  return new Response(zipBuffer, {
     status: 200,
     headers: {
-      "Content-Type": "application/json; charset=utf-8",
+      "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="${filename}"`,
       "Cache-Control": "no-store",
     },
