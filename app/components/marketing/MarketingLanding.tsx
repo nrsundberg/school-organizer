@@ -4,9 +4,21 @@ import { MarketingNav } from "~/components/marketing/MarketingNav";
 import { SUPPORTED_LANGUAGES } from "~/lib/i18n-config";
 
 const VIDEO_EMBEDS = [
-  { id: "gettingStarted", src: "/marketing/videos/getting-started.mp4" },
-  { id: "carLine", src: "/marketing/videos/car-line-pickups.mp4" },
-  { id: "fireDrills", src: "/marketing/videos/fire-drills-safety.mp4" }
+  {
+    id: "gettingStarted",
+    src: "/marketing/videos/getting-started.mp4",
+    poster: "/marketing/posters/getting-started.jpg"
+  },
+  {
+    id: "carLine",
+    src: "/marketing/videos/car-line-pickups.mp4",
+    poster: "/marketing/posters/car-line-pickups.jpg"
+  },
+  {
+    id: "fireDrills",
+    src: "/marketing/videos/fire-drills-safety.mp4",
+    poster: "/marketing/posters/fire-drills-safety.jpg"
+  }
 ] as const;
 
 export function MarketingLanding() {
@@ -83,14 +95,17 @@ export function MarketingLanding() {
                 key={block.id}
                 className="overflow-hidden rounded-2xl border border-white/10 bg-[#151a1a] shadow-xl"
               >
-                <div className="aspect-video w-full bg-black/40">
+                <div className="aspect-[1280/800] w-full bg-black/40">
                   <video
                     controls
                     preload="metadata"
                     playsInline
+                    poster={block.poster}
+                    width={1280}
+                    height={800}
                     aria-label={title}
                     src={block.src}
-                    className="h-full w-full"
+                    className="h-full w-full object-contain"
                   />
                 </div>
                 <div className="space-y-2 px-5 py-4">
