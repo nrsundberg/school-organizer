@@ -39,6 +39,12 @@ export type RequestPathClassification = {
   exemptFromBillingGate: boolean;
   /** Marketing paths that are publicly viewable without auth (host-aware). */
   isPublicMarketingPath: boolean;
+  /**
+   * `/marketing/videos/:name` — same-origin demo mp4s. Must skip auth,
+   * tenant-org redirects, and the billing gate so a `<video>` request is
+   * answered by the route (200/206/404) instead of a login redirect.
+   */
+  isMarketingVideo: boolean;
 };
 
 export function classifyRequestPath(
@@ -69,6 +75,7 @@ export function classifyRequestPath(
   const isStatusProbe = pathname === "/api/status-probe";
   const isPlatform = pathname.startsWith("/platform");
   const isAcceptInvite = pathname === "/accept-invite";
+  const isMarketingVideo = pathname.startsWith("/marketing/videos/");
 
   const isPublicApi =
     isCheckEmailApi ||
@@ -91,7 +98,8 @@ export function classifyRequestPath(
     (pathname === "/signup" && onMarketingHost) ||
     (pathname === "/district/signup" && onMarketingHost) ||
     (pathname.startsWith("/api/onboarding") && onMarketingHost) ||
-    (pathname === "/" && onMarketingHost);
+    (pathname === "/" && onMarketingHost) ||
+    isMarketingVideo;
 
   const anonSkipsViewer =
     isLogin ||
@@ -103,16 +111,19 @@ export function classifyRequestPath(
     isStatic ||
     isPublicApi ||
     isPublicMarketingPath ||
-    isAcceptInvite;
+    isAcceptInvite ||
+    isMarketingVideo;
 
-  const skipTenantOrgBinding = isStatic || isAuthApi || isStripeWebhook || isLogout;
+  const skipTenantOrgBinding =
+    isStatic || isAuthApi || isStripeWebhook || isLogout || isMarketingVideo;
 
   const exemptFromBillingGate =
     isBillingRequired ||
     isOnboardingApi ||
     isStripeWebhook ||
     isAuthApi ||
-    isStatic;
+    isStatic ||
+    isMarketingVideo;
 
   return {
     isStatic,
@@ -131,5 +142,6 @@ export function classifyRequestPath(
     skipTenantOrgBinding,
     exemptFromBillingGate,
     isPublicMarketingPath,
+    isMarketingVideo,
   };
 }

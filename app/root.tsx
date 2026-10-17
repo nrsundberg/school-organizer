@@ -371,7 +371,6 @@ export default function App({ loaderData }: Route.ComponentProps) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Loading...</title>
         <Meta />
         <Links />
         {sentryDsn && (

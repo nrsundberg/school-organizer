@@ -54,6 +54,13 @@ import MobileCallerView from "~/components/MobileCallerView";
 import { BoardControlsDrawer } from "~/components/board/BoardControlsDrawer";
 import confetti from "canvas-confetti";
 import { endOfUtcDay, toDateInputValue } from "~/domain/dismissal/schedule";
+import {
+  callVisibleInRecentQueue,
+  decorateRecentQueueEvents,
+  householdCallSpaceNumbers,
+  recentQueueLabel,
+  type CallLabelStudent,
+} from "~/lib/recent-queue";
 
 export const meta: Route.MetaFunction = ({ data }) => {
   if (!data || data.mode === "marketing") {
@@ -117,7 +124,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     prisma.teacher.findMany({ orderBy: { homeRoom: "asc" } }),
     prisma.callEvent.findMany({
       where: {
-        studentId: { not: null },
+        // Household calls (siblings sharing a space) store studentId null
+        // and the household name. They belong in this queue. The homeroom
+        // filter matches callVisibleInRecentQueue: a null snapshot is
+        // excluded only when a room filter is active.
         homeRoomSnapshot:
           filterRoomList && filterRoomList.length > 0
             ? { in: filterRoomList }
@@ -141,6 +151,27 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }),
   ]);
 
+  const siblingSpaces = householdCallSpaceNumbers(recentCars);
+  const siblingHouseholds = siblingSpaces.length
+    ? await prisma.household.findMany({
+        where: { spaceNumber: { in: siblingSpaces } },
+        select: {
+          spaceNumber: true,
+          students: {
+            select: { firstName: true, lastName: true, suffix: true },
+          },
+        },
+      })
+    : [];
+  const studentsBySpace = new Map<number, CallLabelStudent[]>();
+  for (const household of siblingHouseholds) {
+    if (household.spaceNumber == null) continue;
+    const list = studentsBySpace.get(household.spaceNumber) ?? [];
+    list.push(...household.students);
+    studentsBySpace.set(household.spaceNumber, list);
+  }
+  const recentQueue = decorateRecentQueueEvents(recentCars, studentsBySpace);
+
   const role = user?.role ?? null;
   const maxSpaceNumber =
     spaces.length > 0 ? Math.max(...spaces.map((s) => s.spaceNumber)) : 0;
@@ -153,7 +184,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     user: !!user,
     spaces,
     homeRooms,
-    recentCars,
+    recentCars: recentQueue,
     programCancellations: programCancellations.map((notice) => ({
       id: notice.id,
       programName: notice.program.name,
@@ -241,23 +272,18 @@ function TenantCarLineHome({ loaderData }: { loaderData: Exclude<Route.Component
       }
     },
     onCallEvent: ({ event }) => {
-      if (event.studentId == null) {
-        return;
-      }
       // Respect the active homeroom filter. recentCars is filtered server-side
       // via ?room=, so live events for other homerooms must be dropped here
       // too — otherwise a filtered list repopulates with non-matching calls as
-      // new pickups stream in. Parse the param exactly like the loader does.
+      // new pickups stream in. Household calls (null studentId) are included;
+      // callVisibleInRecentQueue matches the loader's homeRoomSnapshot filter.
       const activeRooms =
         searchParams
           .get("room")
           ?.split(",")
           .map((s) => s.trim())
           .filter(Boolean) ?? [];
-      if (
-        activeRooms.length > 0 &&
-        !activeRooms.includes(event.homeRoomSnapshot ?? "")
-      ) {
+      if (!callVisibleInRecentQueue(event, activeRooms)) {
         return;
       }
       setRecentCars((prev) => [{

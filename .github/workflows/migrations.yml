@@ -1,0 +1,31 @@
+# PRs that edit migrations/ apply the full history to an empty local D1.
+# Broken SQL fails here, before merge. Remote databases are not touched.
+name: migrations
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "migrations/**"
+      # Re-run when the check itself changes, not only when SQL does.
+      - ".github/workflows/migrations.yml"
+
+jobs:
+  local-d1:
+    name: fresh local D1
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      # database_name school-organizer, binding D1_DATABASE. --persist-to
+      # points at an empty directory so this is not a leftover dev database.
+      - name: Apply all migrations to a fresh local D1
+        run: npx wrangler d1 migrations apply school-organizer --local --persist-to "$RUNNER_TEMP/d1"

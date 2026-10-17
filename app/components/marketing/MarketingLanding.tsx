@@ -4,9 +4,9 @@ import { MarketingNav } from "~/components/marketing/MarketingNav";
 import { SUPPORTED_LANGUAGES } from "~/lib/i18n-config";
 
 const VIDEO_EMBEDS = [
-  { id: "gettingStarted", youtubeId: "M7lc1UVf-VE" },
-  { id: "carLine", youtubeId: "M7lc1UVf-VE" },
-  { id: "fireDrills", youtubeId: "M7lc1UVf-VE" }
+  { id: "gettingStarted", src: "/marketing/videos/getting-started.mp4" },
+  { id: "carLine", src: "/marketing/videos/car-line-pickups.mp4" },
+  { id: "fireDrills", src: "/marketing/videos/fire-drills-safety.mp4" }
 ] as const;
 
 export function MarketingLanding() {
@@ -84,13 +84,13 @@ export function MarketingLanding() {
                 className="overflow-hidden rounded-2xl border border-white/10 bg-[#151a1a] shadow-xl"
               >
                 <div className="aspect-video w-full bg-black/40">
-                  <iframe
-                    title={title}
-                    src={`https://www.youtube-nocookie.com/embed/${block.youtubeId}`}
+                  <video
+                    controls
+                    preload="metadata"
+                    playsInline
+                    aria-label={title}
+                    src={block.src}
                     className="h-full w-full"
-                    loading="lazy"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
                   />
                 </div>
                 <div className="space-y-2 px-5 py-4">

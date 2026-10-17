@@ -63,6 +63,25 @@ test("public marketing paths only count when on the marketing host", () => {
   assert.equal(tenant("/").isPublicMarketingPath, false);
 });
 
+test("marketing videos are public and skip tenant and billing gates", () => {
+  for (const path of [
+    "/marketing/videos/getting-started.mp4",
+    "/marketing/videos/car-line-pickups.mp4",
+    "/marketing/videos/fire-drills-safety.mp4",
+  ]) {
+    for (const classify of [marketing, tenant]) {
+      const result = classify(path);
+      assert.equal(result.isMarketingVideo, true, path);
+      assert.equal(result.isPublicMarketingPath, true, path);
+      assert.equal(result.anonSkipsViewer, true, path);
+      assert.equal(result.skipTenantOrgBinding, true, path);
+      assert.equal(result.exemptFromBillingGate, true, path);
+    }
+  }
+  assert.equal(marketing("/pricing").isMarketingVideo, false);
+  assert.equal(tenant("/marketing/videos").isMarketingVideo, false);
+});
+
 test("/platform routes are flagged for the console-redirect rule", () => {
   assert.equal(tenant("/platform").isPlatform, true);
   assert.equal(tenant("/platform/orgs").isPlatform, true);

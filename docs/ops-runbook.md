@@ -34,14 +34,10 @@ that already ran the nightly gate (typecheck + tests + staging smoke).
    nothing you didn't mean to ship.
 2. `npm run typecheck` green.
 3. `npm test` green (unit suites listed in `package.json` → `scripts.test`).
-4. If there are new migrations (`ls migrations/`): stage them first.
-
-   ```bash
-   npm run d1:migrate:staging          # applies to school-organizer-staging
-   npm run deploy:staging              # deploys branch to staging
-   ```
-
-   Then smoke the staging URL manually:
+4. Merging to `master` deploys staging from GitHub Actions: pending
+   migrations on `school-organizer-staging`, then the staging Worker.
+   See [docs/deploy.md](deploy.md). After that workflow is green, smoke
+   staging:
 
    - `https://staging.pickuproster.com/` (marketing)
    - `https://staging.pickuproster.com/healthz`
@@ -54,19 +50,17 @@ that already ran the nightly gate (typecheck + tests + staging smoke).
 5. **Dismissal-window rule.** Do not deploy between 2:30pm and 4:00pm in
    the timezone of any active pilot tenant. The scheduled agents already
    run at night; a human push during that window needs a written reason.
-6. Run prod migrations if any:
+6. Deploy production by tagging the `master` commit and pushing the tag.
+   Actions applies pending migrations on `school-organizer` and, only if
+   that succeeds, deploys the Worker. Details and the API token
+   permissions are in [docs/deploy.md](deploy.md).
 
    ```bash
-   npm run d1:migrate     # applies to school-organizer (prod)
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
    ```
 
-7. Deploy:
-
-   ```bash
-   npm run deploy
-   ```
-
-8. Post-deploy: hit `/healthz` on prod, watch Sentry for 2 minutes, eyeball
+7. Post-deploy: hit `/healthz` on prod, watch Sentry for 2 minutes, eyeball
    the board on a real tenant. Stay on-call for 30 minutes.
 
 ---

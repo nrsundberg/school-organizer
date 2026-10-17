@@ -188,11 +188,9 @@ test("returns a new Response instance (no mutation of input headers)", () => {
   assert.deepEqual([...input.headers.entries()], snapshot);
 });
 
-// Regression: marketing home renders <iframe src="https://www.youtube-nocookie.com/embed/...">
-// in `MarketingLanding.tsx`. Without the YouTube hosts in `frame-src`, the
-// browser refuses to frame the explainer video and logs a CSP violation.
-// Both the privacy-enhanced host and the canonical `www.youtube.com` host
-// are allowed because YouTube's player can fall back / redirect between them.
+// YouTube hosts stay on frame-src. Marketing explainers are now same-origin
+// <video> elements, which default-src 'self' already allows; these hosts
+// remain so a future embed does not regress the Stripe-adjacent CSP.
 test("frame-src allows YouTube embed hosts for the marketing explainer", () => {
   const csp = __INTERNAL__.buildEnforcingCsp(TEST_NONCE, false);
   const frameSrc = csp
