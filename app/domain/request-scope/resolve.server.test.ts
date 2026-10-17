@@ -450,6 +450,67 @@ test("district-attached org with missing district row is denied", async () => {
   assert.equal(result.location, "/billing-required");
 });
 
+test("marketing videos skip auth, tenant-org, and billing redirects", async () => {
+  const video = "/marketing/videos/getting-started.mp4";
+  const suspended = buildOrg({
+    id: "org_1",
+    slug: "test",
+    status: "SUSPENDED",
+  });
+  const home = buildOrg({ id: "org_home", slug: "home" });
+
+  const anonMarketing = await run(marketingRequest(video), makeDeps({ marketing: true }));
+  assert.equal(anonMarketing.kind, "ok");
+
+  const anonTenant = await run(
+    tenantRequest(video),
+    makeDeps({ orgs: [suspended], tenantSlugFromHost: "test" }),
+  );
+  assert.equal(anonTenant.kind, "ok");
+
+  const wrongTenant = await run(
+    tenantRequest(video, "test"),
+    makeDeps({
+      orgs: [suspended, home],
+      tenantSlugFromHost: "test",
+      session: {
+        user: buildUser({ orgId: "org_home", role: "VIEWER" }),
+        impersonatedOrgId: null,
+        impersonatedBy: null,
+      },
+    }),
+  );
+  assert.equal(wrongTenant.kind, "ok");
+
+  const billing = await run(
+    tenantRequest(video),
+    makeDeps({
+      orgs: [suspended],
+      tenantSlugFromHost: "test",
+      session: {
+        user: buildUser({ orgId: "org_1" }),
+        impersonatedOrgId: null,
+        impersonatedBy: null,
+      },
+    }),
+  );
+  assert.equal(billing.kind, "ok");
+
+  const password = await run(
+    tenantRequest(video),
+    makeDeps({
+      orgs: [suspended],
+      tenantSlugFromHost: "test",
+      session: {
+        user: buildUser({ orgId: "org_1", mustChangePassword: true }),
+        impersonatedOrgId: null,
+        impersonatedBy: null,
+      },
+    }),
+  );
+  assert.equal(password.kind, "ok");
+});
+
 test("on the marketing host org and realOrg are null", async () => {
   const result = await run(
     marketingRequest("/pricing"),

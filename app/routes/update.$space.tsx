@@ -11,6 +11,7 @@ import {
   broadcastCallEvent,
   broadcastSpaceUpdate,
 } from "~/lib/broadcast.server";
+import { formatStudentCallName, recentQueueLabel } from "~/lib/recent-queue";
 
 export async function action({ params, request, context }: Route.ActionArgs) {
   const { space } = params;
@@ -80,11 +81,19 @@ export async function action({ params, request, context }: Route.ActionArgs) {
   // can also be in different homerooms → null the snapshot too).
   const students = household?.students ?? [];
   const sole = students.length === 1 ? students[0] : null;
+  // Stored name stays the single student, or the household name when
+  // siblings share the space. The queue label adds the children's names
+  // on top of that stored name without changing the CallEvent row.
   const studentName = sole
-    ? [sole.firstName, sole.lastName, sole.suffix].filter(Boolean).join(" ")
+    ? formatStudentCallName(sole)
     : household && students.length > 1
       ? household.name
       : `Space ${spaceNumber}`;
+  const queueLabel = recentQueueLabel({
+    studentId: sole?.id ?? null,
+    studentName,
+    students,
+  });
 
   const event = await prisma.callEvent.create({
     data: {
@@ -135,7 +144,9 @@ export async function action({ params, request, context }: Route.ActionArgs) {
     fanOut("spaceUpdate", () =>
       broadcastSpaceUpdate(env, org.id, spaceNumber, "ACTIVE", timestamp),
     );
-    fanOut("callEvent", () => broadcastCallEvent(env, org.id, event));
+    fanOut("callEvent", () =>
+      broadcastCallEvent(env, org.id, { ...event, studentName: queueLabel }),
+    );
   }
 
   return new Response("OK");

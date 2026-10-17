@@ -100,6 +100,9 @@ export default [
   route("reset-password", "routes/auth/reset-password.tsx"),
   route("viewer-access", "routes/viewer-access.tsx"),
   route("signup", "routes/auth/signup.tsx"),
+  // Demo mp4s from the private branding bucket. Public so marketing hosts
+  // (and tenant hosts) don't bounce the <video> request through auth.
+  route("marketing/videos/:name", "routes/marketing.videos.$name.ts"),
   route("pricing", "routes/pricing.tsx"),
   route("faqs", "routes/faqs.tsx"),
   route("blog", "routes/blog._index.tsx"),

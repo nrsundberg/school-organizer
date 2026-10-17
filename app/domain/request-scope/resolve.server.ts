@@ -162,7 +162,8 @@ export async function resolveRequestScope(
     session.user?.mustChangePassword &&
     !path.isSetPassword &&
     !path.isApi &&
-    !path.isLogout
+    !path.isLogout &&
+    !path.isMarketingVideo
   ) {
     throw redirect("/set-password");
   }

@@ -42,8 +42,9 @@
  *   library behavior; see the file-level comment above.
  * - `frame-src` whitelists Stripe Checkout and Billing so the customer
  *   portal iframes mount, plus YouTube's privacy-enhanced + canonical
- *   embed hosts (`www.youtube-nocookie.com`, `www.youtube.com`) for the
- *   marketing-home explainer videos rendered by `MarketingLanding.tsx`.
+ *   embed hosts. Marketing explainer videos are same-origin `<video>`
+ *   elements (`/marketing/videos/:name`), so they fall under `default-src
+ *   'self'` rather than `frame-src`.
  * - `frame-ancestors 'none'` is the CSP-level counterpart to
  *   `X-Frame-Options: DENY` and is honored by modern browsers in
  *   preference to the legacy header.
