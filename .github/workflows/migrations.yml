@@ -7,6 +7,8 @@ on:
     branches: [master]
     paths:
       - "migrations/**"
+      # Re-run when the check itself changes, not only when SQL does.
+      - ".github/workflows/migrations.yml"
 
 jobs:
   local-d1:
