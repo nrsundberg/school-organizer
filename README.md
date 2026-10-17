@@ -54,25 +54,9 @@ Trial length follows calendar days and qualifying pickup days (see `app/domain/b
 1. [Install Wrangler](https://developers.cloudflare.com/workers/wrangler/install-and-update/) and log in: `npx wrangler login`.
 2. Ensure the D1 database in `wrangler.jsonc` exists in your account (or create one and update `database_id` / `database_name`).
 
-### Apply D1 migrations (remote)
-
-After schema changes under `migrations/`:
-
-```sh
-npm run d1:migrate
-```
-
 ### Deploy
 
-From a machine where Wrangler can authenticate (see [Wrangler auth](https://developers.cloudflare.com/workers/wrangler/commands/#login)):
-
-```sh
-npm run deploy
-```
-
-This runs `prisma generate`, builds the React Router server bundle and client assets, and publishes the Worker plus static assets.
-
-In non-interactive environments (CI, some sandboxes), set `CLOUDFLARE_API_TOKEN` with a token that has Workers deploy permissions. Otherwise run `npx wrangler login` once locally.
+Production ships from GitHub Actions when a version tag is pushed. Staging ships on every push to `master`. Both jobs apply pending D1 migrations before `wrangler deploy`, and a failed migration stops the deploy. See [docs/deploy.md](docs/deploy.md) for the tag command, the Cloudflare API token permissions, and how SQL in `migrations/` is created (`wrangler d1 migrations create`, not Prisma Migrate).
 
 ### Post-deploy
 
@@ -99,8 +83,8 @@ Point your Stripe webhook endpoint at `https://pickuproster.com/api/webhooks/str
 | `npm run dev` | React Router dev server (local DB) |
 | `npm run dev:worker` | Build + `wrangler dev` (D1 + DO) |
 | `npm run build` | Prisma generate + production build |
-| `npm run deploy` | Build + deploy to Cloudflare |
-| `npm run d1:migrate` | Apply D1 migrations to remote DB |
+| `npm run deploy` | Build + deploy the production Worker from a laptop (does not apply migrations; releases use a `v*` tag, see [docs/deploy.md](docs/deploy.md)) |
+| `npm run d1:migrate` | Apply D1 migrations to the remote production DB |
 | `npm run test` | Domain tests |
 
 ## Running E2E tests
