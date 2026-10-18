@@ -8,22 +8,30 @@ import { UptimeGrid } from "~/components/status/UptimeGrid";
 import { IncidentList } from "~/components/status/IncidentList";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
+import {
+  canonicalUrl,
+  marketingPageMeta,
+  publicSiteOrigin,
+  rootDomainFromContext,
+} from "~/lib/marketing-seo";
 import type {
   ComponentStatus,
   SectionId,
   StatusPageComponent,
 } from "~/domain/status/types";
 
-export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
-  return [
-    { title: data?.metaTitle ?? "Status — Pickup Roster" },
-    {
-      name: "description",
-      content:
-        data?.metaDescription ??
-        "Live status of the Pickup Roster platform, including board infrastructure and third-party dependencies.",
-    },
-  ];
+export function meta({
+  data,
+}: {
+  data?: { metaTitle?: string; metaDescription?: string; canonical?: string };
+}) {
+  return marketingPageMeta({
+    title: data?.metaTitle ?? "Status — PickupRoster",
+    description:
+      data?.metaDescription ??
+      "Live status of the PickupRoster platform, including board infrastructure and third-party dependencies.",
+    canonical: data?.canonical ?? "https://pickuproster.com/status",
+  });
 }
 
 // Cacheable at the edge for 30s; stale-while-revalidate keeps it fast even if
@@ -42,8 +50,10 @@ export async function loader({ request, context }: LoaderFunctionArgs) {
     detectLocale(request, context),
   ]);
   const t = await getFixedT(locale, "common");
+  const origin = publicSiteOrigin(request, rootDomainFromContext(context));
   return {
     ...data,
+    canonical: canonicalUrl(origin, "/status"),
     metaTitle: t("status.metaTitle"),
     metaDescription: t("status.metaDescription"),
   };

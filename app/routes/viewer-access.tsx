@@ -26,7 +26,7 @@ type RootBranding = {
 };
 
 export function meta({ data }: { data?: { metaTitle?: string } }) {
-  return [{ title: data?.metaTitle ?? "Viewer access — Pickup Roster" }];
+  return [{ title: data?.metaTitle ?? "Viewer access — PickupRoster" }];
 }
 
 function safeRedirect(next: string | null): string {

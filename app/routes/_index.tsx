@@ -38,7 +38,13 @@ import {
   getOptionalOrgFromContext,
   getOptionalUserFromContext,
 } from "~/domain/utils/global-context.server";
-import { DEFAULT_SITE_NAME } from "~/lib/site";
+import {
+  canonicalUrl,
+  marketingPageMeta,
+  organizationWebSiteJsonLd,
+  publicSiteOrigin,
+  rootDomainFromContext,
+} from "~/lib/marketing-seo";
 import {
   Button,
   Separator,
@@ -64,14 +70,30 @@ import {
 
 export const meta: Route.MetaFunction = ({ data }) => {
   if (!data || data.mode === "marketing") {
-    return [
-      { title: data?.metaTitle ?? `${DEFAULT_SITE_NAME} — Car line made clear` },
-      { name: "description", content: data?.metaDescription ?? "Live car line board, viewer access, and school admin tools." },
-    ];
+    const origin = data && data.mode === "marketing" ? data.origin : "https://pickuproster.com";
+    return marketingPageMeta({
+      title:
+        data?.metaTitle ??
+        "PickupRoster | Live School Pickup Board & Car Line App",
+      description:
+        data?.metaDescription ??
+        "A live school pickup board for the car line. Staff call cars and every screen updates instantly. Free 30-day trial, no card.",
+      canonical:
+        data && data.mode === "marketing"
+          ? data.canonical
+          : canonicalUrl(origin, "/"),
+      origin,
+      image: true,
+      jsonLd:
+        data && data.mode === "marketing"
+          ? data.jsonLd
+          : organizationWebSiteJsonLd(origin),
+    });
   }
   return [
     { title: data.metaTitle },
     { name: "description", content: data.metaDescription },
+    { name: "robots", content: "noindex, nofollow" },
   ];
 };
 
@@ -89,10 +111,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       const url = await getTenantBoardUrlForRequest(request, context);
       if (url) throw redirect(url);
     }
+    const common = await getFixedT(locale, "common");
+    const origin = publicSiteOrigin(request, rootDomainFromContext(context));
     return {
       mode: "marketing" as const,
-      metaTitle: t("index.metaTitle", { name: DEFAULT_SITE_NAME }),
-      metaDescription: t("index.metaDescription"),
+      origin,
+      canonical: canonicalUrl(origin, "/"),
+      jsonLd: organizationWebSiteJsonLd(origin),
+      metaTitle: common("marketingLanding.metaTitle"),
+      metaDescription: common("marketingLanding.metaDescription"),
     };
   }
 

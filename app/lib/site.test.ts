@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   DEFAULT_SIGNUP_NOTIFY_EMAIL,
   DEFAULT_SUPPORT_EMAIL,
+  getDemoBookingUrl,
   getIntroCallBookingUrl,
   getSignupNotifyEmail,
   getSupportEmail,
@@ -84,5 +85,32 @@ test("getIntroCallBookingUrl accepts only http(s) URLs", () => {
       },
     }),
     "https://cal.example/intro",
+  );
+});
+
+test("getDemoBookingUrl prefers DEMO_BOOKING_URL and falls back to the intro calendar", () => {
+  assert.equal(getDemoBookingUrl({}), null);
+  assert.equal(
+    getDemoBookingUrl({
+      cloudflare: { env: { INTRO_CALL_BOOKING_URL: "https://cal.example/intro" } },
+    }),
+    "https://cal.example/intro",
+  );
+  assert.equal(
+    getDemoBookingUrl({
+      cloudflare: {
+        env: {
+          DEMO_BOOKING_URL: "https://cal.example/demo",
+          INTRO_CALL_BOOKING_URL: "https://cal.example/intro",
+        },
+      },
+    }),
+    "https://cal.example/demo",
+  );
+  assert.equal(
+    getDemoBookingUrl({
+      cloudflare: { env: { DEMO_BOOKING_URL: "javascript:alert(1)" } },
+    }),
+    null,
   );
 });

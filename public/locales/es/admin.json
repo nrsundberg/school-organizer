@@ -315,7 +315,7 @@
       "deleteAll": "Eliminar todos los registros de estudiantes",
       "heading": "Zona de peligro",
       "subtitle": "Elimina permanentemente todos los registros de estudiantes de esta organización. Se conservan los hogares y las aulas.",
-      "notice": "Al hacerlo, se notifica por correo a todos los administradores y al equipo de Pickup Roster. Los registros eliminados aún se pueden recuperar desde las copias de seguridad durante un tiempo limitado: contacta con soporte si fue un error.",
+      "notice": "Al hacerlo, se notifica por correo a todos los administradores y al equipo de PickupRoster. Los registros eliminados aún se pueden recuperar desde las copias de seguridad durante un tiempo limitado: contacta con soporte si fue un error.",
       "unknownActor": "Un administrador"
     },
     "grid": {
@@ -1142,12 +1142,12 @@
   },
   "layout": {
     "closeNav": "Cerrar navegación",
-    "compedThrough": "Tu cuenta es de cortesía hasta el {{date}}. Gracias por seguir con Pickup Roster 💛",
+    "compedThrough": "Tu cuenta es de cortesía hasta el {{date}}. Gracias por seguir con PickupRoster 💛",
     "errors": {
       "accessDenied": "Acceso denegado",
       "accessDeniedBody": "Tu cuenta no tiene permiso para acceder al panel de administración.",
       "goHome": "Ir al inicio",
-      "headerBrand": "Pickup Roster — Fila de autos",
+      "headerBrand": "PickupRoster — Fila de autos",
       "headerLogoAlt": "logo de la escuela",
       "logIn": "Iniciar sesión",
       "loginLink": "Iniciar sesión",
@@ -1170,7 +1170,7 @@
   },
   "trialEndingBanner": {
     "addPaymentMethod": "Añadir método de pago",
-    "body": "Añade un método de pago para seguir usando Pickup Roster cuando termine tu prueba.",
+    "body": "Añade un método de pago para seguir usando PickupRoster cuando termine tu prueba.",
     "headline_one": "Tu prueba termina en {{count}} día.",
     "headline_other": "Tu prueba termina en {{count}} días."
   },

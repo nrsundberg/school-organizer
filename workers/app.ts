@@ -13,6 +13,7 @@ import {
   isMarketingHost,
   resolveTenantSlugFromHost,
 } from "../app/domain/utils/host.server";
+import { canonicalRedirectTarget } from "../app/lib/marketing-seo";
 import { applySecurityHeaders } from "../app/lib/security-headers.server";
 import { createCspNonce, CSP_NONCE_HEADER } from "../app/lib/csp";
 import { scrubSentryEvent } from "../app/lib/sentry-scrub";
@@ -84,6 +85,20 @@ export default withSentry(
       env: Env,
       ctx: ExecutionContext
     ): Promise<Response> {
+      const redirectTo = canonicalRedirectTarget(
+        request,
+        env.PUBLIC_ROOT_DOMAIN,
+      );
+      if (redirectTo) {
+        return new Response(null, {
+          status: 301,
+          headers: {
+            Location: redirectTo,
+            "Cache-Control": "public, max-age=3600",
+          },
+        });
+      }
+
       const url = new URL(request.url);
 
       // Route WebSocket upgrades directly to the per-tenant Durable Object.
@@ -142,11 +157,21 @@ export default withSentry(
       // NB: the WebSocket upgrade branch above returns before reaching here,
       // so we never try to mutate a 101-switching-protocols response. The
       // `scheduled` and `queue` handlers also never pass through this path.
-      return applySecurityHeaders(
+      const secured = applySecurityHeaders(
         response,
         env as { ENVIRONMENT?: string },
         cspNonce
       );
+      if (!isMarketingHost(request, context)) {
+        const headers = new Headers(secured.headers);
+        headers.set("X-Robots-Tag", "noindex, nofollow");
+        return new Response(secured.body, {
+          status: secured.status,
+          statusText: secured.statusText,
+          headers,
+        });
+      }
+      return secured;
     },
 
     async scheduled(

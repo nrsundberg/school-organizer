@@ -14,6 +14,20 @@
     "introCallsBookLead": "You can also book those calls here:",
     "para4": "Either way, I'm glad you're here."
   },
+  "demoRequest": {
+    "subject": "PickupRoster demo request: {{school}}",
+    "preview": "{{name}} ({{email}}) asked for a demo at {{school}}.",
+    "heading": "Demo request",
+    "name": "Name: {{name}}",
+    "role": "Role: {{role}}",
+    "school": "School: {{school}}",
+    "email": "Email: {{email}}",
+    "phone": "Phone: {{phone}}",
+    "studentCount": "Student count: {{studentCount}}",
+    "message": "Message: {{message}}",
+    "when": "Submitted at: {{submittedAt}}",
+    "notProvided": "Not provided"
+  },
   "signupNotification": {
     "subject": "New PickupRoster signup: {{schoolName}}",
     "preview": "{{personName}} ({{personEmail}}) started a {{plan}} trial.",

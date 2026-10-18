@@ -100,10 +100,11 @@ export const meta: Route.MetaFunction = ({ data }) => {
   }
   if (data.marketing) {
     return [
-      { title: `${DEFAULT_SITE_NAME} — Car line made clear` },
+      { title: `${DEFAULT_SITE_NAME} | Live School Pickup Board & Car Line App` },
       {
         name: "description",
-        content: "Live car line board, viewer access, and school admin tools."
+        content:
+          "A live school pickup board for the car line. Staff call cars and every screen updates instantly. Free 30-day trial, no card."
       },
       { name: "theme-color", content: "#3D6B9A" }
     ];
@@ -112,6 +113,7 @@ export const meta: Route.MetaFunction = ({ data }) => {
   return [
     { title: `${name} — Car line` },
     { name: "description", content: `${name} car line board.` },
+    { name: "robots", content: "noindex, nofollow" },
     { name: "theme-color", content: "#3D6B9A" }
   ];
 };

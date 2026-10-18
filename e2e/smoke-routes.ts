@@ -56,7 +56,7 @@ export const publicMarketingRoutes: RouteSpec[] = [
     path: "/",
     expect: "self",
     // Covers the current wordmark+logo header.
-    landmark: { role: "link", name: /Pickup Roster/i }
+    landmark: { role: "link", name: /PickupRoster/i }
   },
   {
     path: "/pricing",

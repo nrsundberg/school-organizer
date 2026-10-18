@@ -16,6 +16,13 @@ import {
   getRateLimiter,
 } from "~/domain/utils/rate-limit.server";
 
+export function meta() {
+  return [
+    { title: "District signup — PickupRoster" },
+    { name: "robots", content: "noindex, follow" },
+  ];
+}
+
 export async function loader({ context }: Route.LoaderArgs) {
   const user = getOptionalUserFromContext(context);
   if (user) {

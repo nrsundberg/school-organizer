@@ -48,6 +48,24 @@ export type SignupNotificationMessage = {
   locale?: EmailLocale;
 };
 
+/**
+ * Internal notice when someone submits the public demo form.
+ * Always English. Failures must not surface as a 500 to the visitor.
+ */
+export type DemoRequestMessage = {
+  kind: "demo_request";
+  to: string;
+  name: string;
+  role: string;
+  school: string;
+  email: string;
+  phone: string | null;
+  studentCount: string | null;
+  message: string | null;
+  submittedAt: string;
+  locale?: EmailLocale;
+};
+
 export type TrialExpiringMessage = {
   kind: "trial_expiring";
   to: string;
@@ -162,7 +180,8 @@ export type SendableEmailMessage =
   | PasswordResetMessage
   | UserInviteMessage
   | StudentsDeletedMessage
-  | SignupNotificationMessage;
+  | SignupNotificationMessage
+  | DemoRequestMessage;
 
 export type EmailMessage = SendableEmailMessage | ProbeMessage;
 
@@ -182,4 +201,4 @@ export type RenderedEmail = {
 };
 
 /** From address used for all outbound mail. Founder voice for now. */
-export const DEFAULT_FROM = "Noah at Pickup Roster <noah@pickuproster.com>";
+export const DEFAULT_FROM = "Noah at PickupRoster <noah@pickuproster.com>";

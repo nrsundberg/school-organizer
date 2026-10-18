@@ -13,16 +13,16 @@ export async function renderUserInvite(
 ): Promise<RenderedEmail> {
   const firstName = firstNameOrFallback(msg.firstName, "there");
   const inviteContext = msg.invitedToLabel
-    ? `to join ${msg.invitedToLabel} on Pickup Roster`
-    : "to the Pickup Roster team";
+    ? `to join ${msg.invitedToLabel} on PickupRoster`
+    : "to the PickupRoster team";
   const expiryClause =
     msg.expiryDays === 1
       ? "This link expires in 1 day."
       : `This link expires in ${msg.expiryDays} days.`;
 
   const subject = msg.invitedToLabel
-    ? `You're invited to ${msg.invitedToLabel} on Pickup Roster`
-    : "You're invited to Pickup Roster";
+    ? `You're invited to ${msg.invitedToLabel} on PickupRoster`
+    : "You're invited to PickupRoster";
   const preview = `Set your password and sign in.`;
   const greeting = `Hi ${firstName},`;
   const intro = `You've been invited ${inviteContext}. Click the button below to set your password and sign in for the first time.`;

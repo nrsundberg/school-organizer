@@ -93,6 +93,26 @@ test("set-password is its own bucket (mustChangePassword guard)", () => {
   assert.equal(tenant("/admin/dashboard").isSetPassword, false);
 });
 
+test("demo and the pickup-board page are public only on the marketing host", () => {
+  assert.equal(marketing("/demo").isPublicMarketingPath, true);
+  assert.equal(tenant("/demo").isPublicMarketingPath, false);
+  assert.equal(marketing("/school-pickup-board").isPublicMarketingPath, true);
+  assert.equal(tenant("/school-pickup-board").isPublicMarketingPath, false);
+  assert.equal(marketing("/demo").anonSkipsViewer, true);
+});
+
+test("robots and sitemap are public on every host and skip tenant gates", () => {
+  for (const path of ["/robots.txt", "/sitemap.xml"]) {
+    for (const classify of [marketing, tenant]) {
+      const result = classify(path);
+      assert.equal(result.isPublicMarketingPath, true, path);
+      assert.equal(result.anonSkipsViewer, true, path);
+      assert.equal(result.skipTenantOrgBinding, true, path);
+      assert.equal(result.exemptFromBillingGate, true, path);
+    }
+  }
+});
+
 test("/accept-invite is anonymous-skippable (anon users can open invite links)", () => {
   assert.equal(
     marketing("/accept-invite").anonSkipsViewer,

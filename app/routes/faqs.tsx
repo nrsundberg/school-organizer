@@ -5,27 +5,42 @@ import { MarketingNav } from "~/components/marketing/MarketingNav";
 import { SUPPORTED_LANGUAGES } from "~/lib/i18n-config";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
+import {
+  canonicalUrl,
+  faqPageJsonLd,
+  marketingPageMeta,
+  publicSiteOrigin,
+  rootDomainFromContext,
+} from "~/lib/marketing-seo";
 
-export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
-  return [
-    { title: data?.metaTitle ?? "FAQs — Pickup Roster" },
-    { name: "description", content: data?.metaDescription ?? "Common questions about car line boards, trials, and security." },
-  ];
+export function meta({
+  data,
+}: {
+  data?: {
+    metaTitle?: string;
+    metaDescription?: string;
+    canonical?: string;
+    origin?: string;
+    jsonLd?: ReturnType<typeof faqPageJsonLd>;
+  };
+}) {
+  const origin = data?.origin ?? "https://pickuproster.com";
+  return marketingPageMeta({
+    title: data?.metaTitle ?? "FAQs — PickupRoster",
+    description:
+      data?.metaDescription ??
+      "Common questions about the school pickup board, the car line, trials, and security.",
+    canonical: data?.canonical ?? canonicalUrl(origin, "/faqs"),
+    origin,
+    image: true,
+    jsonLd: data?.jsonLd,
+  });
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "common");
-  return {
-    metaTitle: t("faqs.metaTitle"),
-    metaDescription: t("faqs.metaDescription"),
-  };
-}
-
-export default function Faqs() {
-  const { t } = useTranslation("common");
   const names = SUPPORTED_LANGUAGES.map((l) => l.nativeName).join(", ");
-
   const items = [
     { q: t("faqs.items.where.q"), a: t("faqs.items.where.a") },
     { q: t("faqs.items.trial.q"), a: t("faqs.items.trial.a") },
@@ -36,6 +51,20 @@ export default function Faqs() {
       a: `${t("marketing.languageList", { names })} ${t("marketing.faqLanguageAnswerSuffix")}`,
     },
   ];
+  const origin = publicSiteOrigin(request, rootDomainFromContext(context));
+  return {
+    items,
+    origin,
+    canonical: canonicalUrl(origin, "/faqs"),
+    jsonLd: faqPageJsonLd(items),
+    metaTitle: t("faqs.metaTitle"),
+    metaDescription: t("faqs.metaDescription"),
+  };
+}
+
+export default function Faqs({ loaderData }: Route.ComponentProps) {
+  const { t } = useTranslation("common");
+  const items = loaderData.items;
 
   return (
     <div className="min-h-screen bg-[#0f1414] text-white">

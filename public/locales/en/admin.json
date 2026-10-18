@@ -315,7 +315,7 @@
       "deleteAll": "Delete All Student Records",
       "heading": "Danger Zone",
       "subtitle": "Permanently delete every student record in this org. Households and classrooms are kept.",
-      "notice": "When you do this, all admins and the Pickup Roster team are emailed. Deleted records can still be recovered from database backups for a limited time — contact support if this was a mistake.",
+      "notice": "When you do this, all admins and the PickupRoster team are emailed. Deleted records can still be recovered from database backups for a limited time — contact support if this was a mistake.",
       "unknownActor": "An administrator"
     },
     "grid": {
@@ -1142,12 +1142,12 @@
   },
   "layout": {
     "closeNav": "Close navigation",
-    "compedThrough": "Your account is comped through {{date}}. Thanks for rolling with Pickup Roster 💛",
+    "compedThrough": "Your account is comped through {{date}}. Thanks for rolling with PickupRoster 💛",
     "errors": {
       "accessDenied": "Access Denied",
       "accessDeniedBody": "Your account doesn't have permission to access the admin panel.",
       "goHome": "Go Home",
-      "headerBrand": "Pickup Roster — Car line",
+      "headerBrand": "PickupRoster — Car line",
       "headerLogoAlt": "school logo",
       "logIn": "Log In",
       "loginLink": "Login",
@@ -1170,7 +1170,7 @@
   },
   "trialEndingBanner": {
     "addPaymentMethod": "Add payment method",
-    "body": "Add a payment method to keep using Pickup Roster after your trial ends.",
+    "body": "Add a payment method to keep using PickupRoster after your trial ends.",
     "headline_one": "Your trial ends in {{count}} day.",
     "headline_other": "Your trial ends in {{count}} days."
   },

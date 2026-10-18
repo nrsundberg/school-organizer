@@ -58,8 +58,9 @@ export const handle = { i18n: ["auth"] };
 
 export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
   return [
-    { title: data?.metaTitle ?? "Signup — Pickup Roster" },
-    { name: "description", content: data?.metaDescription ?? "Create your organization and account" }
+    { title: data?.metaTitle ?? "Signup — PickupRoster" },
+    { name: "description", content: data?.metaDescription ?? "Create your organization and account" },
+    { name: "robots", content: "noindex, follow" }
   ];
 }
 

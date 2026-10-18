@@ -7,6 +7,11 @@ import { formatPostDate } from "~/lib/blog";
 import { getPost } from "~/lib/blog.server";
 import { detectLocale } from "~/i18n.server";
 import { getFixedT } from "~/lib/t.server";
+import {
+  canonicalUrl,
+  publicSiteOrigin,
+  rootDomainFromContext,
+} from "~/lib/marketing-seo";
 
 export function meta({ data }: Route.MetaArgs) {
   if (!data?.post) {
@@ -24,7 +29,9 @@ export function meta({ data }: Route.MetaArgs) {
     { property: "og:type", content: "article" },
     { property: "article:published_time", content: post.date },
     { property: "article:author", content: post.author },
-    ...(canonical ? [{ rel: "canonical", href: canonical } as const] : [])
+    ...(canonical
+      ? [{ tagName: "link" as const, rel: "canonical", href: canonical }]
+      : [])
   ];
 }
 
@@ -36,10 +43,8 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   if (!post) {
     throw new Response("Post not found", { status: 404 });
   }
-  // Canonical points at the apex marketing host so subdomains don't dilute
-  // search indexing of shared blog content.
-  const url = new URL(request.url);
-  const canonical = `${url.protocol}//pickuproster.com/blog/${post.slug}`;
+  const origin = publicSiteOrigin(request, rootDomainFromContext(context));
+  const canonical = canonicalUrl(origin, `/blog/${post.slug}`);
   return {
     post,
     canonical,

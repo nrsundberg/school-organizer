@@ -1,0 +1,107 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  buildSitemapXml,
+  canonicalRedirectTarget,
+  faqPageJsonLd,
+  marketingRobotsTxt,
+  publicSiteOrigin,
+  softwareApplicationJsonLd,
+  tenantRobotsTxt,
+} from "./marketing-seo";
+
+test("sitemap lists marketing URLs and lastmod only for dated entries", () => {
+  const xml = buildSitemapXml("https://pickuproster.com", [
+    { path: "/" },
+    { path: "/school-pickup-board" },
+    { path: "/blog/diagnose-car-line-wait-times-before-the-first-bell", lastmod: "2026-07-20" },
+    { path: "/guides/importing-student-rosters-from-sis", lastmod: "not-a-date" },
+  ]);
+  assert.match(xml, /<loc>https:\/\/pickuproster.com\/<\/loc>/);
+  assert.match(xml, /<loc>https:\/\/pickuproster.com\/school-pickup-board<\/loc>/);
+  assert.match(xml, /<lastmod>2026-07-20<\/lastmod>/);
+  assert.doesNotMatch(xml, /not-a-date/);
+  assert.doesNotMatch(xml, /\/admin/);
+  assert.doesNotMatch(xml, /\/signup/);
+});
+
+test("marketing robots allows the site, blocks app paths, and names the sitemap", () => {
+  const txt = marketingRobotsTxt("https://pickuproster.com/sitemap.xml");
+  assert.match(txt, /^User-agent: \*/);
+  assert.match(txt, /Allow: \//);
+  assert.match(txt, /Disallow: \/login/);
+  assert.match(txt, /Disallow: \/signup/);
+  assert.match(txt, /Disallow: \/admin/);
+  assert.match(txt, /Sitemap: https:\/\/pickuproster.com\/sitemap.xml/);
+});
+
+test("tenant robots disallows the whole host and has no sitemap", () => {
+  const txt = tenantRobotsTxt();
+  assert.equal(txt, "User-agent: *\nDisallow: /\n");
+  assert.doesNotMatch(txt, /Sitemap:/);
+});
+
+test("www and http on the apex redirect to the https apex", () => {
+  assert.equal(
+    canonicalRedirectTarget(
+      new Request("https://www.pickuproster.com/pricing?cycle=annual"),
+      "pickuproster.com",
+    ),
+    "https://pickuproster.com/pricing?cycle=annual",
+  );
+  assert.equal(
+    canonicalRedirectTarget(
+      new Request("http://pickuproster.com/faqs", {
+        headers: { "x-forwarded-proto": "http" },
+      }),
+      "pickuproster.com",
+    ),
+    "https://pickuproster.com/faqs",
+  );
+  assert.equal(
+    canonicalRedirectTarget(
+      new Request("https://pickuproster.com/"),
+      "pickuproster.com",
+    ),
+    null,
+  );
+  assert.equal(
+    canonicalRedirectTarget(
+      new Request("https://maple.pickuproster.com/"),
+      "pickuproster.com",
+    ),
+    null,
+  );
+  assert.equal(
+    canonicalRedirectTarget(new Request("http://localhost:3000/"), "pickuproster.com"),
+    null,
+  );
+});
+
+test("public site origin prefers the configured apex", () => {
+  assert.equal(
+    publicSiteOrigin(new Request("http://localhost:3000/"), "pickuproster.com"),
+    "https://pickuproster.com",
+  );
+  assert.equal(
+    publicSiteOrigin(new Request("http://localhost:3000/blog"), ""),
+    "http://localhost:3000",
+  );
+});
+
+test("pricing JSON-LD uses the current Car Line and Campus prices", () => {
+  const ld = softwareApplicationJsonLd("https://pickuproster.com");
+  const offers = ld.offers.map((offer) => `${offer.name}:${offer.price}`);
+  assert.deepEqual(offers, [
+    "Car Line monthly:150",
+    "Car Line annual:1440",
+    "Campus monthly:500",
+    "Campus annual:4800",
+  ]);
+});
+
+test("FAQ JSON-LD keeps each question and answer", () => {
+  const ld = faqPageJsonLd([{ q: "What is it?", a: "A live pickup board." }]);
+  assert.equal(ld.mainEntity[0]?.name, "What is it?");
+  assert.equal(ld.mainEntity[0]?.acceptedAnswer.text, "A live pickup board.");
+});

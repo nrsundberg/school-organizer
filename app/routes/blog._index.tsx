@@ -6,6 +6,11 @@ import { formatPostDate, type BlogPostMeta } from "~/lib/blog";
 import { listPosts } from "~/lib/blog.server";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
+import {
+  canonicalUrl,
+  publicSiteOrigin,
+  rootDomainFromContext,
+} from "~/lib/marketing-seo";
 
 export function meta({ data }: Route.MetaArgs) {
   const count = data?.posts.length ?? 0;
@@ -23,14 +28,21 @@ export function meta({ data }: Route.MetaArgs) {
       content: data?.ogDescription ?? "Field notes on school dismissal, car-line operations, and district rollouts.",
     },
     { property: "og:type", content: "website" },
+    {
+      tagName: "link",
+      rel: "canonical",
+      href: data?.canonical ?? "https://pickuproster.com/blog",
+    },
   ];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "common");
+  const origin = publicSiteOrigin(request, rootDomainFromContext(context));
   return {
     posts: listPosts(),
+    canonical: canonicalUrl(origin, "/blog"),
     metaTitle: t("blog.metaTitleIndex"),
     metaDescriptionIndex: t("blog.metaDescriptionIndex"),
     metaDescriptionEmpty: t("blog.metaDescriptionEmpty"),
