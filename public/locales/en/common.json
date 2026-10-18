@@ -189,7 +189,21 @@
       "pricing": "Pricing",
       "status": "Status",
       "support": "Support"
+    },
+    "compare": {
+      "heading": "Compare",
+      "pikmykid": "PikMyKid alternatives",
+      "schoolpass": "SchoolPass vs PickupRoster",
+      "dismissalSoftware": "Best dismissal software"
     }
+  },
+  "compare": {
+    "kicker": "Compare",
+    "notFoundTitle": "We can't find that comparison.",
+    "notFoundBody": "The page may have moved. The PickupRoster home page is one click away.",
+    "errorTitle": "We hit a snag loading this page.",
+    "errorBody": "Try refreshing; if the problem sticks, let us know.",
+    "home": "PickupRoster home"
   },
   "guides": {
     "allGuides": "All guides",

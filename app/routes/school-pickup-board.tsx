@@ -45,6 +45,24 @@ const GUIDES = [
   },
 ] as const;
 
+const COMPARE = [
+  {
+    href: "/compare/pikmykid-alternatives",
+    en: "PikMyKid alternatives",
+    es: "Alternativas a PikMyKid",
+  },
+  {
+    href: "/compare/schoolpass-vs-pickuproster",
+    en: "SchoolPass vs PickupRoster",
+    es: "SchoolPass y PickupRoster",
+  },
+  {
+    href: "/blog/best-school-dismissal-software",
+    en: "Best school dismissal software",
+    es: "El mejor software de salida escolar",
+  },
+] as const;
+
 export const handle = { i18n: ["common"] };
 
 export function meta({ data }: Route.MetaArgs) {
@@ -178,6 +196,21 @@ export default function SchoolPickupBoard({ loaderData }: Route.ComponentProps) 
                   className="text-[#E9D500] underline hover:text-[#f5e047]"
                 >
                   {spanish ? guide.es : guide.en}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <h3 className="mt-10 text-lg font-semibold">
+            {spanish ? "Comparar opciones" : "Compare options"}
+          </h3>
+          <ul className="mt-4 space-y-2">
+            {COMPARE.map((page) => (
+              <li key={page.href}>
+                <Link
+                  to={page.href}
+                  className="text-[#E9D500] underline hover:text-[#f5e047]"
+                >
+                  {spanish ? page.es : page.en}
                 </Link>
               </li>
             ))}

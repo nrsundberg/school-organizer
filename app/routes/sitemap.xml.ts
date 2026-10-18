@@ -6,6 +6,7 @@ import {
   buildSitemapXml,
   publicSiteOrigin,
   rootDomainFromContext,
+  SITEMAP_PATH_LASTMOD,
   SITEMAP_STATIC_PATHS,
   type SitemapEntry,
 } from "~/lib/marketing-seo";
@@ -21,7 +22,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const origin = publicSiteOrigin(request, rootDomainFromContext(context));
   const entries: SitemapEntry[] = [
-    ...SITEMAP_STATIC_PATHS.map((path) => ({ path })),
+    ...SITEMAP_STATIC_PATHS.map((path) => ({
+      path,
+      lastmod: SITEMAP_PATH_LASTMOD[path],
+    })),
     ...listPosts().map((post) => ({
       path: `/blog/${post.slug}`,
       lastmod: post.date,

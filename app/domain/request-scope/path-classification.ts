@@ -105,6 +105,7 @@ export function classifyRequestPath(
     (pathname === "/book/intro" && onMarketingHost) ||
     (pathname === "/book/manage" && onMarketingHost) ||
     (pathname === "/school-pickup-board" && onMarketingHost) ||
+    (pathname.startsWith("/compare/") && onMarketingHost) ||
     isCrawlerFile ||
     isMarketingVideo;
 
