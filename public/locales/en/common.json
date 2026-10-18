@@ -96,7 +96,7 @@
         "q": "Can we use our own domain?"
       },
       "trial": {
-        "a": "Your trial ends on the later of 30 calendar days from signup or 25 qualifying pickup days. A qualifying day is a day with more than 10 distinct students marked as called.",
+        "a": "Your free trial lasts 30 calendar days from signup. No credit card is required. If you haven't added a payment method when those 30 days end, your site is suspended and you are not charged.",
         "q": "How does the trial work?"
       },
       "viewer": {
@@ -191,7 +191,7 @@
     "features": {
       "liveBoard": "Live board with WebSocket updates and viewer PINs or magic links.",
       "subdomain": "Subdomain per school (yourslug.pickuproster.com); Campus and District plans can bring a custom domain or a subdomain on your school's own domain.",
-      "trial": "Trial that respects real usage: calendar time and qualifying pickup days."
+      "trial": "30-day free trial from signup. No credit card required."
     },
     "footerCta": {
       "body": "Start a trial from the marketing site. Your live board lives on your school subdomain—never mixed with other tenants.",
@@ -336,8 +336,8 @@
   "welcome": {
     "greeting": "Hi {{firstName}},",
     "para1": "Thanks for signing up. Helping schools have a calmer pickup is the reason I started PickupRoster, so it really means a lot that {{orgName}} gave it a try.",
-    "para2": "I'd love to hear what dismissal looks like at your school today — what's working, what isn't, and what you wish someone would fix. Could we grab 15 minutes on the phone in the next week or two?",
-    "para3": "Just reply with a couple of times that work for you and I'll send over an invite.",
+    "para2": "Every new school gets two free 30-minute intro calls. We'll use them to set up the system with you and to identify anything new you need built.",
+    "para3": "Reply with a couple of times that work for you and I'll send the invites.",
     "para4": "Either way, glad to have you here.",
     "preview": "a quick note from the founder — and a small ask.",
     "subject": "thanks for trying PickupRoster, {{firstName}}"

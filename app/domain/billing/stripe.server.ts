@@ -47,7 +47,7 @@ export function requireStripeConfig(context: any): StripeConfig {
   const config = getStripeConfig(context);
   if (!config) {
     throw new Error(
-      "Stripe is not configured. Set STRIPE_SECRET_KEY, STRIPE_CAR_LINE_PRICE_ID, STRIPE_CAMPUS_PRICE_ID, STRIPE_WEBHOOK_SECRET (or legacy STRIPE_STARTER_PRICE_ID for both prices in dev). Annual prices via STRIPE_CAR_LINE_ANNUAL_PRICE_ID / STRIPE_CAMPUS_ANNUAL_PRICE_ID are optional.",
+      "Stripe is not configured. Set STRIPE_SECRET_KEY, STRIPE_CAR_LINE_PRICE_ID, STRIPE_CAMPUS_PRICE_ID, STRIPE_WEBHOOK_SECRET (or legacy STRIPE_STARTER_PRICE_ID for both monthly prices in dev). Annual checkout also requires STRIPE_CAR_LINE_ANNUAL_PRICE_ID ($1,440/year) and STRIPE_CAMPUS_ANNUAL_PRICE_ID ($4,800/year).",
     );
   }
   return config;

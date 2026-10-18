@@ -1,6 +1,17 @@
 import type { RenderedEmail, WelcomeMessage } from "../types";
 import { getFixedT } from "~/lib/t.server";
-import { escapeHtml, firstNameOrFallback } from "../html";
+import { escapeAttr, escapeHtml, firstNameOrFallback } from "../html";
+
+function safeHttpUrl(raw: string | null | undefined): string {
+  if (!raw) return "";
+  try {
+    const url = new URL(raw.trim());
+    if (url.protocol !== "https:" && url.protocol !== "http:") return "";
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
 
 /**
  * Founder-voice welcome email (Variant A — gratitude-led). Replies land in
@@ -21,8 +32,15 @@ export async function renderWelcome(msg: WelcomeMessage): Promise<RenderedEmail>
   const para2 = t("welcome.para2");
   const para3 = t("welcome.para3");
   const para4 = t("welcome.para4");
+  const bookingUrl = safeHttpUrl(msg.introCallBookingUrl);
+  const bookingLead = bookingUrl ? t("welcome.introCallsBookLead") : "";
   const signOff = t("common.signOff");
   const signOffTitle = t("common.signOffTitle");
+
+  const bookingHtml = bookingUrl
+    ? `<p>${escapeHtml(bookingLead)} <a href="${escapeAttr(bookingUrl)}">${escapeHtml(bookingUrl)}</a></p>`
+    : "";
+  const bookingText = bookingUrl ? `\n${bookingLead} ${bookingUrl}\n` : "";
 
   const html = `<!doctype html>
 <html>
@@ -32,6 +50,7 @@ export async function renderWelcome(msg: WelcomeMessage): Promise<RenderedEmail>
     <p>${escapeHtml(para1)}</p>
     <p>${escapeHtml(para2)}</p>
     <p>${escapeHtml(para3)}</p>
+    ${bookingHtml}
     <p>${escapeHtml(para4)}</p>
     <hr />
     <p>${escapeHtml(signOff)}<br />${escapeHtml(signOffTitle)}</p>
@@ -45,7 +64,7 @@ ${para1}
 ${para2}
 
 ${para3}
-
+${bookingText}
 ${para4}
 
 --

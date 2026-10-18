@@ -764,9 +764,9 @@ enum BillingPlan {
   FREE
   /// @deprecated Use CAR_LINE — migrated in DB; kept for compatibility with old clients.
   STARTER
-  /// Base paid: single school car-line experience ($100/mo). The public default.
+  /// Base paid: single school car-line experience ($150/mo or $1,440/yr). The public default.
   CAR_LINE
-  /// Premium single-school tier ($500/mo): higher caps, dedicated onboarding,
+  /// Premium single-school tier ($500/mo or $4,800/yr): higher caps, dedicated onboarding,
   /// priority support, SSO. Positioned on the public pricing page between
   /// CAR_LINE and DISTRICT.
   CAMPUS

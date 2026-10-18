@@ -27,8 +27,17 @@ declare global {
     STRIPE_CAR_LINE_ANNUAL_PRICE_ID?: string;
     /** Stripe recurring price for Campus plan. */
     STRIPE_CAMPUS_PRICE_ID?: string;
-    /** Stripe recurring annual price for Campus plan (optional). */
+    /** Stripe recurring annual price for Campus ($4,800/year). Required for annual checkout. */
     STRIPE_CAMPUS_ANNUAL_PRICE_ID?: string;
+    /**
+     * Public http(s) URL where a new school books the two free intro calls.
+     * Leave unset until a calendar exists — the UI does not invent a link.
+     */
+    INTRO_CALL_BOOKING_URL?: string;
+    /**
+     * Inbox for trial-start notifications. Defaults to NoahSundberg@gmail.com.
+     */
+    SIGNUP_NOTIFY_EMAIL?: string;
     /** @deprecated Use STRIPE_CAR_LINE_PRICE_ID + STRIPE_CAMPUS_PRICE_ID; dev fallback for both. */
     STRIPE_STARTER_PRICE_ID?: string;
     STRIPE_SECRET_KEY?: string;

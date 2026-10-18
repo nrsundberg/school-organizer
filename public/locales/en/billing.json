@@ -49,12 +49,20 @@
     },
     "cycle": {
       "annual": "Annual",
+      "annualWithSave": "Annual · Save {{percent}}%",
       "monthly": "Monthly"
+    },
+    "saveDetail": "Save {{percent}}% versus {{full}} a year at the monthly rate",
+    "monthlyAnnualHint": "Or {{annual}}/year — save {{percent}}%",
+    "introCalls": {
+      "heading": "Two free intro calls",
+      "body": "Every new school gets two free 30-minute intro calls to set up the system and identify anything new you need built.",
+      "book": "Book an intro call"
     },
     "faq": {
       "afterTrial": {
-        "a": "If you haven't converted, your site is suspended. No surprise charges.",
-        "q": "What happens after 30 days?"
+        "a": "Your free trial lasts 30 calendar days from signup. No credit card is required. If you haven't added a payment method when those 30 days end, your site is suspended and you are not charged.",
+        "q": "How does the free trial work?"
       },
       "creditCard": {
         "a": "No.",

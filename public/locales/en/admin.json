@@ -1154,6 +1154,11 @@
       "loginRequired": "Login Required",
       "loginRequiredBody": "You need to be logged in to access the admin panel."
     },
+    "introCalls": {
+      "heading": "Two free intro calls",
+      "body": "Every new school gets two free 30-minute intro calls to set up the system and identify anything new you need built.",
+      "book": "Book an intro call"
+    },
     "openNav": "Open navigation",
     "panelTitle": "Admin Panel"
   },

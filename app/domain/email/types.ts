@@ -24,6 +24,28 @@ export type WelcomeMessage = {
   userName: string | null;
   /** Recipient locale (BCP-47 short, e.g. "en", "es"). Optional; defaults to "en". */
   locale?: EmailLocale;
+  /**
+   * Public booking page for the two free intro calls. Null/omitted when
+   * `INTRO_CALL_BOOKING_URL` is unset — the template then asks them to reply.
+   */
+  introCallBookingUrl?: string | null;
+};
+
+/**
+ * Internal notice to the founder when a school or district starts a trial.
+ * Always English. Failures must not block signup.
+ */
+export type SignupNotificationMessage = {
+  kind: "signup_notification";
+  to: string;
+  schoolName: string;
+  personName: string | null;
+  personEmail: string;
+  /** Billing plan stored at signup, e.g. CAR_LINE, CAMPUS, DISTRICT. */
+  plan: string;
+  /** ISO-8601 timestamp of the signup. */
+  signedUpAt: string;
+  locale?: EmailLocale;
 };
 
 export type TrialExpiringMessage = {
@@ -139,7 +161,8 @@ export type SendableEmailMessage =
   | MidTrialCheckinMessage
   | PasswordResetMessage
   | UserInviteMessage
-  | StudentsDeletedMessage;
+  | StudentsDeletedMessage
+  | SignupNotificationMessage;
 
 export type EmailMessage = SendableEmailMessage | ProbeMessage;
 

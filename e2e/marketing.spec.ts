@@ -38,8 +38,25 @@ test.describe("marketing site", () => {
 
     const carLineHeading = page.getByRole("heading", { name: /Car Line/i });
     await expect(carLineHeading).toBeVisible();
-    await expect(page.getByText("$100").first()).toBeVisible();
+    await expect(page.getByText("$150").first()).toBeVisible();
+    await expect(page.getByText("$500").first()).toBeVisible();
     await expect(page.getByText("/ month").first()).toBeVisible();
+    await expect(page.getByText("Save 20%").first()).toBeVisible();
+    await expect(
+      page.getByText(/two free 30-minute intro calls/i).first(),
+    ).toBeVisible();
+  });
+
+  test("/pricing annual cycle shows the discounted yearly prices", async ({
+    page,
+  }) => {
+    await page.goto("/pricing?cycle=annual");
+
+    await expect(page.getByText("$1,440").first()).toBeVisible();
+    await expect(page.getByText("$4,800").first()).toBeVisible();
+    await expect(page.getByText("/ year").first()).toBeVisible();
+    await expect(page.getByText("Save 20%").first()).toBeVisible();
+    await expect(page.getByText("Custom pricing")).toBeVisible();
   });
 
   test("/pricing links visitors into plan-specific signup", async ({

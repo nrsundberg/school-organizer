@@ -14,7 +14,10 @@ type BillingDb = {
 
 /**
  * Resolve the Stripe Price ID for a plan + billing cycle.
- * Falls back to the monthly price if an annual price isn't configured.
+ *
+ * Annual checkout requires the matching annual Price ID. It does not fall
+ * back to the monthly price — that would bill $150/month (or $500/month)
+ * after the customer chose the discounted annual amount.
  */
 export function priceIdForPlan(
   cfg: StripeConfig,
@@ -22,12 +25,22 @@ export function priceIdForPlan(
   billingCycle: BillingCycle = "monthly",
 ): string {
   if (plan === "CAR_LINE") {
-    if (billingCycle === "annual" && cfg.carLineAnnualPriceId) {
+    if (billingCycle === "annual") {
+      if (!cfg.carLineAnnualPriceId) {
+        throw new Error(
+          "Annual Car Line billing is not configured. Set STRIPE_CAR_LINE_ANNUAL_PRICE_ID to the $1,440/year Stripe Price.",
+        );
+      }
       return cfg.carLineAnnualPriceId;
     }
     return cfg.carLinePriceId;
   }
-  if (billingCycle === "annual" && cfg.campusAnnualPriceId) {
+  if (billingCycle === "annual") {
+    if (!cfg.campusAnnualPriceId) {
+      throw new Error(
+        "Annual Campus billing is not configured. Set STRIPE_CAMPUS_ANNUAL_PRICE_ID to the $4,800/year Stripe Price.",
+      );
+    }
     return cfg.campusAnnualPriceId;
   }
   return cfg.campusPriceId;

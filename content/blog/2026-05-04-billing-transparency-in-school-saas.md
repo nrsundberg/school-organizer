@@ -18,7 +18,7 @@ This post is about what billing transparency actually looks like in school SaaS 
 
 Transparency in billing is one of those words that sounds good and gets used to mean almost nothing. For a school customer, we think it has to mean four concrete things.
 
-First, the price has to be a price you can read on a public page without filling out a form. Our Car Line tier is $100 per month per campus, billed monthly, with a 30-day free trial that does not require a credit card. The District tier is custom-quoted for up to 10 schools, and we'll send a written quote before anything is signed. That's the whole pricing page. If a salesperson ever has to whisper a different number to you, something has gone wrong.
+First, the price has to be a price you can read on a public page without filling out a form. Our Car Line tier is $150 per month per school, or $1,440 per year (20% off). Campus is $500 per month, or $4,800 per year (20% off). Both include a 30-day free trial that does not require a credit card. The District tier is custom-quoted for up to 10 schools, and we'll send a written quote before anything is signed. That's the whole pricing page. If a salesperson ever has to whisper a different number to you, something has gone wrong.
 
 Second, the invoice has to match the price. No platform fees that appear only at renewal. No "implementation" surcharge for turning a feature on. If we change pricing for new customers, existing customers stay on what they signed.
 

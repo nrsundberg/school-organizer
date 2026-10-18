@@ -49,12 +49,20 @@
     },
     "cycle": {
       "annual": "Anual",
+      "annualWithSave": "Anual · Ahorra {{percent}}%",
       "monthly": "Mensual"
+    },
+    "saveDetail": "Ahorra {{percent}}% frente a {{full}} al año con el precio mensual",
+    "monthlyAnnualHint": "O {{annual}}/año — ahorra {{percent}}%",
+    "introCalls": {
+      "heading": "Dos llamadas de introducción gratis",
+      "body": "Cada escuela nueva recibe dos llamadas de introducción gratis de 30 minutos para configurar el sistema e identificar lo que necesitan que construyamos.",
+      "book": "Reservar una llamada"
     },
     "faq": {
       "afterTrial": {
-        "a": "Si no has convertido, tu sitio queda suspendido. Sin cargos sorpresa.",
-        "q": "¿Qué pasa después de los 30 días?"
+        "a": "Tu prueba gratuita dura 30 días naturales desde el registro. No se requiere tarjeta de crédito. Si no has añadido un método de pago cuando terminan esos 30 días, tu sitio se suspende y no se te cobra.",
+        "q": "¿Cómo funciona la prueba gratuita?"
       },
       "creditCard": {
         "a": "No.",

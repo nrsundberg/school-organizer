@@ -32,6 +32,13 @@ import { getPrisma } from "~/db.server";
 import { signUp } from "~/lib/auth-client";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { MarketingNav } from "~/components/marketing/MarketingNav";
+import { IntroCallsNote } from "~/components/IntroCallsNote";
+import {
+  ANNUAL_DISCOUNT_PERCENT,
+  dollarsForPlan,
+  formatUsdDollars,
+} from "~/domain/billing/public-prices";
+import { getIntroCallBookingUrl } from "~/lib/site";
 import {
   schoolBoardHostname,
   slugifyOrgName,
@@ -87,6 +94,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return {
     plan: plan ?? "car-line",
     billingCycle: normalizePublicBillingCycle(url.searchParams.get("cycle")),
+    introCallBookingUrl: getIntroCallBookingUrl(context),
     metaTitle: t("signup.metaTitle"),
     metaDescription: t("signup.metaDescription"),
   };
@@ -475,20 +483,28 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
         ? t("signup.step3.planNames.campus")
         : t("signup.step3.planNames.carLine");
 
-  const cycleLabel = t(
-    selectedBillingCycle === "annual"
-      ? "signup.step3.cycle.annual"
-      : "signup.step3.cycle.monthly"
-  );
-
   const planDescription = (() => {
     if (plan === "DISTRICT") {
       return t("signup.step3.planDescriptions.district");
     }
+    const pricePlan = plan === "CAMPUS" ? "CAMPUS" : "CAR_LINE";
+    const amount = formatUsdDollars(
+      dollarsForPlan(pricePlan, selectedBillingCycle),
+    );
     if (plan === "CAMPUS") {
-      return t("signup.step3.planDescriptions.campus", { cycle: cycleLabel });
+      return selectedBillingCycle === "annual"
+        ? t("signup.step3.planDescriptions.campusAnnual", {
+            amount,
+            percent: ANNUAL_DISCOUNT_PERCENT,
+          })
+        : t("signup.step3.planDescriptions.campusMonthly", { amount });
     }
-    return t("signup.step3.planDescriptions.carLine", { cycle: cycleLabel });
+    return selectedBillingCycle === "annual"
+      ? t("signup.step3.planDescriptions.carLineAnnual", {
+          amount,
+          percent: ANNUAL_DISCOUNT_PERCENT,
+        })
+      : t("signup.step3.planDescriptions.carLineMonthly", { amount });
   })();
 
   const step3Title = t("signup.step3.title");
@@ -734,6 +750,14 @@ export default function Signup({ loaderData }: Route.ComponentProps) {
                 <p className="mt-1 text-xs text-white/60">
                   {planDescription}
                 </p>
+              </div>
+              <div className="mt-4">
+                <IntroCallsNote
+                  heading={t("signup.step3.introCallsHeading")}
+                  body={t("signup.step3.introCalls")}
+                  bookLabel={t("signup.step3.introCallsBook")}
+                  bookingUrl={loaderData.introCallBookingUrl}
+                />
               </div>
               {/* Step 3 uses a real Form with server action */}
               <Form method="post" className="mt-6 flex flex-col gap-4">

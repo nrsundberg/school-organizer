@@ -96,7 +96,7 @@
         "q": "¿Podemos usar nuestro propio dominio?"
       },
       "trial": {
-        "a": "Tu prueba termina cuando se cumpla lo último entre 30 días naturales desde el registro o 25 días de recogida válidos. Un día válido es un día con más de 10 estudiantes distintos marcados como llamados.",
+        "a": "Tu prueba gratuita dura 30 días naturales desde el registro. No se requiere tarjeta de crédito. Si no has añadido un método de pago cuando terminan esos 30 días, tu sitio se suspende y no se te cobra.",
         "q": "¿Cómo funciona la prueba?"
       },
       "viewer": {
@@ -191,7 +191,7 @@
     "features": {
       "liveBoard": "Tablero en vivo con actualizaciones por WebSocket y acceso de observadores con PIN o enlaces mágicos.",
       "subdomain": "Un subdominio por escuela (tuslug.pickuproster.com); los planes Campus y Distrito pueden usar un dominio personalizado o un subdominio en el dominio propio de tu escuela.",
-      "trial": "Una prueba que respeta el uso real: tiempo natural y días de recogida válidos."
+      "trial": "Prueba gratuita de 30 días desde el registro. Sin tarjeta de crédito."
     },
     "footerCta": {
       "body": "Inicia una prueba desde el sitio de marketing. Tu tablero en vivo vive en el subdominio de tu escuela — nunca se mezcla con otros clientes.",
@@ -336,8 +336,8 @@
   "welcome": {
     "greeting": "Hola {{firstName}},",
     "para1": "Gracias por registrarte. Ayudar a las escuelas a tener una recogida más tranquila es la razón por la que empecé PickupRoster, así que de verdad significa mucho que {{orgName}} le diera una oportunidad.",
-    "para2": "Me encantaría escuchar cómo se ve la salida hoy en tu escuela — qué funciona, qué no y qué te gustaría que alguien arreglara. ¿Podríamos charlar 15 minutos por teléfono en la próxima semana o dos?",
-    "para3": "Solo responde con un par de horarios que te funcionen y te enviaré la invitación.",
+    "para2": "Cada escuela nueva recibe dos llamadas de introducción gratis de 30 minutos. Las usaremos para configurar el sistema contigo e identificar lo que necesitan que construyamos.",
+    "para3": "Responde con un par de horarios que te funcionen y te enviaré las invitaciones.",
     "para4": "De cualquier manera, me alegra que estés aquí.",
     "preview": "una nota rápida del fundador — y un pequeño favor.",
     "subject": "gracias por probar PickupRoster, {{firstName}}"

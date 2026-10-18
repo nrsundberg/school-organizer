@@ -1,7 +1,10 @@
 import { Button, Input } from "@heroui/react";
 import { data, Form, redirect } from "react-router";
 import type { Route } from "./+types/signup";
+import { IntroCallsNote } from "~/components/IntroCallsNote";
+import { notifyNewSignup } from "~/domain/email/signup-notify.server";
 import { createDistrict } from "~/domain/district/district.server";
+import { getIntroCallBookingUrl } from "~/lib/site";
 import { writeDistrictAudit } from "~/domain/district/audit.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { getPrisma } from "~/db.server";
@@ -21,7 +24,7 @@ export async function loader({ context }: Route.LoaderArgs) {
     }
     if (user.orgId) throw redirect("/admin");
   }
-  return null;
+  return { introCallBookingUrl: getIntroCallBookingUrl(context) };
 }
 
 function Field({
@@ -42,8 +45,12 @@ function Field({
   );
 }
 
-export default function DistrictSignup({ actionData }: Route.ComponentProps) {
+export default function DistrictSignup({
+  loaderData,
+  actionData,
+}: Route.ComponentProps) {
   const error = (actionData as { error?: string } | undefined)?.error;
+  const bookingUrl = loaderData?.introCallBookingUrl ?? null;
   return (
     <main className="min-h-screen bg-[#0f1414] px-4 py-12 text-white">
       <div className="mx-auto max-w-md">
@@ -52,6 +59,14 @@ export default function DistrictSignup({ actionData }: Route.ComponentProps) {
           Provision schools for your district from one portal. One bill,
           aggregate visibility, audit-logged access.
         </p>
+        <div className="mt-6">
+          <IntroCallsNote
+            heading="Two free intro calls"
+            body="Every new school gets two free 30-minute intro calls to set up the system and identify anything new you need built."
+            bookLabel="Book an intro call"
+            bookingUrl={bookingUrl}
+          />
+        </div>
         <Form method="post" className="mt-6 space-y-4">
           <Field label="District name">
             <Input name="districtName" required autoComplete="organization" />
@@ -182,6 +197,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     targetType: "User",
     targetId: userId,
     details: { firstAdmin: true },
+  });
+
+  await notifyNewSignup(context, {
+    schoolName: district.name,
+    personName: adminName,
+    personEmail: adminEmail,
+    plan: "DISTRICT",
+    signedUpAt: district.trialStartedAt ?? new Date(),
   });
 
   throw redirect("/district", { headers: setCookieHeaders });
