@@ -29,8 +29,8 @@
 		"MARKETING_HOSTS": "localhost,127.0.0.1,school-organizer.sundbergne.workers.dev",
 		// Scheduler defaults are in code (Mon–Fri 9:00–16:00 America/Denver).
 		// Set ZOOM_MEETING_URL to the Zoom room (MEETING_URL is the fallback).
-		// Set TURNSTILE_SITE_KEY when the widget exists. The secret is
-		// `wrangler secret put TURNSTILE_SECRET_KEY`, not a var.
+		// TURNSTILE_SITE_KEY and TURNSTILE_HOSTNAMES are set on production
+		// and staging. The secret is already `TURNSTILE_SECRET_KEY`.
 		"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
 		"SUPPORT_EMAIL": "support@pickuproster.com",
 		"STRIPE_STATUS_URL": "https://www.stripestatus.com/api/v2/status.json",
@@ -195,6 +195,8 @@
 				"ENVIRONMENT": "production",
 				"PUBLIC_ROOT_DOMAIN": "pickuproster.com",
 				"MARKETING_HOSTS": "localhost,127.0.0.1,school-organizer.sundbergne.workers.dev",
+				"TURNSTILE_SITE_KEY": "0x4AAAAAAFav3K13_MQ3mOj7",
+				"TURNSTILE_HOSTNAMES": "pickuproster.com,www.pickuproster.com",
 				"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
 				"SUPPORT_EMAIL": "support@pickuproster.com",
 				"STRIPE_STATUS_URL": "https://www.stripestatus.com/api/v2/status.json"
@@ -298,6 +300,8 @@
 				"ENVIRONMENT": "staging",
 				"PUBLIC_ROOT_DOMAIN": "staging.pickuproster.com",
 				"MARKETING_HOSTS": "localhost,127.0.0.1,staging.pickuproster.com,www.staging.pickuproster.com,school-organizer-staging.sundbergne.workers.dev",
+				"TURNSTILE_SITE_KEY": "0x4AAAAAAFav3K13_MQ3mOj7",
+				"TURNSTILE_HOSTNAMES": "staging.pickuproster.com",
 				"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
 				"SUPPORT_EMAIL": "support@pickuproster.com",
 				"STRIPE_STATUS_URL": "https://www.stripestatus.com/api/v2/status.json"
