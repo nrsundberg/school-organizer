@@ -28,6 +28,7 @@
 		"PUBLIC_ROOT_DOMAIN": "pickuproster.com",
 		"MARKETING_HOSTS": "localhost,127.0.0.1,school-organizer.sundbergne.workers.dev",
 		// Scheduler defaults are in code (Mon–Fri 9:00–16:00 America/Denver).
+		// Set ZOOM_MEETING_URL to the Zoom room (MEETING_URL is the fallback).
 		// Set TURNSTILE_SITE_KEY when the widget exists. The secret is
 		// `wrangler secret put TURNSTILE_SECRET_KEY`, not a var.
 		"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",

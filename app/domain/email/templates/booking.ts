@@ -21,9 +21,13 @@ export async function renderBookingMail(msg: BookingMailMessage): Promise<Render
   const t = await getFixedT(locale, "email");
   const visitorWhen = whenLabel(msg, msg.visitorTimeZone, locale);
   const hostWhen = whenLabel(msg, msg.scheduleTimeZone, "en");
-  const meeting = msg.meetingUrl?.trim()
-    ? t("booking.meetingSet", { url: msg.meetingUrl })
+  const meetingUrl = msg.meetingUrl?.trim() ?? "";
+  const meeting = meetingUrl
+    ? t("booking.meetingSet", { url: meetingUrl })
     : t("booking.meetingLater");
+  const meetingHtml = meetingUrl
+    ? `${escapeHtml(t("booking.meetingLabel"))}: <a href="${escapeAttr(meetingUrl)}">${escapeHtml(meetingUrl)}</a>`
+    : escapeHtml(meeting);
   const kindLabel = msg.bookingKind === "intro" ? t("booking.introName") : t("booking.demoName");
 
   const subject =
@@ -68,7 +72,12 @@ export async function renderBookingMail(msg: BookingMailMessage): Promise<Render
     <p>${escapeHtml(greeting)}</p>
     <p>${escapeHtml(lead)}</p>
     <ul>
-      ${detailLines.map((line) => `<li>${escapeHtml(line)}</li>`).join("\n      ")}
+      <li>${escapeHtml(detailLines[0] ?? "")}</li>
+      <li>${meetingHtml}</li>
+      ${detailLines
+        .slice(2)
+        .map((line) => `<li>${escapeHtml(line)}</li>`)
+        .join("\n      ")}
     </ul>
     <p><a href="${escapeAttr(msg.manageUrl)}">${escapeHtml(t("booking.manageLink"))}</a></p>
   </body>

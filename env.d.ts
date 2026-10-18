@@ -53,9 +53,11 @@ declare global {
      */
     TURNSTILE_HOSTNAMES?: string;
     /**
-     * Shared meeting room (for example a Google Meet URL) added to the
-     * calendar invite. When unset, the email says Noah will send a link.
+     * Zoom room added to the calendar invite LOCATION and body, labeled
+     * "Join Zoom meeting". When unset, the email says Noah will send a Zoom link.
      */
+    ZOOM_MEETING_URL?: string;
+    /** Fallback when `ZOOM_MEETING_URL` is unset. */
     MEETING_URL?: string;
     /** HMAC secret for cancel/reschedule links. Falls back to BETTER_AUTH_SECRET. */
     BOOKING_TOKEN_SECRET?: string;

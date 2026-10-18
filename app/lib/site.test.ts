@@ -5,6 +5,7 @@ import {
   DEFAULT_SUPPORT_EMAIL,
   getDemoBookingUrl,
   getIntroCallBookingUrl,
+  getMeetingUrl,
   getSignupNotifyEmail,
   getSupportEmail,
 } from "./site";
@@ -122,5 +123,32 @@ test("getDemoBookingUrl defaults to /demo and prefers a valid override", () => {
       cloudflare: { env: { DEMO_BOOKING_URL: "javascript:alert(1)" } },
     }),
     "https://pickuproster.com/demo",
+  );
+});
+
+test("getMeetingUrl prefers ZOOM_MEETING_URL and falls back to MEETING_URL", () => {
+  assert.equal(getMeetingUrl({}), null);
+  assert.equal(
+    getMeetingUrl({
+      cloudflare: { env: { MEETING_URL: "https://zoom.us/j/fallback" } },
+    }),
+    "https://zoom.us/j/fallback",
+  );
+  assert.equal(
+    getMeetingUrl({
+      cloudflare: {
+        env: {
+          ZOOM_MEETING_URL: "https://zoom.us/j/primary",
+          MEETING_URL: "https://zoom.us/j/fallback",
+        },
+      },
+    }),
+    "https://zoom.us/j/primary",
+  );
+  assert.equal(
+    getMeetingUrl({
+      cloudflare: { env: { ZOOM_MEETING_URL: "javascript:alert(1)", MEETING_URL: "https://zoom.us/j/fallback" } },
+    }),
+    "https://zoom.us/j/fallback",
   );
 });

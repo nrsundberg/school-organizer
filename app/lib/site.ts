@@ -81,9 +81,13 @@ export function getDemoBookingUrl(context: any): string {
 }
 
 /**
- * Shared meeting room included in the calendar invite.
- * Leave unset until a room exists — the email then says Noah will send a link.
+ * Zoom room included in the calendar invite.
+ * `ZOOM_MEETING_URL` wins. `MEETING_URL` is the fallback.
+ * When both are unset, the email says Noah will send a Zoom link.
  */
 export function getMeetingUrl(context: any): string | null {
-  return httpUrl(readEnv(context, "MEETING_URL"));
+  return (
+    httpUrl(readEnv(context, "ZOOM_MEETING_URL")) ??
+    httpUrl(readEnv(context, "MEETING_URL"))
+  );
 }

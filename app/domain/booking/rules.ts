@@ -1,7 +1,7 @@
 /**
  * Slot grid for demos and intro calls.
  *
- * Defaults: Monday–Friday, 9:00–16:00 America/Denver, 30-minute meetings,
+ * Defaults: Monday–Friday, 9:00–16:00 America/Denver (Mountain time), 30-minute meetings,
  * 15 minutes of buffer after each one, 12 hours of notice, 21 days ahead,
  * and at most 8 confirmed bookings per Denver day. Every value can be
  * overridden with a BOOKING_* env var. There is no admin UI yet.
