@@ -1,6 +1,15 @@
 import { Prisma } from "~/db";
 
-/** Models that store per-school data; every query must be scoped by org. */
+/**
+ * Models that store per-school data; every query must be scoped by org.
+ *
+ * `OrgAuditLog` belongs here. School-admin reads go through `getTenantPrisma`,
+ * and an unscoped `findMany` on this table returns every school's rows (the
+ * admin dashboard did that). Platform audit pages and `writeOrgAudit` use the
+ * unscoped client from `getPrisma` and stay cross-org on purpose.
+ * Auth tables (`User`, `Session`, …) and global rows (`Org`, `StripeWebhookEvent`)
+ * stay out: callers filter those explicitly.
+ */
 const TENANT_MODELS = new Set<string>([
   "Teacher",
   "Student",
@@ -16,7 +25,13 @@ const TENANT_MODELS = new Set<string>([
   "DismissalException",
   "AfterSchoolProgram",
   "ProgramCancellation",
+  "OrgAuditLog",
 ]);
+
+/** True when `getTenantPrisma` injects `orgId` into queries for this model. */
+export function isTenantScopedModel(model: string): boolean {
+  return TENANT_MODELS.has(model);
+}
 
 const READ_OPS = new Set([
   "findFirst",
@@ -37,6 +52,7 @@ const UPDATE_OPS = new Set(["update", "delete", "upsert"]);
 /**
  * Prisma client extension: injects `orgId` into reads/writes on tenant models.
  * Excludes auth tables (`User`, `Session`, …) and global rows (`Org`, `StripeWebhookEvent`).
+ * See `TENANT_MODELS` for why `OrgAuditLog` is included.
  */
 export function tenantExtension(orgId: string) {
   return Prisma.defineExtension((client) =>

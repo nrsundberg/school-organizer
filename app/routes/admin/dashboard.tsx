@@ -44,6 +44,10 @@ import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
 import { buildBoardResetBatch } from "~/domain/admin/board-reset.server";
 import { auditOrgAction } from "~/domain/org/audit.server";
+import {
+  schoolAuditLogWhere,
+  visibleSchoolAuditLogs,
+} from "~/domain/org/school-activity.server";
 import { enqueueEmails } from "~/domain/email/queue.server";
 import type { StudentsDeletedMessage } from "~/domain/email/types";
 import { getSupportEmail } from "~/lib/site";
@@ -147,17 +151,21 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         template: { select: { id: true, name: true } },
       },
     }),
-    prisma.orgAuditLog.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 10,
-      select: {
-        id: true,
-        action: true,
-        actorUserId: true,
-        onBehalfOfUserId: true,
-        createdAt: true,
-      },
-    }),
+    prisma.orgAuditLog
+      .findMany({
+        where: schoolAuditLogWhere(org.id),
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: {
+          id: true,
+          orgId: true,
+          action: true,
+          actorUserId: true,
+          onBehalfOfUserId: true,
+          createdAt: true,
+        },
+      })
+      .then((rows) => visibleSchoolAuditLogs(org.id, rows)),
     prisma.space.aggregate({ _max: { spaceNumber: true } }),
     prisma.teacher.findMany({ orderBy: { homeRoom: "asc" } }),
     countOrgUsage(prisma, org.id),
