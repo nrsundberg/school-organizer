@@ -147,8 +147,10 @@
     "copyright": "© {{year}} {{siteName}}",
     "nav": {
       "blog": "Blog",
-      "pickupBoard": "Pickup board",
+      "demo": "Book a demo",
       "faqs": "FAQs",
+      "guides": "Guides",
+      "pickupBoard": "Pickup board",
       "login": "Login",
       "pricing": "Pricing",
       "status": "Status",
@@ -327,6 +329,14 @@
       "outage": "outage",
       "withIncidents": "{{bad}} of {{withData}} days with incidents over the last {{total}} days"
     }
+  },
+  "contentCta": {
+    "board": "School pickup board",
+    "body": "Read how the board works, compare plans, or book a short demo.",
+    "demo": "Book a demo",
+    "headline": "See the live school pickup board.",
+    "kicker": "PickupRoster",
+    "pricing": "See pricing"
   },
   "trialCta": {
     "body": "30-day free trial. No credit card required. Built for schools running dismissal for 300 to 3,000 students.",

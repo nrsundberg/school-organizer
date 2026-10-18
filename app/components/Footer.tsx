@@ -34,8 +34,14 @@ export function Footer({ siteName, supportEmail, orgName }: FooterProps) {
           <Link to="/blog" className="hover:text-white transition-colors">
             {t("footer.nav.blog")}
           </Link>
+          <Link to="/guides" className="hover:text-white transition-colors">
+            {t("footer.nav.guides")}
+          </Link>
           <Link to="/faqs" className="hover:text-white transition-colors">
             {t("footer.nav.faqs")}
+          </Link>
+          <Link to="/demo" className="hover:text-white transition-colors">
+            {t("footer.nav.demo")}
           </Link>
           <Link to="/login" className="hover:text-white transition-colors">
             {t("footer.nav.login")}

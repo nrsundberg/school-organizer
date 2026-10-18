@@ -38,8 +38,10 @@ import {
   getOptionalOrgFromContext,
   getOptionalUserFromContext,
 } from "~/domain/utils/global-context.server";
+import { homeCopy } from "~/lib/home-copy";
 import {
   canonicalUrl,
+  homePageJsonLd,
   marketingPageMeta,
   organizationWebSiteJsonLd,
   publicSiteOrigin,
@@ -117,7 +119,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       mode: "marketing" as const,
       origin,
       canonical: canonicalUrl(origin, "/"),
-      jsonLd: organizationWebSiteJsonLd(origin),
+      jsonLd: homePageJsonLd(origin, homeCopy(locale).faqs),
       metaTitle: common("marketingLanding.metaTitle"),
       metaDescription: common("marketingLanding.metaDescription"),
     };

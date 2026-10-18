@@ -156,6 +156,20 @@ export function organizationWebSiteJsonLd(origin: string) {
   };
 }
 
+/** Organization, WebSite, and the home-page FAQ in one graph. */
+export function homePageJsonLd(
+  origin: string,
+  faqs: readonly { q: string; a: string }[],
+) {
+  const base = organizationWebSiteJsonLd(origin);
+  const faq = faqPageJsonLd(faqs);
+  const { "@context": _context, ...faqNode } = faq;
+  return {
+    ...base,
+    "@graph": [...base["@graph"], faqNode],
+  };
+}
+
 export function softwareApplicationJsonLd(origin: string) {
   const car = PUBLIC_PLAN_PRICES.CAR_LINE;
   const campus = PUBLIC_PLAN_PRICES.CAMPUS;

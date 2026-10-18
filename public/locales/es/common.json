@@ -147,7 +147,9 @@
     "copyright": "© {{year}} {{siteName}}",
     "nav": {
       "blog": "Blog",
+      "demo": "Reservar una demo",
       "faqs": "Preguntas frecuentes",
+      "guides": "Guías",
       "pickupBoard": "Tablero de recogida",
       "login": "Iniciar sesión",
       "pricing": "Precios",
@@ -327,6 +329,14 @@
       "outage": "interrupción",
       "withIncidents": "{{bad}} de {{withData}} días con incidentes en los últimos {{total}} días"
     }
+  },
+  "contentCta": {
+    "board": "Tablero de recogida",
+    "body": "Lee cómo funciona el tablero, compara los planes o reserva una demo corta.",
+    "demo": "Reservar una demo",
+    "headline": "Mira el tablero de recogida en vivo.",
+    "kicker": "PickupRoster",
+    "pricing": "Ver precios"
   },
   "trialCta": {
     "body": "Prueba gratuita de 30 días. Sin tarjeta de crédito. Hecho para escuelas que manejan la salida de 300 a 3,000 estudiantes.",
