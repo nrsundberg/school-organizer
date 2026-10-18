@@ -20,7 +20,7 @@ import {
 export const handle = { i18n: ["auth"] };
 
 export function meta() {
-  return [{ title: "Accept invite — Pickup Roster" }];
+  return [{ title: "Accept invite — PickupRoster" }];
 }
 
 const MIN_PASSWORD_LENGTH = 8;

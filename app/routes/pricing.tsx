@@ -5,6 +5,13 @@ import { MarketingNav } from "~/components/marketing/MarketingNav";
 import { IntroCallsNote } from "~/components/IntroCallsNote";
 import { getIntroCallBookingUrl, getSupportEmail } from "~/lib/site";
 import {
+  canonicalUrl,
+  marketingPageMeta,
+  publicSiteOrigin,
+  rootDomainFromContext,
+  softwareApplicationJsonLd,
+} from "~/lib/marketing-seo";
+import {
   ANNUAL_DISCOUNT_PERCENT,
   publicPriceDisplay,
 } from "~/domain/billing/public-prices";
@@ -20,26 +27,37 @@ import { detectLocale } from "~/i18n.server";
 
 export const handle = { i18n: ["common", "billing"] };
 
-export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
-  return [
-    { title: data?.metaTitle ?? "Pricing — Pickup Roster" },
-    {
-      name: "description",
-      content:
-        data?.metaDescription ??
-        "Simple pricing for schools and districts. Pick a plan, create your account, and continue through signup or checkout."
-    }
-  ];
+export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string; canonical?: string; origin?: string; jsonLd?: unknown } }) {
+  const origin = data?.origin ?? "https://pickuproster.com";
+  return marketingPageMeta({
+    title: data?.metaTitle ?? "Pricing — PickupRoster",
+    description:
+      data?.metaDescription ??
+      "Car Line is $150 a month or $1,440 a year. Campus is $500 a month or $4,800 a year. 30-day free trial, no card.",
+    canonical: data?.canonical ?? canonicalUrl(origin, "/pricing"),
+    origin,
+    image: true,
+    jsonLd: data?.jsonLd ?? softwareApplicationJsonLd(origin),
+  });
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "billing");
+  const billingCycle = normalizePublicBillingCycle(url.searchParams.get("cycle"));
+  const origin = publicSiteOrigin(request, rootDomainFromContext(context));
+  const canonical = canonicalUrl(
+    origin,
+    billingCycle === "annual" ? "/pricing?cycle=annual" : "/pricing",
+  );
   return {
     supportEmail: getSupportEmail(context),
     introCallBookingUrl: getIntroCallBookingUrl(context),
-    billingCycle: normalizePublicBillingCycle(url.searchParams.get("cycle")),
+    billingCycle,
+    origin,
+    canonical,
+    jsonLd: softwareApplicationJsonLd(origin),
     metaTitle: t("pricing.metaTitle"),
     metaDescription: t("pricing.metaDescription"),
   };
@@ -213,6 +231,20 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
                   : t(`pricing.cycle.${cycle}`)}
               </Link>
             ))}
+          </div>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              to="/signup?plan=car-line"
+              className="inline-flex items-center justify-center rounded-xl bg-[#E9D500] px-6 py-3 text-base font-semibold text-[#193B4B] transition hover:bg-[#f5e047]"
+            >
+              {t("common:marketingLanding.startFreeTrial")}
+            </Link>
+            <Link
+              to="/demo"
+              className="inline-flex items-center justify-center rounded-xl border border-white/20 px-6 py-3 text-base font-semibold text-white/90 transition hover:border-white/40"
+            >
+              {t("common:marketingLanding.bookDemo")}
+            </Link>
           </div>
         </div>
 

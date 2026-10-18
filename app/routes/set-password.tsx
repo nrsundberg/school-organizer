@@ -12,7 +12,7 @@ import { detectLocale } from "~/i18n.server";
 export const handle = { i18n: ["auth"] };
 
 export function meta({ data }: { data?: { metaTitle?: string } }) {
-  return [{ title: data?.metaTitle ?? "Set password — Pickup Roster" }];
+  return [{ title: data?.metaTitle ?? "Set password — PickupRoster" }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {

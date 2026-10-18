@@ -1,13 +1,13 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("marketing site", () => {
-  test("homepage loads with Pickup Roster nav link", async ({ page }) => {
+  test("homepage loads with PickupRoster nav link", async ({ page }) => {
     await page.goto("/");
 
-    // MarketingNav renders a Link to "/" whose text reads "Pickup Roster"
-    // (the word "Roster" is inside a <span>; combined accessible text is "Pickup Roster")
+    // MarketingNav renders a Link to "/" whose text reads "PickupRoster"
+    // (the word "Roster" is inside a <span>; combined accessible text is "PickupRoster")
     await expect(
-      page.getByRole("link", { name: "Pickup Roster" }).first()
+      page.getByRole("link", { name: "PickupRoster" }).first()
     ).toBeVisible();
   });
 
@@ -82,7 +82,7 @@ test.describe("marketing site", () => {
   test("/status is publicly reachable", async ({ page }) => {
     await page.goto("/status");
     await expect(
-      page.getByRole("heading", { name: "Pickup Roster Status" })
+      page.getByRole("heading", { name: "PickupRoster Status" })
     ).toBeVisible();
   });
 });

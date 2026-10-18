@@ -35,6 +35,11 @@ declare global {
      */
     INTRO_CALL_BOOKING_URL?: string;
     /**
+     * Public http(s) URL for the demo page "Pick a time" button.
+     * Falls back to INTRO_CALL_BOOKING_URL when unset.
+     */
+    DEMO_BOOKING_URL?: string;
+    /**
      * Inbox for trial-start notifications. Defaults to NoahSundberg@gmail.com.
      */
     SIGNUP_NOTIFY_EMAIL?: string;

@@ -48,6 +48,12 @@ export function MarketingLanding() {
                 {t("marketingLanding.startFreeTrial")}
               </Link>
               <Link
+                to="/demo"
+                className="inline-flex items-center justify-center rounded-xl border border-[#E9D500]/50 px-6 py-3 text-base font-semibold text-[#E9D500] transition hover:border-[#E9D500]"
+              >
+                {t("marketingLanding.bookDemo")}
+              </Link>
+              <Link
                 to="/pricing"
                 className="inline-flex items-center justify-center rounded-xl border border-white/20 px-6 py-3 text-base font-semibold text-white/90 transition hover:border-white/40"
               >
@@ -128,12 +134,20 @@ export function MarketingLanding() {
               {t("marketingLanding.footerCta.body")}
             </p>
           </div>
-          <Link
-            to="/signup?plan=car-line"
-            className="inline-flex shrink-0 items-center justify-center rounded-xl bg-[#E9D500] px-6 py-3 text-base font-semibold text-[#193B4B] shadow-lg shadow-[#E9D500]/15 transition hover:bg-[#f5e047]"
-          >
-            {t("marketingLanding.footerCta.createAccount")}
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              to="/signup?plan=car-line"
+              className="inline-flex shrink-0 items-center justify-center rounded-xl bg-[#E9D500] px-6 py-3 text-base font-semibold text-[#193B4B] shadow-lg shadow-[#E9D500]/15 transition hover:bg-[#f5e047]"
+            >
+              {t("marketingLanding.footerCta.createAccount")}
+            </Link>
+            <Link
+              to="/demo"
+              className="inline-flex shrink-0 items-center justify-center rounded-xl border border-white/20 px-6 py-3 text-base font-semibold text-white/90 transition hover:border-white/40"
+            >
+              {t("marketingLanding.bookDemo")}
+            </Link>
+          </div>
         </div>
       </section>
     </div>

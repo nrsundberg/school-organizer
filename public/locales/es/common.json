@@ -4,7 +4,7 @@
       "backToPricing": "Volver a precios",
       "body": "Saliste del Checkout de Stripe antes de completar la compra. No se creó ninguna suscripción.",
       "goToAdmin": "Ir al panel de administración",
-      "metaTitle": "Pago cancelado — Pickup Roster",
+      "metaTitle": "Pago cancelado — PickupRoster",
       "title": "No se realizó ningún cargo"
     },
     "required": {
@@ -20,14 +20,14 @@
     "success": {
       "body": "{{orgName}} ahora está en el plan {{plan}}. Tu recibo está en camino desde Stripe.",
       "goToAdmin": "Ir al panel de administración",
-      "metaTitle": "Mejora completada — Pickup Roster",
+      "metaTitle": "Mejora completada — PickupRoster",
       "planNames": {
         "campus": "Campus",
         "carLine": "Car Line",
         "enterprise": "Enterprise",
         "free": "Gratis"
       },
-      "title": "¡Listo, has mejorado tu plan — bienvenido a Pickup Roster {{plan}}!"
+      "title": "¡Listo, has mejorado tu plan — bienvenido a PickupRoster {{plan}}!"
     }
   },
   "blog": {
@@ -83,6 +83,32 @@
     "skipNote_one": " (se omitió {{count}} fila en blanco)",
     "skipNote_other": " (se omitieron {{count}} filas en blanco)"
   },
+  "demo": {
+    "confirmBody": "Noah te escribirá al correo que indicaste.",
+    "confirmTitle": "Gracias — recibimos tu solicitud.",
+    "email": "Correo",
+    "errors": {
+      "email": "Se necesita un correo válido.",
+      "name": "El nombre es obligatorio.",
+      "rate": "Demasiadas solicitudes. Inténtalo de nuevo en un minuto.",
+      "role": "El rol es obligatorio.",
+      "school": "La escuela es obligatoria."
+    },
+    "heading": "Reservar una demo",
+    "honeypot": "Sitio web",
+    "lede": "Cuéntanos de tu escuela. Te escribiremos para mostrarte el tablero de recogida en vivo.",
+    "message": "Mensaje",
+    "metaDescription": "Cuéntanos de tu escuela y te mostramos el tablero de recogida en vivo.",
+    "metaTitle": "Reservar una demo — PickupRoster",
+    "name": "Nombre",
+    "phone": "Teléfono (opcional)",
+    "pickTime": "Elegir un horario",
+    "role": "Rol",
+    "school": "Escuela",
+    "sending": "Enviando…",
+    "studentCount": "Cantidad de estudiantes",
+    "submit": "Pedir una demo"
+  },
   "errors": {
     "notFound": "404",
     "somethingBroke": "Algo salió mal"
@@ -92,7 +118,7 @@
     "heading": "Preguntas frecuentes",
     "items": {
       "domain": {
-        "a": "Sí — los dominios personalizados (o un subdominio en el dominio propio de tu escuela) están disponibles en los planes Campus y Distrito. Apunta el DNS al mismo Worker que tus otros sitios. Car Line usa un subdominio tuslug.pickuproster.com.",
+        "a": "Sí. Los planes Campus y Distrito pueden usar el dominio de tu escuela, como recogida.tuescuela.edu. Car Line usa una dirección como tuslug.pickuproster.com.",
         "q": "¿Podemos usar nuestro propio dominio?"
       },
       "trial": {
@@ -100,17 +126,17 @@
         "q": "¿Cómo funciona la prueba?"
       },
       "viewer": {
-        "a": "Comparte el PIN del observador o un enlace mágico. Las sesiones de observador están restringidas a tu organización y respetan los bloqueos tras intentos fallidos.",
-        "q": "¿Cómo ven el tablero las familias?"
+        "a": "Car Line incluye un visor para maestros y personal. Comparte un PIN o un enlace mágico. La app para familias está incluida desde Campus. El acceso se limita a tu escuela y se bloquea tras intentos fallidos.",
+        "q": "¿Quién puede ver el tablero?"
       },
       "where": {
-        "a": "Cada organización recibe su propio subdominio, como tuslug.pickuproster.com. El dominio principal muestra este sitio de marketing; el tablero nunca mezcla a distintos clientes. En los planes Campus y Distrito puedes usar un dominio personalizado o un subdominio en el dominio propio de tu escuela (por ejemplo, recogida.tuescuela.edu).",
+        "a": "Cada escuela tiene su propia dirección, como tuslug.pickuproster.com. Este sitio es la página pública. El tablero de una escuela nunca se mezcla con el de otra. Los planes Campus y Distrito pueden usar tu propio dominio, como recogida.tuescuela.edu.",
         "q": "¿Dónde vive mi escuela?"
       }
     },
     "lede": "Respuestas claras para administradores y equipos de TI.",
-    "metaDescription": "Preguntas frecuentes sobre tableros de fila de autos, periodos de prueba y seguridad.",
-    "metaTitle": "Preguntas frecuentes — Pickup Roster",
+    "metaDescription": "Preguntas frecuentes sobre el tablero de recogida escolar, la fila de autos, la prueba y quién puede verlo.",
+    "metaTitle": "Preguntas frecuentes — PickupRoster",
     "readyToTry": "¿Listo para probarlo?"
   },
   "fileChooser": {
@@ -122,6 +148,7 @@
     "nav": {
       "blog": "Blog",
       "faqs": "Preguntas frecuentes",
+      "pickupBoard": "Tablero de recogida",
       "login": "Iniciar sesión",
       "pricing": "Precios",
       "status": "Estado",
@@ -189,22 +216,25 @@
   },
   "marketingLanding": {
     "features": {
-      "liveBoard": "Tablero en vivo con actualizaciones por WebSocket y acceso de observadores con PIN o enlaces mágicos.",
+      "liveBoard": "Un tablero en vivo que actualiza cada pantalla en el momento en que se llama un auto, con PIN o enlaces mágicos para el visor.",
       "subdomain": "Un subdominio por escuela (tuslug.pickuproster.com); los planes Campus y Distrito pueden usar un dominio personalizado o un subdominio en el dominio propio de tu escuela.",
       "trial": "Prueba gratuita de 30 días desde el registro. Sin tarjeta de crédito."
     },
     "footerCta": {
-      "body": "Inicia una prueba desde el sitio de marketing. Tu tablero en vivo vive en el subdominio de tu escuela — nunca se mezcla con otros clientes.",
+      "body": "Empieza una prueba gratis de 30 días. El tablero de tu escuela tiene su propia dirección, aparte de las demás escuelas.",
       "createAccount": "Crea tu cuenta",
       "heading": "Listos cuando tu escuela lo esté"
     },
-    "headline": "Un solo tablero para recogidas, simulacros y el caos diario — sin radios encendidos.",
-    "kicker": "Fila de autos escolar, simplificada",
-    "lede": "Pickup Roster le da a cada escuela su propio tablero en vivo, un acceso para familias en el que pueden confiar y herramientas de administración que tu oficina ya entiende.",
+    "bookDemo": "Reservar una demo",
+    "headline": "Un tablero de recogida escolar en vivo para tu fila de autos.",
+    "kicker": "Recogida escolar y fila de autos",
+    "lede": "PickupRoster le da a cada escuela un tablero de recogida en vivo. El personal llama a los autos y cada pantalla se actualiza al mismo tiempo. Sin radios y sin hardware que comprar.",
+    "metaDescription": "Un tablero de recogida escolar en vivo para la fila de autos. El personal llama a los autos y cada pantalla se actualiza al instante. Prueba gratis de 30 días, sin tarjeta.",
+    "metaTitle": "PickupRoster | Tablero de recogida escolar y app de fila de autos",
     "startFreeTrial": "Comenzar prueba gratuita",
     "videos": {
       "carLine": {
-        "description": "Cómo los controladores mueven la fila y cómo las familias ven el estado en tiempo real.",
+        "description": "Cómo el personal mueve la fila de autos y cómo el tablero se actualiza en tiempo real.",
         "title": "Recogidas en la fila de autos"
       },
       "fireDrills": {
@@ -216,7 +246,7 @@
         "title": "Primeros pasos"
       },
       "heading": "Míralo en acción",
-      "subtitle": "Recorridos cortos que puedes compartir con el personal y las familias."
+      "subtitle": "Recorridos cortos que puedes compartir con tu personal."
     },
     "viewPricing": "Ver precios",
     "whatYouGet": "Lo que obtienes"
@@ -226,11 +256,12 @@
     "dashboard": "Panel",
     "faqs": "Preguntas frecuentes",
     "guides": "Guías",
-    "homeAriaLabel": "Inicio de Pickup Roster",
+    "homeAriaLabel": "Inicio de PickupRoster",
     "login": "Iniciar sesión",
+    "pickupBoard": "Tablero de recogida",
     "pricing": "Precios",
     "signup": "Registrarse",
-    "wordmarkAlt": "Pickup Roster"
+    "wordmarkAlt": "PickupRoster"
   },
   "midTrialCheckin": {
     "greeting": "Hola {{firstName}},",
@@ -259,8 +290,8 @@
       "heading": "Incidentes activos",
       "since": "Desde {{when}}"
     },
-    "metaDescription": "Estado en vivo de la plataforma Pickup Roster, incluida la infraestructura del tablero y las dependencias externas.",
-    "metaTitle": "Estado — Pickup Roster",
+    "metaDescription": "Estado en vivo de la plataforma PickupRoster, incluida la infraestructura del tablero y las dependencias externas.",
+    "metaTitle": "Estado — PickupRoster",
     "ninetyDaysAgo": "Hace 90 días",
     "overall": {
       "degraded": "Rendimiento degradado",
@@ -281,9 +312,9 @@
       "data": "Datos",
       "email": "Correo",
       "payments": "Pagos",
-      "tenants": "Clientes"
+      "tenants": "Escuelas"
     },
-    "title": "Estado de Pickup Roster",
+    "title": "Estado de PickupRoster",
     "today": "Hoy",
     "uptime": {
       "allOperational": "{{withData}} de {{total}} días con datos — todos operativos",

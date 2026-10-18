@@ -11,6 +11,11 @@ import {
 import { listGuidesByCategory } from "~/lib/guides.server";
 import { detectLocale } from "~/i18n.server";
 import { getFixedT } from "~/lib/t.server";
+import {
+  canonicalUrl,
+  publicSiteOrigin,
+  rootDomainFromContext,
+} from "~/lib/marketing-seo";
 
 export function meta({ data }: Route.MetaArgs) {
   const count = data?.totalCount ?? 0;
@@ -29,6 +34,11 @@ export function meta({ data }: Route.MetaArgs) {
       content: data?.ogDescription ?? "How-to guides for setting up and running PickupRoster across your school or district.",
     },
     { property: "og:type", content: "website" },
+    {
+      tagName: "link",
+      rel: "canonical",
+      href: data?.canonical ?? "https://pickuproster.com/guides",
+    },
   ];
 }
 
@@ -39,9 +49,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "common");
 
+  const origin = publicSiteOrigin(request, rootDomainFromContext(context));
   return {
     groups,
     totalCount,
+    canonical: canonicalUrl(origin, "/guides"),
     metaTitle: t("guides.metaTitleIndex"),
     metaDescriptionIndex: t("guides.metaDescriptionIndex"),
     metaDescriptionEmpty: t("guides.metaDescriptionEmpty"),

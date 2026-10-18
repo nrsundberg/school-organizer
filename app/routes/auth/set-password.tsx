@@ -14,7 +14,7 @@ export const handle = { i18n: ["auth"] };
 
 export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
   return [
-    { title: data?.metaTitle ?? "Set password — Pickup Roster" },
+    { title: data?.metaTitle ?? "Set password — PickupRoster" },
     { name: "description", content: data?.metaDescription ?? "Set your password for your school car line" },
   ];
 }

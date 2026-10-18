@@ -11,6 +11,11 @@ import {
 import { getGuide } from "~/lib/guides.server";
 import { detectLocale } from "~/i18n.server";
 import { getFixedT } from "~/lib/t.server";
+import {
+  canonicalUrl,
+  publicSiteOrigin,
+  rootDomainFromContext,
+} from "~/lib/marketing-seo";
 
 export function meta({ data }: Route.MetaArgs) {
   if (!data?.guide) {
@@ -28,7 +33,9 @@ export function meta({ data }: Route.MetaArgs) {
     { property: "og:description", content: description },
     { property: "og:type", content: "article" },
     { property: "article:published_time", content: guide.date },
-    ...(canonical ? [{ rel: "canonical", href: canonical } as const] : []),
+    ...(canonical
+      ? [{ tagName: "link" as const, rel: "canonical", href: canonical }]
+      : []),
   ];
 }
 
@@ -40,10 +47,8 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   if (!guide) {
     throw new Response("Guide not found", { status: 404 });
   }
-  // Canonical points at the apex marketing host so subdomains don't dilute
-  // search indexing of shared guide content.
-  const url = new URL(request.url);
-  const canonical = `${url.protocol}//pickuproster.com/guides/${guide.slug}`;
+  const origin = publicSiteOrigin(request, rootDomainFromContext(context));
+  const canonical = canonicalUrl(origin, `/guides/${guide.slug}`);
   return {
     guide,
     canonical,

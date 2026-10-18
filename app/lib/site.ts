@@ -1,5 +1,5 @@
 /** Product name on marketing routes and when no org is in context. */
-export const DEFAULT_SITE_NAME = "Pickup Roster";
+export const DEFAULT_SITE_NAME = "PickupRoster";
 
 /** Fallback support email when `SUPPORT_EMAIL` env is not set. */
 export const DEFAULT_SUPPORT_EMAIL = "support@pickuproster.com";
@@ -40,8 +40,7 @@ export function getSignupNotifyEmail(context: any): string {
  * Set `INTRO_CALL_BOOKING_URL` (an http or https URL) when a calendar exists.
  * Returns null when unset or invalid so the UI never invents a link.
  */
-export function getIntroCallBookingUrl(context: any): string | null {
-  const raw = readEnv(context, "INTRO_CALL_BOOKING_URL");
+function httpUrl(raw: string | undefined): string | null {
   if (!raw) return null;
   try {
     const url = new URL(raw);
@@ -50,4 +49,22 @@ export function getIntroCallBookingUrl(context: any): string | null {
   } catch {
     return null;
   }
+}
+
+export function getIntroCallBookingUrl(context: any): string | null {
+  return httpUrl(readEnv(context, "INTRO_CALL_BOOKING_URL"));
+}
+
+/**
+ * Calendar link for the demo page.
+ *
+ * `DEMO_BOOKING_URL` wins. When it is unset, the intro-call calendar is used
+ * so one booking link can cover both. Returns null when neither is a valid
+ * http(s) URL.
+ */
+export function getDemoBookingUrl(context: any): string | null {
+  return (
+    httpUrl(readEnv(context, "DEMO_BOOKING_URL")) ??
+    httpUrl(readEnv(context, "INTRO_CALL_BOOKING_URL"))
+  );
 }

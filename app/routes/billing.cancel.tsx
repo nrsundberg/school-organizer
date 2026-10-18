@@ -7,7 +7,7 @@ import { detectLocale } from "~/i18n.server";
 export const handle = { i18n: ["common"] };
 
 export function meta({ data }: { data?: { metaTitle?: string } }) {
-  return [{ title: data?.metaTitle ?? "Checkout canceled — Pickup Roster" }];
+  return [{ title: data?.metaTitle ?? "Checkout canceled — PickupRoster" }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {

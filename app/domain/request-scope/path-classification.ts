@@ -76,6 +76,8 @@ export function classifyRequestPath(
   const isPlatform = pathname.startsWith("/platform");
   const isAcceptInvite = pathname === "/accept-invite";
   const isMarketingVideo = pathname.startsWith("/marketing/videos/");
+  const isCrawlerFile =
+    pathname === "/robots.txt" || pathname === "/sitemap.xml";
 
   const isPublicApi =
     isCheckEmailApi ||
@@ -99,6 +101,9 @@ export function classifyRequestPath(
     (pathname === "/district/signup" && onMarketingHost) ||
     (pathname.startsWith("/api/onboarding") && onMarketingHost) ||
     (pathname === "/" && onMarketingHost) ||
+    (pathname === "/demo" && onMarketingHost) ||
+    (pathname === "/school-pickup-board" && onMarketingHost) ||
+    isCrawlerFile ||
     isMarketingVideo;
 
   const anonSkipsViewer =
@@ -115,7 +120,12 @@ export function classifyRequestPath(
     isMarketingVideo;
 
   const skipTenantOrgBinding =
-    isStatic || isAuthApi || isStripeWebhook || isLogout || isMarketingVideo;
+    isStatic ||
+    isAuthApi ||
+    isStripeWebhook ||
+    isLogout ||
+    isMarketingVideo ||
+    isCrawlerFile;
 
   const exemptFromBillingGate =
     isBillingRequired ||
@@ -123,7 +133,8 @@ export function classifyRequestPath(
     isStripeWebhook ||
     isAuthApi ||
     isStatic ||
-    isMarketingVideo;
+    isMarketingVideo ||
+    isCrawlerFile;
 
   return {
     isStatic,

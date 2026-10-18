@@ -22,7 +22,7 @@ export const handle = { i18n: ["auth"] };
 
 export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
   return [
-    { title: data?.metaTitle ?? "Forgot password — Pickup Roster" },
+    { title: data?.metaTitle ?? "Forgot password — PickupRoster" },
     {
       name: "description",
       content: data?.metaDescription ?? "Start a password reset for your PickupRoster account.",

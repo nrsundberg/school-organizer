@@ -25,6 +25,9 @@ export function Footer({ siteName, supportEmail, orgName }: FooterProps) {
 
         {/* Right column */}
         <nav className="flex flex-wrap gap-4 md:justify-end items-start text-sm">
+          <Link to="/school-pickup-board" className="hover:text-white transition-colors">
+            {t("footer.nav.pickupBoard")}
+          </Link>
           <Link to="/pricing" className="hover:text-white transition-colors">
             {t("footer.nav.pricing")}
           </Link>

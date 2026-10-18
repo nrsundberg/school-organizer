@@ -22,7 +22,7 @@ import { detectLocale } from "~/i18n.server";
 export const handle = { i18n: ["auth"] };
 
 export function meta({ data }: { data?: { metaTitle?: string } }) {
-  return [{ title: data?.metaTitle ?? "Reset password — Pickup Roster" }];
+  return [{ title: data?.metaTitle ?? "Reset password — PickupRoster" }];
 }
 
 // Must match the signup form's rule in app/routes/auth/signup.tsx (min 8).

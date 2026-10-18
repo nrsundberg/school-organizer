@@ -4,7 +4,7 @@
       "backToPricing": "Back to pricing",
       "body": "You backed out of Stripe Checkout before completing the purchase. No subscription was created.",
       "goToAdmin": "Go to admin",
-      "metaTitle": "Checkout canceled — Pickup Roster",
+      "metaTitle": "Checkout canceled — PickupRoster",
       "title": "No charge made"
     },
     "required": {
@@ -20,14 +20,14 @@
     "success": {
       "body": "{{orgName}} is now on the {{plan}} plan. Your receipt is on its way from Stripe.",
       "goToAdmin": "Go to admin",
-      "metaTitle": "Upgrade complete — Pickup Roster",
+      "metaTitle": "Upgrade complete — PickupRoster",
       "planNames": {
         "campus": "Campus",
         "carLine": "Car Line",
         "enterprise": "Enterprise",
         "free": "Free"
       },
-      "title": "You're upgraded — welcome to Pickup Roster {{plan}}!"
+      "title": "You're upgraded — welcome to PickupRoster {{plan}}!"
     }
   },
   "blog": {
@@ -83,6 +83,32 @@
     "skipNote_one": " (skipped {{count}} blank row)",
     "skipNote_other": " (skipped {{count}} blank rows)"
   },
+  "demo": {
+    "confirmBody": "Noah will email you at the address you entered.",
+    "confirmTitle": "Thanks — we got your request.",
+    "email": "Email",
+    "errors": {
+      "email": "A valid email is required.",
+      "name": "Name is required.",
+      "rate": "Too many requests. Please try again in a minute.",
+      "role": "Role is required.",
+      "school": "School is required."
+    },
+    "heading": "Book a demo",
+    "honeypot": "Website",
+    "lede": "Tell us about your school. We'll email you to set up a short look at the live pickup board.",
+    "message": "Message",
+    "metaDescription": "Tell us about your school and we'll show you the live pickup board.",
+    "metaTitle": "Book a demo — PickupRoster",
+    "name": "Name",
+    "phone": "Phone (optional)",
+    "pickTime": "Pick a time",
+    "role": "Role",
+    "school": "School",
+    "sending": "Sending…",
+    "studentCount": "Student count",
+    "submit": "Request a demo"
+  },
   "errors": {
     "notFound": "404",
     "somethingBroke": "Something broke"
@@ -92,7 +118,7 @@
     "heading": "FAQs",
     "items": {
       "domain": {
-        "a": "Yes — custom domains (or a subdomain on your school's own domain) are available on Campus and District plans. Point DNS to the same Worker as your other hosts. Car Line uses a yourslug.pickuproster.com subdomain.",
+        "a": "Yes. Campus and District plans can use your school's own domain, such as pickup.yourschool.edu. Car Line uses an address like yourslug.pickuproster.com.",
         "q": "Can we use our own domain?"
       },
       "trial": {
@@ -100,17 +126,17 @@
         "q": "How does the trial work?"
       },
       "viewer": {
-        "a": "Share the viewer PIN or a magic link. Viewer sessions are scoped to your organization and respect lockouts after failed attempts.",
-        "q": "How do families view the board?"
+        "a": "Car Line includes a teacher and staff viewer. Share a PIN or a magic link. The parent and family viewer app is included on Campus and above. Viewer access stays limited to your school and locks after failed attempts.",
+        "q": "Who can view the board?"
       },
       "where": {
-        "a": "Each organization gets its own subdomain like yourslug.pickuproster.com. The main domain shows this marketing site; the board never mixes tenants. On Campus and District plans you can instead use a custom domain or a subdomain on your school's own domain (for example, pickup.yourschool.edu).",
+        "a": "Each school gets its own address, like yourslug.pickuproster.com. This site is the public page. One school's board is never mixed with another's. Campus and District plans can use your own domain, such as pickup.yourschool.edu.",
         "q": "Where does my school live?"
       }
     },
     "lede": "Straight answers for admins and IT.",
-    "metaDescription": "Common questions about car line boards, trials, and security.",
-    "metaTitle": "FAQs — Pickup Roster",
+    "metaDescription": "Common questions about the school pickup board, the car line, trials, and who can view it.",
+    "metaTitle": "FAQs — PickupRoster",
     "readyToTry": "Ready to try it?"
   },
   "fileChooser": {
@@ -121,6 +147,7 @@
     "copyright": "© {{year}} {{siteName}}",
     "nav": {
       "blog": "Blog",
+      "pickupBoard": "Pickup board",
       "faqs": "FAQs",
       "login": "Login",
       "pricing": "Pricing",
@@ -188,23 +215,26 @@
     "languageList": "Now available in: {{names}}"
   },
   "marketingLanding": {
+    "bookDemo": "Book a demo",
     "features": {
-      "liveBoard": "Live board with WebSocket updates and viewer PINs or magic links.",
+      "liveBoard": "A live board that updates every screen the moment a car is called, with viewer PINs or magic links.",
       "subdomain": "Subdomain per school (yourslug.pickuproster.com); Campus and District plans can bring a custom domain or a subdomain on your school's own domain.",
       "trial": "30-day free trial from signup. No credit card required."
     },
     "footerCta": {
-      "body": "Start a trial from the marketing site. Your live board lives on your school subdomain—never mixed with other tenants.",
+      "body": "Start a free 30-day trial. Your school's board has its own address, separate from every other school.",
       "createAccount": "Create your account",
       "heading": "Ready when your school is"
     },
-    "headline": "One board for pickups, drills, and daily chaos—without the walkie chatter.",
-    "kicker": "School car line, simplified",
-    "lede": "Pickup Roster gives each school its own live board, viewer access families trust, and admin tools your front office already understands.",
+    "headline": "A live school pickup board for your car line.",
+    "kicker": "School pickup and car line",
+    "lede": "PickupRoster gives each school a live pickup board. Staff call cars, and every screen updates at the same moment. No radios, and no hardware to buy.",
+    "metaDescription": "A live school pickup board for the car line. Staff call cars and every screen updates instantly. Free 30-day trial, no card.",
+    "metaTitle": "PickupRoster | Live School Pickup Board & Car Line App",
     "startFreeTrial": "Start free trial",
     "videos": {
       "carLine": {
-        "description": "How controllers move the line and how families see status in real time.",
+        "description": "How staff move the car line and how the board updates in real time.",
         "title": "Car line pickups"
       },
       "fireDrills": {
@@ -216,7 +246,7 @@
         "title": "Getting started"
       },
       "heading": "See it in action",
-      "subtitle": "Short walkthroughs you can share with staff and families."
+      "subtitle": "Short walkthroughs you can share with your staff."
     },
     "viewPricing": "View pricing",
     "whatYouGet": "What you get"
@@ -226,11 +256,12 @@
     "dashboard": "Dashboard",
     "faqs": "FAQs",
     "guides": "Guides",
-    "homeAriaLabel": "Pickup Roster home",
+    "homeAriaLabel": "PickupRoster home",
+    "pickupBoard": "Pickup board",
     "login": "Log in",
     "pricing": "Pricing",
     "signup": "Sign up",
-    "wordmarkAlt": "Pickup Roster"
+    "wordmarkAlt": "PickupRoster"
   },
   "midTrialCheckin": {
     "greeting": "Hi {{firstName}},",
@@ -259,8 +290,8 @@
       "heading": "Active incidents",
       "since": "Since {{when}}"
     },
-    "metaDescription": "Live status of the Pickup Roster platform, including board infrastructure and third-party dependencies.",
-    "metaTitle": "Status — Pickup Roster",
+    "metaDescription": "Live status of the PickupRoster platform, including board infrastructure and third-party dependencies.",
+    "metaTitle": "Status — PickupRoster",
     "ninetyDaysAgo": "90 days ago",
     "overall": {
       "degraded": "Degraded performance",
@@ -281,9 +312,9 @@
       "data": "Data",
       "email": "Email",
       "payments": "Payments",
-      "tenants": "Tenants"
+      "tenants": "Schools"
     },
-    "title": "Pickup Roster Status",
+    "title": "PickupRoster Status",
     "today": "Today",
     "uptime": {
       "allOperational": "{{withData}} of {{total}} days with data — all operational",

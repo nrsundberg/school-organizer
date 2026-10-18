@@ -14,6 +14,20 @@
     "introCallsBookLead": "También puedes reservar esas llamadas aquí:",
     "para4": "De cualquier manera, me alegra que estés aquí."
   },
+  "demoRequest": {
+    "subject": "Solicitud de demo de PickupRoster: {{school}}",
+    "preview": "{{name}} ({{email}}) pidió una demo en {{school}}.",
+    "heading": "Solicitud de demo",
+    "name": "Nombre: {{name}}",
+    "role": "Rol: {{role}}",
+    "school": "Escuela: {{school}}",
+    "email": "Correo: {{email}}",
+    "phone": "Teléfono: {{phone}}",
+    "studentCount": "Cantidad de estudiantes: {{studentCount}}",
+    "message": "Mensaje: {{message}}",
+    "when": "Enviado: {{submittedAt}}",
+    "notProvided": "No indicado"
+  },
   "signupNotification": {
     "subject": "Nuevo registro en PickupRoster: {{schoolName}}",
     "preview": "{{personName}} ({{personEmail}}) comenzó una prueba {{plan}}.",
