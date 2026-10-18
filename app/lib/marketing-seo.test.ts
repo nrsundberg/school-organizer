@@ -4,6 +4,7 @@ import {
   buildSitemapXml,
   canonicalRedirectTarget,
   faqPageJsonLd,
+  homePageJsonLd,
   marketingRobotsTxt,
   publicSiteOrigin,
   softwareApplicationJsonLd,
@@ -98,6 +99,17 @@ test("pricing JSON-LD uses the current Car Line and Campus prices", () => {
     "Campus monthly:500",
     "Campus annual:4800",
   ]);
+});
+
+test("home JSON-LD merges the FAQ into the organization graph", () => {
+  const ld = homePageJsonLd("https://pickuproster.com", [
+    { q: "What is a school pickup board?", a: "A live display." },
+  ]);
+  const types = ld["@graph"].map((node) => node["@type"]);
+  assert.deepEqual(types, ["Organization", "WebSite", "FAQPage"]);
+  const faq = ld["@graph"][2];
+  assert.equal(faq && "mainEntity" in faq ? faq.mainEntity[0]?.name : "", "What is a school pickup board?");
+  assert.equal("@context" in (faq ?? {}), false);
 });
 
 test("FAQ JSON-LD keeps each question and answer", () => {
