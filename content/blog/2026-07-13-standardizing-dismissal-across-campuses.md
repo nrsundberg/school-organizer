@@ -69,4 +69,4 @@ Districts that hold this line end up with something better than uniformity: camp
 
 ---
 
-If your district sits somewhere between "every campus has a clipboard" and "we standardized on something nobody uses," it's worth seeing the district/campus configuration split in practice. PickupRoster's Car Line tier is $100/month per school with a 30-day free trial—no credit card—and the District tier is custom-quoted for up to ten schools. Start with one campus at [pickuproster.com/pricing](https://pickuproster.com/pricing) and learn what the default should be before you push it to the rest.
+If your district sits somewhere between "every campus has a clipboard" and "we standardized on something nobody uses," it's worth seeing the district/campus configuration split in practice. PickupRoster's Car Line tier is $150/month per school ($1,440/year, 20% off) with a 30-day free trial—no credit card—and the District tier is custom-quoted for up to ten schools. Start with one campus at [pickuproster.com/pricing](https://pickuproster.com/pricing) and learn what the default should be before you push it to the rest.

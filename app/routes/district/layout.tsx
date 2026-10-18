@@ -2,7 +2,8 @@ import { NavLink, Outlet } from "react-router";
 import type { Route } from "./+types/layout";
 import { requireDistrictAdmin } from "~/domain/district/route-guard.server";
 import { getDistrictById } from "~/domain/district/district.server";
-import { DEFAULT_SITE_NAME } from "~/lib/site";
+import { IntroCallsNote } from "~/components/IntroCallsNote";
+import { DEFAULT_SITE_NAME, getIntroCallBookingUrl } from "~/lib/site";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   [
@@ -16,11 +17,15 @@ export async function loader({ context }: Route.LoaderArgs) {
   const districtId = requireDistrictAdmin(context);
   const district = await getDistrictById(context, districtId);
   if (!district) throw new Response("District not found", { status: 404 });
-  return { district };
+  return {
+    district,
+    showIntroCalls: district.status === "TRIALING",
+    introCallBookingUrl: getIntroCallBookingUrl(context),
+  };
 }
 
 export default function DistrictLayout({ loaderData }: Route.ComponentProps) {
-  const { district } = loaderData;
+  const { district, showIntroCalls, introCallBookingUrl } = loaderData;
   return (
     <div className="min-h-screen bg-[#0f1414] text-white">
       <header className="border-b border-white/10 px-4 py-3">
@@ -68,6 +73,16 @@ export default function DistrictLayout({ loaderData }: Route.ComponentProps) {
         </nav>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8">
+        {showIntroCalls ? (
+          <div className="mb-6">
+            <IntroCallsNote
+              heading="Two free intro calls"
+              body="Every new school gets two free 30-minute intro calls to set up the system and identify anything new you need built."
+              bookLabel="Book an intro call"
+              bookingUrl={introCallBookingUrl}
+            />
+          </div>
+        ) : null}
         <Outlet />
       </main>
     </div>

@@ -1154,6 +1154,11 @@
       "loginRequired": "Inicio de sesión requerido",
       "loginRequiredBody": "Necesitas iniciar sesión para acceder al panel de administración."
     },
+    "introCalls": {
+      "heading": "Dos llamadas de introducción gratis",
+      "body": "Cada escuela nueva recibe dos llamadas de introducción gratis de 30 minutos para configurar el sistema e identificar lo que necesitan que construyamos.",
+      "book": "Reservar una llamada"
+    },
     "openNav": "Abrir navegación",
     "panelTitle": "Panel de administración"
   },

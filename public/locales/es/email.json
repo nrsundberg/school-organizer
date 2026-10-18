@@ -9,9 +9,20 @@
     "preview": "una nota rápida del fundador — y un pequeño favor.",
     "greeting": "Hola {{firstName}},",
     "para1": "Gracias por registrarte. Ayudar a las escuelas a tener una recogida más tranquila es la razón por la que empecé PickupRoster, así que de verdad significa mucho que {{orgName}} le diera una oportunidad.",
-    "para2": "Me encantaría escuchar cómo se ve la salida hoy en tu escuela — qué funciona, qué no y qué te gustaría que alguien arreglara. ¿Podríamos charlar 15 minutos por teléfono en la próxima semana o dos?",
-    "para3": "Solo responde con un par de horarios que te funcionen y te enviaré la invitación.",
+    "para2": "Cada escuela nueva recibe dos llamadas de introducción gratis de 30 minutos. Las usaremos para configurar el sistema contigo e identificar lo que necesitan que construyamos.",
+    "para3": "Responde con un par de horarios que te funcionen y te enviaré las invitaciones.",
+    "introCallsBookLead": "También puedes reservar esas llamadas aquí:",
     "para4": "De cualquier manera, me alegra que estés aquí."
+  },
+  "signupNotification": {
+    "subject": "Nuevo registro en PickupRoster: {{schoolName}}",
+    "preview": "{{personName}} ({{personEmail}}) comenzó una prueba {{plan}}.",
+    "heading": "Nuevo registro",
+    "school": "Escuela: {{schoolName}}",
+    "person": "Registró: {{personName}}",
+    "email": "Correo: {{personEmail}}",
+    "plan": "Plan: {{plan}}",
+    "when": "Fecha de registro: {{signedUpAt}}"
   },
   "passwordReset": {
     "subject": "Restablece tu contraseña de PickupRoster",

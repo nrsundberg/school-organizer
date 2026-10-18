@@ -2,7 +2,12 @@ import { Form, Link, useNavigation, useRouteLoaderData } from "react-router";
 import { useTranslation } from "react-i18next";
 import type { Route } from "./+types/pricing";
 import { MarketingNav } from "~/components/marketing/MarketingNav";
-import { getSupportEmail } from "~/lib/site";
+import { IntroCallsNote } from "~/components/IntroCallsNote";
+import { getIntroCallBookingUrl, getSupportEmail } from "~/lib/site";
+import {
+  ANNUAL_DISCOUNT_PERCENT,
+  publicPriceDisplay,
+} from "~/domain/billing/public-prices";
 import { SUPPORTED_LANGUAGES } from "~/lib/i18n-config";
 import {
   normalizePublicBillingCycle,
@@ -33,6 +38,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const t = await getFixedT(locale, "billing");
   return {
     supportEmail: getSupportEmail(context),
+    introCallBookingUrl: getIntroCallBookingUrl(context),
     billingCycle: normalizePublicBillingCycle(url.searchParams.get("cycle")),
     metaTitle: t("pricing.metaTitle"),
     metaDescription: t("pricing.metaDescription"),
@@ -95,26 +101,45 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
   const rootData = useRouteLoaderData("root") as RootLoader | undefined;
   const navigation = useNavigation();
   const isSignedInOrgAdmin = !!rootData?.user?.orgId;
-  const { billingCycle, supportEmail } = loaderData;
+  const { billingCycle, supportEmail, introCallBookingUrl } = loaderData;
   const languageCount = SUPPORTED_LANGUAGES.length;
 
-  const priceForCycle = (monthlyPrice: number, cycle: PublicBillingCycle) => {
+  const priceForPlan = (
+    plan: "CAR_LINE" | "CAMPUS",
+    cycle: PublicBillingCycle,
+  ) => {
+    // USD grouping stays en-US ($1,440) in every language.
+    const display = publicPriceDisplay(plan, cycle);
+    const annualAmount = t("pricing.amount.year", { value: display.annualFormatted });
+    const fullAnnual = t("pricing.amount.year", {
+      value: display.undiscountedAnnualFormatted,
+    });
     if (cycle === "annual") {
       return {
-        amount: t("pricing.amount.year", { value: (monthlyPrice * 12).toLocaleString() }),
+        amount: t("pricing.amount.year", { value: display.formatted }),
         period: t("pricing.period.year"),
         note: t("pricing.note.annual"),
+        savings: t("pricing.saveDetail", {
+          percent: display.savePercent,
+          full: fullAnnual,
+        }),
+        monthlyHint: null as string | null,
       };
     }
     return {
-      amount: t("pricing.amount.month", { value: monthlyPrice.toLocaleString() }),
+      amount: t("pricing.amount.month", { value: display.formatted }),
       period: t("pricing.period.month"),
       note: t("pricing.note.monthly"),
+      savings: null as string | null,
+      monthlyHint: t("pricing.monthlyAnnualHint", {
+        annual: annualAmount,
+        percent: ANNUAL_DISCOUNT_PERCENT,
+      }),
     };
   };
 
-  const carLinePrice = priceForCycle(100, billingCycle);
-  const campusPrice = priceForCycle(500, billingCycle);
+  const carLinePrice = priceForPlan("CAR_LINE", billingCycle);
+  const campusPrice = priceForPlan("CAMPUS", billingCycle);
   const isCheckoutPending =
     navigation.state !== "idle" &&
     navigation.formAction === "/api/billing/checkout";
@@ -181,7 +206,11 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
                     : "text-white/70 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                {t(`pricing.cycle.${cycle}`)}
+                {cycle === "annual"
+                  ? t("pricing.cycle.annualWithSave", {
+                      percent: ANNUAL_DISCOUNT_PERCENT,
+                    })
+                  : t(`pricing.cycle.${cycle}`)}
               </Link>
             ))}
           </div>
@@ -205,6 +234,16 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
                 </span>
               </p>
               <p className="mt-1 text-xs text-white/50">{carLinePrice.note}</p>
+              {carLinePrice.savings ? (
+                <p className="mt-2 text-sm font-semibold text-emerald-300">
+                  {carLinePrice.savings}
+                </p>
+              ) : null}
+              {carLinePrice.monthlyHint ? (
+                <p className="mt-2 text-sm font-semibold text-emerald-300">
+                  {carLinePrice.monthlyHint}
+                </p>
+              ) : null}
             </div>
             <ul className="mt-6 flex-1 space-y-2 text-sm text-white/80">
               {carLineFeatures.map((f) => (
@@ -250,6 +289,16 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
                 </span>
               </p>
               <p className="mt-1 text-xs text-white/50">{campusPrice.note}</p>
+              {campusPrice.savings ? (
+                <p className="mt-2 text-sm font-semibold text-emerald-300">
+                  {campusPrice.savings}
+                </p>
+              ) : null}
+              {campusPrice.monthlyHint ? (
+                <p className="mt-2 text-sm font-semibold text-emerald-300">
+                  {campusPrice.monthlyHint}
+                </p>
+              ) : null}
             </div>
             <ul className="mt-6 flex-1 space-y-2 text-sm text-white/80">
               {campusFeatures.map((f) => (
@@ -327,6 +376,15 @@ export default function Pricing({ loaderData }: Route.ComponentProps) {
               </p>
             </div>
           </div>
+        </div>
+
+        <div className="mx-auto mt-12 max-w-3xl">
+          <IntroCallsNote
+            heading={t("pricing.introCalls.heading")}
+            body={t("pricing.introCalls.body")}
+            bookLabel={t("pricing.introCalls.book")}
+            bookingUrl={introCallBookingUrl}
+          />
         </div>
 
         {/* FAQ */}

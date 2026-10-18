@@ -3,6 +3,8 @@ import { getPrisma } from "~/db.server";
 import { addDaysUtc } from "~/domain/billing/trial.server";
 import { slugifyOrgName } from "~/lib/org-slug";
 import { enqueueEmail } from "~/domain/email/queue.server";
+import { notifyNewSignup } from "~/domain/email/signup-notify.server";
+import { getIntroCallBookingUrl } from "~/lib/site";
 
 export { slugifyOrgName };
 
@@ -73,7 +75,7 @@ export async function ensureOrgForUser(params: {
   });
 
   // Fire-and-forget welcome email via the EMAIL_QUEUE. Failures here must not
-  // block signup — enqueueEmail swallows errors and logs.
+  // block signup — enqueueEmail swallows a missing queue, and we catch throws.
   try {
     await enqueueEmail(context, {
       kind: "welcome",
@@ -82,10 +84,20 @@ export async function ensureOrgForUser(params: {
       orgSlug: slug,
       userName: existingUser.name || null,
       locale: recipientLocale,
+      introCallBookingUrl: getIntroCallBookingUrl(context),
     });
   } catch (err) {
     console.error("enqueueEmail(welcome) failed", err);
   }
+
+  // Founder alert. notifyNewSignup never throws.
+  await notifyNewSignup(context, {
+    schoolName: org.name,
+    personName: existingUser.name || null,
+    personEmail: email,
+    plan,
+    signedUpAt: trialStartedAt,
+  });
 
   return { orgId: org.id, plan, created: true };
 }

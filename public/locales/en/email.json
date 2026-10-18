@@ -9,9 +9,20 @@
     "preview": "a quick note from the founder — and a small ask.",
     "greeting": "Hi {{firstName}},",
     "para1": "Thank you for signing up. Helping schools run a calmer pickup is the whole reason I started PickupRoster, so it genuinely means a lot that {{orgName}} gave it a shot.",
-    "para2": "I'd love to hear what dismissal actually looks like at your school right now — what's working, what's not, and what you wish someone would fix. Could we grab 15 minutes on the phone in the next week or two?",
-    "para3": "Just hit reply with a couple of times that work for you and I'll send an invite.",
+    "para2": "Every new school gets two free 30-minute intro calls. We'll use them to set up the system with you and to identify anything new you need built.",
+    "para3": "Reply with a couple of times that work for you and I'll send the invites.",
+    "introCallsBookLead": "You can also book those calls here:",
     "para4": "Either way, I'm glad you're here."
+  },
+  "signupNotification": {
+    "subject": "New PickupRoster signup: {{schoolName}}",
+    "preview": "{{personName}} ({{personEmail}}) started a {{plan}} trial.",
+    "heading": "New signup",
+    "school": "School: {{schoolName}}",
+    "person": "Signed up by: {{personName}}",
+    "email": "Email: {{personEmail}}",
+    "plan": "Plan: {{plan}}",
+    "when": "Signed up at: {{signedUpAt}}"
   },
   "passwordReset": {
     "subject": "Reset your PickupRoster password",

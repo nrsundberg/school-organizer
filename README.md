@@ -45,7 +45,7 @@ Configure these Worker vars (see [`wrangler.jsonc`](wrangler.jsonc) and [`env.d.
 - **`MARKETING_HOSTS`** — comma-separated hosts that always behave as marketing (default includes `localhost` and `127.0.0.1` for local dev).
 - **`PLATFORM_ADMIN_EMAILS`** — comma-separated emails that may access `/platform` (internal org list) in addition to users with role `PLATFORM_ADMIN`.
 
-Trial length follows calendar days and qualifying pickup days (see `app/domain/billing/trial.server.ts`). A **scheduled cron** in `wrangler.jsonc` runs trial maintenance daily.
+Self-serve signups start a **30-calendar-day** trial with no card (`trialEndsAt` at signup; the daily cron suspends the org when it passes). The qualifying-pickup-day extension applies only to `FREE` plans (see `app/domain/billing/trial.server.ts`). A **scheduled cron** in `wrangler.jsonc` runs trial maintenance daily.
 
 ## Cloudflare
 
@@ -65,13 +65,15 @@ Production ships from GitHub Actions when a version tag is pushed. Staging ships
 
 ### Stripe
 
-See [docs/stripe-products.md](docs/stripe-products.md) for product/price setup. Then set the required secrets:
+See [docs/stripe-products.md](docs/stripe-products.md) for product/price setup. Create the four Prices (Car Line $150/month and $1,440/year, Campus $500/month and $4,800/year) with `npm run stripe:create-prices`, then set the secrets it prints:
 
 ```sh
 npx wrangler secret put STRIPE_SECRET_KEY
 npx wrangler secret put STRIPE_WEBHOOK_SECRET
 npx wrangler secret put STRIPE_CAR_LINE_PRICE_ID
+npx wrangler secret put STRIPE_CAR_LINE_ANNUAL_PRICE_ID
 npx wrangler secret put STRIPE_CAMPUS_PRICE_ID
+npx wrangler secret put STRIPE_CAMPUS_ANNUAL_PRICE_ID
 ```
 
 Point your Stripe webhook endpoint at `https://pickuproster.com/api/webhooks/stripe` and subscribe to at least `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `checkout.session.completed`, `invoice.payment_succeeded`, and `invoice.payment_failed`.

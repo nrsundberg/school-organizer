@@ -21,7 +21,9 @@ import AdminSidebar from "~/components/admin/AdminSidebar";
 import { AdminUsageBanner } from "~/components/admin/AdminUsageBanner";
 import { PastDuePaymentBanner } from "~/components/admin/PastDuePaymentBanner";
 import { TrialEndingBanner } from "~/components/admin/TrialEndingBanner";
+import { IntroCallsNote } from "~/components/IntroCallsNote";
 import Header from "~/components/Header";
+import { getIntroCallBookingUrl } from "~/lib/site";
 import logo from "/logo-icon.svg?url";
 
 export const handle = { i18n: ["admin", "common"] };
@@ -75,6 +77,8 @@ export async function loader({ context }: Route.LoaderArgs) {
     // Schools inside a district don't manage their own billing — hide the
     // sidebar Billing link.
     orgIsInDistrict: !!org.districtId,
+    showIntroCalls: org.status === "TRIALING",
+    introCallBookingUrl: getIntroCallBookingUrl(context),
   };
 }
 
@@ -168,6 +172,8 @@ export default function AdminLayout() {
     trialEndingBanner,
     compedUntil,
     orgIsInDistrict,
+    showIntroCalls,
+    introCallBookingUrl,
   } = useLoaderData<typeof loader>();
   const { t, i18n } = useTranslation("admin");
   const isComped = !!compedUntil && new Date(compedUntil) > new Date();
@@ -197,6 +203,16 @@ export default function AdminLayout() {
           daysRemaining={trialEndingBanner.daysRemaining}
           billingPlan={trialEndingBanner.billingPlan}
         />
+      )}
+      {showIntroCalls && (
+        <div className="border-b border-white/10 bg-[#1a1f1f] px-4 py-3">
+          <IntroCallsNote
+            heading={t("layout.introCalls.heading")}
+            body={t("layout.introCalls.body")}
+            bookLabel={t("layout.introCalls.book")}
+            bookingUrl={introCallBookingUrl}
+          />
+        </div>
       )}
       {usage.limits && <AdminUsageBanner usage={usage} />}
       <div className="flex flex-1">
