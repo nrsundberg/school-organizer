@@ -30,15 +30,53 @@ declare global {
     /** Stripe recurring annual price for Campus ($4,800/year). Required for annual checkout. */
     STRIPE_CAMPUS_ANNUAL_PRICE_ID?: string;
     /**
-     * Public http(s) URL where a new school books the two free intro calls.
-     * Leave unset until a calendar exists — the UI does not invent a link.
+     * Optional override for the intro-call page. When unset, links use
+     * https://<PUBLIC_ROOT_DOMAIN>/book/intro.
      */
     INTRO_CALL_BOOKING_URL?: string;
     /**
-     * Public http(s) URL for the demo page "Pick a time" button.
-     * Falls back to INTRO_CALL_BOOKING_URL when unset.
+     * Optional override for the demo page. When unset, links use
+     * https://<PUBLIC_ROOT_DOMAIN>/demo.
      */
     DEMO_BOOKING_URL?: string;
+    /** Public Turnstile site key. The widget is hidden when this is unset. */
+    TURNSTILE_SITE_KEY?: string;
+    /**
+     * Turnstile secret. `wrangler secret put TURNSTILE_SECRET_KEY`.
+     * Verification is skipped only when this is missing outside production
+     * and staging.
+     */
+    TURNSTILE_SECRET_KEY?: string;
+    /**
+     * Comma-separated hostnames Siteverify must return. Defaults to the
+     * apex and www of PUBLIC_ROOT_DOMAIN.
+     */
+    TURNSTILE_HOSTNAMES?: string;
+    /**
+     * Shared meeting room (for example a Google Meet URL) added to the
+     * calendar invite. When unset, the email says Noah will send a link.
+     */
+    MEETING_URL?: string;
+    /** HMAC secret for cancel/reschedule links. Falls back to BETTER_AUTH_SECRET. */
+    BOOKING_TOKEN_SECRET?: string;
+    /** IANA zone for the bookable grid. Default America/Denver. */
+    BOOKING_TIMEZONE?: string;
+    /** First hour of the grid, 0–23. Default 9. */
+    BOOKING_START_HOUR?: string;
+    /** Hour the grid ends (meetings must finish by this hour). Default 16. */
+    BOOKING_END_HOUR?: string;
+    /** ISO weekdays, Monday = 1. Default 1,2,3,4,5. */
+    BOOKING_WEEKDAYS?: string;
+    /** Meeting length in minutes. Default 30. */
+    BOOKING_SLOT_MINUTES?: string;
+    /** Gap after each meeting, in minutes. Default 15. */
+    BOOKING_BUFFER_MINUTES?: string;
+    /** Minimum notice in hours. Default 12. */
+    BOOKING_MIN_NOTICE_HOURS?: string;
+    /** How many days ahead a visitor can book. Default 21. */
+    BOOKING_HORIZON_DAYS?: string;
+    /** Max confirmed bookings per schedule-zone day, per kind. Default 8. */
+    BOOKING_MAX_PER_DAY?: string;
     /**
      * Inbox for trial-start notifications. Defaults to NoahSundberg@gmail.com.
      */

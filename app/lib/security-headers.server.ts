@@ -52,12 +52,12 @@
 function buildEnforcingCsp(cspNonce: string, isDev: boolean): string {
   const directives = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${cspNonce}' https://js.stripe.com`,
+    `script-src 'self' 'nonce-${cspNonce}' https://js.stripe.com https://challenges.cloudflare.com`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.sentry.io https://*.ingest.sentry.io https://api.stripe.com",
-    "frame-src https://js.stripe.com https://checkout.stripe.com https://billing.stripe.com https://www.youtube-nocookie.com https://www.youtube.com",
+    "connect-src 'self' https://*.sentry.io https://*.ingest.sentry.io https://api.stripe.com https://challenges.cloudflare.com",
+    "frame-src https://js.stripe.com https://checkout.stripe.com https://billing.stripe.com https://www.youtube-nocookie.com https://www.youtube.com https://challenges.cloudflare.com",
     "base-uri 'self'",
     "form-action 'self' https://checkout.stripe.com https://billing.stripe.com",
     "frame-ancestors 'none'",

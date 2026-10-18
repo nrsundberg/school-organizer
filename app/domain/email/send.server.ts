@@ -2,6 +2,13 @@ import { Resend } from "resend";
 import { DEFAULT_FROM, type SendableEmailMessage } from "./types";
 import { renderEmail } from "./templates";
 
+function toBase64(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
 /**
  * Low-level send: given a fully-typed EmailMessage, render it and hand it to
  * Resend. Called from the EMAIL_QUEUE consumer — do not call from request
@@ -28,6 +35,16 @@ export async function sendEmail(env: Env, msg: SendableEmailMessage): Promise<vo
   const rendered = await renderEmail(msg, publicRoot);
   const resend = new Resend(apiKey);
 
+  const attachments = rendered.ics
+    ? [
+        {
+          filename: rendered.ics.filename,
+          content: toBase64(rendered.ics.content),
+          contentType: `text/calendar; charset=utf-8; method=${rendered.ics.method}`,
+        },
+      ]
+    : undefined;
+
   const { error } = await resend.emails.send({
     from: DEFAULT_FROM,
     to: msg.to,
@@ -37,6 +54,7 @@ export async function sendEmail(env: Env, msg: SendableEmailMessage): Promise<vo
     // Per-template Reply-To override (e.g. welcome routes replies to Noah's
     // personal inbox). When undefined, Resend defaults to the From address.
     ...(rendered.replyTo ? { replyTo: rendered.replyTo } : {}),
+    ...(attachments ? { attachments } : {}),
     // Tag so we can segment by email kind in Resend's dashboard/webhooks.
     tags: [
       { name: "kind", value: msg.kind },

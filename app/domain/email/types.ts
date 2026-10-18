@@ -49,6 +49,35 @@ export type SignupNotificationMessage = {
 };
 
 /**
+ * Calendar mail for a demo or intro call. Sent twice: once to the booker
+ * and once to the signup inbox. Both messages carry the same .ics payload.
+ */
+export type BookingMailMessage = {
+  kind: "booking_mail";
+  to: string;
+  audience: "booker" | "host";
+  event: "confirmed" | "cancelled" | "rescheduled";
+  bookingKind: "demo" | "intro";
+  bookingId: string;
+  sequence: number;
+  name: string;
+  email: string;
+  role: string | null;
+  school: string | null;
+  phone: string | null;
+  studentCount: string | null;
+  message: string | null;
+  startsAt: string;
+  endsAt: string;
+  visitorTimeZone: string;
+  scheduleTimeZone: string;
+  manageUrl: string;
+  meetingUrl: string | null;
+  hostEmail: string;
+  locale?: EmailLocale;
+};
+
+/**
  * Internal notice when someone submits the public demo form.
  * Always English. Failures must not surface as a 500 to the visitor.
  */
@@ -181,7 +210,8 @@ export type SendableEmailMessage =
   | UserInviteMessage
   | StudentsDeletedMessage
   | SignupNotificationMessage
-  | DemoRequestMessage;
+  | DemoRequestMessage
+  | BookingMailMessage;
 
 export type EmailMessage = SendableEmailMessage | ProbeMessage;
 
@@ -198,6 +228,12 @@ export type RenderedEmail = {
    * Omit (or leave undefined) to let Resend default to the From address.
    */
   replyTo?: string;
+  /** Calendar invite attached by the Resend send. */
+  ics?: {
+    method: "REQUEST" | "CANCEL";
+    filename: string;
+    content: string;
+  };
 };
 
 /** From address used for all outbound mail. Founder voice for now. */

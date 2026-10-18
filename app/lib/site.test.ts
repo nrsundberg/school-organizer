@@ -64,19 +64,29 @@ test("getSignupNotifyEmail defaults to Noah and honors a valid override", () => 
   );
 });
 
-test("getIntroCallBookingUrl accepts only http(s) URLs", () => {
-  assert.equal(getIntroCallBookingUrl({}), null);
+test("getIntroCallBookingUrl defaults to the in-app page and accepts http(s) overrides", () => {
+  assert.equal(getIntroCallBookingUrl({}), "https://pickuproster.com/book/intro");
   assert.equal(
     getIntroCallBookingUrl({
       cloudflare: { env: { INTRO_CALL_BOOKING_URL: "" } },
     }),
-    null,
+    "https://pickuproster.com/book/intro",
   );
   assert.equal(
     getIntroCallBookingUrl({
       cloudflare: { env: { INTRO_CALL_BOOKING_URL: "javascript:alert(1)" } },
     }),
-    null,
+    "https://pickuproster.com/book/intro",
+  );
+  assert.equal(
+    getIntroCallBookingUrl({
+      cloudflare: {
+        env: {
+          PUBLIC_ROOT_DOMAIN: "staging.pickuproster.com",
+        },
+      },
+    }),
+    "https://staging.pickuproster.com/book/intro",
   );
   assert.equal(
     getIntroCallBookingUrl({
@@ -88,13 +98,13 @@ test("getIntroCallBookingUrl accepts only http(s) URLs", () => {
   );
 });
 
-test("getDemoBookingUrl prefers DEMO_BOOKING_URL and falls back to the intro calendar", () => {
-  assert.equal(getDemoBookingUrl({}), null);
+test("getDemoBookingUrl defaults to /demo and prefers a valid override", () => {
+  assert.equal(getDemoBookingUrl({}), "https://pickuproster.com/demo");
   assert.equal(
     getDemoBookingUrl({
       cloudflare: { env: { INTRO_CALL_BOOKING_URL: "https://cal.example/intro" } },
     }),
-    "https://cal.example/intro",
+    "https://pickuproster.com/demo",
   );
   assert.equal(
     getDemoBookingUrl({
@@ -111,6 +121,6 @@ test("getDemoBookingUrl prefers DEMO_BOOKING_URL and falls back to the intro cal
     getDemoBookingUrl({
       cloudflare: { env: { DEMO_BOOKING_URL: "javascript:alert(1)" } },
     }),
-    null,
+    "https://pickuproster.com/demo",
   );
 });

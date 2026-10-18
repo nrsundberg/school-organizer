@@ -19,6 +19,7 @@ export const SITEMAP_STATIC_PATHS = [
   "/guides",
   "/blog",
   "/demo",
+  "/book/intro",
   "/school-pickup-board",
 ] as const;
 
@@ -26,6 +27,7 @@ export const SITEMAP_STATIC_PATHS = [
 export const ROBOTS_DISALLOW_PATHS = [
   "/login",
   "/signup",
+  "/book/manage",
   "/admin",
   "/forgot-password",
   "/reset-password",

@@ -736,6 +736,37 @@ enum Status {
   EMPTY
 }
 
+/// A public demo or intro-call booking on the marketing site.
+/// Not tenant-scoped. `slotKey` is the start time in UTC while the booking
+/// is confirmed, and null after it is cancelled, so the unique index frees
+/// the slot. Demos and intro calls share that key. SQLite allows many nulls.
+///
+/// TODO(calendar): subtract Google Calendar busy times (plus the buffer)
+/// before offering a slot. The unique slotKey stops two PickupRoster
+/// bookings from sharing a start, and it does not yet see Noah's other events.
+model Booking {
+  id              String    @id @default(cuid())
+  kind            String
+  status          String    @default("confirmed")
+  slotKey         String?   @unique
+  startsAt        DateTime
+  endsAt          DateTime
+  name            String
+  email           String
+  role            String?
+  school          String?
+  phone           String?
+  studentCount    String?
+  message         String?
+  visitorTimeZone String
+  sequence        Int       @default(0)
+  createdAt       DateTime  @default(now())
+  cancelledAt     DateTime?
+
+  @@index([kind, startsAt])
+  @@index([email])
+}
+
 /// Grade level for a Teacher (classroom). PRE_K covers any preschool/transitional
 /// kindergarten. K is kindergarten. G1–G12 are first through twelfth grade.
 /// OTHER is an escape hatch for non-standard groupings (mixed-age studios,
