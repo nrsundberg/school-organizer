@@ -10,6 +10,11 @@ import {
   getUserFromContext,
 } from "~/domain/utils/global-context.server";
 import { recordOrgAudit } from "~/domain/billing/comp.server";
+import {
+  schoolAuditLogWhere,
+  visibleSchoolAuditLogs,
+  type SchoolAuditRow,
+} from "~/domain/org/school-activity.server";
 import { planAllowsReports } from "~/lib/plan-limits";
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
@@ -252,14 +257,16 @@ export async function action({ request, context }: Route.ActionArgs) {
     // if the audit dump is unavailable.
     (async () => {
       try {
-        return await pageAll((skip) =>
-          (prisma as any).orgAuditLog.findMany({
-            where,
-            skip,
-            take: PAGE,
-            orderBy: { createdAt: "asc" },
-          }),
+        const rows = await pageAll(
+          (skip) =>
+            (prisma as any).orgAuditLog.findMany({
+              where: schoolAuditLogWhere(org.id),
+              skip,
+              take: PAGE,
+              orderBy: { createdAt: "asc" },
+            }) as Promise<SchoolAuditRow[]>,
         );
+        return visibleSchoolAuditLogs(org.id, rows);
       } catch {
         return [] as Array<Record<string, unknown>>;
       }

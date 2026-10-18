@@ -5,6 +5,7 @@ import { Menu, X } from "lucide-react";
 import wordmark from "/logo-wordmark.svg?url";
 import { DEFAULT_SITE_NAME } from "~/lib/site";
 import LanguageSwitcher from "~/components/LanguageSwitcher";
+import { boardHeaderLinkProps } from "~/lib/board-frame";
 
 type HeaderBranding = {
   orgName?: string;
@@ -35,9 +36,12 @@ function contrastForeground(hex: string): "dark" | "light" {
 export default function ({
   user,
   branding,
+  documentNavigation = false,
 }: {
   user: boolean;
   branding?: HeaderBranding;
+  /** Live board: Admin / Profile do a full page load. See board-frame.ts. */
+  documentNavigation?: boolean;
 }) {
   const { t } = useTranslation("common");
   const orgName = branding?.orgName ?? DEFAULT_SITE_NAME;
@@ -89,6 +93,7 @@ export default function ({
   }, [menuOpen]);
 
   const closeMenu = () => setMenuOpen(false);
+  const boardLinkProps = boardHeaderLinkProps(documentNavigation);
 
   return user ? (
     <div className="relative h-10 w-full flex items-center justify-center" style={{ backgroundColor: headerColor }}>
@@ -104,10 +109,10 @@ export default function ({
       </Link>
       <div className="hidden md:inline-flex gap-2 absolute right-2 items-center">
         <LanguageSwitcher placement="compact" tone={tone} />
-        <Link className={linkClass} to="/admin">
+        <Link className={linkClass} to="/admin" {...boardLinkProps}>
           {t("header.admin")}
         </Link>
-        <Link className={linkClass} to="/admin/profile">
+        <Link className={linkClass} to="/admin/profile" {...boardLinkProps}>
           {t("header.profile")}
         </Link>
       </div>
@@ -137,6 +142,7 @@ export default function ({
               className={`${linkClass} text-center`}
               to="/admin"
               onClick={closeMenu}
+              {...boardLinkProps}
             >
               {t("header.admin")}
             </Link>
@@ -144,6 +150,7 @@ export default function ({
               className={`${linkClass} text-center`}
               to="/admin/profile"
               onClick={closeMenu}
+              {...boardLinkProps}
             >
               {t("header.profile")}
             </Link>
