@@ -1,12 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  articleJsonLd,
   buildSitemapXml,
   canonicalRedirectTarget,
   faqPageJsonLd,
   homePageJsonLd,
+  itemListJsonLd,
   marketingRobotsTxt,
   publicSiteOrigin,
+  SITEMAP_PATH_LASTMOD,
+  SITEMAP_STATIC_PATHS,
   softwareApplicationJsonLd,
   tenantRobotsTxt,
 } from "./marketing-seo";
@@ -116,4 +120,37 @@ test("FAQ JSON-LD keeps each question and answer", () => {
   const ld = faqPageJsonLd([{ q: "What is it?", a: "A live pickup board." }]);
   assert.equal(ld.mainEntity[0]?.name, "What is it?");
   assert.equal(ld.mainEntity[0]?.acceptedAnswer.text, "A live pickup board.");
+});
+
+test("comparison pages are in the sitemap with a lastmod", () => {
+  assert.ok(SITEMAP_STATIC_PATHS.includes("/compare/pikmykid-alternatives"));
+  assert.ok(SITEMAP_STATIC_PATHS.includes("/compare/schoolpass-vs-pickuproster"));
+  assert.equal(SITEMAP_PATH_LASTMOD["/compare/pikmykid-alternatives"], "2026-10-18");
+  assert.equal(SITEMAP_PATH_LASTMOD["/compare/schoolpass-vs-pickuproster"], "2026-10-18");
+  const xml = buildSitemapXml("https://pickuproster.com", [
+    {
+      path: "/compare/pikmykid-alternatives",
+      lastmod: SITEMAP_PATH_LASTMOD["/compare/pikmykid-alternatives"],
+    },
+    { path: "/blog/best-school-dismissal-software", lastmod: "2026-10-18" },
+  ]);
+  assert.match(xml, /<loc>https:\/\/pickuproster.com\/compare\/pikmykid-alternatives<\/loc>/);
+  assert.match(xml, /<loc>https:\/\/pickuproster.com\/blog\/best-school-dismissal-software<\/loc>/);
+  assert.match(xml, /<lastmod>2026-10-18<\/lastmod>/);
+});
+
+test("article and item list JSON-LD name the page and the tools", () => {
+  const article = articleJsonLd({
+    headline: "SchoolPass vs PickupRoster",
+    description: "Compare cost and setup.",
+    url: "https://pickuproster.com/compare/schoolpass-vs-pickuproster",
+    dateModified: "2026-10-18",
+  });
+  assert.equal(article["@type"], "Article");
+  assert.equal(article.dateModified, "2026-10-18");
+  assert.equal(article.headline, "SchoolPass vs PickupRoster");
+  const list = itemListJsonLd(["PickupRoster", "PikMyKid (CENTEGIX)"]);
+  assert.equal(list.numberOfItems, 2);
+  assert.equal(list.itemListElement[1]?.name, "PikMyKid (CENTEGIX)");
+  assert.equal(list.itemListElement[1]?.position, 2);
 });

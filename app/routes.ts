@@ -109,6 +109,7 @@ export default [
   route("book/intro", "routes/book.intro.tsx"),
   route("book/manage", "routes/book.manage.tsx"),
   route("school-pickup-board", "routes/school-pickup-board.tsx"),
+  route("compare/:slug", "routes/compare.$slug.tsx"),
   route("sitemap.xml", "routes/sitemap.xml.ts"),
   route("robots.txt", "routes/robots.txt.ts"),
   route("blog", "routes/blog._index.tsx"),

@@ -9,7 +9,11 @@ import { getPost } from "~/lib/blog.server";
 import { detectLocale } from "~/i18n.server";
 import { getFixedT } from "~/lib/t.server";
 import {
+  articleJsonLd,
   canonicalUrl,
+  faqPageJsonLd,
+  itemListJsonLd,
+  marketingPageMeta,
   publicSiteOrigin,
   rootDomainFromContext,
 } from "~/lib/marketing-seo";
@@ -21,7 +25,34 @@ export function meta({ data }: Route.MetaArgs) {
       { name: "robots", content: "noindex" },
     ];
   }
-  const { post, canonical, metaTitle } = data;
+  const { post, canonical, metaTitle, origin } = data;
+  if (post.seoTitle && canonical && origin) {
+    const jsonLd = [
+      articleJsonLd({
+        headline: post.title,
+        description: post.excerpt,
+        url: canonical,
+        dateModified: post.date,
+        datePublished: post.date,
+      }),
+      ...(post.faqs.length > 0 ? [faqPageJsonLd(post.faqs)] : []),
+      ...(post.tools.length > 0 ? [itemListJsonLd(post.tools)] : []),
+    ];
+    return [
+      ...marketingPageMeta({
+        title: post.seoTitle,
+        description: post.excerpt,
+        canonical,
+        origin,
+        image: true,
+        type: "article",
+        jsonLd,
+      }),
+      { property: "article:published_time", content: post.date },
+      { property: "article:modified_time", content: post.date },
+      { property: "article:author", content: post.author },
+    ];
+  }
   return [
     { title: metaTitle ?? `${post.title} — PickupRoster Blog` },
     { name: "description", content: post.excerpt },
@@ -48,6 +79,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   const canonical = canonicalUrl(origin, `/blog/${post.slug}`);
   return {
     post,
+    origin,
     canonical,
     metaTitle: t("blog.post.metaTitle", { title: post.title }),
     metaNotFound: t("blog.post.metaNotFound"),

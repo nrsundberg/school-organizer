@@ -11,7 +11,7 @@ export function Footer({ siteName, supportEmail, orgName }: FooterProps) {
   const { t } = useTranslation("common");
   return (
     <footer className="border-t border-white/10 py-8 px-4 bg-[#0f1414] text-white/80">
-      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Left column */}
         <div>
           <p className="font-bold text-white">{orgName || siteName}</p>
@@ -24,7 +24,7 @@ export function Footer({ siteName, supportEmail, orgName }: FooterProps) {
         </div>
 
         {/* Right column */}
-        <nav className="flex flex-wrap gap-4 md:justify-end items-start text-sm">
+        <nav className="flex flex-wrap gap-4 items-start text-sm">
           <Link to="/school-pickup-board" className="hover:text-white transition-colors">
             {t("footer.nav.pickupBoard")}
           </Link>
@@ -55,6 +55,29 @@ export function Footer({ siteName, supportEmail, orgName }: FooterProps) {
           <Link to="/status" className="hover:text-white transition-colors">
             {t("footer.nav.status")}
           </Link>
+        </nav>
+
+        <nav aria-label={t("footer.compare.heading")} className="text-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/50">
+            {t("footer.compare.heading")}
+          </p>
+          <ul className="mt-3 space-y-2">
+            <li>
+              <Link to="/compare/pikmykid-alternatives" className="hover:text-white transition-colors">
+                {t("footer.compare.pikmykid")}
+              </Link>
+            </li>
+            <li>
+              <Link to="/compare/schoolpass-vs-pickuproster" className="hover:text-white transition-colors">
+                {t("footer.compare.schoolpass")}
+              </Link>
+            </li>
+            <li>
+              <Link to="/blog/best-school-dismissal-software" className="hover:text-white transition-colors">
+                {t("footer.compare.dismissalSoftware")}
+              </Link>
+            </li>
+          </ul>
         </nav>
       </div>
     </footer>

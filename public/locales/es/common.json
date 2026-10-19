@@ -189,7 +189,21 @@
       "pricing": "Precios",
       "status": "Estado",
       "support": "Soporte"
+    },
+    "compare": {
+      "heading": "Comparar",
+      "pikmykid": "Alternativas a PikMyKid",
+      "schoolpass": "SchoolPass y PickupRoster",
+      "dismissalSoftware": "Mejor software de salida"
     }
+  },
+  "compare": {
+    "kicker": "Comparar",
+    "notFoundTitle": "No encontramos esa comparación.",
+    "notFoundBody": "Es posible que la página se haya movido. La página de inicio de PickupRoster está a un clic.",
+    "errorTitle": "Tuvimos un problema al cargar esta página.",
+    "errorBody": "Intenta actualizar; si el problema continúa, avísanos.",
+    "home": "Inicio de PickupRoster"
   },
   "guides": {
     "allGuides": "Todas las guías",

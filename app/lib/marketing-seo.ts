@@ -21,7 +21,17 @@ export const SITEMAP_STATIC_PATHS = [
   "/demo",
   "/book/intro",
   "/school-pickup-board",
+  "/compare/pikmykid-alternatives",
+  "/compare/schoolpass-vs-pickuproster",
 ] as const;
+
+/** lastmod for static marketing URLs that have a known publish date. */
+export const SITEMAP_PATH_LASTMOD: Partial<
+  Record<(typeof SITEMAP_STATIC_PATHS)[number], string>
+> = {
+  "/compare/pikmykid-alternatives": "2026-10-18",
+  "/compare/schoolpass-vs-pickuproster": "2026-10-18",
+};
 
 /** App and auth prefixes a marketing robots.txt must disallow. */
 export const ROBOTS_DISALLOW_PATHS = [
@@ -252,6 +262,39 @@ export function marketingPageMeta(input: {
     }
   }
   return tags;
+}
+
+export function articleJsonLd(input: {
+  headline: string;
+  description: string;
+  url: string;
+  dateModified: string;
+  datePublished?: string;
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: input.headline,
+    description: input.description,
+    dateModified: input.dateModified,
+    datePublished: input.datePublished ?? input.dateModified,
+    author: { "@type": "Organization", name: "PickupRoster" },
+    publisher: { "@type": "Organization", name: "PickupRoster" },
+    mainEntityOfPage: input.url,
+  };
+}
+
+export function itemListJsonLd(names: readonly string[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    numberOfItems: names.length,
+    itemListElement: names.map((name, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name,
+    })),
+  };
 }
 
 export function faqPageJsonLd(items: readonly { q: string; a: string }[]) {

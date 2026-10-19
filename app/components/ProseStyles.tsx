@@ -48,10 +48,35 @@ export function ProseStyles() {
     .prose-pr hr { border: 0; border-top: 1px solid rgb(255 255 255 / 0.1); margin: 2.25em 0; }
     .prose-pr img { border-radius: 0.75rem; max-width: 100%; height: auto; }
     .prose-pr table { width: 100%; border-collapse: collapse; margin: 1.5em 0; font-size: 0.95rem; }
+    .prose-pr .table-scroll {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      max-width: 100%;
+      margin: 1.5em 0;
+      border: 1px solid rgb(255 255 255 / 0.12);
+      border-radius: 0.75rem;
+    }
+    .prose-pr .table-scroll table {
+      width: max-content;
+      min-width: 100%;
+      margin: 0;
+      font-size: 0.875rem;
+      line-height: 1.45;
+    }
     .prose-pr th, .prose-pr td {
       border-bottom: 1px solid rgb(255 255 255 / 0.1);
       padding: 0.6em 0.75em;
       text-align: left;
+      vertical-align: top;
+      min-width: 8.75rem;
+      max-width: 18rem;
+    }
+    .prose-pr th:first-child, .prose-pr td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 1;
+      background: #0f1414;
+      box-shadow: 1px 0 0 rgb(255 255 255 / 0.1);
     }
     .prose-pr th { color: #fff; font-weight: 600; }
   `;
