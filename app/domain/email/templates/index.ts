@@ -7,6 +7,7 @@ import { renderUserInvite } from "./user-invite";
 import { renderStudentsDeleted } from "./students-deleted";
 import { renderSignupNotification } from "./signup-notification";
 import { renderDemoRequest } from "./demo-request";
+import { renderBookingMail } from "./booking";
 
 /**
  * Map an EmailMessage to a {subject, html, text} payload.
@@ -47,6 +48,8 @@ export async function renderEmail(
       return renderSignupNotification(msg);
     case "demo_request":
       return renderDemoRequest(msg);
+    case "booking_mail":
+      return renderBookingMail(msg);
     case "probe":
       // Probes are drained by the queue consumer before they reach here;
       // if one slips through, fail loudly rather than silently drop.

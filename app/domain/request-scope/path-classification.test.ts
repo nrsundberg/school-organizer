@@ -99,6 +99,10 @@ test("demo and the pickup-board page are public only on the marketing host", () 
   assert.equal(marketing("/school-pickup-board").isPublicMarketingPath, true);
   assert.equal(tenant("/school-pickup-board").isPublicMarketingPath, false);
   assert.equal(marketing("/demo").anonSkipsViewer, true);
+  assert.equal(marketing("/book/intro").isPublicMarketingPath, true);
+  assert.equal(tenant("/book/intro").isPublicMarketingPath, false);
+  assert.equal(marketing("/book/manage").isPublicMarketingPath, true);
+  assert.equal(tenant("/book/manage").isPublicMarketingPath, false);
 });
 
 test("robots and sitemap are public on every host and skip tenant gates", () => {

@@ -1,6 +1,6 @@
 /**
  * Shared "two free intro calls" note. The booking link renders only when
- * `bookingUrl` is set (INTRO_CALL_BOOKING_URL). No placeholder URL is invented.
+ * `bookingUrl` is set. The default is the in-app /book/intro page.
  */
 export function IntroCallsNote({
   heading,

@@ -34,12 +34,6 @@ export function getSignupNotifyEmail(context: any): string {
   return DEFAULT_SIGNUP_NOTIFY_EMAIL;
 }
 
-/**
- * Public booking link for the two free intro calls.
- *
- * Set `INTRO_CALL_BOOKING_URL` (an http or https URL) when a calendar exists.
- * Returns null when unset or invalid so the UI never invents a link.
- */
 function httpUrl(raw: string | undefined): string | null {
   if (!raw) return null;
   try {
@@ -51,20 +45,49 @@ function httpUrl(raw: string | undefined): string | null {
   }
 }
 
-export function getIntroCallBookingUrl(context: any): string | null {
-  return httpUrl(readEnv(context, "INTRO_CALL_BOOKING_URL"));
+function bookingOrigin(context: any): string {
+  const raw = context?.cloudflare?.env?.PUBLIC_ROOT_DOMAIN;
+  const root = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (root && root !== "localhost" && !root.endsWith(".localhost")) {
+    return `https://${root}`;
+  }
+  return "https://pickuproster.com";
 }
 
 /**
- * Calendar link for the demo page.
+ * Public page for the two free intro calls.
  *
- * `DEMO_BOOKING_URL` wins. When it is unset, the intro-call calendar is used
- * so one booking link can cover both. Returns null when neither is a valid
- * http(s) URL.
+ * `INTRO_CALL_BOOKING_URL` overrides the built-in scheduler. When it is
+ * unset or not an http(s) URL, the link is the in-app page `/book/intro`.
  */
-export function getDemoBookingUrl(context: any): string | null {
+export function getIntroCallBookingUrl(context: any): string {
+  return (
+    httpUrl(readEnv(context, "INTRO_CALL_BOOKING_URL")) ??
+    `${bookingOrigin(context)}/book/intro`
+  );
+}
+
+/**
+ * Public page for a demo.
+ *
+ * `DEMO_BOOKING_URL` overrides the built-in scheduler. When it is unset or
+ * not an http(s) URL, the link is the in-app page `/demo`.
+ */
+export function getDemoBookingUrl(context: any): string {
   return (
     httpUrl(readEnv(context, "DEMO_BOOKING_URL")) ??
-    httpUrl(readEnv(context, "INTRO_CALL_BOOKING_URL"))
+    `${bookingOrigin(context)}/demo`
+  );
+}
+
+/**
+ * Zoom room included in the calendar invite.
+ * `ZOOM_MEETING_URL` wins. `MEETING_URL` is the fallback.
+ * When both are unset, the email says Noah will send a Zoom link.
+ */
+export function getMeetingUrl(context: any): string | null {
+  return (
+    httpUrl(readEnv(context, "ZOOM_MEETING_URL")) ??
+    httpUrl(readEnv(context, "MEETING_URL"))
   );
 }
