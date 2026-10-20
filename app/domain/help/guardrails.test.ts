@@ -187,6 +187,7 @@ test("help chat key normalization strips paste wrappers", () => {
   assert.equal(normalizeAnthropicApiKey('"sk-ant-api03-abc"'), "sk-ant-api03-abc");
   assert.equal(normalizeAnthropicApiKey("Bearer sk-ant-api03-abc"), "sk-ant-api03-abc");
   assert.equal(normalizeAnthropicApiKey("x-api-key: sk-ant-api03-abc"), "sk-ant-api03-abc");
+  assert.equal(normalizeAnthropicApiKey("sk-ant-api03-abc\ndef"), "sk-ant-api03-abcdef");
   assert.equal(normalizeAnthropicApiKey("   "), undefined);
 });
 

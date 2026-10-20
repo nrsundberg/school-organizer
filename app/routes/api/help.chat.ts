@@ -126,7 +126,11 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (!outcome.ok) {
     return data(
-      { error: outcome.error, ...(outcome.code ? { code: outcome.code } : {}) },
+      {
+        error: outcome.error,
+        ...(outcome.code ? { code: outcome.code } : {}),
+        ...(outcome.upstreamType ? { upstreamType: outcome.upstreamType } : {}),
+      },
       { status: outcome.status },
     );
   }

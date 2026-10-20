@@ -226,7 +226,8 @@ export function anthropicModelFromEnv(env: { ANTHROPIC_MODEL?: string } | undefi
 
 /**
  * Strip paste mistakes that make Anthropic return 401: a BOM, quotes,
- * a `Bearer ` prefix, or an `x-api-key:` label. The key itself is unchanged.
+ * a `Bearer ` prefix, an `x-api-key:` label, or a line break inside the
+ * secret. The key itself is unchanged.
  */
 export function normalizeAnthropicApiKey(raw: string | undefined): string | undefined {
   if (typeof raw !== "string") return undefined;
@@ -238,7 +239,8 @@ export function normalizeAnthropicApiKey(raw: string | undefined): string | unde
   ) {
     value = value.slice(1, -1).trim();
   }
-  value = value.replace(/^Bearer\s+/i, "").replace(/^x-api-key\s*:\s*/i, "").trim();
+  value = value.replace(/^Bearer\s+/i, "").replace(/^x-api-key\s*:\s*/i, "");
+  value = value.replace(/\s+/g, "");
   return value.length > 0 ? value : undefined;
 }
 
