@@ -3,6 +3,26 @@ import { getFixedT } from "~/lib/t.server";
 import { escapeAttr, escapeHtml } from "../html";
 import { buildBookingIcs } from "~/domain/booking/ics";
 import { formatSlotRange } from "~/domain/booking/rules";
+import { zoomJoinDetails } from "~/lib/site";
+import type { TFunction } from "i18next";
+
+function meetingCopy(
+  t: TFunction,
+  meetingUrl: string,
+): { text: string; html: string } {
+  const details = zoomJoinDetails(meetingUrl);
+  const lines = [
+    t("booking.meetingSet", { url: meetingUrl }),
+    details ? t("booking.meetingId", { id: details.id }) : "",
+    details ? t("booking.meetingPasscode", { passcode: details.passcode }) : "",
+  ].filter(Boolean);
+  const htmlLines = [
+    `${escapeHtml(t("booking.meetingLabel"))}: <a href="${escapeAttr(meetingUrl)}">${escapeHtml(meetingUrl)}</a>`,
+    details ? escapeHtml(t("booking.meetingId", { id: details.id })) : "",
+    details ? escapeHtml(t("booking.meetingPasscode", { passcode: details.passcode })) : "",
+  ].filter(Boolean);
+  return { text: lines.join("\n"), html: htmlLines.join("<br>") };
+}
 
 function whenLabel(msg: BookingMailMessage, timeZone: string, locale: string): string {
   const start = new Date(msg.startsAt);
@@ -22,12 +42,9 @@ export async function renderBookingMail(msg: BookingMailMessage): Promise<Render
   const visitorWhen = whenLabel(msg, msg.visitorTimeZone, locale);
   const hostWhen = whenLabel(msg, msg.scheduleTimeZone, "en");
   const meetingUrl = msg.meetingUrl?.trim() ?? "";
-  const meeting = meetingUrl
-    ? t("booking.meetingSet", { url: meetingUrl })
-    : t("booking.meetingLater");
-  const meetingHtml = meetingUrl
-    ? `${escapeHtml(t("booking.meetingLabel"))}: <a href="${escapeAttr(meetingUrl)}">${escapeHtml(meetingUrl)}</a>`
-    : escapeHtml(meeting);
+  const copied = meetingUrl ? meetingCopy(t, meetingUrl) : null;
+  const meeting = copied?.text ?? t("booking.meetingLater");
+  const meetingHtml = copied?.html ?? escapeHtml(meeting);
   const kindLabel = msg.bookingKind === "intro" ? t("booking.introName") : t("booking.demoName");
 
   const subject =

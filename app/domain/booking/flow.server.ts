@@ -26,7 +26,7 @@ import { bookingTokenSecret, signBookingToken, verifyBookingToken } from "./toke
 import { turnstileSiteKey, verifyTurnstileFromContext } from "./turnstile";
 
 export type BookingActionData =
-  | { status: "sent"; whenLabel: string }
+  | { status: "sent"; whenLabel: string; meetingUrl: string | null }
   | { status: "error"; code: BookingFormError | "rate" | "turnstile" | "taken" | "full" }
   | { status: "managed"; event: "cancelled" | "rescheduled"; whenLabel: string }
   | { status: "closed" };
@@ -66,7 +66,7 @@ export async function submitPublicBooking(args: {
   });
   if (!limit.ok) return { status: "error", code: "rate" };
   if (!parsed.ok) return { status: "error", code: parsed.error };
-  if (parsed.honeypot) return { status: "sent", whenLabel: "" };
+  if (parsed.honeypot) return { status: "sent", whenLabel: "", meetingUrl: null };
 
   const turnstile = await verifyTurnstileFromContext({
     context: args.context,
@@ -138,7 +138,11 @@ export async function submitPublicBooking(args: {
     reserved.booking.visitorTimeZone,
     args.locale,
   );
-  return { status: "sent", whenLabel: `${label.day}, ${label.time} ${label.zone}` };
+  return {
+    status: "sent",
+    whenLabel: `${label.day}, ${label.time} ${label.zone}`,
+    meetingUrl: getMeetingUrl(args.context),
+  };
 }
 
 async function manageUrlFor(

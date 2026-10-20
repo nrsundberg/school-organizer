@@ -116,6 +116,9 @@
     "confirmBody": "You're booked for {{when}}. A calendar invite is on its way.",
     "confirmBodyPlain": "Thanks. If this was a real request, a calendar invite is on its way.",
     "confirmTitle": "You're booked",
+    "joinZoom": "Join Zoom meeting",
+    "meetingId": "Meeting ID: {{id}}",
+    "meetingPasscode": "Passcode: {{passcode}}",
     "errors": {
       "email": "A valid email is required.",
       "full": "That day is full. Pick another time.",

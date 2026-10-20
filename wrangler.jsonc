@@ -28,7 +28,8 @@
 		"PUBLIC_ROOT_DOMAIN": "pickuproster.com",
 		"MARKETING_HOSTS": "localhost,127.0.0.1,school-organizer.sundbergne.workers.dev",
 		// Scheduler defaults are in code (Mon–Fri 9:00–16:00 America/Denver).
-		// Set ZOOM_MEETING_URL to the Zoom room (MEETING_URL is the fallback).
+		// Production and staging set ZOOM_MEETING_URL to the Zoom room.
+		// MEETING_URL is the fallback when that var is unset.
 		// TURNSTILE_SITE_KEY and TURNSTILE_HOSTNAMES are set on production
 		// and staging. The secret is already `TURNSTILE_SECRET_KEY`.
 		"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
@@ -217,6 +218,7 @@
 				"MARKETING_HOSTS": "localhost,127.0.0.1,school-organizer.sundbergne.workers.dev",
 				"TURNSTILE_SITE_KEY": "0x4AAAAAAFav3K13_MQ3mOj7",
 				"TURNSTILE_HOSTNAMES": "pickuproster.com,www.pickuproster.com",
+				"ZOOM_MEETING_URL": "https://us05web.zoom.us/j/3504620740?pwd=kFLGxaFkDuO8z0q4KLXIBlLzfsYQib.1",
 				"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
 				"SUPPORT_EMAIL": "support@pickuproster.com",
 				"SUPPORT_NOTIFY_EMAIL": "NoahSundberg@gmail.com",
@@ -340,6 +342,7 @@
 				"MARKETING_HOSTS": "localhost,127.0.0.1,staging.pickuproster.com,www.staging.pickuproster.com,school-organizer-staging.sundbergne.workers.dev",
 				"TURNSTILE_SITE_KEY": "0x4AAAAAAFav3K13_MQ3mOj7",
 				"TURNSTILE_HOSTNAMES": "staging.pickuproster.com",
+				"ZOOM_MEETING_URL": "https://us05web.zoom.us/j/3504620740?pwd=kFLGxaFkDuO8z0q4KLXIBlLzfsYQib.1",
 				"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
 				"SUPPORT_EMAIL": "support@pickuproster.com",
 				"SUPPORT_NOTIFY_EMAIL": "NoahSundberg@gmail.com",

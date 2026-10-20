@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { zfd } from "zod-form-data";
 import type { Route } from "./+types/signup";
+import { redirectSignedInAwayFromAuth } from "~/domain/auth/marketing-auth-redirect.server";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
 import {
   getPublicEnv,
@@ -19,7 +20,6 @@ import {
   isPlatformAdmin,
   marketingOriginFromRequest
 } from "~/domain/utils/host.server";
-import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { ensureOrgForUser } from "~/domain/billing/onboarding.server";
 import {
@@ -68,18 +68,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (!isMarketingHost(request, context)) {
     throw redirect(`${marketingOriginFromRequest(request, context)}/`);
   }
-  // Old links from before the dedicated /district/signup route may still
-  // pass ?plan=district. The flow they expect is the District wizard, not
-  // the school wizard, so bounce to the right place.
   const url = new URL(request.url);
-  if (url.searchParams.get("plan") === "district") {
-    throw redirect("/district/signup");
-  }
   const user = getOptionalUserFromContext(context);
-  if (user?.orgId) {
-    const url = await getTenantBoardUrlForRequest(request, context);
-    if (url) throw redirect(url);
-    throw redirect("/");
+  await redirectSignedInAwayFromAuth({ request, context, page: "signup" });
+  // Old links from before the dedicated /district/signup route may still
+  // pass ?plan=district. Signed-out visitors belong in the district wizard.
+  // Signed-in visitors were already sent to their home above.
+  if (!user && url.searchParams.get("plan") === "district") {
+    throw redirect("/district/signup");
   }
   // Require a plan selection. If absent/invalid, bounce to pricing so the user
   // picks a tier — there is no public free tier. Exception: users who've
