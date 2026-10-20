@@ -1,9 +1,7 @@
 import { Button, Input } from "@heroui/react";
-import { data, Link, redirect } from "react-router";
+import { data, Link } from "react-router";
 import { useTranslation } from "react-i18next";
-import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
-import { isPlatformAdmin } from "~/domain/utils/host.server";
-import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.server";
+import { redirectSignedInAwayFromAuth } from "~/domain/auth/marketing-auth-redirect.server";
 import type { Route } from "./+types/login";
 import { useState } from "react";
 import { signIn } from "~/lib/auth-client";
@@ -26,35 +24,8 @@ export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: 
   ];
 }
 
-function safeInternalNextPath(next: string | null): string | null {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) return null;
-  return next;
-}
-
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const user = getOptionalUserFromContext(context);
-  if (user) {
-    const next = safeInternalNextPath(new URL(request.url).searchParams.get("next"));
-    if (next) {
-      throw redirect(next);
-    }
-
-    if (isPlatformAdmin(user, context)) {
-      throw redirect("/platform");
-    }
-
-    // District admins land in the district portal. Has to come before the
-    // !user.orgId check below since district-scoped users have no orgId.
-    if ((user as { districtId?: string | null }).districtId) {
-      throw redirect("/district");
-    }
-
-    if (!user.orgId) throw redirect("/signup?step=2");
-
-    const boardUrl = await getTenantBoardUrlForRequest(request, context);
-    if (boardUrl) throw redirect(boardUrl);
-    throw redirect("/");
-  }
+  await redirectSignedInAwayFromAuth({ request, context, page: "login" });
 
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "auth");

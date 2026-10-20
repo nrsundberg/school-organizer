@@ -8,7 +8,7 @@ import { getIntroCallBookingUrl } from "~/lib/site";
 import { writeDistrictAudit } from "~/domain/district/audit.server";
 import { getAuth } from "~/domain/auth/better-auth.server";
 import { getPrisma } from "~/db.server";
-import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
+import { redirectSignedInAwayFromAuth } from "~/domain/auth/marketing-auth-redirect.server";
 import { isPlatformAdmin } from "~/domain/utils/host.server";
 import {
   checkRateLimit,
@@ -23,14 +23,8 @@ export function meta() {
   ];
 }
 
-export async function loader({ context }: Route.LoaderArgs) {
-  const user = getOptionalUserFromContext(context);
-  if (user) {
-    if ((user as { districtId?: string | null }).districtId) {
-      throw redirect("/district");
-    }
-    if (user.orgId) throw redirect("/admin");
-  }
+export async function loader({ request, context }: Route.LoaderArgs) {
+  await redirectSignedInAwayFromAuth({ request, context, page: "district-signup" });
   return { introCallBookingUrl: getIntroCallBookingUrl(context) };
 }
 
