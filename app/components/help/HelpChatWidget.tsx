@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import { MessageCircle, X } from "lucide-react";
+import { helpErrorRef, restoreFailedChatSend } from "~/domain/help/chat-ui";
 import { executeTurnstile } from "./turnstile-client";
 
 type Turn = { role: "user" | "assistant"; content: string };
@@ -101,6 +102,7 @@ export function HelpChatWidget({
   const [turns, setTurns] = useState<Turn[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorRef, setErrorRef] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(!chatEnabled);
   const [ticketSent, setTicketSent] = useState(false);
   const [name, setName] = useState(signedInName ?? "");
@@ -122,14 +124,21 @@ export function HelpChatWidget({
   async function sendChat(text: string) {
     const content = text.trim();
     if (!content || pending) return;
-    const nextTurns: Turn[] = [...turns, { role: "user", content }];
+    const prevTurns = turns;
+    const nextTurns: Turn[] = [...prevTurns, { role: "user", content }];
     setTurns(nextTurns);
     setDraft("");
     setPending(true);
     setError(null);
+    setErrorRef(null);
     try {
       const payload = await postChat(nextTurns, false);
-      if (!payload) return;
+      if (!payload) {
+        const restored = restoreFailedChatSend(prevTurns, content);
+        setTurns(restored.turns);
+        setDraft(restored.draft);
+        return;
+      }
       storeHelpGrant(payload.sessionGrant);
       setTurns([...nextTurns, { role: "assistant", content: payload.reply ?? "" }]);
       if (payload.suggestEscalation) {
@@ -137,7 +146,11 @@ export function HelpChatWidget({
         setTicketMessage((current) => current || content);
       }
     } catch {
+      const restored = restoreFailedChatSend(prevTurns, content);
+      setTurns(restored.turns);
+      setDraft(restored.draft);
       setError("The help assistant is unavailable right now.");
+      setErrorRef(null);
     } finally {
       setPending(false);
     }
@@ -155,6 +168,7 @@ export function HelpChatWidget({
         turnstileToken = await challengeToken("help_chat");
       } catch {
         setError("Confirm you're a person, then send your message again.");
+        setErrorRef(null);
         return null;
       }
     }
@@ -174,6 +188,7 @@ export function HelpChatWidget({
       suggestEscalation?: boolean;
       error?: string;
       code?: string;
+      upstreamType?: string;
       sessionGrant?: string | null;
     };
     if (response.status === 403 && payload.code === "challenge" && !challenged) {
@@ -182,6 +197,7 @@ export function HelpChatWidget({
     }
     if (!response.ok || !payload.reply) {
       setError(payload.error || "The help assistant is unavailable right now.");
+      setErrorRef(helpErrorRef(payload.code, payload.upstreamType));
       if (payload.code === "unconfigured" || payload.code === "disabled" || payload.code === "quota") {
         setShowForm(true);
       }
@@ -275,6 +291,7 @@ export function HelpChatWidget({
             {error ? (
               <p className="text-sm text-red-200" role="alert">
                 {error}
+                {errorRef ? <span className="mt-1 block text-xs text-white/50">{errorRef}</span> : null}
               </p>
             ) : null}
           </div>

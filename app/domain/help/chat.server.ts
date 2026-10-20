@@ -20,6 +20,7 @@ export type HelpChatFailure = {
   status: number;
   error: string;
   code?: string;
+  upstreamType?: string;
 };
 
 export async function handleHelpChat(args: {
@@ -68,7 +69,13 @@ export async function handleHelpChat(args: {
     model: args.model,
   });
   if (!result.ok) {
-    return { ok: false, status: 502, error: result.error };
+    return {
+      ok: false,
+      status: 502,
+      error: result.error,
+      code: result.code,
+      ...(result.upstreamType ? { upstreamType: result.upstreamType } : {}),
+    };
   }
 
   const split = splitEscalation(result.text);
