@@ -9,6 +9,10 @@ declare global {
     RL_AUTH: RateLimit;
     /** Rate limiter for /api/billing/checkout and /api/billing/portal (20 req / 60 s per org/IP) */
     RL_BILLING: RateLimit;
+    /** Help chat (20 req / 60 s per IP and per browser session) */
+    RL_HELP: RateLimit;
+    /** Contact form and chat escalation (5 req / 60 s per IP) */
+    RL_CONTACT: RateLimit;
     BINGO_BOARD: DurableObjectNamespace;
     SENTRY_DSN: string;
     SENTRY_RELEASE: string;
@@ -89,6 +93,22 @@ declare global {
     STRIPE_WEBHOOK_SECRET?: string;
     /** Support email shown in footer/error pages; defaults to support@pickuproster.com when unset. */
     SUPPORT_EMAIL?: string;
+    /**
+     * Inbox for new help-chat and contact-form tickets.
+     * Defaults to NoahSundberg@gmail.com when unset.
+     */
+    SUPPORT_NOTIFY_EMAIL?: string;
+    /**
+     * Anthropic API key for the help chat. Worker secret — never commit a value.
+     * `wrangler secret put ANTHROPIC_API_KEY` (and `--env staging` / `--env production`).
+     * Chat replies are disabled when this is missing; the contact form still works.
+     */
+    ANTHROPIC_API_KEY?: string;
+    /**
+     * Messages API model id. Defaults to claude-haiku-5-5.
+     * Set as a Worker var (not a secret) when you want a different model.
+     */
+    ANTHROPIC_MODEL?: string;
     /** Resend API key (Worker secret). Required for email sends. */
     RESEND_API_KEY: string;
     /** Producer binding for outbound email queue (see wrangler.jsonc `queues.producers`). */

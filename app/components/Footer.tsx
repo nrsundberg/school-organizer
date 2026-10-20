@@ -40,6 +40,9 @@ export function Footer({ siteName, supportEmail, orgName }: FooterProps) {
           <Link to="/faqs" className="hover:text-white transition-colors">
             {t("footer.nav.faqs")}
           </Link>
+          <Link to="/contact" className="hover:text-white transition-colors">
+            {t("footer.nav.contact")}
+          </Link>
           <Link to="/demo" className="hover:text-white transition-colors">
             {t("footer.nav.demo")}
           </Link>

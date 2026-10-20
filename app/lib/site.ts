@@ -11,6 +11,12 @@ export const DEFAULT_SUPPORT_EMAIL = "support@pickuproster.com";
  */
 export const DEFAULT_SIGNUP_NOTIFY_EMAIL = "NoahSundberg@gmail.com";
 
+/**
+ * Inbox for new support tickets from the help chat and contact form.
+ * Override with the `SUPPORT_NOTIFY_EMAIL` Worker var or secret.
+ */
+export const DEFAULT_SUPPORT_NOTIFY_EMAIL = "NoahSundberg@gmail.com";
+
 function readEnv(context: any, key: string): string | undefined {
   const raw = context?.cloudflare?.env?.[key] ?? process.env[key];
   if (typeof raw !== "string") return undefined;
@@ -32,6 +38,12 @@ export function getSignupNotifyEmail(context: any): string {
   const configured = readEnv(context, "SIGNUP_NOTIFY_EMAIL");
   if (configured && configured.includes("@")) return configured;
   return DEFAULT_SIGNUP_NOTIFY_EMAIL;
+}
+
+export function getSupportNotifyEmail(context: any): string {
+  const configured = readEnv(context, "SUPPORT_NOTIFY_EMAIL");
+  if (configured && configured.includes("@")) return configured;
+  return DEFAULT_SUPPORT_NOTIFY_EMAIL;
 }
 
 function httpUrl(raw: string | undefined): string | null {

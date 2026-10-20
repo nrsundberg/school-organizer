@@ -33,6 +33,8 @@
 		// and staging. The secret is already `TURNSTILE_SECRET_KEY`.
 		"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
 		"SUPPORT_EMAIL": "support@pickuproster.com",
+		"SUPPORT_NOTIFY_EMAIL": "NoahSundberg@gmail.com",
+		"ANTHROPIC_MODEL": "claude-haiku-5-5",
 		"STRIPE_STATUS_URL": "https://www.stripestatus.com/api/v2/status.json",
 		// Browsers drop cookies whose Domain attribute (`pickuproster.com`)
 		// doesn't match the request host (`localhost` / `*.localhost`). In
@@ -121,6 +123,24 @@
 				"limit": 20,
 				"period": 60
 			}
+		},
+		{
+			// Help chat: per IP and per browser session
+			"name": "RL_HELP",
+			"namespace_id": "1003",
+			"simple": {
+				"limit": 20,
+				"period": 60
+			}
+		},
+		{
+			// Contact form and chat-to-ticket escalation
+			"name": "RL_CONTACT",
+			"namespace_id": "1004",
+			"simple": {
+				"limit": 5,
+				"period": 60
+			}
 		}
 	],
 	// Outbound email queue. Producers enqueue EmailMessage payloads from request
@@ -199,6 +219,8 @@
 				"TURNSTILE_HOSTNAMES": "pickuproster.com,www.pickuproster.com",
 				"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
 				"SUPPORT_EMAIL": "support@pickuproster.com",
+				"SUPPORT_NOTIFY_EMAIL": "NoahSundberg@gmail.com",
+				"ANTHROPIC_MODEL": "claude-haiku-5-5",
 				"STRIPE_STATUS_URL": "https://www.stripestatus.com/api/v2/status.json"
 			},
 			"triggers": {
@@ -254,6 +276,22 @@
 						"limit": 20,
 						"period": 60
 					}
+				},
+				{
+					"name": "RL_HELP",
+					"namespace_id": "1003",
+					"simple": {
+						"limit": 20,
+						"period": 60
+					}
+				},
+				{
+					"name": "RL_CONTACT",
+					"namespace_id": "1004",
+					"simple": {
+						"limit": 5,
+						"period": 60
+					}
 				}
 			],
 			"queues": {
@@ -304,6 +342,8 @@
 				"TURNSTILE_HOSTNAMES": "staging.pickuproster.com",
 				"PLATFORM_ADMIN_EMAILS": "noahsundberg@gmail.com",
 				"SUPPORT_EMAIL": "support@pickuproster.com",
+				"SUPPORT_NOTIFY_EMAIL": "NoahSundberg@gmail.com",
+				"ANTHROPIC_MODEL": "claude-haiku-5-5",
 				"STRIPE_STATUS_URL": "https://www.stripestatus.com/api/v2/status.json"
 			},
 			"d1_databases": [
@@ -351,6 +391,22 @@
 					"namespace_id": "2002",
 					"simple": {
 						"limit": 30,
+						"period": 60
+					}
+				},
+				{
+					"name": "RL_HELP",
+					"namespace_id": "2003",
+					"simple": {
+						"limit": 30,
+						"period": 60
+					}
+				},
+				{
+					"name": "RL_CONTACT",
+					"namespace_id": "2004",
+					"simple": {
+						"limit": 10,
 						"period": 60
 					}
 				}

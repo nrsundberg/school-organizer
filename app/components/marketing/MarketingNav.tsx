@@ -47,6 +47,9 @@ export function MarketingNav() {
           <Link to="/faqs" className="transition hover:text-white">
             {t("marketingNav.faqs")}
           </Link>
+          <Link to="/contact" className="transition hover:text-white">
+            {t("marketingNav.contact")}
+          </Link>
           <LanguageSwitcher placement="compact" />
           {showDashboard ? (
             <a

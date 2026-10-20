@@ -69,6 +69,11 @@ export const publicMarketingRoutes: RouteSpec[] = [
     landmark: { role: "heading" }
   },
   {
+    path: "/contact",
+    expect: "self",
+    landmark: { role: "heading", name: /Contact support/i }
+  },
+  {
     // Blog index is linked from the marketing nav + footer on every page, so
     // signed-out visitors MUST be able to hit it. The middleware in
     // app/domain/utils/global-context.server.ts gates `publicMarketingPath`;
@@ -214,7 +219,8 @@ export const platformRoutes: RouteSpec[] = [
   { path: "/platform/signups", expect: "either" },
   { path: "/platform/sessions", expect: "either" },
   { path: "/platform/webhooks", expect: "either" },
-  { path: "/platform/audit", expect: "either" }
+  { path: "/platform/audit", expect: "either" },
+  { path: "/platform/support", expect: "either" }
 ];
 
 /* ------------------------------------------------------------------ */

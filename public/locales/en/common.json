@@ -182,6 +182,7 @@
     "nav": {
       "blog": "Blog",
       "demo": "Book a demo",
+      "contact": "Contact",
       "faqs": "FAQs",
       "guides": "Guides",
       "pickupBoard": "Pickup board",
@@ -304,6 +305,7 @@
   "marketingNav": {
     "blog": "Blog",
     "dashboard": "Dashboard",
+    "contact": "Contact",
     "faqs": "FAQs",
     "guides": "Guides",
     "homeAriaLabel": "PickupRoster home",

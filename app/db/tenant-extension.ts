@@ -7,8 +7,9 @@ import { Prisma } from "~/db";
  * and an unscoped `findMany` on this table returns every school's rows (the
  * admin dashboard did that). Platform audit pages and `writeOrgAudit` use the
  * unscoped client from `getPrisma` and stay cross-org on purpose.
- * Auth tables (`User`, `Session`, …) and global rows (`Org`, `StripeWebhookEvent`)
- * stay out: callers filter those explicitly.
+ * Auth tables (`User`, `Session`, …) and global rows (`Org`, `StripeWebhookEvent`,
+ * `SupportTicket`, `SupportTicketMessage`) stay out: callers filter those
+ * explicitly. Support tickets are platform-level and must not pick up orgId.
  */
 const TENANT_MODELS = new Set<string>([
   "Teacher",

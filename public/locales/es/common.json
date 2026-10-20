@@ -182,6 +182,7 @@
     "nav": {
       "blog": "Blog",
       "demo": "Reservar una demo",
+      "contact": "Contacto",
       "faqs": "Preguntas frecuentes",
       "guides": "Guías",
       "pickupBoard": "Tablero de recogida",
@@ -303,6 +304,7 @@
   },
   "marketingNav": {
     "blog": "Blog",
+    "contact": "Contacto",
     "dashboard": "Panel",
     "faqs": "Preguntas frecuentes",
     "guides": "Guías",

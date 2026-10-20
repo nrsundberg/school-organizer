@@ -25,6 +25,10 @@ test("auth-flow paths are anonymous-skippable", () => {
     "/api/branding/logo/abc",
     "/api/healthz",
     "/api/status-probe",
+    "/api/help/chat",
+    "/api/help/ticket",
+    "/contact",
+    "/support/abc",
   ]) {
     assert.equal(
       tenant(path).anonSkipsViewer,
