@@ -44,6 +44,10 @@ Configure these Worker vars (see [`wrangler.jsonc`](wrangler.jsonc) and [`env.d.
 - **`PUBLIC_ROOT_DOMAIN`** — e.g. `pickuproster.com`. The apex host and `www` serve the marketing pages (`/`, `/pricing`, `/faqs`, `/signup`). Tenant hosts are `{orgSlug}.PUBLIC_ROOT_DOMAIN`, resolved to `Org.slug`.
 - **`MARKETING_HOSTS`** — comma-separated hosts that always behave as marketing (default includes `localhost` and `127.0.0.1` for local dev).
 - **`PLATFORM_ADMIN_EMAILS`** — comma-separated emails that may access `/platform` (internal org list) in addition to users with role `PLATFORM_ADMIN`.
+- **`ANTHROPIC_MODEL`** — Messages API model for the help chat. Defaults to `claude-haiku-5-5`.
+- **`SUPPORT_NOTIFY_EMAIL`** — inbox for new support tickets. Defaults to `NoahSundberg@gmail.com`.
+
+The help chat also needs the Worker secret `ANTHROPIC_API_KEY` (`npx wrangler secret put ANTHROPIC_API_KEY`). Do not commit a key. Staff replies reuse `RESEND_API_KEY` and the email queue. See [docs/deploy.md](docs/deploy.md).
 
 Self-serve signups start a **30-calendar-day** trial with no card (`trialEndsAt` at signup; the daily cron suspends the org when it passes). The qualifying-pickup-day extension applies only to `FREE` plans (see `app/domain/billing/trial.server.ts`). A **scheduled cron** in `wrangler.jsonc` runs trial maintenance daily.
 

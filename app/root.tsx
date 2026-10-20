@@ -39,6 +39,7 @@ import { getTenantBoardUrlForRequest } from "~/domain/utils/tenant-board-url.ser
 import { ImpersonationBanner } from "~/components/ImpersonationBanner";
 import { DistrictImpersonationBanner } from "~/components/DistrictImpersonationBanner";
 import { Footer } from "~/components/Footer";
+import { HelpChatWidget } from "~/components/help/HelpChatWidget";
 import logo from "/logo-icon.svg?url";
 import { getBrandingFromOrg } from "~/domain/org/branding.server";
 import { HEX_COLOR_RE } from "~/domain/org/branding-constants";
@@ -424,6 +425,10 @@ export default function App({ loaderData }: Route.ComponentProps) {
             orgName={branding?.orgName ?? null}
           />
         )}
+        <HelpChatWidget
+          signedInEmail={user?.email ?? null}
+          signedInName={user?.name?.trim() ? user.name : null}
+        />
         <ScrollRestoration nonce={cspNonce ?? undefined} />
         <Scripts nonce={cspNonce ?? undefined} />
       </body>

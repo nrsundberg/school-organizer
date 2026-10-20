@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { reactRouter } from "@react-router/dev/vite";
 import type { Plugin } from "vite";
 import { sentryReactRouter } from "@sentry/react-router";
@@ -14,6 +15,10 @@ import babel from "vite-plugin-babel";
 const cloudflareWasmModule: Plugin = {
   name: "cloudflare-wasm-module",
   enforce: "pre",
+  // The relative wasm id is for the Worker bundle (resolved from
+  // build/server/index.js). Applying it during `react-router dev` makes Vite
+  // look for app/db/app/db/generated/... and every Prisma call fails.
+  apply: "build",
   resolveId(id) {
     if (id.includes(".wasm") && id.endsWith("?module")) {
       return {
@@ -21,6 +26,31 @@ const cloudflareWasmModule: Plugin = {
         external: true,
       };
     }
+  },
+};
+
+const prismaWasmFile = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "app/db/generated/internal/query_compiler_fast_bg.wasm",
+);
+
+/** Dev-only loader. Prisma's `*.wasm?module` import is a Workers convention. */
+const prismaWasmDev: Plugin = {
+  name: "prisma-wasm-dev",
+  apply: "serve",
+  enforce: "pre",
+  resolveId(id) {
+    if (id.includes("query_compiler_fast_bg.wasm") && id.includes("?module")) {
+      return "\0prisma-query-compiler-wasm";
+    }
+  },
+  load(id) {
+    if (id !== "\0prisma-query-compiler-wasm") return null;
+    return `
+      import { readFileSync } from "node:fs";
+      const bytes = readFileSync(${JSON.stringify(prismaWasmFile)});
+      export default new WebAssembly.Module(bytes);
+    `;
   },
 };
 
@@ -67,6 +97,7 @@ export default defineConfig((config) => {
       port: 3000,
     },
     plugins: [
+      prismaWasmDev,
       cloudflareWasmModule,
       tailwindcss(),
       reactRouter(),

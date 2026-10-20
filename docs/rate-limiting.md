@@ -2,17 +2,21 @@
 
 ## Workers Bindings (in-process)
 
-Two rate limit bindings are configured in `wrangler.jsonc` under the `ratelimits` top-level array (GA as of September 2025):
+Rate limit bindings are configured in `wrangler.jsonc` under the `ratelimits` top-level array (GA as of September 2025):
 
 | Binding      | Namespace ID | Limit     | Period | Guards                                              |
 |--------------|--------------|-----------|--------|-----------------------------------------------------|
 | `RL_AUTH`    | `1001`       | 10 req    | 60 s   | `POST /login` action, `POST /signup` action (step 3) |
 | `RL_BILLING` | `1002`       | 20 req    | 60 s   | `POST /api/billing/checkout`, `POST /api/billing/portal` |
+| `RL_HELP`    | `1003`       | 20 req    | 60 s   | `POST /api/help/chat` (per IP and per browser session) |
+| `RL_CONTACT` | `1004`       | 5 req     | 60 s   | `POST /contact`, `POST /api/help/ticket` (per IP) |
 
 ### Key scheme
 
 - Auth routes key on `"auth:<client-ip>"` — rate limit is per IP across both login and signup.
 - Billing routes key on `"billing:<orgId>"` when the user has an org, falling back to `"billing:<client-ip>"` — rate limit is per organization.
+- Help chat keys on `"help:ip:<client-ip>"` and, when the browser sends a UUID session id, `"help:ses:<session-id>"`. Either miss returns 429.
+- Contact and ticket escalation key on `"contact:ip:<client-ip>"`.
 
 ### Local development behaviour
 
@@ -68,8 +72,8 @@ Configure these in **Security → WAF → Rate Limiting Rules** for the `pickupr
 
 | File | Purpose |
 |------|---------|
-| `wrangler.jsonc` | `ratelimits` array defining `RL_AUTH` and `RL_BILLING` bindings |
-| `env.d.ts` | TypeScript declarations for both `RateLimit` bindings on `Env` |
+| `wrangler.jsonc` | `ratelimits` array defining `RL_AUTH`, `RL_BILLING`, `RL_HELP`, and `RL_CONTACT` bindings |
+| `env.d.ts` | TypeScript declarations for the `RateLimit` bindings on `Env` |
 | `app/domain/utils/rate-limit.server.ts` | `checkRateLimit()` helper + `clientIpFromRequest()` utility |
 | `app/domain/utils/rate-limit.test.ts` | Unit tests for the above utilities |
 | `app/routes/auth/login.tsx` | Added `action` export with `RL_AUTH` check |

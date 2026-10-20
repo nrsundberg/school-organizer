@@ -52,6 +52,9 @@ export default function PlatformLayout() {
           <NavLink to="/platform/audit" className={navLinkClass}>
             Audit
           </NavLink>
+          <NavLink to="/platform/support" className={navLinkClass}>
+            Support
+          </NavLink>
         </nav>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8">

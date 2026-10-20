@@ -767,6 +767,48 @@ model Booking {
   @@index([email])
 }
 
+/// Platform-level support request from the help chat or /contact.
+/// Not school data: there is no orgId. Keep this model out of TENANT_MODELS
+/// in app/db/tenant-extension.ts and read it only through getPrisma(context).
+model SupportTicket {
+  id             String                 @id @default(cuid())
+  /// Unguessable token for the requester's read-only thread link.
+  viewToken      String                 @unique
+  /// open | replied | closed
+  status         String                 @default("open")
+  /// chat | contact
+  source         String
+  requesterName  String
+  requesterEmail String
+  subject        String
+  message        String
+  /// JSON array of { role, content } when the ticket came from the help chat.
+  transcriptJson String?
+  pagePath       String?
+  /// Signed-in email at creation, if any. Not a tenant key.
+  signedInEmail  String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  messages       SupportTicketMessage[]
+
+  @@index([status, createdAt])
+  @@index([requesterEmail])
+  @@index([createdAt])
+}
+
+model SupportTicketMessage {
+  id         String        @id @default(cuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  /// requester | staff
+  authorRole String
+  authorName String?
+  body       String
+  createdAt  DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
+}
+
 /// Grade level for a Teacher (classroom). PRE_K covers any preschool/transitional
 /// kindergarten. K is kindergarten. G1–G12 are first through twelfth grade.
 /// OTHER is an escape hatch for non-standard groupings (mixed-age studios,

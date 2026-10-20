@@ -69,3 +69,20 @@ User:
 - **Memberships: Read**
 
 Wrangler uses the user scopes to resolve the account. Rate-limit bindings are part of the Worker publish (Workers Scripts: Edit), not a separate product permission.
+
+## Help chat and support inbox
+
+The help bubble calls Anthropic from the Worker. The key is a secret, not a var in `wrangler.jsonc` (this repo is public).
+
+```sh
+npx wrangler secret put ANTHROPIC_API_KEY --env staging
+npx wrangler secret put ANTHROPIC_API_KEY --env production
+```
+
+`ANTHROPIC_MODEL` is a plain var and defaults to `claude-haiku-5-5`. Change it in `wrangler.jsonc` if you want a different Messages API model id.
+
+New tickets email `SUPPORT_NOTIFY_EMAIL` (default `NoahSundberg@gmail.com`). Staff replies use the existing Resend queue (`RESEND_API_KEY` plus the `EMAIL_QUEUE` binding). Set `RESEND_API_KEY` with `wrangler secret put` if it is not already on the Worker.
+
+Support tables ship in `migrations/0045_support_tickets.sql`. The tag deploy applies that migration before the new Worker goes out. A laptop `npm run deploy` does not.
+
+Local `npm run dev` uses the LibSQL file (`file:./dev.db`), not D1. Apply the Prisma schema there with `npx prisma db push` before trying the contact form or the inbox. Put `ANTHROPIC_API_KEY` in the environment (or `.dev.vars` for `npm run dev:worker`). Without the key the bubble still opens and the contact form still saves tickets.

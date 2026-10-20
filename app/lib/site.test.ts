@@ -8,6 +8,8 @@ import {
   getMeetingUrl,
   getSignupNotifyEmail,
   getSupportEmail,
+  getSupportNotifyEmail,
+  DEFAULT_SUPPORT_NOTIFY_EMAIL,
   zoomJoinDetails,
 } from "./site";
 
@@ -63,6 +65,22 @@ test("getSignupNotifyEmail defaults to Noah and honors a valid override", () => 
       cloudflare: { env: { SIGNUP_NOTIFY_EMAIL: "not-an-email" } },
     }),
     DEFAULT_SIGNUP_NOTIFY_EMAIL,
+  );
+});
+
+test("getSupportNotifyEmail defaults to Noah and honors a valid override", () => {
+  assert.equal(getSupportNotifyEmail({}), DEFAULT_SUPPORT_NOTIFY_EMAIL);
+  assert.equal(
+    getSupportNotifyEmail({
+      cloudflare: { env: { SUPPORT_NOTIFY_EMAIL: "ops@pickuproster.com" } },
+    }),
+    "ops@pickuproster.com",
+  );
+  assert.equal(
+    getSupportNotifyEmail({
+      cloudflare: { env: { SUPPORT_NOTIFY_EMAIL: "not-an-email" } },
+    }),
+    DEFAULT_SUPPORT_NOTIFY_EMAIL,
   );
 });
 

@@ -199,6 +199,38 @@ export type ProbeMessage = {
 };
 
 /**
+ * Internal notice when someone opens a support ticket from the help chat
+ * or the contact form. English. Failures must not hide the saved ticket.
+ */
+export type SupportTicketNoticeMessage = {
+  kind: "support_ticket_notice";
+  to: string;
+  ticketId: string;
+  requesterName: string;
+  requesterEmail: string;
+  source: "chat" | "contact";
+  subject: string;
+  message: string;
+  pagePath: string | null;
+  inboxUrl: string;
+};
+
+/**
+ * Staff reply mailed to the requester, with a link back to the thread.
+ * Email replies from the requester are not ingested.
+ */
+export type SupportTicketReplyMessage = {
+  kind: "support_ticket_reply";
+  to: string;
+  requesterName: string;
+  subject: string;
+  replyBody: string;
+  threadUrl: string;
+  /** Support inbox, so a mail-client reply still reaches a person. */
+  replyTo: string;
+};
+
+/**
  * Messages that actually result in an outbound Resend email. The probe kind
  * is excluded because it has no recipient/template.
  */
@@ -211,7 +243,9 @@ export type SendableEmailMessage =
   | StudentsDeletedMessage
   | SignupNotificationMessage
   | DemoRequestMessage
-  | BookingMailMessage;
+  | BookingMailMessage
+  | SupportTicketNoticeMessage
+  | SupportTicketReplyMessage;
 
 export type EmailMessage = SendableEmailMessage | ProbeMessage;
 

@@ -29,5 +29,15 @@ SENTRY_DSN=
 # Optional https URL for the two free intro calls. Leave unset until a calendar exists.
 # INTRO_CALL_BOOKING_URL=
 
-# Resend — required for welcome mail and signup alerts (same EMAIL_QUEUE path).
+# Resend — required for welcome mail, signup alerts, and support replies (same EMAIL_QUEUE path).
 # RESEND_API_KEY=
+
+# Help chat. Secret — do not commit a real key. The widget still opens without it;
+# replies stay disabled until this is set. `npm run dev` reads process.env;
+# `npm run dev:worker` reads this file.
+# ANTHROPIC_API_KEY=
+# Optional model override. Default is claude-haiku-5-5.
+# ANTHROPIC_MODEL=claude-haiku-5-5
+
+# Optional inbox for new support tickets. Defaults to NoahSundberg@gmail.com.
+# SUPPORT_NOTIFY_EMAIL=NoahSundberg@gmail.com

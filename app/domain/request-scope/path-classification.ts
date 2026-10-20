@@ -22,7 +22,7 @@ export type RequestPathClassification = {
   isOnboardingApi: boolean;
   /** True for /api/webhooks/stripe. */
   isStripeWebhook: boolean;
-  /** True for /api/check-email, /api/check-org-slug, /api/branding/logo/*, /api/healthz, /api/status-probe. */
+  /** True for /api/check-email, /api/check-org-slug, /api/branding/logo/*, /api/healthz, /api/status-probe, /api/help/*. */
   isPublicApi: boolean;
   /** True for /platform/*. */
   isPlatform: boolean;
@@ -79,12 +79,18 @@ export function classifyRequestPath(
   const isCrawlerFile =
     pathname === "/robots.txt" || pathname === "/sitemap.xml";
 
+  const isHelpApi =
+    pathname === "/api/help/chat" || pathname === "/api/help/ticket";
+  const isContact = pathname === "/contact";
+  const isSupportThread = pathname.startsWith("/support/");
+
   const isPublicApi =
     isCheckEmailApi ||
     isCheckOrgSlugApi ||
     isBrandingLogoApi ||
     isHealthz ||
-    isStatusProbe;
+    isStatusProbe ||
+    isHelpApi;
 
   const isAuthFlow =
     isLogin || isForgotPassword || isResetPassword || isViewerAccess;
@@ -107,7 +113,9 @@ export function classifyRequestPath(
     (pathname === "/school-pickup-board" && onMarketingHost) ||
     (pathname.startsWith("/compare/") && onMarketingHost) ||
     isCrawlerFile ||
-    isMarketingVideo;
+    isMarketingVideo ||
+    isContact ||
+    isSupportThread;
 
   const anonSkipsViewer =
     isLogin ||
@@ -128,7 +136,10 @@ export function classifyRequestPath(
     isStripeWebhook ||
     isLogout ||
     isMarketingVideo ||
-    isCrawlerFile;
+    isCrawlerFile ||
+    isHelpApi ||
+    isContact ||
+    isSupportThread;
 
   const exemptFromBillingGate =
     isBillingRequired ||
@@ -137,7 +148,10 @@ export function classifyRequestPath(
     isAuthApi ||
     isStatic ||
     isMarketingVideo ||
-    isCrawlerFile;
+    isCrawlerFile ||
+    isHelpApi ||
+    isContact ||
+    isSupportThread;
 
   return {
     isStatic,

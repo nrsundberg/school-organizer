@@ -11,4 +11,6 @@ test("auth and global tables stay unscoped and must be filtered by the caller", 
   assert.equal(isTenantScopedModel("Session"), false);
   assert.equal(isTenantScopedModel("Org"), false);
   assert.equal(isTenantScopedModel("StripeWebhookEvent"), false);
+  assert.equal(isTenantScopedModel("SupportTicket"), false);
+  assert.equal(isTenantScopedModel("SupportTicketMessage"), false);
 });

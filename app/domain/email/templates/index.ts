@@ -8,6 +8,7 @@ import { renderStudentsDeleted } from "./students-deleted";
 import { renderSignupNotification } from "./signup-notification";
 import { renderDemoRequest } from "./demo-request";
 import { renderBookingMail } from "./booking";
+import { renderSupportTicketNotice, renderSupportTicketReply } from "./support-ticket";
 
 /**
  * Map an EmailMessage to a {subject, html, text} payload.
@@ -50,6 +51,10 @@ export async function renderEmail(
       return renderDemoRequest(msg);
     case "booking_mail":
       return renderBookingMail(msg);
+    case "support_ticket_notice":
+      return renderSupportTicketNotice(msg);
+    case "support_ticket_reply":
+      return renderSupportTicketReply(msg);
     case "probe":
       // Probes are drained by the queue consumer before they reach here;
       // if one slips through, fail loudly rather than silently drop.
