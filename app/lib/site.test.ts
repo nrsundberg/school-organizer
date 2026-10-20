@@ -8,6 +8,7 @@ import {
   getMeetingUrl,
   getSignupNotifyEmail,
   getSupportEmail,
+  zoomJoinDetails,
 } from "./site";
 
 test("getSupportEmail returns DEFAULT_SUPPORT_EMAIL when env is empty", () => {
@@ -151,4 +152,15 @@ test("getMeetingUrl prefers ZOOM_MEETING_URL and falls back to MEETING_URL", () 
     }),
     "https://zoom.us/j/fallback",
   );
+});
+
+test("zoomJoinDetails prints the personal room id and passcode only for that room", () => {
+  assert.deepEqual(
+    zoomJoinDetails(
+      "https://us05web.zoom.us/j/3504620740?pwd=kFLGxaFkDuO8z0q4KLXIBlLzfsYQib.1",
+    ),
+    { id: "350 462 0740", passcode: "Zd8X3j" },
+  );
+  assert.equal(zoomJoinDetails("https://zoom.us/j/123456789"), null);
+  assert.equal(zoomJoinDetails(null), null);
 });
