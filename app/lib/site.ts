@@ -91,3 +91,17 @@ export function getMeetingUrl(context: any): string | null {
     httpUrl(readEnv(context, "MEETING_URL"))
   );
 }
+
+/** Noah's Zoom Personal Room. The join URL embeds the passcode; mail also prints these. */
+const ZOOM_PERSONAL_ROOM = {
+  digits: "3504620740",
+  id: "350 462 0740",
+  passcode: "Zd8X3j",
+};
+
+export function zoomJoinDetails(
+  url: string | null | undefined,
+): { id: string; passcode: string } | null {
+  if (!url || !url.includes(`/j/${ZOOM_PERSONAL_ROOM.digits}`)) return null;
+  return { id: ZOOM_PERSONAL_ROOM.id, passcode: ZOOM_PERSONAL_ROOM.passcode };
+}

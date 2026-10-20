@@ -116,6 +116,9 @@
     "confirmBody": "Quedaste agendado para {{when}}. El aviso de calendario va en camino.",
     "confirmBodyPlain": "Gracias. Si esta fue una solicitud real, el aviso de calendario va en camino.",
     "confirmTitle": "Quedó agendado",
+    "joinZoom": "Unirse a la reunión de Zoom",
+    "meetingId": "ID de la reunión: {{id}}",
+    "meetingPasscode": "Código de acceso: {{passcode}}",
     "errors": {
       "email": "Se necesita un correo válido.",
       "full": "Ese día está lleno. Elige otro horario.",

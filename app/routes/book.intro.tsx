@@ -80,6 +80,7 @@ export default function IntroBookingPage({
           errorCode={errorCode}
           sent={sent}
           whenLabel={actionData?.status === "sent" ? actionData.whenLabel : ""}
+          meetingUrl={actionData?.status === "sent" ? actionData.meetingUrl : null}
           requireRole={false}
         />
       </div>
