@@ -1,7 +1,11 @@
 import { data, Form, Link, redirect, useActionData } from "react-router";
 import type { Route } from "./+types/contact";
 import { MarketingNav } from "~/components/marketing/MarketingNav";
+import { TurnstileField } from "~/components/marketing/TurnstileField";
+import { turnstileSiteKey } from "~/domain/booking/turnstile";
+import { requireHuman } from "~/domain/help/access.server";
 import { helpRateLimitKeys, parseTicketDraft } from "~/domain/help/guardrails";
+import { TURNSTILE_ACTION_CONTACT } from "~/domain/help/limits";
 import { submitPublicTicket } from "~/domain/help/submit-ticket.server";
 import {
   checkRateLimit,
@@ -42,6 +46,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const origin = publicSiteOrigin(request, rootDomainFromContext(context));
   return {
     supportEmail: getSupportEmail(context),
+    siteKey: turnstileSiteKey(context),
     origin,
     canonical: canonicalUrl(origin, "/contact"),
   };
@@ -77,6 +82,16 @@ export async function action({ request, context }: Route.ActionArgs) {
         { status: 429, headers: { "Retry-After": String(limit.retryAfter) } },
       );
     }
+  }
+
+  const human = await requireHuman({
+    source: context,
+    request,
+    token: form.get("cf-turnstile-response"),
+    expectedAction: TURNSTILE_ACTION_CONTACT,
+  });
+  if (!human.ok) {
+    return data({ ok: false as const, error: human.error }, { status: 403 });
   }
 
   try {
@@ -156,6 +171,12 @@ export default function Contact({ loaderData }: Route.ComponentProps) {
                 className={fieldClass}
               />
             </label>
+            <TurnstileField
+              siteKey={loaderData.siteKey}
+              action="contact"
+              resetKey={result && "error" in result ? result.error : "contact"}
+              appearance="interaction-only"
+            />
             <div className="absolute -left-[9999px] h-0 w-0 overflow-hidden" aria-hidden="true">
               <label>
                 Company website

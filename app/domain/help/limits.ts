@@ -16,8 +16,22 @@ export const MAX_EMAIL_CHARS = 254;
 export const MAX_SUBJECT_CHARS = 140;
 export const MAX_PAGE_PATH_CHARS = 200;
 
-/** Output cap passed to the Messages API. Thinking tokens count toward this. */
-export const ANTHROPIC_MAX_OUTPUT_TOKENS = 1024;
+/**
+ * Output cap passed to the Messages API. Thinking is disabled for this bot,
+ * so the whole budget is the visible reply.
+ */
+export const ANTHROPIC_MAX_OUTPUT_TOKENS = 512;
+
+/** Signed chat grant lifetime. A new grant is issued on each accepted turn. */
+export const HELP_SESSION_TTL_MS = 30 * 60 * 1000;
+
+/** UTC-day caps. The rate-limit binding only allows a 10s or 60s window. */
+export const DAILY_IP_MESSAGE_CAP = 30;
+export const DAILY_SESSION_MESSAGE_CAP = 20;
+
+export const TURNSTILE_ACTION_CHAT = "help_chat";
+export const TURNSTILE_ACTION_TICKET = "help_ticket";
+export const TURNSTILE_ACTION_CONTACT = "contact";
 
 export const DEFAULT_ANTHROPIC_MODEL = "claude-haiku-5-5";
 

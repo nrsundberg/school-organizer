@@ -138,7 +138,8 @@ test("Anthropic HTTP client sends no tools and ignores thinking blocks", async (
   });
   assert.equal(apiKeyHeader, "sk-test-secret");
   assert.equal(body.model, "claude-haiku-5-5");
-  assert.equal(body.max_tokens, 1024);
+  assert.equal(body.max_tokens, 512);
+  assert.deepEqual(body.thinking, { type: "disabled" });
   assert.deepEqual(body.output_config, { effort: "low" });
   assert.equal("tools" in body, false);
   assert.equal(result.ok, true);

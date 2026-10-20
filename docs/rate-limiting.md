@@ -8,14 +8,14 @@ Rate limit bindings are configured in `wrangler.jsonc` under the `ratelimits` to
 |--------------|--------------|-----------|--------|-----------------------------------------------------|
 | `RL_AUTH`    | `1001`       | 10 req    | 60 s   | `POST /login` action, `POST /signup` action (step 3) |
 | `RL_BILLING` | `1002`       | 20 req    | 60 s   | `POST /api/billing/checkout`, `POST /api/billing/portal` |
-| `RL_HELP`    | `1003`       | 20 req    | 60 s   | `POST /api/help/chat` (per IP and per browser session) |
+| `RL_HELP`    | `1003`       | 8 req     | 60 s   | `POST /api/help/chat` (per IP and per browser session). Staging uses namespace `2003` at 12/60. |
 | `RL_CONTACT` | `1004`       | 5 req     | 60 s   | `POST /contact`, `POST /api/help/ticket` (per IP) |
 
 ### Key scheme
 
 - Auth routes key on `"auth:<client-ip>"` — rate limit is per IP across both login and signup.
 - Billing routes key on `"billing:<orgId>"` when the user has an org, falling back to `"billing:<client-ip>"` — rate limit is per organization.
-- Help chat keys on `"help:ip:<client-ip>"` and, when the browser sends a UUID session id, `"help:ses:<session-id>"`. Either miss returns 429.
+- Help chat keys on `"help:ip:<client-ip>"` and `"help:ses:<session-id>"`. Either miss returns 429. The binding period can only be 10 or 60 seconds, so the UTC-day caps (30 messages per IP, 20 per session) live in the platform `HelpChatQuota` table.
 - Contact and ticket escalation key on `"contact:ip:<client-ip>"`.
 
 ### Local development behaviour

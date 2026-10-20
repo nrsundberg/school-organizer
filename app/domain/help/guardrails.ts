@@ -60,12 +60,16 @@ export function validateChatMessages(
     if (role !== "user" && role !== "assistant") {
       return { ok: false, error: "Invalid conversation." };
     }
-    if (typeof content !== "string") {
+    if (typeof content !== "string" || content.includes("\u0000")) {
       return { ok: false, error: "Invalid conversation." };
     }
     const trimmed = content.trim();
-    if (!trimmed) {
-      return { ok: false, error: "Messages can't be empty." };
+    if (!trimmed || trimmed.includes(ESCALATE_TOKEN)) {
+      return { ok: false, error: "Invalid conversation." };
+    }
+    const expected = messages.length % 2 === 0 ? "user" : "assistant";
+    if (role !== expected) {
+      return { ok: false, error: "Invalid conversation." };
     }
     if (trimmed.length > MAX_MESSAGE_CHARS) {
       return {
@@ -220,12 +224,71 @@ export function anthropicModelFromEnv(env: { ANTHROPIC_MODEL?: string } | undefi
   return DEFAULT_ANTHROPIC_MODEL;
 }
 
+/**
+ * Strip paste mistakes that make Anthropic return 401: a BOM, quotes,
+ * a `Bearer ` prefix, or an `x-api-key:` label. The key itself is unchanged.
+ */
+export function normalizeAnthropicApiKey(raw: string | undefined): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  let value = raw.replace(/^\uFEFF/, "").trim();
+  if (
+    value.length >= 2 &&
+    ((value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'")))
+  ) {
+    value = value.slice(1, -1).trim();
+  }
+  value = value.replace(/^Bearer\s+/i, "").replace(/^x-api-key\s*:\s*/i, "").trim();
+  return value.length > 0 ? value : undefined;
+}
+
 export function anthropicApiKeyFromEnv(
   env: { ANTHROPIC_API_KEY?: string } | undefined,
 ): string | undefined {
-  const fromBinding = env?.ANTHROPIC_API_KEY?.trim();
+  const fromBinding = normalizeAnthropicApiKey(env?.ANTHROPIC_API_KEY);
   if (fromBinding) return fromBinding;
   const fromProcess =
-    typeof process !== "undefined" ? process.env.ANTHROPIC_API_KEY?.trim() : undefined;
-  return fromProcess || undefined;
+    typeof process !== "undefined"
+      ? normalizeAnthropicApiKey(process.env.ANTHROPIC_API_KEY)
+      : undefined;
+  return fromProcess;
+}
+
+/** Unset means the chat is on. `0`, `false`, `off`, or `no` turns it off. */
+export function helpChatEnabled(source: unknown): boolean {
+  const record = source as {
+    HELP_CHAT_ENABLED?: string;
+    cloudflare?: { env?: { HELP_CHAT_ENABLED?: string } };
+  };
+  const raw =
+    record?.cloudflare?.env?.HELP_CHAT_ENABLED ??
+    record?.HELP_CHAT_ENABLED ??
+    (typeof process !== "undefined" ? process.env.HELP_CHAT_ENABLED : undefined);
+  const value = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+  if (!value) return true;
+  return value !== "0" && value !== "false" && value !== "off" && value !== "no";
+}
+
+/**
+ * Hosts the help widget may mint a Turnstile token on: marketing hosts,
+ * the apex, and tenant subdomains of PUBLIC_ROOT_DOMAIN.
+ */
+export function helpHostAllowed(host: string, source: unknown): boolean {
+  const hostname = host.trim().toLowerCase();
+  if (!hostname || hostname.includes("..")) return false;
+  const record = source as {
+    MARKETING_HOSTS?: string;
+    PUBLIC_ROOT_DOMAIN?: string;
+    cloudflare?: { env?: { MARKETING_HOSTS?: string; PUBLIC_ROOT_DOMAIN?: string } };
+  };
+  const env = record?.cloudflare?.env ?? record;
+  const marketing = (env?.MARKETING_HOSTS ?? "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+  if (marketing.includes(hostname)) return true;
+  if (hostname === "localhost" || hostname.endsWith(".localhost")) return true;
+  const root = (env?.PUBLIC_ROOT_DOMAIN ?? "").trim().toLowerCase();
+  if (!root || root === "localhost" || root.endsWith(".localhost")) return false;
+  return hostname === root || hostname === `www.${root}` || hostname.endsWith(`.${root}`);
 }
