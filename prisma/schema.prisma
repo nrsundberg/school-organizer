@@ -809,6 +809,18 @@ model SupportTicketMessage {
   @@index([ticketId, createdAt])
 }
 
+/// UTC-day counters for the help chat. Platform-level, no orgId.
+/// Keep this model out of TENANT_MODELS. The rate-limit binding only
+/// supports a 10s or 60s window, so the daily cap lives here.
+model HelpChatQuota {
+  subject   String
+  day       String
+  count     Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([subject, day])
+}
+
 /// Grade level for a Teacher (classroom). PRE_K covers any preschool/transitional
 /// kindergarten. K is kindergarten. G1–G12 are first through twelfth grade.
 /// OTHER is an escape hatch for non-standard groupings (mixed-age studios,

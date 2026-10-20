@@ -3,7 +3,12 @@ import { useEffect, useRef } from "react";
 type TurnstileApi = {
   render: (
     el: HTMLElement,
-    options: { sitekey: string; action: string; theme: "dark" },
+    options: {
+      sitekey: string;
+      action: string;
+      theme: "dark";
+      appearance?: "always" | "execute" | "interaction-only";
+    },
   ) => string;
   reset: (id: string) => void;
   remove: (id: string) => void;
@@ -23,10 +28,12 @@ export function TurnstileField({
   siteKey,
   action,
   resetKey,
+  appearance,
 }: {
   siteKey: string | null;
   action: string;
   resetKey: string;
+  appearance?: "always" | "execute" | "interaction-only";
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | null>(null);
@@ -41,6 +48,7 @@ export function TurnstileField({
         sitekey: siteKey,
         action,
         theme: "dark",
+        ...(appearance ? { appearance } : {}),
       });
     };
     if (turnstileApi()) {
@@ -63,7 +71,7 @@ export function TurnstileField({
       if (widgetId.current && api) api.remove(widgetId.current);
       widgetId.current = null;
     };
-  }, [siteKey, action, resetKey]);
+  }, [siteKey, action, resetKey, appearance]);
 
   if (!siteKey) return null;
   return <div ref={ref} className="min-h-16" />;

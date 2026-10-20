@@ -1,16 +1,37 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import { MessageCircle, X } from "lucide-react";
+import { executeTurnstile } from "./turnstile-client";
 
 type Turn = { role: "user" | "assistant"; content: string };
 
 type Props = {
   signedInEmail: string | null;
   signedInName: string | null;
+  turnstileSiteKey: string | null;
+  chatEnabled: boolean;
 };
 
 const SESSION_KEY = "pickuproster.helpSession";
+const GRANT_KEY = "pickuproster.helpGrant";
 const LINK_RE = /\[([^\]]+)\]\((\/[^)\s]*)\)/g;
+
+function helpGrant(): string {
+  try {
+    return sessionStorage.getItem(GRANT_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function storeHelpGrant(grant: string | null | undefined) {
+  try {
+    if (grant) sessionStorage.setItem(GRANT_KEY, grant);
+    else sessionStorage.removeItem(GRANT_KEY);
+  } catch {
+    // private mode
+  }
+}
 
 function helpSessionId(): string {
   try {
@@ -66,7 +87,12 @@ function MessageBody({ text }: { text: string }) {
   );
 }
 
-export function HelpChatWidget({ signedInEmail, signedInName }: Props) {
+export function HelpChatWidget({
+  signedInEmail,
+  signedInName,
+  turnstileSiteKey,
+  chatEnabled,
+}: Props) {
   const { pathname } = useLocation();
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -75,7 +101,7 @@ export function HelpChatWidget({ signedInEmail, signedInName }: Props) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(!chatEnabled);
   const [ticketSent, setTicketSent] = useState(false);
   const [name, setName] = useState(signedInName ?? "");
   const [email, setEmail] = useState(signedInEmail ?? "");
@@ -102,27 +128,10 @@ export function HelpChatWidget({ signedInEmail, signedInName }: Props) {
     setPending(true);
     setError(null);
     try {
-      const response = await fetch("/api/help/chat", {
-        method: "POST",
-        headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({
-          messages: nextTurns,
-          pagePath: pathname,
-          sessionId: helpSessionId(),
-        }),
-      });
-      const payload = (await response.json()) as {
-        reply?: string;
-        suggestEscalation?: boolean;
-        error?: string;
-        code?: string;
-      };
-      if (!response.ok || !payload.reply) {
-        setError(payload.error || "The help assistant is unavailable right now.");
-        if (payload.code === "unconfigured") setShowForm(true);
-        return;
-      }
-      setTurns([...nextTurns, { role: "assistant", content: payload.reply }]);
+      const payload = await postChat(nextTurns, false);
+      if (!payload) return;
+      storeHelpGrant(payload.sessionGrant);
+      setTurns([...nextTurns, { role: "assistant", content: payload.reply ?? "" }]);
       if (payload.suggestEscalation) {
         setShowForm(true);
         setTicketMessage((current) => current || content);
@@ -134,10 +143,64 @@ export function HelpChatWidget({ signedInEmail, signedInName }: Props) {
     }
   }
 
+  async function challengeToken(action: string): Promise<string | undefined> {
+    if (!turnstileSiteKey) return undefined;
+    return executeTurnstile(turnstileSiteKey, action);
+  }
+
+  async function postChat(nextTurns: Turn[], challenged: boolean) {
+    let turnstileToken: string | undefined;
+    if (!helpGrant()) {
+      try {
+        turnstileToken = await challengeToken("help_chat");
+      } catch {
+        setError("Confirm you're a person, then send your message again.");
+        return null;
+      }
+    }
+    const response = await fetch("/api/help/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({
+        messages: nextTurns,
+        pagePath: pathname,
+        sessionId: helpSessionId(),
+        sessionGrant: helpGrant(),
+        turnstileToken,
+      }),
+    });
+    const payload = (await response.json()) as {
+      reply?: string;
+      suggestEscalation?: boolean;
+      error?: string;
+      code?: string;
+      sessionGrant?: string | null;
+    };
+    if (response.status === 403 && payload.code === "challenge" && !challenged) {
+      storeHelpGrant(null);
+      return postChat(nextTurns, true);
+    }
+    if (!response.ok || !payload.reply) {
+      setError(payload.error || "The help assistant is unavailable right now.");
+      if (payload.code === "unconfigured" || payload.code === "disabled" || payload.code === "quota") {
+        setShowForm(true);
+      }
+      return null;
+    }
+    return payload;
+  }
+
   async function sendTicket() {
     setPending(true);
     setError(null);
     try {
+      let turnstileToken: string | undefined;
+      try {
+        turnstileToken = await challengeToken("help_ticket");
+      } catch {
+        setError("Confirm you're a person, then try again.");
+        return;
+      }
       const response = await fetch("/api/help/ticket", {
         method: "POST",
         headers: { "content-type": "application/json", accept: "application/json" },
@@ -149,6 +212,7 @@ export function HelpChatWidget({ signedInEmail, signedInName }: Props) {
           pagePath: pathname,
           transcript: turns,
           company_website: honeypot,
+          turnstileToken,
         }),
       });
       const payload = (await response.json()) as { ok?: boolean; error?: string };

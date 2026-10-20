@@ -8,7 +8,7 @@ This document describes how **school-scoped data** is isolated per organization 
 |----------|--------|---------|
 | **Tenant (school) data** | `Teacher`, `Student`, `Space`, `CallEvent`, `AppSettings`, `ViewerAccessAttempt`, `ViewerAccessSession`, `ViewerMagicLink` | Every row has `orgId` → `Org`. Queries go through **`getTenantPrisma`** so the extension enforces `orgId`. |
 | **Global / auth** | `User`, `Session`, `Account`, `Verification` | Not wrapped by the tenant extension. `User` may have `orgId` for membership, but user/session queries use **`getPrisma(context)`** without the extension. |
-| **Global app data** | `Org`, `StripeWebhookEvent`, `SupportTicket`, `SupportTicketMessage` | No `orgId` filter. Support tickets are platform-level: read them with `getPrisma(context)` and keep them out of `TENANT_MODELS`. |
+| **Global app data** | `Org`, `StripeWebhookEvent`, `SupportTicket`, `SupportTicketMessage`, `HelpChatQuota` | No `orgId` filter. Support tickets and help-chat quotas are platform-level: read them with `getPrisma(context)` and keep them out of `TENANT_MODELS`. |
 
 Authoritative schema: `prisma/schema.prisma`.
 

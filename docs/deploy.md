@@ -79,10 +79,14 @@ npx wrangler secret put ANTHROPIC_API_KEY --env staging
 npx wrangler secret put ANTHROPIC_API_KEY --env production
 ```
 
-`ANTHROPIC_MODEL` is a plain var and defaults to `claude-haiku-5-5`. Change it in `wrangler.jsonc` if you want a different Messages API model id.
+`ANTHROPIC_MODEL` is a plain var and defaults to `claude-haiku-5-5`. Change it in `wrangler.jsonc` if you want a different Messages API model id. Paste the key alone: quotes, a `Bearer ` prefix, or an `x-api-key:` label make Anthropic return 401. Set `HELP_CHAT_ENABLED` to `0` to turn the model off without removing the secret. The contact form stays up.
+
+The first chat message, `/contact`, and `/api/help/ticket` require the existing Turnstile widget (`TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`, `TURNSTILE_HOSTNAMES`). The widget should be Managed. The chat uses `appearance: interaction-only` and action `help_chat`; the contact form uses `contact`; ticket posts use `help_ticket`. After a valid token the chat returns an HMAC grant (signed with `BETTER_AUTH_SECRET`) that lasts 30 minutes, then the visitor is challenged again. Siteverify checks the action and that the token hostname is the request host. Add every host the bubble runs on (apex, `www`, workers.dev, and tenant subdomains) to the Turnstile widget's hostname list in the Cloudflare dashboard, or the widget will not issue a token there.
 
 New tickets email `SUPPORT_NOTIFY_EMAIL` (default `NoahSundberg@gmail.com`). Staff replies use the existing Resend queue (`RESEND_API_KEY` plus the `EMAIL_QUEUE` binding). Set `RESEND_API_KEY` with `wrangler secret put` if it is not already on the Worker.
 
-Support tables ship in `migrations/0045_support_tickets.sql`. The tag deploy applies that migration before the new Worker goes out. A laptop `npm run deploy` does not.
+Support tables ship in `migrations/0045_support_tickets.sql`. Daily chat counters ship in `migrations/0046_help_chat_quota.sql`. The tag deploy applies those migrations before the new Worker goes out. A laptop `npm run deploy` does not.
 
-Local `npm run dev` uses the LibSQL file (`file:./dev.db`), not D1. Apply the Prisma schema there with `npx prisma db push` before trying the contact form or the inbox. Put `ANTHROPIC_API_KEY` in the environment (or `.dev.vars` for `npm run dev:worker`). Without the key the bubble still opens and the contact form still saves tickets.
+`staging.pickuproster.com/*` is a zone route on the staging Worker, next to the custom domain. Production's `*.pickuproster.com/*` route matches that host and takes precedence over a custom domain, so the apex was served by production until the more specific route existed. Publishing routes needs **Zone → Workers Routes → Write** on `pickuproster.com` for the GitHub `CLOUDFLARE_API_TOKEN`. Script upload succeeds with Workers Editor alone, which is why staging deploys fail at the routes step while workers.dev still updates.
+
+Local `npm run dev` uses the LibSQL file (`file:./dev.db`), not D1. Apply the Prisma schema there with `npx prisma db push` before trying the contact form or the inbox. Put `ANTHROPIC_API_KEY` in the environment (or `.dev.vars` for `npm run dev:worker`). Without the key the bubble still opens and the contact form still saves tickets. Turnstile is skipped when `TURNSTILE_SECRET_KEY` is unset and `ENVIRONMENT` is not `staging` or `production`.

@@ -4,6 +4,10 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1
+	},
 	"main": "./workers/app.ts",
 	"assets": {
 		"directory": "./build/client"
@@ -126,11 +130,11 @@
 			}
 		},
 		{
-			// Help chat: per IP and per browser session
+			// Help chat: per IP and per browser session. Daily caps are in HelpChatQuota.
 			"name": "RL_HELP",
 			"namespace_id": "1003",
 			"simple": {
-				"limit": 20,
+				"limit": 8,
 				"period": 60
 			}
 		},
@@ -210,6 +214,10 @@
 					"zone_name": "pickuproster.com"
 				}
 			],
+			"observability": {
+				"enabled": true,
+				"head_sampling_rate": 1
+			},
 			"name": "school-organizer",
 			"vars": {
 				"SENTRY_DSN": "",
@@ -283,7 +291,7 @@
 					"name": "RL_HELP",
 					"namespace_id": "1003",
 					"simple": {
-						"limit": 20,
+						"limit": 8,
 						"period": 60
 					}
 				},
@@ -328,11 +336,23 @@
 					"pattern": "staging.pickuproster.com",
 					"custom_domain": true
 				},
+				// Zone route, not only a custom domain. Production's
+				// `*.pickuproster.com/*` route is less specific but routes
+				// take precedence over custom domains, so the apex was served
+				// by the production Worker until this pattern existed.
+				{
+					"pattern": "staging.pickuproster.com/*",
+					"zone_name": "pickuproster.com"
+				},
 				{
 					"pattern": "*.staging.pickuproster.com/*",
 					"zone_name": "pickuproster.com"
 				}
 			],
+			"observability": {
+				"enabled": true,
+				"head_sampling_rate": 1
+			},
 			"name": "school-organizer-staging",
 			"workers_dev": true,
 			"vars": {
@@ -401,7 +421,7 @@
 					"name": "RL_HELP",
 					"namespace_id": "2003",
 					"simple": {
-						"limit": 30,
+						"limit": 12,
 						"period": 60
 					}
 				},

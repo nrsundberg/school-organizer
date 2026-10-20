@@ -40,6 +40,8 @@ import { ImpersonationBanner } from "~/components/ImpersonationBanner";
 import { DistrictImpersonationBanner } from "~/components/DistrictImpersonationBanner";
 import { Footer } from "~/components/Footer";
 import { HelpChatWidget } from "~/components/help/HelpChatWidget";
+import { turnstileSiteKey } from "~/domain/booking/turnstile";
+import { helpChatEnabled } from "~/domain/help/guardrails";
 import logo from "/logo-icon.svg?url";
 import { getBrandingFromOrg } from "~/domain/org/branding.server";
 import { HEX_COLOR_RE } from "~/domain/org/branding-constants";
@@ -221,6 +223,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       marketing,
       dashboardUrl,
       supportEmail: getSupportEmail(context),
+      helpChatEnabled: helpChatEnabled(context),
+      turnstileSiteKey: turnstileSiteKey(context),
       sentryDsn: (context as any).cloudflare?.env?.SENTRY_DSN ?? null,
       cspNonce: getCspNonceFromRequest(request),
       locale,
@@ -313,6 +317,8 @@ export default function App({ loaderData }: Route.ComponentProps) {
     districtImpersonation,
     branding,
     supportEmail,
+    helpChatEnabled: chatEnabled,
+    turnstileSiteKey,
     sentryDsn,
     marketing,
     cspNonce,
@@ -428,6 +434,8 @@ export default function App({ loaderData }: Route.ComponentProps) {
         <HelpChatWidget
           signedInEmail={user?.email ?? null}
           signedInName={user?.name?.trim() ? user.name : null}
+          turnstileSiteKey={turnstileSiteKey}
+          chatEnabled={chatEnabled}
         />
         <ScrollRestoration nonce={cspNonce ?? undefined} />
         <Scripts nonce={cspNonce ?? undefined} />

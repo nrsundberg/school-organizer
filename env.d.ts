@@ -109,6 +109,11 @@ declare global {
      * Set as a Worker var (not a secret) when you want a different model.
      */
     ANTHROPIC_MODEL?: string;
+    /**
+     * Set to `0` or `false` to turn the help chat off without a deploy.
+     * Unset means the chat is on. The contact form stays available.
+     */
+    HELP_CHAT_ENABLED?: string;
     /** Resend API key (Worker secret). Required for email sends. */
     RESEND_API_KEY: string;
     /** Producer binding for outbound email queue (see wrangler.jsonc `queues.producers`). */

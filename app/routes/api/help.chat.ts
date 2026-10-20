@@ -1,8 +1,11 @@
 import { data } from "react-router";
 import type { Route } from "./+types/help.chat";
+import { authorizeHelpChat } from "~/domain/help/access.server";
+import { verifyTurnstile } from "~/domain/booking/turnstile";
 import { completeHelpTurn, handleHelpChat, helpChatEnv } from "~/domain/help/chat.server";
-import { helpRateLimitKeys, readSessionId } from "~/domain/help/guardrails";
-import { MAX_REQUEST_CHARS } from "~/domain/help/limits";
+import { helpChatEnabled, helpHostAllowed, helpRateLimitKeys, readSessionId } from "~/domain/help/guardrails";
+import { MAX_REQUEST_CHARS, TURNSTILE_ACTION_CHAT } from "~/domain/help/limits";
+import { consumeHelpQuotaFromContext } from "~/domain/help/quota.server";
 import { getOptionalUserFromContext } from "~/domain/utils/global-context.server";
 import {
   checkRateLimit,
@@ -35,8 +38,22 @@ export async function action({ request, context }: Route.ActionArgs) {
     body && typeof body === "object" ? (body as Record<string, unknown>) : {};
 
   const sessionId = readSessionId(record.sessionId);
+  if (!helpChatEnabled(context)) {
+    return data(
+      {
+        error: "Help chat is turned off right now. Use the contact form and we'll write back.",
+        code: "disabled",
+      },
+      { status: 503 },
+    );
+  }
+  if (!sessionId) {
+    return data({ error: "Refresh the page and try again." }, { status: 400 });
+  }
+
   const limiter = getRateLimiter(context, "RL_HELP");
-  for (const key of helpRateLimitKeys("help", clientIpFromRequest(request), sessionId)) {
+  const ip = clientIpFromRequest(request);
+  for (const key of helpRateLimitKeys("help", ip, sessionId)) {
     const limit = await checkRateLimit({ limiter, key });
     if (!limit.ok) {
       return data(
@@ -46,8 +63,49 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
   }
 
-  const env = (context as { cloudflare?: { env?: { ANTHROPIC_API_KEY?: string; ANTHROPIC_MODEL?: string } } })
-    .cloudflare?.env;
+  const env = (
+    context as {
+      cloudflare?: {
+        env?: {
+          ANTHROPIC_API_KEY?: string;
+          ANTHROPIC_MODEL?: string;
+          TURNSTILE_SECRET_KEY?: string;
+          ENVIRONMENT?: string;
+        };
+      };
+    }
+  ).cloudflare?.env;
+  const host = new URL(request.url).hostname.toLowerCase();
+  const turnstileRequired = Boolean(env?.TURNSTILE_SECRET_KEY?.trim()) ||
+    env?.ENVIRONMENT === "production" ||
+    env?.ENVIRONMENT === "staging";
+  const access = await authorizeHelpChat({
+    source: context,
+    sessionId,
+    grant: record.sessionGrant,
+    turnstileToken: record.turnstileToken,
+    turnstileRequired,
+    verify: async (token) => {
+      if (!helpHostAllowed(host, context)) return { ok: false, error: "turnstile" };
+      return verifyTurnstile({
+        secret: env?.TURNSTILE_SECRET_KEY,
+        token,
+        remoteIp: ip,
+        expectedAction: TURNSTILE_ACTION_CHAT,
+        expectedHostnames: [host],
+        environment: env?.ENVIRONMENT ?? "development",
+      });
+    },
+  });
+  if (!access.ok) {
+    return data({ error: access.error, code: access.code }, { status: access.status });
+  }
+
+  const quota = await consumeHelpQuotaFromContext({ context, ip, sessionId });
+  if (!quota.ok) {
+    return data({ error: quota.error, code: "quota" }, { status: 429 });
+  }
+
   const { apiKey, model } = helpChatEnv(env);
   const user = getOptionalUserFromContext(context);
   const outcome = await handleHelpChat({
@@ -75,5 +133,6 @@ export async function action({ request, context }: Route.ActionArgs) {
   return data({
     reply: outcome.reply,
     suggestEscalation: outcome.suggestEscalation,
+    sessionGrant: access.grant,
   });
 }

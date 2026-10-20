@@ -38,6 +38,8 @@ SENTRY_DSN=
 # ANTHROPIC_API_KEY=
 # Optional model override. Default is claude-haiku-5-5.
 # ANTHROPIC_MODEL=claude-haiku-5-5
+# Set to 0 to turn the help chat off. The contact form still works.
+# HELP_CHAT_ENABLED=1
 
 # Optional inbox for new support tickets. Defaults to NoahSundberg@gmail.com.
 # SUPPORT_NOTIFY_EMAIL=NoahSundberg@gmail.com
