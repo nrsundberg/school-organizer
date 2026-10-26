@@ -50,7 +50,11 @@ function indexingResponse(request: Request, context: unknown): Response | null {
   });
 }
 
-/** Runs before tenant resolution so the app host can leave marketing URLs. */
+/**
+ * Runs before tenant resolution so the app host can leave marketing URLs.
+ * Paths that match no route never get here. `/content/*` is a real route
+ * for that reason.
+ */
 export const indexingMiddleware: MiddlewareFunction<Response> = async (
   { request, context },
   next,

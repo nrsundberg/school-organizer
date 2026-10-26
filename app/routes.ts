@@ -116,6 +116,9 @@ export default [
   route("compare/:slug", "routes/compare.$slug.tsx"),
   route("sitemap.xml", "routes/sitemap.xml.ts"),
   route("robots.txt", "routes/robots.txt.ts"),
+  // Must exist: unmatched paths never enter root middleware, so raw
+  // /content/(blog|guides)/*.md URLs would stay 404s.
+  route("content/*", "routes/content-source.ts"),
   route("blog", "routes/blog._index.tsx"),
   route("blog/:slug", "routes/blog.$slug.tsx"),
   route("guides", "routes/guides._index.tsx"),
