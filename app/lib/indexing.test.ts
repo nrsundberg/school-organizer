@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   contentSourceRedirect,
@@ -154,6 +154,11 @@ test("the app host sends marketing paths to the apex and leaves the board alone"
     }),
     null,
   );
+});
+
+test("raw markdown URLs have a route so the redirect can run", () => {
+  const routes = readFileSync(join(ROOT, "app/routes.ts"), "utf8");
+  assert.match(routes, /route\("content\/\*",\s*"routes\/content-source\.ts"\)/);
 });
 
 test("auth and manifest URLs are noindex and stay out of the sitemap", () => {
