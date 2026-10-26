@@ -58,9 +58,11 @@ import {
 import { parseDrillAudience } from "~/domain/drills/types";
 import { hasValidViewerAccess } from "~/domain/auth/viewer-access.server";
 import { getCspNonceFromRequest } from "~/lib/csp";
+import { indexingMiddleware } from "~/lib/indexing.server";
 import { useLiveDrillTakeover } from "~/hooks/useLiveDrillTakeover";
 
 export const middleware: MiddlewareFunction<Response>[] = [
+  indexingMiddleware,
   globalStorageMiddleware
 ];
 

@@ -21,6 +21,7 @@ export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: 
   return [
     { title: data?.metaTitle ?? "Login — PickupRoster" },
     { name: "description", content: data?.metaDescription ?? "Sign in to your school car line board" },
+    { name: "robots", content: "noindex, follow" },
   ];
 }
 

@@ -20,8 +20,6 @@ export type GuideMeta = {
   /** Human-readable estimate e.g. "8 minutes". Stored as-authored. */
   estimatedTime: string;
   difficulty: GuideDifficulty;
-  /** Source filename, useful for debugging. */
-  file: string;
 };
 
 /** Display label for a category slug. Falls back to title-casing the slug. */

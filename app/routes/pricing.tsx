@@ -47,10 +47,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const t = await getFixedT(locale, "billing");
   const billingCycle = normalizePublicBillingCycle(url.searchParams.get("cycle"));
   const origin = publicSiteOrigin(request, rootDomainFromContext(context));
-  const canonical = canonicalUrl(
-    origin,
-    billingCycle === "annual" ? "/pricing?cycle=annual" : "/pricing",
-  );
+  const canonical = canonicalUrl(origin, "/pricing");
   return {
     supportEmail: getSupportEmail(context),
     introCallBookingUrl: getIntroCallBookingUrl(context),

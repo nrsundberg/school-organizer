@@ -2,6 +2,7 @@ import type { Route } from "./+types/sitemap.xml";
 import { isMarketingHost } from "~/domain/utils/host.server";
 import { listPosts } from "~/lib/blog.server";
 import { listGuides } from "~/lib/guides.server";
+import { sitemapPathIsIndexable } from "~/lib/indexing";
 import {
   buildSitemapXml,
   publicSiteOrigin,
@@ -34,7 +35,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       path: `/guides/${guide.slug}`,
       lastmod: guide.date,
     })),
-  ];
+  ].filter((entry) => sitemapPathIsIndexable(entry.path));
 
   return new Response(buildSitemapXml(origin, entries), {
     headers: {
