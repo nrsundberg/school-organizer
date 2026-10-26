@@ -53,14 +53,24 @@ import {
 import { getFixedT } from "~/lib/t.server";
 import { detectLocale } from "~/i18n.server";
 import { localizedErrorMap } from "~/lib/zod-error-map.server";
+import {
+  canonicalUrl,
+  publicSiteOrigin,
+  rootDomainFromContext,
+} from "~/lib/marketing-seo";
 
 export const handle = { i18n: ["auth"] };
 
-export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string } }) {
+export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: string; canonical?: string } }) {
   return [
     { title: data?.metaTitle ?? "Signup — PickupRoster" },
     { name: "description", content: data?.metaDescription ?? "Create your organization and account" },
-    { name: "robots", content: "noindex, follow" }
+    { name: "robots", content: "noindex, follow" },
+    {
+      tagName: "link",
+      rel: "canonical",
+      href: data?.canonical ?? "https://pickuproster.com/signup",
+    },
   ];
 }
 
@@ -88,12 +98,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
   const locale = await detectLocale(request, context);
   const t = await getFixedT(locale, "auth");
+  const origin = publicSiteOrigin(request, rootDomainFromContext(context));
   return {
     plan: plan ?? "car-line",
     billingCycle: normalizePublicBillingCycle(url.searchParams.get("cycle")),
     introCallBookingUrl: getIntroCallBookingUrl(context),
     metaTitle: t("signup.metaTitle"),
     metaDescription: t("signup.metaDescription"),
+    canonical: canonicalUrl(origin, "/signup"),
   };
 }
 

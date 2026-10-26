@@ -27,6 +27,7 @@ export function meta({ data }: { data?: { metaTitle?: string; metaDescription?: 
       name: "description",
       content: data?.metaDescription ?? "Start a password reset for your PickupRoster account.",
     },
+    { name: "robots", content: "noindex, follow" },
   ];
 }
 

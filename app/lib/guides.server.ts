@@ -204,7 +204,6 @@ function toGuide(file: string, source: string): Guide {
     category: required("category"),
     estimatedTime: required("estimated_time"),
     difficulty,
-    file,
   };
 
   const html = marked.parse(body) as string;

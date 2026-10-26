@@ -34,7 +34,7 @@ const GUIDES = [
     es: "Configura una plantilla de simulacro",
   },
   {
-    href: "/guides/privacy-and-ferpa-in-pickup-logistics",
+    href: "/blog/privacy-and-ferpa-in-pickup-logistics",
     en: "Privacy and pickup records",
     es: "Privacidad y registros de recogida",
   },

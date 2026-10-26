@@ -77,7 +77,6 @@ function toPost(file: string, source: string): BlogPost {
     author: typeof data.author === "string" ? data.author : "PickupRoster Team",
     tags: Array.isArray(data.tags) ? data.tags : [],
     image: typeof data.image === "string" ? data.image : "",
-    file,
   };
 
   const prepared = prepareMarketingMarkdown(body);
@@ -110,7 +109,6 @@ export function listPosts(): BlogPostMeta[] {
     author: post.author,
     tags: post.tags,
     image: post.image,
-    file: post.file,
   }));
 }
 

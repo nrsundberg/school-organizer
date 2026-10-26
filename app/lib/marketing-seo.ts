@@ -33,17 +33,17 @@ export const SITEMAP_PATH_LASTMOD: Partial<
   "/compare/schoolpass-vs-pickuproster": "2026-10-18",
 };
 
-/** App and auth prefixes a marketing robots.txt must disallow. */
+/**
+ * Prefixes a marketing robots.txt must disallow.
+ * /login, /signup, /forgot-password, and /viewer-access stay crawlable so
+ * Google can see their noindex tags. Blocking them left those URLs indexed.
+ */
 export const ROBOTS_DISALLOW_PATHS = [
-  "/login",
-  "/signup",
   "/book/manage",
   "/admin",
-  "/forgot-password",
   "/reset-password",
   "/set-password",
   "/accept-invite",
-  "/viewer-access",
   "/logout",
   "/api/",
   "/platform",
@@ -92,8 +92,10 @@ export function shareImageUrl(origin: string): string {
 }
 
 export function canonicalUrl(origin: string, pathname: string): string {
-  const path = pathname.startsWith("/") ? pathname : `/${pathname}`;
-  return `${origin}${path === "/" ? "/" : path.replace(/\/+$/, "")}`;
+  const raw = pathname.startsWith("/") ? pathname : `/${pathname}`;
+  const pathOnly = raw.split(/[?#]/, 1)[0] || "/";
+  const path = pathOnly === "/" ? "/" : pathOnly.replace(/\/+$/, "") || "/";
+  return `${origin}${path}`;
 }
 
 /**
@@ -146,6 +148,14 @@ export function marketingRobotsTxt(sitemapUrl: string): string {
 
 export function tenantRobotsTxt(): string {
   return "User-agent: *\nDisallow: /\n";
+}
+
+/**
+ * app.pickuproster.com must be crawlable. A blanket Disallow hides the
+ * marketing-page redirects and the noindex header on the utility pages.
+ */
+export function appHostRobotsTxt(sitemapUrl: string): string {
+  return `User-agent: *\nAllow: /\nSitemap: ${sitemapUrl}\n`;
 }
 
 export function organizationWebSiteJsonLd(origin: string) {

@@ -13,6 +13,7 @@ import {
   isMarketingHost,
   resolveTenantSlugFromHost,
 } from "../app/domain/utils/host.server";
+import { isAppHostname, marketingNoindexHeader } from "../app/lib/indexing";
 import { canonicalRedirectTarget } from "../app/lib/marketing-seo";
 import { applySecurityHeaders } from "../app/lib/security-headers.server";
 import { createCspNonce, CSP_NONCE_HEADER } from "../app/lib/csp";
@@ -162,9 +163,24 @@ export default withSentry(
         env as { ENVIRONMENT?: string },
         cspNonce
       );
-      if (!isMarketingHost(request, context)) {
+      const marketing = isMarketingHost(request, context);
+      const redirecting = secured.status >= 300 && secured.status < 400;
+      const appHost = isAppHostname(url.hostname, env.PUBLIC_ROOT_DOMAIN);
+      if (!marketing) {
+        // A 301 to the apex should stay a redirect. noindex on it hides the hop.
+        if (appHost && redirecting) return secured;
         const headers = new Headers(secured.headers);
         headers.set("X-Robots-Tag", "noindex, nofollow");
+        return new Response(secured.body, {
+          status: secured.status,
+          statusText: secured.statusText,
+          headers,
+        });
+      }
+      const noindex = marketingNoindexHeader(url.pathname);
+      if (noindex) {
+        const headers = new Headers(secured.headers);
+        headers.set("X-Robots-Tag", noindex);
         return new Response(secured.body, {
           status: secured.status,
           statusText: secured.statusText,

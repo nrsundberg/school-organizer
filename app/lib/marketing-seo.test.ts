@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   articleJsonLd,
   buildSitemapXml,
+  appHostRobotsTxt,
   canonicalRedirectTarget,
+  canonicalUrl,
   faqPageJsonLd,
   homePageJsonLd,
   itemListJsonLd,
@@ -30,14 +32,37 @@ test("sitemap lists marketing URLs and lastmod only for dated entries", () => {
   assert.doesNotMatch(xml, /\/signup/);
 });
 
-test("marketing robots allows the site, blocks app paths, and names the sitemap", () => {
+test("marketing robots allows auth pages so their noindex tags can be seen", () => {
   const txt = marketingRobotsTxt("https://pickuproster.com/sitemap.xml");
   assert.match(txt, /^User-agent: \*/);
   assert.match(txt, /Allow: \//);
-  assert.match(txt, /Disallow: \/login/);
-  assert.match(txt, /Disallow: \/signup/);
+  assert.doesNotMatch(txt, /Disallow: \/login/);
+  assert.doesNotMatch(txt, /Disallow: \/signup/);
+  assert.doesNotMatch(txt, /Disallow: \/forgot-password/);
+  assert.doesNotMatch(txt, /Disallow: \/viewer-access/);
   assert.match(txt, /Disallow: \/admin/);
+  assert.match(txt, /Disallow: \/reset-password/);
   assert.match(txt, /Sitemap: https:\/\/pickuproster.com\/sitemap.xml/);
+});
+
+test("the app host robots file allows crawling and points at the apex sitemap", () => {
+  const txt = appHostRobotsTxt("https://pickuproster.com/sitemap.xml");
+  assert.match(txt, /^User-agent: \*/);
+  assert.match(txt, /Allow: \//);
+  assert.doesNotMatch(txt, /Disallow:/);
+  assert.match(txt, /Sitemap: https:\/\/pickuproster.com\/sitemap.xml/);
+});
+
+test("canonical URLs are the apex path with no query string", () => {
+  assert.equal(
+    canonicalUrl("https://pickuproster.com", "/pricing?cycle=annual"),
+    "https://pickuproster.com/pricing",
+  );
+  assert.equal(
+    canonicalUrl("https://pickuproster.com", "/signup?plan=campus&cycle=annual"),
+    "https://pickuproster.com/signup",
+  );
+  assert.equal(canonicalUrl("https://pickuproster.com", "/"), "https://pickuproster.com/");
 });
 
 test("tenant robots disallows the whole host and has no sitemap", () => {

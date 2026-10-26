@@ -15,8 +15,6 @@ export type BlogPostMeta = {
   author: string;
   tags: string[];
   image: string;
-  /** Source filename, useful for debugging. */
-  file: string;
 };
 
 /**
