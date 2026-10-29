@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import { MessageCircle, X } from "lucide-react";
 import { helpErrorRef, restoreFailedChatSend } from "~/domain/help/chat-ui";
-import { executeTurnstile } from "./turnstile-client";
+import { executeTurnstile, isTurnstileCancelled } from "./turnstile-client";
 
 type Turn = { role: "user" | "assistant"; content: string };
 
@@ -97,7 +97,10 @@ export function HelpChatWidget({
   const { pathname } = useLocation();
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  const turnstileSlotRef = useRef<HTMLDivElement>(null);
+  const disposeTurnstileRef = useRef<(() => void) | null>(null);
   const [open, setOpen] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [draft, setDraft] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const [pending, setPending] = useState(false);
@@ -110,6 +113,8 @@ export function HelpChatWidget({
   const [ticketMessage, setTicketMessage] = useState("");
   const [honeypot, setHoneypot] = useState("");
 
+  const hideWidget = hiddenOnPath(pathname);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
@@ -119,7 +124,21 @@ export function HelpChatWidget({
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  if (hiddenOnPath(pathname)) return null;
+  useEffect(() => {
+    if (open && !hideWidget) return;
+    disposeTurnstileRef.current?.();
+    disposeTurnstileRef.current = null;
+    setVerifying(false);
+  }, [open, hideWidget]);
+
+  useEffect(() => {
+    return () => {
+      disposeTurnstileRef.current?.();
+      disposeTurnstileRef.current = null;
+    };
+  }, []);
+
+  if (hideWidget) return null;
 
   async function sendChat(text: string) {
     const content = text.trim();
@@ -158,7 +177,18 @@ export function HelpChatWidget({
 
   async function challengeToken(action: string): Promise<string | undefined> {
     if (!turnstileSiteKey) return undefined;
-    return executeTurnstile(turnstileSiteKey, action);
+    const container = turnstileSlotRef.current;
+    if (!container?.isConnected) throw new Error("turnstile");
+    setVerifying(true);
+    const handle = executeTurnstile(turnstileSiteKey, action, container);
+    disposeTurnstileRef.current = handle.dispose;
+    try {
+      return await handle.token;
+    } finally {
+      handle.dispose();
+      if (disposeTurnstileRef.current === handle.dispose) disposeTurnstileRef.current = null;
+      setVerifying(false);
+    }
   }
 
   async function postChat(nextTurns: Turn[], challenged: boolean) {
@@ -166,9 +196,11 @@ export function HelpChatWidget({
     if (!helpGrant()) {
       try {
         turnstileToken = await challengeToken("help_chat");
-      } catch {
-        setError("Confirm you're a person, then send your message again.");
-        setErrorRef(null);
+      } catch (error) {
+        if (!isTurnstileCancelled(error)) {
+          setError("Confirm you're a person, then send your message again.");
+          setErrorRef(null);
+        }
         return null;
       }
     }
@@ -213,8 +245,10 @@ export function HelpChatWidget({
       let turnstileToken: string | undefined;
       try {
         turnstileToken = await challengeToken("help_ticket");
-      } catch {
-        setError("Confirm you're a person, then try again.");
+      } catch (error) {
+        if (!isTurnstileCancelled(error)) {
+          setError("Confirm you're a person, then try again.");
+        }
         return;
       }
       const response = await fetch("/api/help/ticket", {
@@ -252,9 +286,9 @@ export function HelpChatWidget({
           role="dialog"
           aria-modal="false"
           aria-labelledby={titleId}
-          className="fixed bottom-20 right-4 z-[70] flex max-h-[min(32rem,calc(100vh-6rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#151a1a] text-white shadow-2xl"
+          className="fixed bottom-20 right-4 z-[70] flex max-h-[min(32rem,calc(100vh-6rem))] w-[min(24rem,calc(100vw-2rem))] flex-col overflow-visible rounded-2xl border border-white/15 bg-[#151a1a] text-white shadow-2xl"
         >
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+          <div className="flex shrink-0 items-center justify-between overflow-hidden rounded-t-2xl border-b border-white/10 px-4 py-3">
             <div>
               <h2 id={titleId} className="text-sm font-semibold">
                 PickupRoster help
@@ -271,7 +305,7 @@ export function HelpChatWidget({
             </button>
           </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3 text-sm">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3 text-sm">
             <div className="rounded-xl bg-white/5 px-3 py-2 text-white/80">
               <MessageBody text="Hi — I can help with signup, the 30-day free trial, pricing, and finding pages like homerooms, the car line board, viewer access, and billing." />
             </div>
@@ -287,13 +321,24 @@ export function HelpChatWidget({
                 <MessageBody text={turn.content} />
               </div>
             ))}
-            {pending && !showForm ? <p className="text-xs text-white/50">Thinking…</p> : null}
+            {pending && !verifying && !showForm ? <p className="text-xs text-white/50">Thinking…</p> : null}
             {error ? (
               <p className="text-sm text-red-200" role="alert">
                 {error}
                 {errorRef ? <span className="mt-1 block text-xs text-white/50">{errorRef}</span> : null}
               </p>
             ) : null}
+          </div>
+
+          <div
+            className={`relative z-20 shrink-0 overflow-visible px-4 ${verifying ? "border-t border-white/10 pt-3 pb-2" : ""}`}
+          >
+            {verifying ? (
+              <p className="mb-2 text-xs font-medium text-white/80" role="status">
+                Verify to continue
+              </p>
+            ) : null}
+            <div ref={turnstileSlotRef} data-help-turnstile="" className="relative w-full overflow-visible" />
           </div>
 
           {showForm ? (
